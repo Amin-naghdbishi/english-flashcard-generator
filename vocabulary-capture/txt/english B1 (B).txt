@@ -1,0 +1,5 @@
+--
+Word=abandon
+Deck=English::B1
+Persian Meaning=رها کردن
+--

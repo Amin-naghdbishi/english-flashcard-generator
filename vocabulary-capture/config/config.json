@@ -1,0 +1,14 @@
+{
+  "global_shortcut": "<ctrl>+<alt>+v",
+  "txt_directory": "txt",
+  "ai_provider": "ollama",
+  "ollama_url": "http://localhost:11434",
+  "ollama_model": "",
+  "default_deck": "English::B1",
+  "show_tabs": true,
+  "theme": "anki-dark",
+  "stay_on_top": true,
+  "window_width": 380,
+  "window_height": 480,
+  "auto_trigger_meaning": false
+}
