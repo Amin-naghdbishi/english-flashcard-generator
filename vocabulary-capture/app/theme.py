@@ -111,8 +111,21 @@ QPushButton.success-btn:hover {
     background-color: #059669;
 }
 
+QPushButton.icon-btn {
+    background-color: #27272A;
+    border: 1px solid #3F3F46;
+    border-radius: 3px;
+    padding: 3px 6px;
+    font-size: 12px;
+}
+
+QPushButton.icon-btn:hover {
+    background-color: #3B82F6;
+    color: #FFFFFF;
+}
+
 /* Input Fields & Textareas */
-QLineEdit, QTextEdit, QPlainTextEdit {
+QLineEdit, QTextEdit, QPlainTextEdit, QDoubleSpinBox, QSpinBox {
     background-color: #18181B;
     color: #F4F4F5;
     border: 1px solid #3F3F46;
@@ -120,7 +133,7 @@ QLineEdit, QTextEdit, QPlainTextEdit {
     padding: 4px 6px;
 }
 
-QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus {
     border: 1px solid #3B82F6;
 }
 
@@ -142,6 +155,37 @@ QComboBox QAbstractItemView {
     color: #F4F4F5;
     border: 1px solid #3F3F46;
     selection-background-color: #3B82F6;
+}
+
+/* TabWidget for Dashboard */
+QTabWidget::pane {
+    border: 1px solid #3F3F46;
+    background-color: #18181B;
+    border-radius: 4px;
+    padding: 8px;
+}
+
+QTabBar::tab {
+    background-color: #27272A;
+    color: #A1A1AA;
+    border: 1px solid #3F3F46;
+    border-bottom: none;
+    padding: 6px 12px;
+    margin-right: 2px;
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+    font-weight: 500;
+}
+
+QTabBar::tab:selected {
+    background-color: #18181B;
+    color: #3B82F6;
+    font-weight: 600;
+    border-color: #3F3F46;
+}
+
+QTabBar::tab:hover {
+    color: #F4F4F5;
 }
 
 /* Scrollbars */
@@ -208,7 +252,7 @@ QCheckBox::indicator:checked {
     border-color: #3B82F6;
 }
 
-/* Labels */
+/* Labels & Status */
 QLabel.muted {
     color: #A1A1AA;
     font-size: 11px;
@@ -222,6 +266,16 @@ QLabel.success {
 QLabel.error {
     color: #F87171;
     font-weight: 500;
+}
+
+QLabel.connected {
+    color: #10B981;
+    font-weight: 600;
+}
+
+QLabel.disconnected {
+    color: #EF4444;
+    font-weight: 600;
 }
 """
 
@@ -333,8 +387,21 @@ QPushButton.success-btn:hover {
     background-color: #059669;
 }
 
+QPushButton.icon-btn {
+    background-color: #F1F5F9;
+    border: 1px solid #CBD5E1;
+    border-radius: 3px;
+    padding: 3px 6px;
+    font-size: 12px;
+}
+
+QPushButton.icon-btn:hover {
+    background-color: #2563EB;
+    color: #FFFFFF;
+}
+
 /* Input Fields & Textareas */
-QLineEdit, QTextEdit, QPlainTextEdit {
+QLineEdit, QTextEdit, QPlainTextEdit, QDoubleSpinBox, QSpinBox {
     background-color: #FFFFFF;
     color: #0F172A;
     border: 1px solid #CBD5E1;
@@ -342,7 +409,7 @@ QLineEdit, QTextEdit, QPlainTextEdit {
     padding: 4px 6px;
 }
 
-QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus {
     border: 1px solid #2563EB;
 }
 
@@ -364,6 +431,37 @@ QComboBox QAbstractItemView {
     color: #0F172A;
     border: 1px solid #CBD5E1;
     selection-background-color: #2563EB;
+}
+
+/* TabWidget for Dashboard */
+QTabWidget::pane {
+    border: 1px solid #CBD5E1;
+    background-color: #FFFFFF;
+    border-radius: 4px;
+    padding: 8px;
+}
+
+QTabBar::tab {
+    background-color: #F1F5F9;
+    color: #64748B;
+    border: 1px solid #CBD5E1;
+    border-bottom: none;
+    padding: 6px 12px;
+    margin-right: 2px;
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+    font-weight: 500;
+}
+
+QTabBar::tab:selected {
+    background-color: #FFFFFF;
+    color: #2563EB;
+    font-weight: 600;
+    border-color: #CBD5E1;
+}
+
+QTabBar::tab:hover {
+    color: #0F172A;
 }
 
 /* Scrollbars */
@@ -430,7 +528,7 @@ QCheckBox::indicator:checked {
     border-color: #2563EB;
 }
 
-/* Labels */
+/* Labels & Status */
 QLabel.muted {
     color: #64748B;
     font-size: 11px;
@@ -444,6 +542,16 @@ QLabel.success {
 QLabel.error {
     color: #DC2626;
     font-weight: 500;
+}
+
+QLabel.connected {
+    color: #059669;
+    font-weight: 600;
+}
+
+QLabel.disconnected {
+    color: #DC2626;
+    font-weight: 600;
 }
 """
 

@@ -8,7 +8,9 @@ from PySide6.QtWidgets import QApplication
 
 from app.config import ConfigManager, AppConfig
 from app.ai_service import AIService
-from app.capture_service import CaptureService
+from app.tts_service import TTSService
+from app.capture_service import CaptureService, capture_selected_text_fast
+from app.ipc import IPCServer, send_ipc_message
 from app.ui.floating_window import FloatingWindow
 from app.ui.dashboard_window import DashboardWindow
 from app.ui.tray_icon import SystemTrayManager
@@ -22,34 +24,39 @@ class VocabularyCaptureApp:
         self.app = QApplication.instance() or QApplication(sys.argv)
         self.app.setApplicationName("Vocabulary Capture")
         self.app.setApplicationDisplayName("Vocabulary Capture")
+        self.app.setDesktopFileName("vocabulary-capture")
         
-        # CRITICAL: Keep running in background when windows are closed
+        # Keep running in background when windows are closed
         self.app.setQuitOnLastWindowClosed(False)
 
         # 2. Initialize Core Services
         self.config_manager = ConfigManager()
         self.config = self.config_manager.config
-        self.ai_service = AIService(
-            base_url=self.config.ollama_url,
-            default_model=self.config.ollama_model
-        )
+        self.ai_service = AIService()
+        self.tts_service = TTSService(self.config.tts)
 
         # 3. Initialize UI Windows
-        self.floating_window = FloatingWindow(self.config, self.ai_service)
-        self.dashboard_window = DashboardWindow(self.config_manager, self.ai_service)
+        self.floating_window = FloatingWindow(self.config, self.ai_service, self.tts_service)
+        self.dashboard_window = DashboardWindow(self.config_manager, self.ai_service, self.tts_service)
         self.tray_manager = SystemTrayManager()
 
-        # 4. Thread-Safe Signal Bridge for Global Hotkey
+        # 4. IPC Server for Wayland/Niri instant triggers
+        self.ipc_server = IPCServer()
+        self.ipc_server.capture_requested.connect(self._on_captured_in_main_thread)
+        self.ipc_server.show_floating_requested.connect(self.show_floating)
+        self.ipc_server.show_dashboard_requested.connect(self.show_dashboard)
+
+        # 5. Thread-Safe Signal Bridge for Global Hotkey
         self.bridge = BridgeSignaler()
         self.bridge.text_captured.connect(self._on_captured_in_main_thread)
 
-        # 5. Initialize Background Global Hotkey Listener
+        # 6. Initialize Background Global Hotkey Listener
         self.capture_service = CaptureService(
             shortcut=self.config.global_shortcut,
             on_captured_callback=self._on_hotkey_triggered
         )
 
-        # 6. Wire Signals
+        # 7. Wire Signals
         self._connect_signals()
 
     def _connect_signals(self):
@@ -63,7 +70,6 @@ class VocabularyCaptureApp:
         self.dashboard_window.settings_saved.connect(self._on_settings_saved)
 
     def _on_hotkey_triggered(self, text: str):
-        # Cross-thread safe emission to Qt event loop
         self.bridge.text_captured.emit(text)
 
     def _on_captured_in_main_thread(self, text: str):
@@ -71,12 +77,12 @@ class VocabularyCaptureApp:
 
     def _on_settings_saved(self, new_config: AppConfig):
         self.config = new_config
-        self.ai_service.base_url = new_config.ollama_url
-        self.ai_service.default_model = new_config.ollama_model
+        self.tts_service.config = new_config.tts
 
         self.floating_window.config = new_config
         self.floating_window.apply_theme()
         self.floating_window.update_tab_visibility()
+        self.floating_window.setFixedSize(max(340, new_config.window_width), max(420, new_config.window_height))
 
         self.dashboard_window.apply_theme()
 
@@ -92,17 +98,19 @@ class VocabularyCaptureApp:
         self.floating_window.show_window()
 
     def exit_application(self):
-        """Completely terminates the application and background listener."""
+        """Completely terminates the application, IPC server, and background listener."""
         print("[Vocabulary Capture] Exiting application...")
         self.capture_service.stop()
+        self.ipc_server.stop()
         self.tray_manager.hide()
         self.floating_window.close()
         self.dashboard_window.close()
         self.app.quit()
 
     def run(self) -> int:
-        # Start background shortcut listener
+        # Start background shortcut listener and IPC server
         self.capture_service.start()
+        self.ipc_server.start()
 
         # Show System Tray icon
         self.tray_manager.show()
@@ -111,6 +119,10 @@ class VocabularyCaptureApp:
         args = sys.argv[1:]
         if "--minimized" in args or "--tray" in args or "--background" in args:
             pass  # Start silently in system tray
+        elif "--capture" in args or "--trigger" in args:
+            # Capture selection immediately
+            text = capture_selected_text_fast()
+            self._on_captured_in_main_thread(text)
         elif "--floating" in args:
             self.show_floating()
         else:

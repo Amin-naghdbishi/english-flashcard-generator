@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QComboBox,
     QApplication,
+    QSizePolicy,
 )
 
 from app.config import AppConfig
@@ -33,7 +34,8 @@ from app.txt_manager import (
     create_new_txt_file,
     format_clean_filename,
 )
-from app.ai_service import AIService
+from app.ai_service import AIService, AIStreamWorker
+from app.tts_service import TTSService
 from app.theme import get_theme_qss
 
 class NewFileDialog(QDialog):
@@ -86,22 +88,25 @@ class NewFileDialog(QDialog):
 class FloatingWindow(QWidget):
     """
     Compact, persistent floating window for Vocabulary Capture.
-    - Minimal Anki-inspired design.
-    - Top contains ONLY small tab buttons and the small '×' close button (NO 'Vocabulary Capture' title).
+    - Tailored for Wayland / Niri (Fixed compact size, dialog hint, stays above).
+    - Top contains ONLY small tabs & close button (NO 'Vocabulary Capture' title).
     - Never auto-closes on actions (user closes explicitly with ×).
-    - Tab 1: AI Assistant.
+    - Tab 1: AI Assistant with TRUE streaming response & Piper TTS audio button.
     - Tab 2: Add to TXT (Format A & B).
     - Keyboard navigation: 1 / 2, Left / Right arrows.
     """
     closed = Signal()
 
-    def __init__(self, config: AppConfig, ai_service: AIService, parent=None):
+    def __init__(self, config: AppConfig, ai_service: AIService, tts_service: Optional[TTSService] = None, parent=None):
         super().__init__(parent)
         self.config = config
         self.ai_service = ai_service
+        self.tts_service = tts_service or TTSService(config.tts)
         self.captured_text = ""
         self.selected_b_file: Optional[Path] = None
         self.current_format_filter = TXTFormat.A
+        self.active_stream_worker: Optional[AIStreamWorker] = None
+        self.chat_history: List[Dict[str, str]] = []
 
         self._drag_pos = QPoint()
         self._is_dragging = False
@@ -111,12 +116,22 @@ class FloatingWindow(QWidget):
         self.apply_theme()
 
     def _init_window_flags(self):
-        flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool
+        self.setWindowTitle("Vocabulary Capture Floating")
+        self.setObjectName("VocabularyCaptureFloating")
+
+        # Niri / Wayland floating-friendly flags
+        flags = Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint
         if self.config.stay_on_top:
             flags |= Qt.WindowType.WindowStaysOnTopHint
+
         self.setWindowFlags(flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
-        self.resize(self.config.window_width, self.config.window_height)
+
+        # Enforce fixed size constraints so Niri / Wayland compositors float it properly
+        w = max(340, self.config.window_width)
+        h = max(420, self.config.window_height)
+        self.setFixedSize(w, h)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
     def apply_theme(self):
         qss = get_theme_qss(self.config.theme)
@@ -196,7 +211,7 @@ class FloatingWindow(QWidget):
         self.tab_btn_txt.setVisible(self.config.show_tabs)
 
     # -------------------------------------------------------------
-    # TAB 1: AI ASSISTANT
+    # TAB 1: AI ASSISTANT & STREAMING & PIPER TTS
     # -------------------------------------------------------------
     def _create_ai_tab(self) -> QWidget:
         page = QWidget()
@@ -204,20 +219,28 @@ class FloatingWindow(QWidget):
         layout.setContentsMargins(0, 2, 0, 0)
         layout.setSpacing(6)
 
-        # Selected text header display
+        # Selected text container with Audio Button
         self.ai_selection_box = QFrame()
         self.ai_selection_box.setStyleSheet("background-color: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 4px;")
-        sel_layout = QVBoxLayout(self.ai_selection_box)
-        sel_layout.setContentsMargins(6, 4, 6, 4)
-        sel_layout.setSpacing(2)
+        sel_outer = QHBoxLayout(self.ai_selection_box)
+        sel_outer.setContentsMargins(6, 4, 6, 4)
+        sel_outer.setSpacing(6)
 
         self.ai_selection_lbl = QLabel("No text captured yet.")
         self.ai_selection_lbl.setWordWrap(True)
         self.ai_selection_lbl.setStyleSheet("font-weight: 600; font-size: 11px;")
-        sel_layout.addWidget(self.ai_selection_lbl)
+        sel_outer.addWidget(self.ai_selection_lbl, 1)
+
+        self.btn_tts_selection = QPushButton("🔊")
+        self.btn_tts_selection.setProperty("class", "icon-btn")
+        self.btn_tts_selection.setFixedSize(26, 22)
+        self.btn_tts_selection.setToolTip("Read selected text aloud with Piper TTS")
+        self.btn_tts_selection.clicked.connect(self._play_selection_tts)
+        sel_outer.addWidget(self.btn_tts_selection)
+
         layout.addWidget(self.ai_selection_box)
 
-        # Action Buttons
+        # Action Buttons Row
         act_layout = QHBoxLayout()
         act_layout.setSpacing(4)
         self.btn_define = QPushButton("Meaning")
@@ -230,15 +253,16 @@ class FloatingWindow(QWidget):
 
         act_layout.addWidget(self.btn_define)
         act_layout.addWidget(self.btn_translate)
+        act_layout.addStretch(1)
         layout.addLayout(act_layout)
 
-        # Chat / Response area
+        # Streaming Chat / Response Area
         self.ai_chat_output = QTextEdit()
         self.ai_chat_output.setReadOnly(True)
-        self.ai_chat_output.setPlaceholderText("AI responses and explanations will appear here...")
+        self.ai_chat_output.setPlaceholderText("AI responses and explanations will stream here...")
         layout.addWidget(self.ai_chat_output, 1)
 
-        # Follow-up question input
+        # Follow-up question input row
         chat_inp_layout = QHBoxLayout()
         chat_inp_layout.setSpacing(4)
         self.ai_input = QLineEdit()
@@ -250,8 +274,15 @@ class FloatingWindow(QWidget):
         self.ai_send_btn.setStyleSheet("font-size: 11px; padding: 4px 8px;")
         self.ai_send_btn.clicked.connect(self._ai_send_followup)
 
-        chat_inp_layout.addWidget(self.ai_input)
+        self.btn_tts_response = QPushButton("🔊")
+        self.btn_tts_response.setProperty("class", "icon-btn")
+        self.btn_tts_response.setFixedSize(26, 26)
+        self.btn_tts_response.setToolTip("Read response aloud with Piper TTS")
+        self.btn_tts_response.clicked.connect(self._play_response_tts)
+
+        chat_inp_layout.addWidget(self.ai_input, 1)
         chat_inp_layout.addWidget(self.ai_send_btn)
+        chat_inp_layout.addWidget(self.btn_tts_response)
         layout.addLayout(chat_inp_layout)
 
         return page
@@ -396,17 +427,17 @@ class FloatingWindow(QWidget):
         return inp
 
     # -------------------------------------------------------------
-    # ACTIONS & LOGIC
+    # ACTIONS & CAPTURE LOGIC
     # -------------------------------------------------------------
     def set_captured_text(self, text: str):
-        """Called when text is captured via global shortcut."""
+        """Called when text is captured via global shortcut or IPC."""
         self.captured_text = text.strip()
         self.ai_selection_lbl.setText(self.captured_text if self.captured_text else "No text captured.")
         self.b_inp_word.setText(self.captured_text)
 
         # Auto-trigger AI analysis if configured
         if self.config.auto_trigger_meaning and self.captured_text:
-            self._ai_get_meaning()
+            self._ai_auto_analyze()
 
         self.refresh_file_list()
         self.show_window()
@@ -453,7 +484,6 @@ class FloatingWindow(QWidget):
         for f in files:
             fmt = detect_format_from_filename(f)
             clean_name = f.stem
-            # Clean display label with format tag
             display = f"{clean_name:<25} ({fmt})"
             item = QListWidgetItem(display)
             item.setData(Qt.ItemDataRole.UserRole, str(f))
@@ -468,7 +498,6 @@ class FloatingWindow(QWidget):
         fmt = detect_format_from_filename(file_path)
 
         if fmt == TXTFormat.A:
-            # Format A: Directly append word
             word = self.captured_text or self.b_inp_word.text().strip()
             if not word:
                 self._show_status("⚠ No word/text captured to add.", is_error=True)
@@ -481,7 +510,6 @@ class FloatingWindow(QWidget):
                 self._show_status("Failed to append to file.", is_error=True)
 
         elif fmt == TXTFormat.B:
-            # Format B: Transition to B Editor within the same window
             self.selected_b_file = file_path
             self.b_target_lbl.setText(f"Target: {file_path.name}")
             self.txt_stack.setCurrentIndex(1)
@@ -497,7 +525,6 @@ class FloatingWindow(QWidget):
             self._show_status("Word field is required.", is_error=True)
             return
 
-        # Build dictionary - Empty strings or None will be strictly omitted by append_to_format_b
         fields: Dict[str, Optional[Union[str, bool]]] = {
             "Word": word,
             "Deck": deck,
@@ -537,58 +564,114 @@ class FloatingWindow(QWidget):
         self.txt_status_lbl.setVisible(True)
 
     # -------------------------------------------------------------
-    # AI ASSISTANT ACTIONS
+    # AI ASSISTANT STREAMING ACTIONS
     # -------------------------------------------------------------
+    def _start_streaming_ai(self, prompt: str, system_prompt: str = ""):
+        # Cancel previous active stream if running
+        if self.active_stream_worker and self.active_stream_worker.isRunning():
+            self.active_stream_worker.cancel()
+            self.active_stream_worker.wait(100)
+
+        self.ai_chat_output.clear()
+        provider = self.config.get_active_provider()
+
+        self.active_stream_worker = AIStreamWorker(
+            service=self.ai_service,
+            prompt=prompt,
+            system_prompt=system_prompt,
+            provider=provider,
+            parent=self,
+        )
+
+        def _on_chunk(chunk: str):
+            self.ai_chat_output.insertPlainText(chunk)
+            # Scroll to bottom
+            sb = self.ai_chat_output.verticalScrollBar()
+            sb.setValue(sb.maximum())
+
+        def _on_finished(full_text: str):
+            self.chat_history.append({"role": "user", "content": prompt})
+            self.chat_history.append({"role": "assistant", "content": full_text})
+
+        def _on_error(err_msg: str):
+            self.ai_chat_output.append(f"\n[Error: {err_msg}]")
+
+        self.active_stream_worker.chunk_received.connect(_on_chunk)
+        self.active_stream_worker.finished.connect(_on_finished)
+        self.active_stream_worker.error.connect(_on_error)
+        self.active_stream_worker.start()
+
+    def _ai_auto_analyze(self):
+        text = self.captured_text or self.b_inp_word.text().strip()
+        if not text:
+            return
+        is_single_word = len(text.split()) <= 2 and len(text) < 30
+        if is_single_word:
+            self._ai_get_meaning()
+        else:
+            self._ai_translate()
+
     def _ai_get_meaning(self):
         text = self.captured_text or self.b_inp_word.text().strip()
         if not text:
             return
-        self.ai_chat_output.setText(f"Analyzing '{text}' with Ollama ({self.config.ollama_model or 'default'})...")
-        QApplication.processEvents()
-
-        success, response = self.ai_service.analyze_selection(text, model=self.config.ollama_model)
-        self.ai_chat_output.setText(response)
+        prompt = self.ai_service.build_vocab_prompt(text, self.config.prompts.vocab_prompt)
+        sys_prompt = self.config.prompts.system_prompt
+        if self.config.prompts.custom_instructions:
+            sys_prompt += f"\n\n{self.config.prompts.custom_instructions}"
+        self._start_streaming_ai(prompt=prompt, system_prompt=sys_prompt)
 
     def _ai_translate(self):
         text = self.captured_text or self.b_inp_word.text().strip()
         if not text:
             return
-        self.ai_chat_output.setText("Translating...")
-        QApplication.processEvents()
-
-        prompt = f"Translate the following English text to natural, accurate Persian (فارسی):\n\n\"{text}\""
-        success, response = self.ai_service.generate_response(prompt, model=self.config.ollama_model)
-        self.ai_chat_output.setText(response)
+        prompt = self.ai_service.build_sentence_prompt(text, self.config.prompts.sentence_prompt)
+        sys_prompt = self.config.prompts.system_prompt
+        if self.config.prompts.custom_instructions:
+            sys_prompt += f"\n\n{self.config.prompts.custom_instructions}"
+        self._start_streaming_ai(prompt=prompt, system_prompt=sys_prompt)
 
     def _ai_send_followup(self):
         q = self.ai_input.text().strip()
         if not q:
             return
         self.ai_input.clear()
-        current_text = self.ai_chat_output.toPlainText()
-        self.ai_chat_output.append(f"\nUser: {q}\nAI: Thinking...")
-        QApplication.processEvents()
+        self.ai_chat_output.append(f"\n\nUser: {q}\nAI: ")
 
-        prompt = f"Context text: '{self.captured_text}'\n\nQuestion: {q}"
-        success, response = self.ai_service.generate_response(prompt, model=self.config.ollama_model)
-        self.ai_chat_output.setText(f"{current_text}\n\nUser: {q}\nAI: {response}")
+        prompt = f"Context: '{self.captured_text}'\n\nQuestion: {q}"
+        sys_prompt = self.config.prompts.system_prompt
+        self._start_streaming_ai(prompt=prompt, system_prompt=sys_prompt)
+
+    # -------------------------------------------------------------
+    # PIPER TTS AUDIO ACTIONS
+    # -------------------------------------------------------------
+    def _play_selection_tts(self):
+        text = self.captured_text or self.b_inp_word.text().strip()
+        if not text:
+            return
+        self.tts_service.config = self.config.tts
+        self.tts_service.speak_text_async(text)
+
+    def _play_response_tts(self):
+        text = self.ai_chat_output.toPlainText().strip()
+        if not text:
+            return
+        self.tts_service.config = self.config.tts
+        self.tts_service.speak_text_async(text)
 
     # -------------------------------------------------------------
     # WINDOW MOVEMENT & KEYBOARD SHORTCUTS
     # -------------------------------------------------------------
     def keyPressEvent(self, event: QKeyEvent):
         key = event.key()
-        # Key '1' -> Tab 1 (AI)
         if key == Qt.Key.Key_1 and not self._is_input_focused():
             self.switch_tab(0)
             event.accept()
             return
-        # Key '2' -> Tab 2 (TXT)
         if key == Qt.Key.Key_2 and not self._is_input_focused():
             self.switch_tab(1)
             event.accept()
             return
-        # Left Arrow / Right Arrow -> Switch tabs
         if not self._is_input_focused():
             if key == Qt.Key.Key_Left:
                 self.switch_tab(0)
@@ -626,5 +709,7 @@ class FloatingWindow(QWidget):
 
     def hide_window(self):
         """User explicitly closes with ×."""
+        if self.active_stream_worker and self.active_stream_worker.isRunning():
+            self.active_stream_worker.cancel()
         self.hide()
         self.closed.emit()

@@ -1,14 +1,56 @@
 {
   "global_shortcut": "<ctrl>+<alt>+v",
   "txt_directory": "txt",
-  "ai_provider": "ollama",
-  "ollama_url": "http://localhost:11434",
-  "ollama_model": "",
   "default_deck": "English::B1",
   "show_tabs": true,
   "theme": "anki-dark",
   "stay_on_top": true,
   "window_width": 380,
   "window_height": 480,
-  "auto_trigger_meaning": false
+  "auto_trigger_meaning": true,
+  "active_provider_id": "ollama",
+  "providers": [
+    {
+      "id": "ollama",
+      "name": "Ollama (Local)",
+      "type": "ollama",
+      "base_url": "http://localhost:11434",
+      "api_key": "",
+      "model": "",
+      "custom_headers": {},
+      "streaming": true
+    },
+    {
+      "id": "gemini",
+      "name": "Google Gemini",
+      "type": "gemini",
+      "base_url": "https://generativelanguage.googleapis.com",
+      "api_key": "",
+      "model": "gemini-1.5-flash",
+      "custom_headers": {},
+      "streaming": true
+    },
+    {
+      "id": "custom",
+      "name": "Custom / OpenAI / 9Router",
+      "type": "openai_compatible",
+      "base_url": "http://localhost:8080/v1",
+      "api_key": "",
+      "model": "gpt-3.5-turbo",
+      "custom_headers": {},
+      "streaming": true
+    }
+  ],
+  "prompts": {
+    "system_prompt": "You are an expert English-to-Persian vocabulary and language learning assistant. Your job is to provide clear, direct, and accurate Persian meanings, definitions, and translations for English learners.",
+    "vocab_prompt": "Explain the Persian meaning of the English word/term '{text}' clearly and concisely for an English learner. Provide the primary Persian translation(s), part of speech, IPA phonetic pronunciation, and a brief natural example sentence with Persian translation.",
+    "sentence_prompt": "Translate the following English sentence/text into natural, fluent Persian (فارسی) for a language learner, followed by a brief explanation of any key idioms or vocabulary if relevant:\n\n\"{text}\"",
+    "custom_instructions": "Keep responses clean, concise, and formatted for a compact screen."
+  },
+  "tts": {
+    "piper_url": "http://127.0.0.1:5000",
+    "voice": "",
+    "length_scale": 1.0,
+    "auto_play": false
+  }
 }

@@ -17,7 +17,6 @@ if local_libs.exists():
         existing_ld = os.environ.get("LD_LIBRARY_PATH", "")
         if joined_libs not in existing_ld:
             os.environ["LD_LIBRARY_PATH"] = joined_libs + (":" + existing_ld if existing_ld else "")
-            # Re-exec if LD_LIBRARY_PATH was not initially set in dynamic linker
             if not os.environ.get("_VC_RELOADED"):
                 os.environ["_VC_RELOADED"] = "1"
                 try:
@@ -28,6 +27,26 @@ if local_libs.exists():
 # Add vocabulary-capture directory to sys.path
 if str(current_dir) not in sys.path:
     sys.path.insert(0, str(current_dir))
+
+# Check for CLI IPC delegation
+args = sys.argv[1:]
+if "--capture" in args or "--trigger" in args:
+    from app.capture_service import capture_selected_text_fast
+    from app.ipc import send_ipc_message
+    text = capture_selected_text_fast()
+    # Try sending to running background instance
+    if send_ipc_message({"action": "capture", "text": text}):
+        sys.exit(0)
+
+elif "--floating" in args:
+    from app.ipc import send_ipc_message
+    if send_ipc_message({"action": "show_floating"}):
+        sys.exit(0)
+
+elif "--dashboard" in args:
+    from app.ipc import send_ipc_message
+    if send_ipc_message({"action": "show_dashboard"}):
+        sys.exit(0)
 
 from app.main import main
 
