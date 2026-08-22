@@ -411,3 +411,99 @@ export async function getSmartImage(
     };
   }
 }
+
+/**
+ * Downloads an image from any HTTP/HTTPS or Data URL, converts to base64, and returns unique Anki filename
+ */
+export async function downloadImageAsBase64(
+  imageUrl: string,
+  word?: string
+): Promise<{
+  success: boolean;
+  imageBase64?: string;
+  imageFileName?: string;
+  mimeType?: string;
+  error?: string;
+}> {
+  try {
+    const cleanWord = (word || 'image').trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+    // If it's already a Data URL
+    if (imageUrl.startsWith('data:image/')) {
+      const match = imageUrl.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/);
+      if (match) {
+        const mime = match[1];
+        const base64 = match[2];
+        const ext = mime.includes('png') ? 'png' : (mime.includes('webp') ? 'webp' : 'jpg');
+        const fileName = `card_manual_${cleanWord}_${Date.now()}.${ext}`;
+        return {
+          success: true,
+          imageBase64: base64,
+          imageFileName: fileName,
+          mimeType: mime,
+        };
+      }
+    }
+
+    const { buffer, contentType } = await downloadBinary(imageUrl);
+    if (!buffer || buffer.length === 0) {
+      return { success: false, error: 'Downloaded image is empty' };
+    }
+
+    const isPng = buffer.slice(0, 8).toString('hex') === '89504e470d0a1a0a';
+    const isWebp = buffer.slice(8, 12).toString('ascii') === 'WEBP';
+    const ext = isPng ? 'png' : (isWebp ? 'webp' : 'jpg');
+    const mime = contentType || (isPng ? 'image/png' : (isWebp ? 'image/webp' : 'image/jpeg'));
+    const fileName = `card_manual_${cleanWord}_${Date.now()}.${ext}`;
+    const base64 = buffer.toString('base64');
+
+    return {
+      success: true,
+      imageBase64: base64,
+      imageFileName: fileName,
+      mimeType: mime,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: `Failed to download image: ${err?.message || 'Unknown network error'}`,
+    };
+  }
+}
+
+/**
+ * Searches online image results for quick manual selection
+ */
+export async function searchImagesOnline(
+  searchTerm: string
+): Promise<Array<{ title: string; thumbUrl: string; fullUrl: string; source: string }>> {
+  const cleanWord = (searchTerm || '').trim().toLowerCase();
+  if (!cleanWord) return [];
+
+  const results: Array<{ title: string; thumbUrl: string; fullUrl: string; source: string }> = [];
+
+  try {
+    const commonsUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=${encodeURIComponent(cleanWord)}&gsrlimit=8&prop=imageinfo&iiprop=url|mime&iiurlwidth=400&format=json`;
+    const { buffer } = await downloadBinary(commonsUrl);
+    const json = JSON.parse(buffer.toString('utf-8'));
+    const pages = json?.query?.pages;
+    if (pages) {
+      for (const p of Object.values(pages) as any[]) {
+        const info = p?.imageinfo?.[0];
+        if (info?.thumburl || info?.url) {
+          const mime = info?.mime || '';
+          if (mime.includes('jpeg') || mime.includes('png') || mime.includes('webp') || mime.includes('jpg')) {
+            results.push({
+              title: p.title?.replace(/^File:/i, '') || cleanWord,
+              thumbUrl: info.thumburl || info.url,
+              fullUrl: info.url || info.thumburl,
+              source: 'Wikimedia Commons',
+            });
+          }
+        }
+      }
+    }
+  } catch {}
+
+  return results;
+}

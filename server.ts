@@ -7,7 +7,7 @@ import { checkGeminiConnection, generateWithGemini, GEMINI_MODELS } from './serv
 import { checkCustomAIConnection, getCustomAIModels, generateWithCustomAI } from './server/customAi';
 import { synthesizeCustomTTS, testCustomTTS, GENERIC_TTS_TEST_SENTENCE } from './server/customTts';
 import { getDictionaryData, lookupAbadis, lookupFreeDictionary } from './server/dictionary';
-import { getSmartImage, evaluateWordNeedsImageHeuristic } from './server/smartImages';
+import { getSmartImage, evaluateWordNeedsImageHeuristic, downloadImageAsBase64, searchImagesOnline } from './server/smartImages';
 import {
   checkPiperHealth,
   synthesizePiperAudio,
@@ -351,6 +351,20 @@ async function startServer() {
       config || appSettings.smartImages,
       appSettings
     );
+    res.json(result);
+  });
+
+  app.get('/api/smart-images/search', async (req, res) => {
+    const word = (req.query.word as string) || '';
+    if (!word) return res.json({ success: true, results: [] });
+    const results = await searchImagesOnline(word);
+    res.json({ success: true, results });
+  });
+
+  app.post('/api/download-image', async (req, res) => {
+    const { url, word } = req.body;
+    if (!url) return res.status(400).json({ success: false, error: 'URL is required' });
+    const result = await downloadImageAsBase64(url, word);
     res.json(result);
   });
 
@@ -830,39 +844,56 @@ async function startServer() {
       });
     }
 
-    // [5] Smart Images (Automatic image evaluation & download, or explicit Photo Choice)
-    const explicitPhotoChoice = (manualOverrides && typeof manualOverrides.needsPhoto === 'boolean')
-      ? manualOverrides.needsPhoto
-      : (req.body.photoChoice === 'yes' || req.body.photoChoice === true
-          ? true
-          : (req.body.photoChoice === 'no' || req.body.photoChoice === false
-              ? false
-              : undefined));
+    // [5] Smart Images (Manual Image Override, Automatic image evaluation, or explicit Photo Choice)
+    if (manualOverrides && manualOverrides.imageBase64) {
+      const fileName =
+        manualOverrides.imageFileName ||
+        `card_manual_${cleanWord.replace(/[^a-z0-9_-]/g, '_')}_${Date.now()}.png`;
+      cardData.imageBase64 = manualOverrides.imageBase64;
+      cardData.imageFileName = fileName;
+      cardData.needsImage = true;
+      cardData.imageReason = 'Manual image override selected by user';
+      pushLog(
+        5,
+        'Manual Image Attached',
+        'success',
+        `Attached manual user-selected image (${fileName})`,
+        'User manual override takes absolute priority'
+      );
+    } else {
+      const explicitPhotoChoice = (manualOverrides && typeof manualOverrides.needsPhoto === 'boolean')
+        ? manualOverrides.needsPhoto
+        : (req.body.photoChoice === 'yes' || req.body.photoChoice === true
+            ? true
+            : (req.body.photoChoice === 'no' || req.body.photoChoice === false
+                ? false
+                : undefined));
 
-    if (explicitPhotoChoice === false) {
-      pushLog(5, 'Smart Image Option', 'skipped', `Photo disabled by user (Photo: No). No image searched.`);
-    } else if (explicitPhotoChoice === true || appSettings.smartImages.enabled) {
-      try {
-        const forceFetch = explicitPhotoChoice === true;
-        const imgRes = await getSmartImage(
-          cardData.word,
-          cardData.partOfSpeech,
-          cardData.meaningFa,
-          appSettings.smartImages,
-          appSettings,
-          forceFetch
-        );
-        if (imgRes.success && imgRes.needsImage && imgRes.imageBase64 && imgRes.imageFileName) {
-          cardData.imageBase64 = imgRes.imageBase64;
-          cardData.imageFileName = imgRes.imageFileName;
-          cardData.needsImage = true;
-          cardData.imageReason = imgRes.reason;
-          pushLog(5, 'Smart Image Attached', 'success', `Attached image for "${cardData.word}" (${imgRes.imageFileName})`, imgRes.reason);
-        } else {
-          pushLog(5, 'Smart Image Evaluated', 'skipped', `No image attached: ${imgRes.reason || 'Not needed or not found'}`);
+      if (explicitPhotoChoice === false) {
+        pushLog(5, 'Smart Image Option', 'skipped', `Photo disabled by user (Photo: No). No image searched.`);
+      } else if (explicitPhotoChoice === true || appSettings.smartImages.enabled) {
+        try {
+          const forceFetch = explicitPhotoChoice === true;
+          const imgRes = await getSmartImage(
+            cardData.word,
+            cardData.partOfSpeech,
+            cardData.meaningFa,
+            appSettings.smartImages,
+            appSettings,
+            forceFetch
+          );
+          if (imgRes.success && imgRes.needsImage && imgRes.imageBase64 && imgRes.imageFileName) {
+            cardData.imageBase64 = imgRes.imageBase64;
+            cardData.imageFileName = imgRes.imageFileName;
+            cardData.needsImage = true;
+            cardData.imageReason = imgRes.reason;
+            pushLog(5, 'Smart Image Attached', 'success', `Attached image for "${cardData.word}" (${imgRes.imageFileName})`, imgRes.reason);
+          } else {
+            pushLog(5, 'Smart Image Evaluated', 'skipped', `No image attached: ${imgRes.reason || 'Not needed or not found'}`);
+          }
+        } catch (err: any) {
+          pushLog(5, 'Smart Image Evaluated', 'skipped', `Image search skipped: ${err?.message}`);
         }
-      } catch (err: any) {
-        pushLog(5, 'Smart Image Evaluated', 'skipped', `Image search skipped: ${err?.message}`);
       }
     }
 

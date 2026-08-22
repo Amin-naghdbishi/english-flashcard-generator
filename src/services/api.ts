@@ -182,7 +182,7 @@ export async function runOnlineTTSDiagnostics(): Promise<OnlineTTSDiagnosticResu
   return res.json();
 }
 
-// --- Smart Images ---
+// --- Smart Images & Manual Image Selection ---
 export async function testSmartImage(
   word: string,
   partOfSpeech?: string,
@@ -193,6 +193,29 @@ export async function testSmartImage(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ word, partOfSpeech, meaningFa, config }),
+  });
+  return res.json();
+}
+
+export async function searchOnlineImages(word: string): Promise<{
+  success: boolean;
+  results: Array<{ title: string; thumbUrl: string; fullUrl: string; source: string }>;
+}> {
+  const res = await fetch(`/api/smart-images/search?word=${encodeURIComponent(word)}`);
+  return res.json();
+}
+
+export async function downloadImage(url: string, word?: string): Promise<{
+  success: boolean;
+  imageBase64?: string;
+  imageFileName?: string;
+  mimeType?: string;
+  error?: string;
+}> {
+  const res = await fetch('/api/download-image', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, word }),
   });
   return res.json();
 }

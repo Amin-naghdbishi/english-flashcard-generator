@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CardData, ManualOverrides, AppSettings, StepLog, AnkiCardVerificationDetails, CardType, AppTheme } from '../types';
 import { CardPreview } from './CardPreview';
 import { AudioPlayer } from './AudioPlayer';
@@ -10,6 +10,8 @@ import {
   runAnkiPipelineTest,
   openInAnki,
   verifyNoteInAnki,
+  downloadImage,
+  searchOnlineImages,
 } from '../services/api';
 import {
   Sparkles,
@@ -24,6 +26,7 @@ import {
   Info,
   ExternalLink,
   Image as ImageIcon,
+  Globe,
 } from 'lucide-react';
 
 interface CreateCardViewProps {
@@ -70,7 +73,20 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
     example: '',
     translationFa: '',
     mnemonic: '',
+    imageBase64: undefined,
+    imageFileName: undefined,
   });
+
+  // Manual Image Selection State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showInternetPanel, setShowInternetPanel] = useState(false);
+  const [internetUrlInput, setInternetUrlInput] = useState('');
+  const [isDownloadingImage, setIsDownloadingImage] = useState(false);
+  const [imageDownloadError, setImageDownloadError] = useState<string | null>(null);
+  const [onlineSearchResults, setOnlineSearchResults] = useState<
+    Array<{ title: string; thumbUrl: string; fullUrl: string; source: string }>
+  >([]);
+  const [isSearchingOnline, setIsSearchingOnline] = useState(false);
 
   // Pipeline Status & Logs
   const [isGenerating, setIsGenerating] = useState(false);
@@ -123,6 +139,111 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
   useEffect(() => {
     loadDecks();
   }, [settings.anki.url]);
+
+  // Manual image handlers
+  const handleLocalImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '');
+      const ext = file.name.split('.').pop() || 'png';
+      const cleanWord = (word || 'card').trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const fileName = `card_manual_${cleanWord}_${Date.now()}.${ext}`;
+
+      setOverrides((prev) => ({
+        ...prev,
+        imageBase64: base64,
+        imageFileName: fileName,
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const fetchOnlineImageSuggestions = async (term: string) => {
+    if (!term) return;
+    setIsSearchingOnline(true);
+    try {
+      const res = await searchOnlineImages(term);
+      if (res.success && res.results) {
+        setOnlineSearchResults(res.results);
+      }
+    } catch {
+      // Ignore
+    } finally {
+      setIsSearchingOnline(false);
+    }
+  };
+
+  const handleOpenInternetSearch = () => {
+    const currentWord = word.trim() || 'word';
+    let searchUrl = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(currentWord)}`;
+    if (settings.smartImages?.searchProvider === 'wikimedia') {
+      searchUrl = `https://commons.wikimedia.org/w/index.php?search=${encodeURIComponent(currentWord)}`;
+    } else if (settings.smartImages?.searchProvider === 'unsplash') {
+      searchUrl = `https://unsplash.com/s/photos/${encodeURIComponent(currentWord)}`;
+    }
+    window.open(searchUrl, '_blank', 'noopener,noreferrer');
+    setShowInternetPanel(true);
+    fetchOnlineImageSuggestions(currentWord);
+  };
+
+  const handleDownloadFromUrl = async () => {
+    const url = internetUrlInput.trim();
+    if (!url) return;
+    setIsDownloadingImage(true);
+    setImageDownloadError(null);
+    try {
+      const res = await downloadImage(url, word.trim());
+      if (!res.success || !res.imageBase64) {
+        throw new Error(res.error || 'Failed to download image from the provided URL');
+      }
+      setOverrides((prev) => ({
+        ...prev,
+        imageBase64: res.imageBase64,
+        imageFileName: res.imageFileName || `card_manual_${word.trim()}_${Date.now()}.png`,
+      }));
+      setInternetUrlInput('');
+      setShowInternetPanel(false);
+    } catch (err: any) {
+      setImageDownloadError(err.message || 'Could not download image from the provided URL');
+    } finally {
+      setIsDownloadingImage(false);
+    }
+  };
+
+  const handleSelectOnlineResult = async (imgUrl: string) => {
+    setIsDownloadingImage(true);
+    setImageDownloadError(null);
+    try {
+      const res = await downloadImage(imgUrl, word.trim());
+      if (!res.success || !res.imageBase64) {
+        throw new Error(res.error || 'Failed to download image from the selected result');
+      }
+      setOverrides((prev) => ({
+        ...prev,
+        imageBase64: res.imageBase64,
+        imageFileName: res.imageFileName || `card_manual_${word.trim()}_${Date.now()}.png`,
+      }));
+      setShowInternetPanel(false);
+    } catch (err: any) {
+      setImageDownloadError(err.message || 'Could not download image');
+    } finally {
+      setIsDownloadingImage(false);
+    }
+  };
+
+  const handleRemoveImageOverride = () => {
+    setOverrides((prev) => ({
+      ...prev,
+      imageBase64: undefined,
+      imageFileName: undefined,
+    }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   // Handle Form Submit
   const handleCreate = async (forceAdd = false) => {
@@ -584,6 +705,182 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                       }`}
                     />
                   </div>
+
+                  {/* Manual Image Override */}
+                  <div className="pt-2 border-t border-dashed border-zinc-300 dark:border-zinc-700">
+                    <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+                      <label className={`text-[11px] font-semibold flex items-center gap-1.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                        <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
+                        <span>Image (تصویر دستی کارت)</span>
+                        {overrides.imageBase64 && (
+                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                            ✓ Image Selected
+                          </span>
+                        )}
+                      </label>
+
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleLocalImageUpload}
+                          accept="image/*"
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className={`px-2 py-1 text-xs font-semibold rounded border cursor-pointer flex items-center gap-1 transition-colors ${
+                            isDark
+                              ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700'
+                              : 'bg-white hover:bg-zinc-100 text-zinc-800 border-zinc-300 shadow-xs'
+                          }`}
+                          title="Select image from your computer"
+                        >
+                          <span className="text-xs">📁</span>
+                          <span className="text-[11px]">Computer</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleOpenInternetSearch}
+                          className={`px-2 py-1 text-xs font-semibold rounded border cursor-pointer flex items-center gap-1 transition-colors ${
+                            isDark
+                              ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700'
+                              : 'bg-white hover:bg-zinc-100 text-zinc-800 border-zinc-300 shadow-xs'
+                          }`}
+                          title="Open new tab to search and import internet image"
+                        >
+                          <span className="text-xs">🌐</span>
+                          <span className="text-[11px]">Internet</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {overrides.imageBase64 ? (
+                      <div
+                        className={`p-2 border rounded-md flex items-center justify-between gap-2 mt-1 ${
+                          isDark ? 'bg-zinc-850 border-zinc-700' : 'bg-white border-zinc-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <img
+                            src={
+                              overrides.imageBase64.startsWith('data:')
+                                ? overrides.imageBase64
+                                : `data:image/jpeg;base64,${overrides.imageBase64}`
+                            }
+                            alt="Selected manual override"
+                            className="w-12 h-12 object-cover rounded border border-zinc-300 dark:border-zinc-700 shrink-0"
+                          />
+                          <div className="min-w-0 text-left">
+                            <p className="text-xs font-semibold truncate text-zinc-800 dark:text-zinc-200">
+                              {overrides.imageFileName || 'custom_image.jpg'}
+                            </p>
+                            <p className="text-[10px] text-zinc-500">
+                              Will be saved in Anki media and used for this card.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveImageOverride}
+                          className="px-2 py-1 text-[11px] font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded border border-rose-200 dark:border-rose-800 cursor-pointer shrink-0"
+                        >
+                          ✕ Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <p className={`text-[10px] ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                        Choose an image from your computer or search on the internet.
+                      </p>
+                    )}
+
+                    {showInternetPanel && (
+                      <div
+                        className={`mt-2 p-2.5 border rounded-md text-xs space-y-2 ${
+                          isDark ? 'bg-zinc-900 border-zinc-700' : 'bg-zinc-50 border-zinc-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-[11px] flex items-center gap-1">
+                            <Globe className="w-3.5 h-3.5 text-blue-500" />
+                            <span>Import Internet Image for "{word.trim() || 'word'}"</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowInternetPanel(false)}
+                            className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-xs cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        <p className="text-[10px] text-zinc-500">
+                          Search opened in a new tab. Copy any image address, paste below and click Import:
+                        </p>
+
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            placeholder="Paste image URL (e.g. https://.../photo.jpg)"
+                            value={internetUrlInput}
+                            onChange={(e) => setInternetUrlInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleDownloadFromUrl()}
+                            className={`flex-1 p-1.5 border rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                              isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleDownloadFromUrl}
+                            disabled={isDownloadingImage || !internetUrlInput.trim()}
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium text-xs rounded cursor-pointer shrink-0 flex items-center gap-1"
+                          >
+                            {isDownloadingImage ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                            <span>Import</span>
+                          </button>
+                        </div>
+
+                        {imageDownloadError && (
+                          <p className="text-[11px] text-rose-500 font-medium">{imageDownloadError}</p>
+                        )}
+
+                        {isSearchingOnline && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 py-1">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span>Searching quick suggestions...</span>
+                          </div>
+                        )}
+
+                        {onlineSearchResults.length > 0 && (
+                          <div className="space-y-1 pt-1">
+                            <span className="text-[10px] text-zinc-500 block font-medium">
+                              Or click a quick suggestion to import:
+                            </span>
+                            <div className="grid grid-cols-4 gap-1.5 max-h-36 overflow-y-auto p-0.5">
+                              {onlineSearchResults.map((res, i) => (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => handleSelectOnlineResult(res.fullUrl || res.thumbUrl)}
+                                  className={`group relative border rounded overflow-hidden aspect-square hover:ring-2 hover:ring-blue-500 cursor-pointer ${
+                                    isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'
+                                  }`}
+                                  title={res.title}
+                                >
+                                  <img src={res.thumbUrl} alt={res.title} className="w-full h-full object-cover" />
+                                  <span className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[10px] text-white font-bold">
+                                    Select
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -999,14 +1296,27 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
             isDark ? 'bg-[#1F1F23] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
           }`}
         >
-          <div className="relative z-10 w-full flex-1 flex flex-col justify-center min-w-0">
             <CardPreview
-              cardData={generatedCard}
+              cardData={
+                generatedCard || {
+                  word: word.trim() || 'abandon',
+                  phonetic: overrides.phonetic || '/əˈbændən/',
+                  partOfSpeech: overrides.partOfSpeech || 'verb',
+                  meaningFa: overrides.meaningFa || 'رها کردن، ترک کردن',
+                  example: overrides.example || 'He abandoned his car on the highway.',
+                  translationFa: overrides.translationFa || 'او ماشین خود را در بزرگراه رها کرد.',
+                  mnemonic: overrides.mnemonic || 'A-BAND-ON: Imagine a band left behind on the stage.',
+                  cardType: cardType,
+                  spellingSentence: 'He ______ his car on the highway.',
+                  imageBase64: overrides.imageBase64,
+                  imageFileName: overrides.imageFileName,
+                  needsImage: !!overrides.imageBase64 || photoChoice === 'yes',
+                }
+              }
               themeId={settings.theme}
               emptyWordPlaceholder={word || 'abandon'}
               appTheme={isDark ? 'anki-dark' : 'anki-light'}
             />
-          </div>
         </div>
       </section>
     </div>
