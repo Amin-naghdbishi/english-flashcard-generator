@@ -659,10 +659,11 @@ async function startServer() {
 
   // --- Full Generation Pipeline Route ---
   app.post('/api/pipeline', async (req, res) => {
-    const { word, deck, manualOverrides, createInAnki = true, cardType = 'normal' } = req.body;
+    const { word, deck, manualOverrides, createInAnki = true, cardType } = req.body;
     const cleanWord = (word || '').trim();
     const targetDeck = deck || appSettings.anki.defaultDeck || 'English::B1';
-    const effectiveCardType: CardType = cardType || appSettings.defaultCard?.cardType || 'normal';
+    const effectiveCardType: CardType =
+      manualOverrides?.cardType || cardType || appSettings.defaultCard?.cardType || 'normal';
 
     if (!cleanWord) {
       return res.status(400).json({

@@ -38,7 +38,7 @@ export interface BatchParsedResult {
   format: BatchFormatType;
   formatLabel: string;
   formatDescription: string;
-  items: Array<{ word: string; deck: string; parsedFields: Partial<CardData> & { needsPhoto?: boolean } }>;
+  items: Array<{ word: string; deck: string; parsedFields: Partial<CardData> & { needsPhoto?: boolean; cardType?: CardType } }>;
 }
 
 const DEFAULT_SAMPLE_FORMAT_A = `apple
@@ -58,6 +58,7 @@ Example Sentence=I need an eraser to fix this mistake.
 ExampleTranslation=من به یک پاک‌کن برای تصحیح این اشتباه نیاز دارم.
 Memory Aid=ERASE-ER: It erases mistakes on paper.
 Photo=true
+Spelling=false
 --
 Word=abandon
 Deck=English::B1
@@ -68,16 +69,19 @@ Example Sentence=He abandoned his car on the highway.
 ExampleTranslation=او ماشین خود را در بزرگراه رها کرد.
 Memory Aid=A-BAND-ON: Imagine a band left behind on the stage.
 Photo=false
+Spelling=true
 --
 Word=bank
 Deck=English::B1
 Persian Meaning=بانک (موسسه مالی)
 Photo=true
+Spelling=false
 --
 Word=bank
 Deck=English::B1
 Persian Meaning=ساحل رودخانه
 Photo=true
+Spelling=true
 --`;
 
 export function autoDetectAndParseBatchInput(
@@ -95,7 +99,7 @@ export function autoDetectAndParseBatchInput(
   }
 
   const hasSeparator = /(?:^|\r?\n)\s*--\s*(?:\r?\n|$)/m.test(trimmed);
-  const hasKeyValuePairs = /(?:^|\r?\n)\s*(?:word|deck|phonetic|ipa|part\s*of\s*speech|pos|persian\s*meaning|meaning|example\s*sentence|example|memory\s*aid|mnemonic|photo|image|picture)\s*[:=]/i.test(trimmed);
+  const hasKeyValuePairs = /(?:^|\r?\n)\s*(?:word|deck|phonetic|ipa|part\s*of\s*speech|pos|persian\s*meaning|meaning|example\s*sentence|example|memory\s*aid|mnemonic|photo|image|picture|spelling|cardtype)\s*[:=]/i.test(trimmed);
 
   if (hasSeparator || hasKeyValuePairs) {
     const rawBlocks = hasSeparator
@@ -103,7 +107,7 @@ export function autoDetectAndParseBatchInput(
       : trimmed.split(/\r?\n\s*\r?\n/);
 
     const blocks = rawBlocks.map((b) => b.trim()).filter(Boolean);
-    const results: Array<{ word: string; deck: string; parsedFields: Partial<CardData> & { needsPhoto?: boolean } }> = [];
+    const results: Array<{ word: string; deck: string; parsedFields: Partial<CardData> & { needsPhoto?: boolean; cardType?: CardType } }> = [];
 
     for (const block of blocks) {
       const lines = block.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -134,8 +138,24 @@ export function autoDetectAndParseBatchInput(
         }
       }
 
+      let cardType: CardType | undefined = undefined;
+      const spellingRaw =
+        fields['spelling'] ||
+        fields['isspelling'] ||
+        fields['spellingcard'] ||
+        fields['cardtype'];
+
+      if (spellingRaw !== undefined) {
+        const sLow = spellingRaw.trim().toLowerCase();
+        if (sLow === 'true' || sLow === 'yes' || sLow === '1' || sLow === 'y' || sLow === 'on' || sLow === 'spelling') {
+          cardType = 'spelling';
+        } else if (sLow === 'false' || sLow === 'no' || sLow === '0' || sLow === 'n' || sLow === 'off' || sLow === 'normal') {
+          cardType = 'normal';
+        }
+      }
+
       const deck = fields['deck'] || fields['deckname'] || fields['targetdeck'] || defaultDeck;
-      const parsedFields: Partial<CardData> & { needsPhoto?: boolean } = {
+      const parsedFields: Partial<CardData> & { needsPhoto?: boolean; cardType?: CardType } = {
         word,
         phonetic: fields['phonetic'] || fields['ipa'] || fields['pronunciation'] || undefined,
         partOfSpeech: fields['partofspeech'] || fields['pos'] || fields['type'] || undefined,
@@ -144,6 +164,7 @@ export function autoDetectAndParseBatchInput(
         translationFa: fields['exampletranslation'] || fields['translation'] || fields['translationfa'] || fields['sentencefa'] || undefined,
         mnemonic: fields['memoryaid'] || fields['mnemonic'] || fields['aid'] || fields['code'] || undefined,
         needsPhoto,
+        cardType,
       };
 
       results.push({ word, deck, parsedFields });
@@ -332,15 +353,26 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
           if (currentItem.parsedFields.needsPhoto !== undefined) {
             customOverrides.needsPhoto = currentItem.parsedFields.needsPhoto;
           }
+          if (currentItem.parsedFields.cardType !== undefined) {
+            customOverrides.cardType = currentItem.parsedFields.cardType;
+          }
         }
+
+        const effectiveCardType: CardType =
+          currentItem.parsedFields?.cardType ||
+          settings.defaultCard?.cardType ||
+          'normal';
 
         const targetDeck = currentItem.deck || deck;
 
         const res = await runFullPipeline({
           word: currentItem.word,
           deck: targetDeck,
-          manualOverrides: customOverrides,
-          cardType: settings.defaultCard?.cardType || 'normal',
+          manualOverrides: {
+            ...customOverrides,
+            cardType: effectiveCardType,
+          },
+          cardType: effectiveCardType,
           createInAnki: true,
         });
 
@@ -398,13 +430,22 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
         if (fieldConfig.translationFa && itemToRetry.parsedFields.translationFa) customOverrides.translationFa = itemToRetry.parsedFields.translationFa;
         if (fieldConfig.mnemonic && itemToRetry.parsedFields.mnemonic) customOverrides.mnemonic = itemToRetry.parsedFields.mnemonic;
         if (itemToRetry.parsedFields.needsPhoto !== undefined) customOverrides.needsPhoto = itemToRetry.parsedFields.needsPhoto;
+        if (itemToRetry.parsedFields.cardType !== undefined) customOverrides.cardType = itemToRetry.parsedFields.cardType;
       }
+
+      const effectiveCardType: CardType =
+        itemToRetry.parsedFields?.cardType ||
+        settings.defaultCard?.cardType ||
+        'normal';
 
       const res = await runFullPipeline({
         word: itemToRetry.word,
         deck: itemToRetry.deck || deck,
-        manualOverrides: customOverrides,
-        cardType: settings.defaultCard?.cardType || 'normal',
+        manualOverrides: {
+          ...customOverrides,
+          cardType: effectiveCardType,
+        },
+        cardType: effectiveCardType,
         createInAnki: true,
       });
 
@@ -733,13 +774,34 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                       {idx + 1}.
                     </span>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-semibold text-sm truncate">{item.word}</span>
                         {item.noteId && (
                           <span className={`text-[10px] font-mono font-medium px-1.5 py-0.2 rounded ${
                             isDark ? 'bg-zinc-800 text-emerald-400' : 'bg-zinc-100 text-emerald-700'
                           }`}>
                             #{item.noteId}
+                          </span>
+                        )}
+                        {item.parsedFields?.cardType === 'spelling' && (
+                          <span className={`text-[9px] font-semibold px-1.5 py-0.2 rounded border ${
+                            isDark ? 'bg-amber-950/60 text-amber-300 border-amber-800' : 'bg-amber-50 text-amber-800 border-amber-300'
+                          }`}>
+                            Spelling
+                          </span>
+                        )}
+                        {item.parsedFields?.cardType === 'normal' && (
+                          <span className={`text-[9px] font-semibold px-1.5 py-0.2 rounded border ${
+                            isDark ? 'bg-blue-950/60 text-blue-300 border-blue-800' : 'bg-blue-50 text-blue-800 border-blue-300'
+                          }`}>
+                            Normal
+                          </span>
+                        )}
+                        {item.parsedFields?.needsPhoto === true && (
+                          <span className={`text-[9px] font-semibold px-1.5 py-0.2 rounded border ${
+                            isDark ? 'bg-purple-950/60 text-purple-300 border-purple-800' : 'bg-purple-50 text-purple-800 border-purple-300'
+                          }`}>
+                            Photo
                           </span>
                         )}
                       </div>
