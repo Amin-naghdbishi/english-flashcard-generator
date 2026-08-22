@@ -1,0 +1,6 @@
+{
+  "name": "Local AI English Flashcard Generator",
+  "description": "Generate Anki flashcards with local Ollama AI, offline Kokoro TTS audio, and custom comic themes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

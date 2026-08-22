@@ -1,0 +1,26 @@
+{
+  "ai": {
+    "url": "http://127.0.0.1:11434",
+    "model": "gemma3:4b",
+    "temperature": 0.2,
+    "contextLength": 2048
+  },
+  "tts": {
+    "engine": "piper",
+    "endpoint": "http://127.0.0.1:5000",
+    "americanVoice": "en_US-lessac-high",
+    "britishVoice": "en_GB-cori-high",
+    "normalSpeed": 1,
+    "slowSpeed": 1.25,
+    "generateSlow": true,
+    "generateBritish": true,
+    "generateAmerican": true,
+    "generateSlowExample": false
+  },
+  "anki": {
+    "url": "http://127.0.0.1:8765",
+    "defaultDeck": "English::B1",
+    "noteType": "AI Vocabulary"
+  },
+  "theme": "comic-light"
+}
