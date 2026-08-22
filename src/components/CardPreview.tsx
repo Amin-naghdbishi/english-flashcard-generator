@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { CardData, ThemeDefinition, ThemeId, CardType, AppTheme } from '../types';
 import { THEMES, renderThemeHtml, getSpellingFrontHtml } from '../themes';
-import { Eye, Sparkles, Volume2, Smartphone, Monitor, CheckCircle, HelpCircle } from 'lucide-react';
+import { Eye, Smartphone, Monitor } from 'lucide-react';
+import { useAppTheme } from '../context/ThemeContext';
 
 interface CardPreviewProps {
   cardData: CardData | null;
@@ -16,15 +17,14 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
   themeId = 'comic-pop-dark',
   cardType = 'normal',
   emptyWordPlaceholder = 'eraser',
-  appTheme = 'comic',
+  appTheme: propTheme,
 }) => {
+  const themeContext = useAppTheme();
+  const isDark = (propTheme || themeContext.appTheme) === 'anki-dark';
+
   const [activeSide, setActiveSide] = useState<'front' | 'back' | 'both'>('back');
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
   const [previewCardType, setPreviewCardType] = useState<CardType>(cardType);
-
-  const isMinimalLight = appTheme === 'minimal-light';
-  const isMinimalDark = appTheme === 'minimal-dark';
-  const isMinimal = isMinimalLight || isMinimalDark;
 
   useEffect(() => {
     if (cardData?.cardType) {
@@ -95,164 +95,132 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
   const backRendered = renderThemeHtml(theme.backHtml, { ...displayData, cardType: previewCardType }, { isPreview: true, cardType: previewCardType });
 
   return (
-    <div className={`w-full flex flex-col h-full min-w-0 ${isMinimalDark ? 'text-zinc-100' : 'text-black'}`}>
-      {/* Inject Selected Theme CSS */}
+    <div className={`w-full flex flex-col h-full min-w-0 ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+      {/* Inject Selected Card Theme CSS (isolated to the card content) */}
       <style>{theme.css}</style>
 
       {/* Preview Header & Controls */}
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2">
-          <Eye className={`w-4 h-4 ${isMinimal ? 'text-blue-500' : 'text-[#FF4B4B]'}`} />
-          <span className={`text-xs ${isMinimal ? 'font-semibold text-slate-700 dark:text-zinc-300' : 'font-black uppercase tracking-wider text-black'}`}>
-            {theme.name} • {previewCardType === 'spelling' ? 'Spelling Mode' : 'Normal Mode'}
+          <Eye className="w-4 h-4 text-blue-500" />
+          <span className={`text-xs font-semibold ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+            {theme.name} • {previewCardType === 'spelling' ? 'Spelling Challenge' : 'Vocabulary'}
           </span>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Card Type Toggle [ Normal | Spelling ] */}
-          <div className={isMinimal ? 'inline-flex border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-0.5 rounded-md shadow-sm' : 'inline-flex border-2 border-black bg-white p-0.5 shadow-[2px_2px_0px_#000000]'}>
+          <div className={`inline-flex border p-0.5 rounded-md shadow-xs ${isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'}`}>
             <button
               type="button"
               onClick={() => setPreviewCardType('normal')}
-              className={
-                isMinimal
-                  ? `px-2.5 py-0.5 text-xs font-medium rounded transition-all cursor-pointer ${
-                      previewCardType === 'normal'
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : isMinimalDark
-                        ? 'text-zinc-400 hover:text-white'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`
-                  : `px-2 py-0.5 text-[11px] font-black uppercase transition-all cursor-pointer ${
-                      previewCardType === 'normal'
-                        ? 'bg-[#4ADE80] text-black shadow-inner'
-                        : 'bg-zinc-100 text-black hover:bg-zinc-200'
-                    }`
-              }
+              className={`px-2.5 py-1 text-xs font-medium rounded transition-colors cursor-pointer ${
+                previewCardType === 'normal'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : isDark
+                  ? 'text-zinc-400 hover:text-white'
+                  : 'text-zinc-600 hover:text-zinc-900'
+              }`}
             >
               Normal
             </button>
             <button
               type="button"
               onClick={() => setPreviewCardType('spelling')}
-              className={
-                isMinimal
-                  ? `px-2.5 py-0.5 text-xs font-medium rounded transition-all cursor-pointer ${
-                      previewCardType === 'spelling'
-                        ? 'bg-purple-600 text-white shadow-sm'
-                        : isMinimalDark
-                        ? 'text-zinc-400 hover:text-white'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`
-                  : `px-2 py-0.5 text-[11px] font-black uppercase transition-all cursor-pointer ${
-                      previewCardType === 'spelling'
-                        ? 'bg-[#C084FC] text-black shadow-inner'
-                        : 'bg-zinc-100 text-black hover:bg-zinc-200'
-                    }`
-              }
+              className={`px-2.5 py-1 text-xs font-medium rounded transition-colors cursor-pointer ${
+                previewCardType === 'spelling'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : isDark
+                  ? 'text-zinc-400 hover:text-white'
+                  : 'text-zinc-600 hover:text-zinc-900'
+              }`}
             >
               Spelling
             </button>
           </div>
 
           {/* Desktop / Mobile Width Mode Toggle */}
-          <div className={isMinimal ? 'inline-flex border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-0.5 rounded-md shadow-sm' : 'inline-flex border-2 border-black bg-white p-0.5 shadow-[2px_2px_0px_#000000]'}>
+          <div className={`inline-flex border p-0.5 rounded-md shadow-xs ${isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'}`}>
             <button
               type="button"
               onClick={() => setViewMode('desktop')}
               title="Desktop View (Full Width)"
-              className={
-                isMinimal
-                  ? `p-1 text-xs font-medium rounded transition-all cursor-pointer flex items-center gap-1 ${
-                      viewMode === 'desktop'
-                        ? 'bg-slate-200 dark:bg-zinc-700 text-slate-900 dark:text-white'
-                        : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
-                    }`
-                  : `p-1 text-xs font-black transition-all cursor-pointer flex items-center gap-1 ${
-                      viewMode === 'desktop' ? 'bg-[#38BDF8] text-black shadow-inner' : 'bg-zinc-100 text-black hover:bg-zinc-200'
-                    }`
-              }
+              className={`p-1 text-xs font-medium rounded transition-colors cursor-pointer flex items-center gap-1 ${
+                viewMode === 'desktop'
+                  ? isDark
+                    ? 'bg-zinc-700 text-white'
+                    : 'bg-zinc-200 text-zinc-900'
+                  : isDark
+                  ? 'text-zinc-400 hover:text-zinc-200'
+                  : 'text-zinc-500 hover:text-zinc-800'
+              }`}
             >
               <Monitor className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline text-[10px] font-bold uppercase">Desktop</span>
+              <span className="hidden sm:inline text-[10px] font-medium">Desktop</span>
             </button>
             <button
               type="button"
               onClick={() => setViewMode('mobile')}
-              title="Mobile / AnkiDroid View (Narrow ~340px)"
-              className={
-                isMinimal
-                  ? `p-1 text-xs font-medium rounded transition-all cursor-pointer flex items-center gap-1 ${
-                      viewMode === 'mobile'
-                        ? 'bg-slate-200 dark:bg-zinc-700 text-slate-900 dark:text-white'
-                        : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400'
-                    }`
-                  : `p-1 text-xs font-black transition-all cursor-pointer flex items-center gap-1 ${
-                      viewMode === 'mobile' ? 'bg-[#38BDF8] text-black shadow-inner' : 'bg-zinc-100 text-black hover:bg-zinc-200'
-                    }`
-              }
+              title="Mobile / AnkiDroid View (~340px)"
+              className={`p-1 text-xs font-medium rounded transition-colors cursor-pointer flex items-center gap-1 ${
+                viewMode === 'mobile'
+                  ? isDark
+                    ? 'bg-zinc-700 text-white'
+                    : 'bg-zinc-200 text-zinc-900'
+                  : isDark
+                  ? 'text-zinc-400 hover:text-zinc-200'
+                  : 'text-zinc-500 hover:text-zinc-800'
+              }`}
             >
               <Smartphone className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline text-[10px] font-bold uppercase">AnkiDroid</span>
+              <span className="hidden sm:inline text-[10px] font-medium">AnkiDroid</span>
             </button>
           </div>
 
           {/* Front / Back Toggle Buttons */}
-          <div className={isMinimal ? 'inline-flex border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-0.5 gap-0.5 rounded-md shadow-sm' : 'inline-flex border-2 border-black bg-white p-0.5 gap-1 shadow-[2px_2px_0px_#000000]'}>
+          <div className={`inline-flex border p-0.5 gap-0.5 rounded-md shadow-xs ${isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'}`}>
             <button
               type="button"
               onClick={() => setActiveSide('front')}
-              className={
-                isMinimal
-                  ? `text-xs px-2.5 py-0.5 font-medium rounded transition-all cursor-pointer ${
-                      activeSide === 'front'
-                        ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-                        : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-700'
-                    }`
-                  : `text-xs px-2.5 py-1 font-black uppercase transition-all cursor-pointer ${
-                      activeSide === 'front'
-                        ? 'bg-[#FFD93D] text-black shadow-inner'
-                        : 'bg-zinc-100 text-black hover:bg-zinc-200'
-                    }`
-              }
+              className={`text-xs px-2.5 py-1 font-medium rounded transition-colors cursor-pointer ${
+                activeSide === 'front'
+                  ? isDark
+                    ? 'bg-zinc-100 text-zinc-900 font-semibold'
+                    : 'bg-zinc-900 text-white font-semibold'
+                  : isDark
+                  ? 'text-zinc-400 hover:bg-zinc-700'
+                  : 'text-zinc-600 hover:bg-zinc-100'
+              }`}
             >
               Front
             </button>
             <button
               type="button"
               onClick={() => setActiveSide('back')}
-              className={
-                isMinimal
-                  ? `text-xs px-2.5 py-0.5 font-medium rounded transition-all cursor-pointer ${
-                      activeSide === 'back'
-                        ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-                        : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-700'
-                    }`
-                  : `text-xs px-2.5 py-1 font-black uppercase transition-all cursor-pointer ${
-                      activeSide === 'back'
-                        ? 'bg-[#FFD93D] text-black shadow-inner'
-                        : 'bg-zinc-100 text-black hover:bg-zinc-200'
-                    }`
-              }
+              className={`text-xs px-2.5 py-1 font-medium rounded transition-colors cursor-pointer ${
+                activeSide === 'back'
+                  ? isDark
+                    ? 'bg-zinc-100 text-zinc-900 font-semibold'
+                    : 'bg-zinc-900 text-white font-semibold'
+                  : isDark
+                  ? 'text-zinc-400 hover:bg-zinc-700'
+                  : 'text-zinc-600 hover:bg-zinc-100'
+              }`}
             >
               Back
             </button>
             <button
               type="button"
               onClick={() => setActiveSide('both')}
-              className={
-                isMinimal
-                  ? `text-xs px-2.5 py-0.5 font-medium rounded transition-all cursor-pointer ${
-                      activeSide === 'both'
-                        ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-                        : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-700'
-                    }`
-                  : `text-xs px-2.5 py-1 font-black uppercase transition-all cursor-pointer ${
-                      activeSide === 'both'
-                        ? 'bg-[#FFD93D] text-black shadow-inner'
-                        : 'bg-zinc-100 text-black hover:bg-zinc-200'
-                    }`
-              }
+              className={`text-xs px-2.5 py-1 font-medium rounded transition-colors cursor-pointer ${
+                activeSide === 'both'
+                  ? isDark
+                    ? 'bg-zinc-100 text-zinc-900 font-semibold'
+                    : 'bg-zinc-900 text-white font-semibold'
+                  : isDark
+                  ? 'text-zinc-400 hover:bg-zinc-700'
+                  : 'text-zinc-600 hover:bg-zinc-100'
+              }`}
             >
               Both
             </button>
@@ -269,11 +237,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
           <div className="w-full flex flex-col items-center">
             {activeSide === 'both' && (
               <div
-                className={
-                  isMinimal
-                    ? 'mb-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-300 dark:border-zinc-700 shadow-xs'
-                    : 'mb-2 text-[10px] font-black uppercase tracking-wider text-black bg-[#38BDF8] px-2.5 py-0.5 border-2 border-black shadow-[2px_2px_0px_#000000]'
-                }
+                className={`mb-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border shadow-xs ${
+                  isDark
+                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700'
+                    : 'bg-zinc-100 text-zinc-700 border-zinc-200'
+                }`}
               >
                 — FRONT CARD ({previewCardType.toUpperCase()}) —
               </div>
@@ -281,7 +249,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             <div
               className={`w-full transition-all duration-200 ${
                 viewMode === 'mobile'
-                  ? `max-w-[340px] border-x-2 border-dashed ${isMinimal ? 'border-slate-300 dark:border-zinc-700' : 'border-zinc-400'} p-1`
+                  ? `max-w-[340px] border-x-2 border-dashed ${isDark ? 'border-zinc-700' : 'border-zinc-300'} p-1`
                   : 'max-w-md'
               }`}
               dangerouslySetInnerHTML={{ __html: frontRendered }}
@@ -293,11 +261,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
           <div className="w-full flex flex-col items-center">
             {activeSide === 'both' && (
               <div
-                className={
-                  isMinimal
-                    ? 'mb-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-300 dark:border-zinc-700 shadow-xs'
-                    : 'mb-2 text-[10px] font-black uppercase tracking-wider text-black bg-[#4ADE80] px-2.5 py-0.5 border-2 border-black shadow-[2px_2px_0px_#000000]'
-                }
+                className={`mb-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border shadow-xs ${
+                  isDark
+                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700'
+                    : 'bg-zinc-100 text-zinc-700 border-zinc-200'
+                }`}
               >
                 — BACK CARD —
               </div>
@@ -305,7 +273,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             <div
               className={`w-full transition-all duration-200 ${
                 viewMode === 'mobile'
-                  ? `max-w-[340px] border-x-2 border-dashed ${isMinimal ? 'border-slate-300 dark:border-zinc-700' : 'border-zinc-400'} p-1`
+                  ? `max-w-[340px] border-x-2 border-dashed ${isDark ? 'border-zinc-700' : 'border-zinc-300'} p-1`
                   : 'max-w-md'
               }`}
               dangerouslySetInnerHTML={{ __html: backRendered }}

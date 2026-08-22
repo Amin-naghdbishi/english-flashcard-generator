@@ -2,15 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   AppSettings,
   DiagnosticsReport,
-  AnkiCardVerificationDetails,
   ThemeId,
-  AIProvider,
-  TTSProvider,
-  CardType,
-  CardData,
+  AppTheme,
   CustomAIProviderConfig,
   CustomTTSProviderConfig,
-  AppTheme,
 } from '../types';
 import {
   saveConfig,
@@ -43,7 +38,7 @@ import { PiperVoice, PiperDiagnosticResult } from '../../server/piper';
 import { OnlineTTSDiagnosticResult } from '../../server/onlineTts';
 import { THEME_GROUPS, THEMES } from '../themes';
 import { AudioPlayer } from './AudioPlayer';
-import { CardPreview } from './CardPreview';
+import { useAppTheme } from '../context/ThemeContext';
 import {
   Sliders,
   Cpu,
@@ -54,17 +49,12 @@ import {
   XCircle,
   AlertTriangle,
   RefreshCw,
-  Play,
   Save,
-  Wrench,
-  HelpCircle,
   Activity,
   Copy,
   Check,
   Zap,
   Loader2,
-  ExternalLink,
-  Info,
   Power,
   PowerOff,
   Globe,
@@ -79,6 +69,7 @@ import {
   Eye,
   EyeOff,
   Radio,
+  HelpCircle,
 } from 'lucide-react';
 
 interface SettingsViewProps {
@@ -87,16 +78,15 @@ interface SettingsViewProps {
   appTheme?: AppTheme;
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSettings, appTheme = settings.appTheme || 'comic' }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSettings, appTheme: propTheme }) => {
+  const themeContext = useAppTheme();
   const [form, setForm] = useState<AppSettings>(settings);
   const [activeSubTab, setActiveSubTab] = useState<
     'ai' | 'tts' | 'dictionary' | 'smartImages' | 'defaultCard' | 'appearance' | 'anki' | 'diagnostics' | 'guide'
   >('ai');
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
-  const isMinimalLight = (form.appTheme || appTheme) === 'minimal-light';
-  const isMinimalDark = (form.appTheme || appTheme) === 'minimal-dark';
-  const isMinimal = isMinimalLight || isMinimalDark;
+  const isDark = (form.appTheme || propTheme || themeContext.appTheme) === 'anki-dark';
 
   // Ollama states
   const [ollamaStatus, setOllamaStatus] = useState<{ connected: boolean; version?: string; error?: string } | null>(null);
@@ -361,35 +351,33 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-6 min-w-0">
       {/* Header with Save Button */}
       <div
-        className={
-          isMinimalLight
-            ? 'bg-white p-4 sm:p-5 border border-slate-200 rounded-lg shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-slate-800'
-            : isMinimalDark
-            ? 'bg-[#27272A] p-4 sm:p-5 border border-zinc-700 rounded-lg shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-zinc-100'
-            : 'bg-[#FFD93D] p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-black'
-        }
+        className={`p-4 sm:p-5 border rounded-lg shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
+          isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+        }`}
       >
         <div>
-          <h1 className={isMinimal ? 'text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2' : 'text-2xl sm:text-3xl font-black uppercase italic tracking-tight text-black flex items-center gap-2'}>
-            <Sliders className="w-6 h-6" />
+          <h1 className="text-lg sm:text-xl font-bold tracking-tight flex items-center gap-2">
+            <Sliders className="w-5 h-5 text-blue-500" />
             <span>Settings & Configuration</span>
           </h1>
         </div>
 
         <div className="flex items-center gap-3">
           {saveStatus && (
-            <span className={isMinimal ? 'text-xs font-semibold px-3 py-1.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 rounded border border-emerald-300 dark:border-emerald-800' : 'text-xs font-black px-3 py-1.5 bg-black text-[#4ADE80] border-2 border-black'}>
+            <span
+              className={`text-xs font-semibold px-3 py-1.5 rounded border ${
+                isDark
+                  ? 'bg-emerald-950 text-emerald-200 border-emerald-800'
+                  : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+              }`}
+            >
               {saveStatus}
             </span>
           )}
           <button
             type="button"
             onClick={handleSave}
-            className={
-              isMinimal
-                ? 'px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-md shadow-sm flex items-center gap-2 cursor-pointer transition-colors'
-                : 'px-5 py-2.5 bg-[#FF4B4B] hover:bg-[#ff6161] text-white font-black text-sm uppercase border-4 border-black shadow-[4px_4px_0px_#000000] flex items-center gap-2 cursor-pointer active:translate-y-0.5'
-            }
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
           >
             <Save className="w-4 h-4" />
             <span>Save Settings</span>
@@ -398,14 +386,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       </div>
 
       {/* Navigation Sub-Tabs */}
-      <div className={isMinimal ? 'flex flex-wrap gap-1.5 border-b border-slate-200 dark:border-zinc-700 pb-2' : 'flex flex-wrap gap-2 border-b-4 border-black pb-2'}>
+      <div className={`flex flex-wrap gap-1.5 border-b pb-2 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
         {[
           { id: 'ai', label: 'AI Providers', icon: Cpu },
           { id: 'tts', label: 'TTS', icon: Volume2 },
           { id: 'dictionary', label: 'Dictionaries', icon: BookOpen },
           { id: 'smartImages', label: 'Smart Images', icon: ImageIcon },
           { id: 'defaultCard', label: 'Default Card', icon: CheckSquare },
-          { id: 'appearance', label: 'Card Themes', icon: Palette },
+          { id: 'appearance', label: 'Appearance & Themes', icon: Palette },
           { id: 'anki', label: 'Anki', icon: Bookmark },
           { id: 'diagnostics', label: 'Diagnostics', icon: Activity },
           { id: 'guide', label: 'Guide', icon: HelpCircle },
@@ -417,23 +405,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               key={tab.id}
               type="button"
               onClick={() => setActiveSubTab(tab.id as any)}
-              className={
-                isMinimal
-                  ? `px-3 py-1.5 font-medium text-xs rounded-md flex items-center gap-1.5 transition-colors cursor-pointer ${
-                      isActive
-                        ? 'bg-blue-600 text-white shadow-sm font-semibold'
-                        : isMinimalDark
-                        ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-750'
-                        : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-                    }`
-                  : `px-3.5 py-2 font-black text-xs uppercase border-4 border-black flex items-center gap-1.5 transition-transform cursor-pointer ${
-                      isActive
-                        ? 'bg-black text-[#FFD93D] shadow-[4px_4px_0px_0px_rgba(255,217,61,1)] -translate-y-0.5'
-                        : 'bg-white hover:bg-zinc-100 text-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                    }`
-              }
+              className={`px-3 py-1.5 font-medium text-xs rounded-md flex items-center gap-1.5 transition-colors cursor-pointer ${
+                isActive
+                  ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                  : isDark
+                  ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-750'
+                  : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50'
+              }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-3.5 h-3.5" />
               <span>{tab.label}</span>
             </button>
           );
@@ -448,24 +428,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             {/* Ollama Option */}
             <div
               onClick={() => setForm({ ...form, ai: { ...form.ai, provider: 'ollama' } })}
-              className={
-                isMinimal
-                  ? `p-4 border rounded-lg cursor-pointer transition-all ${
-                      form.ai.provider === 'ollama'
-                        ? isMinimalDark
-                          ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
-                          : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
-                        : isMinimalDark
-                        ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
-                        : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                    }`
-                  : `p-4 border-4 border-black cursor-pointer shadow-[4px_4px_0px_#000000] transition-all ${
-                      form.ai.provider === 'ollama' ? 'bg-[#4ADE80] text-black font-black' : 'bg-white text-black'
-                    }`
-              }
+              className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                form.ai.provider === 'ollama'
+                  ? isDark
+                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
+                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
+                  : isDark
+                  ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
+                  : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300'
+              }`}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className={isMinimal ? 'text-sm font-bold' : 'text-base font-black uppercase'}>Local Ollama</span>
+                <span className="text-sm font-semibold">Local Ollama</span>
                 <input
                   type="radio"
                   name="ai_provider"
@@ -474,7 +448,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   className="w-4 h-4 accent-blue-600"
                 />
               </div>
-              <p className={isMinimal ? 'text-xs text-slate-500 dark:text-zinc-400' : 'text-xs font-bold opacity-90'}>
+              <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                 100% offline AI running locally on your computer (e.g. qwen3:4b, llama3.2).
               </p>
             </div>
@@ -482,24 +456,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             {/* Gemini Option */}
             <div
               onClick={() => setForm({ ...form, ai: { ...form.ai, provider: 'gemini' } })}
-              className={
-                isMinimal
-                  ? `p-4 border rounded-lg cursor-pointer transition-all ${
-                      form.ai.provider === 'gemini'
-                        ? isMinimalDark
-                          ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
-                          : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
-                        : isMinimalDark
-                        ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
-                        : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                    }`
-                  : `p-4 border-4 border-black cursor-pointer shadow-[4px_4px_0px_#000000] transition-all ${
-                      form.ai.provider === 'gemini' ? 'bg-[#38BDF8] text-black font-black' : 'bg-white text-black'
-                    }`
-              }
+              className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                form.ai.provider === 'gemini'
+                  ? isDark
+                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
+                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
+                  : isDark
+                  ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
+                  : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300'
+              }`}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className={isMinimal ? 'text-sm font-bold' : 'text-base font-black uppercase'}>Google Gemini</span>
+                <span className="text-sm font-semibold">Google Gemini</span>
                 <input
                   type="radio"
                   name="ai_provider"
@@ -508,7 +476,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   className="w-4 h-4 accent-blue-600"
                 />
               </div>
-              <p className={isMinimal ? 'text-xs text-slate-500 dark:text-zinc-400' : 'text-xs font-bold opacity-90'}>
+              <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                 Fast, high-quality cloud AI (gemini-2.5-flash, gemini-1.5-pro).
               </p>
             </div>
@@ -516,26 +484,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             {/* Custom AI Option (9Router style) */}
             <div
               onClick={() => setForm({ ...form, ai: { ...form.ai, provider: 'custom' } })}
-              className={
-                isMinimal
-                  ? `p-4 border rounded-lg cursor-pointer transition-all ${
-                      form.ai.provider === 'custom' || (!['ollama', 'gemini'].includes(form.ai.provider))
-                        ? isMinimalDark
-                          ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
-                          : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
-                        : isMinimalDark
-                        ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
-                        : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                    }`
-                  : `p-4 border-4 border-black cursor-pointer shadow-[4px_4px_0px_#000000] transition-all ${
-                      form.ai.provider === 'custom' || (!['ollama', 'gemini'].includes(form.ai.provider))
-                        ? 'bg-[#C084FC] text-black font-black'
-                        : 'bg-white text-black'
-                    }`
-              }
+              className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                form.ai.provider === 'custom' || (!['ollama', 'gemini'].includes(form.ai.provider))
+                  ? isDark
+                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
+                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
+                  : isDark
+                  ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
+                  : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300'
+              }`}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className={isMinimal ? 'text-sm font-bold' : 'text-base font-black uppercase'}>Custom AI / 9Router</span>
+                <span className="text-sm font-semibold">Custom AI / 9Router</span>
                 <input
                   type="radio"
                   name="ai_provider"
@@ -544,7 +504,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   className="w-4 h-4 accent-blue-600"
                 />
               </div>
-              <p className={isMinimal ? 'text-xs text-slate-500 dark:text-zinc-400' : 'text-xs font-bold opacity-90'}>
+              <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                 Connect ANY OpenAI-compatible endpoint, OpenRouter, Groq, DeepSeek, vLLM, or LMStudio.
               </p>
             </div>
@@ -553,24 +513,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           {/* OLLAMA CONFIGURATION */}
           {form.ai.provider === 'ollama' && (
             <div
-              className={
-                isMinimalLight
-                  ? 'bg-white p-5 border border-slate-200 rounded-lg shadow-sm space-y-4 text-slate-800'
-                  : isMinimalDark
-                  ? 'bg-[#27272A] p-5 border border-zinc-700 rounded-lg shadow-sm space-y-4 text-zinc-100'
-                  : 'bg-white p-5 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-4 text-black'
-              }
+              className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+                isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+              }`}
             >
-              <div className={`flex items-center justify-between pb-2 ${isMinimal ? 'border-b border-slate-200 dark:border-zinc-700' : 'border-b-2 border-black'}`}>
-                <h3 className={isMinimal ? 'font-bold text-sm uppercase' : 'font-black text-sm uppercase'}>Ollama Settings</h3>
+              <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+                <h3 className="font-semibold text-sm uppercase">Ollama Settings</h3>
                 <button
                   type="button"
                   onClick={refreshOllamaInfo}
-                  className={
-                    isMinimal
-                      ? 'px-3 py-1 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 font-medium text-xs rounded border border-slate-300 dark:border-zinc-700 flex items-center gap-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-750 transition-colors'
-                      : 'px-2.5 py-1 bg-[#FFD93D] text-black font-black text-xs border-2 border-black flex items-center gap-1 cursor-pointer'
-                  }
+                  className={`px-3 py-1 font-medium text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                    isDark
+                      ? 'bg-zinc-800 text-zinc-200 border-zinc-700 hover:bg-zinc-750'
+                      : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
+                  }`}
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${loadingModels ? 'animate-spin' : ''}`} />
                   <span>Refresh Models</span>
@@ -579,7 +535,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>Ollama Base URL</label>
+                  <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                    Ollama Base URL
+                  </label>
                   <input
                     type="text"
                     value={form.ai.ollama.url}
@@ -593,19 +551,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         },
                       })
                     }
-                    className={
-                      isMinimalLight
-                        ? 'w-full bg-white text-slate-900 text-xs font-mono font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : isMinimalDark
-                        ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-mono font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : 'w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black'
-                    }
-                    placeholder="http://127.0.0.1:11434"
+                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                      isDark
+                        ? 'bg-zinc-800 text-zinc-100 border-zinc-700'
+                        : 'bg-white text-zinc-900 border-zinc-300'
+                    }`}
                   />
                 </div>
 
                 <div>
-                  <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>Model Name</label>
+                  <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                    Model Name
+                  </label>
                   <select
                     value={form.ai.ollama.model}
                     onChange={(e) =>
@@ -618,284 +575,419 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         },
                       })
                     }
-                    className={
-                      isMinimalLight
-                        ? 'w-full bg-white text-slate-900 text-xs font-mono font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
-                        : isMinimalDark
-                        ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-mono font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
-                        : 'w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black cursor-pointer'
-                    }
+                    className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                      isDark
+                        ? 'bg-zinc-800 text-zinc-100 border-zinc-700'
+                        : 'bg-white text-zinc-900 border-zinc-300'
+                    }`}
                   >
-                    {ollamaModels.length > 0 ? (
-                      ollamaModels.map((m) => (
-                        <option key={m.name} value={m.name}>
-                          {m.name} ({Math.round(m.size / 1024 / 1024 / 1024)}GB)
-                        </option>
-                      ))
-                    ) : (
-                      <option value={form.ai.ollama.model}>{form.ai.ollama.model}</option>
+                    {ollamaModels.map((m) => (
+                      <option key={m.name} value={m.name}>
+                        {m.name} ({m.size ? `${(m.size / (1024 * 1024 * 1024)).toFixed(1)}GB` : 'local'})
+                      </option>
+                    ))}
+                    {!ollamaModels.some((m) => m.name === form.ai.ollama.model) && (
+                      <option value={form.ai.ollama.model}>{form.ai.ollama.model} (custom)</option>
                     )}
                   </select>
                 </div>
               </div>
+
+              {/* Status report */}
+              {ollamaStatus && (
+                <div
+                  className={`p-3 border rounded-md text-xs flex items-center justify-between ${
+                    ollamaStatus.connected
+                      ? isDark
+                        ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
+                        : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                      : isDark
+                      ? 'bg-rose-950/40 text-rose-200 border-rose-800'
+                      : 'bg-rose-50 text-rose-800 border-rose-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {ollamaStatus.connected ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-rose-500" />
+                    )}
+                    <span>
+                      {ollamaStatus.connected
+                        ? `Ollama is connected (Version: ${ollamaStatus.version || 'OK'})`
+                        : `Ollama is unreachable: ${ollamaStatus.error}`}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* GEMINI CONFIGURATION */}
           {form.ai.provider === 'gemini' && (
             <div
-              className={
-                isMinimalLight
-                  ? 'bg-white p-5 border border-slate-200 rounded-lg shadow-sm space-y-4 text-slate-800'
-                  : isMinimalDark
-                  ? 'bg-[#27272A] p-5 border border-zinc-700 rounded-lg shadow-sm space-y-4 text-zinc-100'
-                  : 'bg-white p-5 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-4 text-black'
-              }
+              className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+                isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+              }`}
             >
-              <h3 className={`pb-2 ${isMinimal ? 'font-bold text-sm uppercase border-b border-slate-200 dark:border-zinc-700' : 'font-black text-sm uppercase border-b-2 border-black'}`}>Gemini API Settings</h3>
+              <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+                <h3 className="font-semibold text-sm uppercase">Google Gemini Settings</h3>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setTestingGemini(true);
+                    const res = await checkGemini(form.ai.gemini.apiKey, form.ai.gemini.model);
+                    setGeminiStatus(res);
+                    setTestingGemini(false);
+                  }}
+                  className={`px-3 py-1 font-medium text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                    isDark
+                      ? 'bg-zinc-800 text-zinc-200 border-zinc-700 hover:bg-zinc-750'
+                      : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
+                  }`}
+                >
+                  <Zap className={`w-3.5 h-3.5 text-blue-500 ${testingGemini ? 'animate-spin' : ''}`} />
+                  <span>Test API Connection</span>
+                </button>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>Gemini API Key</label>
+                  <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                    Gemini API Key
+                  </label>
                   <input
                     type="password"
                     value={form.ai.gemini.apiKey}
                     onChange={(e) =>
                       setForm({
                         ...form,
-                        ai: { ...form.ai, gemini: { ...form.ai.gemini, apiKey: e.target.value } },
+                        ai: {
+                          ...form.ai,
+                          gemini: { ...form.ai.gemini, apiKey: e.target.value },
+                          apiKey: e.target.value,
+                        },
                       })
                     }
-                    className={
-                      isMinimalLight
-                        ? 'w-full bg-white text-slate-900 text-xs font-mono font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : isMinimalDark
-                        ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-mono font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : 'w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black'
-                    }
                     placeholder="AIzaSy..."
+                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                      isDark
+                        ? 'bg-zinc-800 text-zinc-100 border-zinc-700'
+                        : 'bg-white text-zinc-900 border-zinc-300'
+                    }`}
                   />
                 </div>
 
                 <div>
-                  <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>Gemini Model</label>
+                  <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                    Gemini Model
+                  </label>
                   <select
                     value={form.ai.gemini.model}
                     onChange={(e) =>
                       setForm({
                         ...form,
-                        ai: { ...form.ai, gemini: { ...form.ai.gemini, model: e.target.value } },
+                        ai: {
+                          ...form.ai,
+                          gemini: { ...form.ai.gemini, model: e.target.value },
+                          model: e.target.value,
+                        },
                       })
                     }
-                    className={
-                      isMinimalLight
-                        ? 'w-full bg-white text-slate-900 text-xs font-mono font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
-                        : isMinimalDark
-                        ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-mono font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
-                        : 'w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black cursor-pointer'
-                    }
+                    className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                      isDark
+                        ? 'bg-zinc-800 text-zinc-100 border-zinc-700'
+                        : 'bg-white text-zinc-900 border-zinc-300'
+                    }`}
                   >
                     {geminiModels.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.name}
+                        {m.name} ({m.id})
                       </option>
                     ))}
+                    {!geminiModels.some((m) => m.id === form.ai.gemini.model) && (
+                      <option value={form.ai.gemini.model}>{form.ai.gemini.model}</option>
+                    )}
                   </select>
                 </div>
               </div>
+
+              {geminiStatus && (
+                <div
+                  className={`p-3 border rounded-md text-xs flex items-center justify-between ${
+                    geminiStatus.connected
+                      ? isDark
+                        ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
+                        : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                      : isDark
+                      ? 'bg-rose-950/40 text-rose-200 border-rose-800'
+                      : 'bg-rose-50 text-rose-800 border-rose-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {geminiStatus.connected ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-rose-500" />
+                    )}
+                    <span>
+                      {geminiStatus.connected
+                        ? `Gemini is reachable (Model: ${geminiStatus.model || form.ai.gemini.model})`
+                        : `Gemini test failed: ${geminiStatus.error}`}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* CUSTOM AI PROVIDER (9Router Style) */}
+          {/* CUSTOM AI PROVIDERS (9Router Flexibility) */}
           {(form.ai.provider === 'custom' || (!['ollama', 'gemini'].includes(form.ai.provider))) && (
             <div
-              className={
-                isMinimalLight
-                  ? 'bg-white p-5 border border-slate-200 rounded-lg shadow-sm space-y-4 text-slate-800'
-                  : isMinimalDark
-                  ? 'bg-[#27272A] p-5 border border-zinc-700 rounded-lg shadow-sm space-y-4 text-zinc-100'
-                  : 'bg-white p-5 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-4 text-black'
-              }
+              className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+                isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+              }`}
             >
-              <div className={`flex items-center justify-between pb-2 ${isMinimal ? 'border-b border-slate-200 dark:border-zinc-700' : 'border-b-2 border-black'}`}>
-                <h3 className={`flex items-center gap-2 ${isMinimal ? 'font-bold text-sm uppercase' : 'font-black text-sm uppercase'}`}>
-                  <Sparkles className="w-4 h-4 text-blue-500" />
-                  <span>Custom AI Provider Configuration</span>
+              <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+                <h3 className="font-semibold text-sm uppercase flex items-center gap-2">
+                  <span>Custom AI / 9Router Provider</span>
                 </h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newId = `custom_${Date.now()}`;
+                      const newProvider: CustomAIProviderConfig = {
+                        id: newId,
+                        name: 'New Custom Provider',
+                        protocol: 'openai-compatible',
+                        baseUrl: 'https://api.openai.com/v1',
+                        apiKey: '',
+                        model: 'gpt-4o-mini',
+                        temperature: 0.2,
+                        authType: 'bearer',
+                      };
+                      setForm({
+                        ...form,
+                        ai: {
+                          ...form.ai,
+                          customProviders: [...(form.ai.customProviders || []), newProvider],
+                        },
+                      });
+                      setSelectedCustomAiId(newId);
+                    }}
+                    className={`px-2.5 py-1 text-xs font-medium rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-zinc-800 text-zinc-200 border-zinc-700 hover:bg-zinc-750'
+                        : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
+                    }`}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Provider</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Provider Fields */}
+              {/* Provider Selector Tabs */}
+              <div className="flex flex-wrap gap-2">
+                {(form.ai.customProviders || []).map((prov) => (
+                  <button
+                    key={prov.id}
+                    type="button"
+                    onClick={() => setSelectedCustomAiId(prov.id)}
+                    className={`px-3 py-1 text-xs font-medium rounded border flex items-center gap-1.5 cursor-pointer transition-colors ${
+                      selectedCustomAiId === prov.id
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                        : isDark
+                        ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
+                        : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
+                    }`}
+                  >
+                    <span>{prov.name}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Active Custom Provider Form */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>Provider Name / Label</label>
+                  <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>Provider Name</label>
                   <input
                     type="text"
                     value={activeCustomAiConfig.name}
                     onChange={(e) => {
-                      const updated = (form.ai.customProviders || [activeCustomAiConfig]).map((p) =>
+                      const updated = (form.ai.customProviders || []).map((p) =>
                         p.id === activeCustomAiConfig.id ? { ...p, name: e.target.value } : p
                       );
                       setForm({ ...form, ai: { ...form.ai, customProviders: updated } });
                     }}
-                    className={
-                      isMinimalLight
-                        ? 'w-full bg-white text-slate-900 text-xs font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : isMinimalDark
-                        ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : 'w-full bg-zinc-50 text-black text-xs font-bold p-2.5 border-2 border-black'
-                    }
-                    placeholder="e.g. OpenRouter / DeepSeek V3"
+                    className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                      isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                    }`}
                   />
                 </div>
 
                 <div>
-                  <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>Protocol / Format</label>
-                  <select
-                    value={activeCustomAiConfig.protocol}
-                    onChange={(e) => {
-                      const updated = (form.ai.customProviders || [activeCustomAiConfig]).map((p) =>
-                        p.id === activeCustomAiConfig.id ? { ...p, protocol: e.target.value as any } : p
-                      );
-                      setForm({ ...form, ai: { ...form.ai, customProviders: updated } });
-                    }}
-                    className={
-                      isMinimalLight
-                        ? 'w-full bg-white text-slate-900 text-xs font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
-                        : isMinimalDark
-                        ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
-                        : 'w-full bg-zinc-50 text-black text-xs font-bold p-2.5 border-2 border-black cursor-pointer'
-                    }
-                  >
-                    <option value="openai-compatible">OpenAI-Compatible (/chat/completions)</option>
-                    <option value="gemini">Gemini Compatible</option>
-                    <option value="ollama">Ollama Compatible</option>
-                    <option value="custom-rest">Custom REST JSON</option>
-                  </select>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>
-                    API Endpoint / Base URL (e.g. https://openrouter.ai/api/v1 or https://api.groq.com/openai/v1)
-                  </label>
+                  <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>Base API URL</label>
                   <input
                     type="text"
                     value={activeCustomAiConfig.baseUrl}
                     onChange={(e) => {
-                      const updated = (form.ai.customProviders || [activeCustomAiConfig]).map((p) =>
+                      const updated = (form.ai.customProviders || []).map((p) =>
                         p.id === activeCustomAiConfig.id ? { ...p, baseUrl: e.target.value } : p
                       );
                       setForm({ ...form, ai: { ...form.ai, customProviders: updated } });
                     }}
-                    className={
-                      isMinimalLight
-                        ? 'w-full bg-white text-slate-900 text-xs font-mono font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : isMinimalDark
-                        ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-mono font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : 'w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black'
-                    }
                     placeholder="https://openrouter.ai/api/v1"
+                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                      isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                    }`}
                   />
-                </div>
-
-                <div>
-                  <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>API Key / Token</label>
-                  <div className="relative">
-                    <input
-                      type={showApiKeyCustomAi ? 'text' : 'password'}
-                      value={activeCustomAiConfig.apiKey || ''}
-                      onChange={(e) => {
-                        const updated = (form.ai.customProviders || [activeCustomAiConfig]).map((p) =>
-                          p.id === activeCustomAiConfig.id ? { ...p, apiKey: e.target.value } : p
-                        );
-                        setForm({ ...form, ai: { ...form.ai, customProviders: updated } });
-                      }}
-                      className={
-                        isMinimalLight
-                          ? 'w-full bg-white text-slate-900 text-xs font-mono font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 pr-9'
-                          : isMinimalDark
-                          ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-mono font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 pr-9'
-                          : 'w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black pr-9'
-                      }
-                      placeholder="sk-..."
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKeyCustomAi(!showApiKeyCustomAi)}
-                      className={`absolute right-2.5 top-2.5 cursor-pointer ${isMinimal ? 'text-slate-400 dark:text-zinc-400 hover:text-slate-600 dark:hover:text-zinc-200' : 'text-zinc-500 hover:text-black'}`}
-                    >
-                      {showApiKeyCustomAi ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className={isMinimal ? 'text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase' : 'text-xs font-black uppercase'}>Model Identifier</label>
+                    <label className={`block text-xs font-semibold uppercase ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>API Key</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKeyCustomAi(!showApiKeyCustomAi)}
+                      className="text-[10px] text-blue-500 hover:underline"
+                    >
+                      {showApiKeyCustomAi ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                  <input
+                    type={showApiKeyCustomAi ? 'text' : 'password'}
+                    value={activeCustomAiConfig.apiKey || ''}
+                    onChange={(e) => {
+                      const updated = (form.ai.customProviders || []).map((p) =>
+                        p.id === activeCustomAiConfig.id ? { ...p, apiKey: e.target.value } : p
+                      );
+                      setForm({ ...form, ai: { ...form.ai, customProviders: updated } });
+                    }}
+                    placeholder="sk-..."
+                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                      isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>Model ID</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={activeCustomAiConfig.model}
+                      onChange={(e) => {
+                        const updated = (form.ai.customProviders || []).map((p) =>
+                          p.id === activeCustomAiConfig.id ? { ...p, model: e.target.value } : p
+                        );
+                        setForm({ ...form, ai: { ...form.ai, customProviders: updated } });
+                      }}
+                      placeholder="e.g. meta-llama/llama-3.3-70b-instruct"
+                      className={`flex-1 text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                        isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                      }`}
+                    />
                     <button
                       type="button"
                       onClick={() => handleFetchCustomAiModels(activeCustomAiConfig)}
                       disabled={fetchingCustomAiModels}
-                      className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-1"
+                      className={`px-3 py-1 font-medium text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                        isDark
+                          ? 'bg-zinc-800 text-zinc-200 border-zinc-700 hover:bg-zinc-750'
+                          : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
+                      }`}
+                      title="Auto-fetch available models from /models endpoint"
                     >
-                      <RefreshCw className={`w-3 h-3 ${fetchingCustomAiModels ? 'animate-spin' : ''}`} />
-                      <span>Fetch /models</span>
+                      <RefreshCw className={`w-3.5 h-3.5 ${fetchingCustomAiModels ? 'animate-spin' : ''}`} />
+                      <span>Models</span>
                     </button>
                   </div>
-                  <input
-                    type="text"
-                    value={activeCustomAiConfig.model}
-                    onChange={(e) => {
-                      const updated = (form.ai.customProviders || [activeCustomAiConfig]).map((p) =>
-                        p.id === activeCustomAiConfig.id ? { ...p, model: e.target.value } : p
-                      );
-                      setForm({ ...form, ai: { ...form.ai, customProviders: updated } });
-                    }}
-                    className={
-                      isMinimalLight
-                        ? 'w-full bg-white text-slate-900 text-xs font-mono font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : isMinimalDark
-                        ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-mono font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : 'w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black'
-                    }
-                    placeholder="e.g. deepseek/deepseek-chat, gpt-4o-mini, llama-3.3-70b-versatile"
-                  />
                 </div>
               </div>
 
-              {/* Action: Test Custom AI Connection */}
-              <div className={`pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${isMinimal ? 'border-t border-slate-200 dark:border-zinc-700' : 'border-t-2 border-black'}`}>
+              {/* Action Buttons for Custom AI */}
+              <div className="flex items-center gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => handleTestCustomAi(activeCustomAiConfig)}
                   disabled={testingCustomAi}
-                  className={
-                    isMinimal
-                      ? 'px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors'
-                      : 'px-4 py-2 bg-[#FFD93D] hover:bg-[#ffe066] text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_#000000] flex items-center gap-1.5 cursor-pointer'
-                  }
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
-                  {testingCustomAi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                  <Zap className={`w-3.5 h-3.5 ${testingCustomAi ? 'animate-spin' : ''}`} />
                   <span>Test Connection</span>
                 </button>
 
-                {customAiTestResult && (
-                  <div
-                    className={
-                      isMinimal
-                        ? `text-xs font-medium px-3 py-1.5 rounded border ${
-                            customAiTestResult.connected
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-                              : 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
-                          }`
-                        : `text-xs font-bold px-3 py-1.5 border-2 border-black ${
-                            customAiTestResult.connected ? 'bg-emerald-100 text-emerald-900' : 'bg-red-100 text-red-900'
-                          }`
-                    }
+                {(form.ai.customProviders || []).length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const remaining = (form.ai.customProviders || []).filter(
+                        (p) => p.id !== activeCustomAiConfig.id
+                      );
+                      setForm({ ...form, ai: { ...form.ai, customProviders: remaining } });
+                      setSelectedCustomAiId(remaining[0]?.id || '');
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-rose-950/40 text-rose-300 border-rose-800 hover:bg-rose-900/40'
+                        : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                    }`}
                   >
-                    {customAiTestResult.message || customAiTestResult.error}
-                  </div>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Provider</span>
+                  </button>
                 )}
               </div>
+
+              {/* Custom AI Test Result Banner */}
+              {customAiTestResult && (
+                <div
+                  className={`p-3 border rounded-md text-xs space-y-1 ${
+                    customAiTestResult.connected
+                      ? isDark
+                        ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
+                        : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                      : isDark
+                      ? 'bg-rose-950/40 text-rose-200 border-rose-800'
+                      : 'bg-rose-50 text-rose-800 border-rose-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 font-semibold">
+                    {customAiTestResult.connected ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-rose-500" />
+                    )}
+                    <span>{customAiTestResult.message || (customAiTestResult.connected ? 'Connected' : 'Error')}</span>
+                  </div>
+                  {customAiTestResult.models && customAiTestResult.models.length > 0 && (
+                    <div className="pt-1">
+                      <span className="font-semibold block mb-1">Available Models:</span>
+                      <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                        {customAiTestResult.models.map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => {
+                              const updated = (form.ai.customProviders || []).map((p) =>
+                                p.id === activeCustomAiConfig.id ? { ...p, model: m } : p
+                              );
+                              setForm({ ...form, ai: { ...form.ai, customProviders: updated } });
+                            }}
+                            className={`px-1.5 py-0.5 text-[10px] font-mono rounded border cursor-pointer ${
+                              isDark ? 'bg-zinc-800 border-zinc-700 text-zinc-200' : 'bg-white border-zinc-200 text-zinc-800'
+                            }`}
+                          >
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -908,24 +1000,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div
               onClick={() => setForm({ ...form, tts: { ...form.tts, provider: 'piper' } })}
-              className={
-                isMinimal
-                  ? `p-4 border rounded-lg cursor-pointer transition-all ${
-                      form.tts.provider === 'piper'
-                        ? isMinimalDark
-                          ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
-                          : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
-                        : isMinimalDark
-                        ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
-                        : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                    }`
-                  : `p-4 border-4 border-black cursor-pointer shadow-[4px_4px_0px_#000000] ${
-                      form.tts.provider === 'piper' ? 'bg-[#4ADE80] text-black font-black' : 'bg-white text-black'
-                    }`
-              }
+              className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                form.tts.provider === 'piper'
+                  ? isDark
+                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
+                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
+                  : isDark
+                  ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
+                  : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300'
+              }`}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className={isMinimal ? 'text-sm font-bold' : 'text-base font-black uppercase'}>Local Piper TTS</span>
+                <span className="text-sm font-semibold">Local Piper TTS</span>
                 <input
                   type="radio"
                   name="tts_provider"
@@ -934,29 +1020,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   className="w-4 h-4 accent-blue-600"
                 />
               </div>
-              <p className={isMinimal ? 'text-xs text-slate-500 dark:text-zinc-400' : 'text-xs font-bold opacity-90'}>Fast offline neural speech with American & British voices.</p>
+              <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                100% offline neural voice synthesis running directly on your computer.
+              </p>
             </div>
 
             <div
               onClick={() => setForm({ ...form, tts: { ...form.tts, provider: 'online' } })}
-              className={
-                isMinimal
-                  ? `p-4 border rounded-lg cursor-pointer transition-all ${
-                      form.tts.provider === 'online'
-                        ? isMinimalDark
-                          ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
-                          : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
-                        : isMinimalDark
-                        ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
-                        : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                    }`
-                  : `p-4 border-4 border-black cursor-pointer shadow-[4px_4px_0px_#000000] ${
-                      form.tts.provider === 'online' ? 'bg-[#38BDF8] text-black font-black' : 'bg-white text-black'
-                    }`
-              }
+              className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                form.tts.provider === 'online'
+                  ? isDark
+                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
+                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
+                  : isDark
+                  ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
+                  : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300'
+              }`}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className={isMinimal ? 'text-sm font-bold' : 'text-base font-black uppercase'}>Online TTS</span>
+                <span className="text-sm font-semibold">Online Fallback TTS</span>
                 <input
                   type="radio"
                   name="tts_provider"
@@ -965,31 +1047,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   className="w-4 h-4 accent-blue-600"
                 />
               </div>
-              <p className={isMinimal ? 'text-xs text-slate-500 dark:text-zinc-400' : 'text-xs font-bold opacity-90'}>Cloud TTS with zero local Piper setup required.</p>
+              <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                Zero-setup online speech synthesis via Google Speech Services.
+              </p>
             </div>
 
             <div
               onClick={() => setForm({ ...form, tts: { ...form.tts, provider: 'custom' } })}
-              className={
-                isMinimal
-                  ? `p-4 border rounded-lg cursor-pointer transition-all ${
-                      form.tts.provider === 'custom' || (!['piper', 'online'].includes(form.tts.provider))
-                        ? isMinimalDark
-                          ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
-                          : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
-                        : isMinimalDark
-                        ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
-                        : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                    }`
-                  : `p-4 border-4 border-black cursor-pointer shadow-[4px_4px_0px_#000000] ${
-                      form.tts.provider === 'custom' || (!['piper', 'online'].includes(form.tts.provider))
-                        ? 'bg-[#C084FC] text-black font-black'
-                        : 'bg-white text-black'
-                    }`
-              }
+              className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                form.tts.provider === 'custom' || (!['piper', 'online'].includes(form.tts.provider))
+                  ? isDark
+                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
+                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
+                  : isDark
+                  ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
+                  : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300'
+              }`}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className={isMinimal ? 'text-sm font-bold' : 'text-base font-black uppercase'}>Custom TTS Provider</span>
+                <span className="text-sm font-semibold">Custom TTS Provider</span>
                 <input
                   type="radio"
                   name="tts_provider"
@@ -998,245 +1074,288 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   className="w-4 h-4 accent-blue-600"
                 />
               </div>
-              <p className={isMinimal ? 'text-xs text-slate-500 dark:text-zinc-400' : 'text-xs font-bold opacity-90'}>OpenAI Speech, ElevenLabs, or Custom Audio Endpoint.</p>
+              <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                Connect OpenAI Audio Speech, ElevenLabs, Azure, or self-hosted TTS services.
+              </p>
             </div>
           </div>
 
-          {/* NUMERIC SLOW SPEED / LENGTH SCALE CONFIGURATION */}
-          <div
-            className={
-              isMinimalLight
-                ? 'bg-white p-5 border border-slate-200 rounded-lg shadow-sm space-y-4 text-slate-800'
-                : isMinimalDark
-                ? 'bg-[#27272A] p-5 border border-zinc-700 rounded-lg shadow-sm space-y-4 text-zinc-100'
-                : 'bg-white p-5 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-4 text-black'
-            }
-          >
-            <h3 className={`pb-2 flex items-center gap-2 ${isMinimal ? 'font-bold text-sm uppercase border-b border-slate-200 dark:border-zinc-700' : 'font-black text-sm uppercase border-b-2 border-black'}`}>
-              <Volume2 className="w-4 h-4" />
-              <span>Slow Audio Speed Factor / Length Scale</span>
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-              <div>
-                <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>
-                  Slowdown Factor (Length Scale: {form.tts.slowSpeed}x)
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="1.05"
-                    max="1.80"
-                    step="0.05"
-                    value={form.tts.slowSpeed}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        tts: { ...form.tts, slowSpeed: parseFloat(e.target.value) },
-                      })
-                    }
-                    className="flex-1 accent-blue-600 cursor-pointer"
-                  />
-                  <input
-                    type="number"
-                    min="1.05"
-                    max="2.00"
-                    step="0.05"
-                    value={form.tts.slowSpeed}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        tts: { ...form.tts, slowSpeed: parseFloat(e.target.value) || 1.25 },
-                      })
-                    }
-                    className={
-                      isMinimalLight
-                        ? 'w-20 bg-white text-slate-900 text-xs font-mono font-medium p-2 border border-slate-300 rounded-md text-center focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : isMinimalDark
-                        ? 'w-20 bg-zinc-800 text-zinc-100 text-xs font-mono font-medium p-2 border border-zinc-700 rounded-md text-center focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : 'w-20 bg-zinc-50 text-black text-xs font-mono font-bold p-2 border-2 border-black text-center'
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className={isMinimal ? 'bg-slate-50 dark:bg-zinc-800/60 p-3 rounded-md border border-slate-200 dark:border-zinc-700 text-xs text-slate-600 dark:text-zinc-400' : 'bg-zinc-50 p-3 border-2 border-black text-xs text-zinc-700 font-bold'}>
-                💡 Higher value (e.g. 1.25 – 1.40) produces genuinely slower, clearer audio pronunciation for learning.
-              </div>
-            </div>
-          </div>
-
-          {/* CUSTOM TTS CONFIGURATION */}
-          {(form.tts.provider === 'custom' || (!['piper', 'online'].includes(form.tts.provider))) && (
+          {/* PIPER CONFIG */}
+          {form.tts.provider === 'piper' && (
             <div
-              className={
-                isMinimalLight
-                  ? 'bg-white p-5 border border-slate-200 rounded-lg shadow-sm space-y-4 text-slate-800'
-                  : isMinimalDark
-                  ? 'bg-[#27272A] p-5 border border-zinc-700 rounded-lg shadow-sm space-y-4 text-zinc-100'
-                  : 'bg-white p-5 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-4 text-black'
-              }
+              className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+                isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+              }`}
             >
-              <div className={`flex items-center justify-between pb-2 ${isMinimal ? 'border-b border-slate-200 dark:border-zinc-700' : 'border-b-2 border-black'}`}>
-                <h3 className={isMinimal ? 'font-bold text-sm uppercase' : 'font-black text-sm uppercase'}>Custom TTS Provider Settings</h3>
+              <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+                <h3 className="font-semibold text-sm uppercase">Piper TTS Configuration</h3>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setTestingPiper(true);
+                    const res = await runTTSDiagnostics();
+                    setPiperDiag(res);
+                    setTestingPiper(false);
+                  }}
+                  className={`px-3 py-1 font-medium text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                    isDark
+                      ? 'bg-zinc-800 text-zinc-200 border-zinc-700 hover:bg-zinc-750'
+                      : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
+                  }`}
+                >
+                  <Zap className={`w-3.5 h-3.5 text-blue-500 ${testingPiper ? 'animate-spin' : ''}`} />
+                  <span>Run Voice Diagnostic</span>
+                </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>Provider Name</label>
+                  <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                    Piper Endpoint
+                  </label>
                   <input
                     type="text"
-                    value={activeCustomTtsConfig.name}
-                    onChange={(e) => {
-                      const updated = (form.tts.customProviders || [activeCustomTtsConfig]).map((p) =>
-                        p.id === activeCustomTtsConfig.id ? { ...p, name: e.target.value } : p
-                      );
-                      setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
-                    }}
-                    className={
-                      isMinimalLight
-                        ? 'w-full bg-white text-slate-900 text-xs font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : isMinimalDark
-                        ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : 'w-full bg-zinc-50 text-black text-xs font-bold p-2.5 border-2 border-black'
-                    }
-                    placeholder="e.g. OpenAI Speech TTS"
+                    value={form.tts.endpoint}
+                    onChange={(e) => setForm({ ...form, tts: { ...form.tts, endpoint: e.target.value } })}
+                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                      isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                    }`}
                   />
                 </div>
 
                 <div>
-                  <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>Protocol / Format</label>
+                  <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                    Default Piper Voice
+                  </label>
                   <select
-                    value={activeCustomTtsConfig.protocol}
-                    onChange={(e) => {
-                      const updated = (form.tts.customProviders || [activeCustomTtsConfig]).map((p) =>
-                        p.id === activeCustomTtsConfig.id ? { ...p, protocol: e.target.value as any } : p
-                      );
-                      setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
-                    }}
-                    className={
-                      isMinimalLight
-                        ? 'w-full bg-white text-slate-900 text-xs font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
-                        : isMinimalDark
-                        ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
-                        : 'w-full bg-zinc-50 text-black text-xs font-bold p-2.5 border-2 border-black cursor-pointer'
-                    }
+                    value={form.tts.voice}
+                    onChange={(e) => setForm({ ...form, tts: { ...form.tts, voice: e.target.value } })}
+                    className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                      isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                    }`}
                   >
-                    <option value="openai-speech">OpenAI Speech (/v1/audio/speech)</option>
-                    <option value="elevenlabs">ElevenLabs TTS</option>
-                    <option value="google-translate">Google Translate Web TTS</option>
-                    <option value="piper-http">Piper HTTP Daemon</option>
-                    <option value="custom-http">Custom REST POST/GET</option>
+                    {piperVoices.map((v) => (
+                      <option key={v.key} value={v.key}>
+                        {v.name} ({v.quality})
+                      </option>
+                    ))}
+                    {!piperVoices.some((v) => v.key === form.tts.voice) && (
+                      <option value={form.tts.voice}>{form.tts.voice}</option>
+                    )}
                   </select>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>Endpoint URL</label>
-                  <input
-                    type="text"
-                    value={activeCustomTtsConfig.endpoint}
-                    onChange={(e) => {
-                      const updated = (form.tts.customProviders || [activeCustomTtsConfig]).map((p) =>
-                        p.id === activeCustomTtsConfig.id ? { ...p, endpoint: e.target.value } : p
-                      );
-                      setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
-                    }}
-                    className={
-                      isMinimalLight
-                        ? 'w-full bg-white text-slate-900 text-xs font-mono font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : isMinimalDark
-                        ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-mono font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : 'w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black'
-                    }
-                    placeholder="https://api.openai.com/v1/audio/speech"
-                  />
-                </div>
-
-                <div>
-                  <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>API Key</label>
-                  <div className="relative">
-                    <input
-                      type={showApiKeyCustomTts ? 'text' : 'password'}
-                      value={activeCustomTtsConfig.apiKey || ''}
-                      onChange={(e) => {
-                        const updated = (form.tts.customProviders || [activeCustomTtsConfig]).map((p) =>
-                          p.id === activeCustomTtsConfig.id ? { ...p, apiKey: e.target.value } : p
-                        );
-                        setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
-                      }}
-                      className={
-                        isMinimalLight
-                          ? 'w-full bg-white text-slate-900 text-xs font-mono font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 pr-9'
-                          : isMinimalDark
-                          ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-mono font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 pr-9'
-                          : 'w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black pr-9'
-                      }
-                      placeholder="sk-..."
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKeyCustomTts(!showApiKeyCustomTts)}
-                      className={`absolute right-2.5 top-2.5 cursor-pointer ${isMinimal ? 'text-slate-400 dark:text-zinc-400 hover:text-slate-600 dark:hover:text-zinc-200' : 'text-zinc-500 hover:text-black'}`}
-                    >
-                      {showApiKeyCustomTts ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>Voice Identifier</label>
-                  <input
-                    type="text"
-                    value={activeCustomTtsConfig.voice}
-                    onChange={(e) => {
-                      const updated = (form.tts.customProviders || [activeCustomTtsConfig]).map((p) =>
-                        p.id === activeCustomTtsConfig.id ? { ...p, voice: e.target.value } : p
-                      );
-                      setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
-                    }}
-                    className={
-                      isMinimalLight
-                        ? 'w-full bg-white text-slate-900 text-xs font-mono font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : isMinimalDark
-                        ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-mono font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                        : 'w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black'
-                    }
-                    placeholder="alloy, nova, echo, rachel..."
-                  />
                 </div>
               </div>
 
-              {/* TEST VOICE BUTTON */}
-              <div className={`pt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${isMinimal ? 'border-t border-slate-200 dark:border-zinc-700' : 'border-t-2 border-black'}`}>
+              {piperDiag && (
+                <div
+                  className={`p-3 border rounded-md text-xs space-y-1.5 ${
+                    piperDiag.success
+                      ? isDark
+                        ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
+                        : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                      : isDark
+                      ? 'bg-rose-950/40 text-rose-200 border-rose-800'
+                      : 'bg-rose-50 text-rose-800 border-rose-200'
+                  }`}
+                >
+                  <div className="font-semibold flex items-center gap-1.5">
+                    {piperDiag.success ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <XCircle className="w-4 h-4 text-rose-500" />}
+                    <span>{piperDiag.message}</span>
+                  </div>
+                  {piperDiag.audioBase64 && (
+                    <div className="pt-1">
+                      <AudioPlayer base64Wav={piperDiag.audioBase64} label="Test Voice Sample" size="sm" />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ONLINE TTS CONFIG */}
+          {form.tts.provider === 'online' && (
+            <div
+              className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+                isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+              }`}
+            >
+              <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+                <h3 className="font-semibold text-sm uppercase">Online Speech Services</h3>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setTestingOnlineTts(true);
+                    const res = await runOnlineTTSDiagnostics();
+                    setOnlineTtsDiag(res);
+                    setTestingOnlineTts(false);
+                  }}
+                  className={`px-3 py-1 font-medium text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                    isDark
+                      ? 'bg-zinc-800 text-zinc-200 border-zinc-700 hover:bg-zinc-750'
+                      : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
+                  }`}
+                >
+                  <Zap className={`w-3.5 h-3.5 text-blue-500 ${testingOnlineTts ? 'animate-spin' : ''}`} />
+                  <span>Test Online Voice</span>
+                </button>
+              </div>
+
+              <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                Online TTS automatically generates clear standard pronunciation for words and sentences without requiring local piper models.
+              </p>
+
+              {onlineTtsDiag && (
+                <div
+                  className={`p-3 border rounded-md text-xs space-y-1.5 ${
+                    onlineTtsDiag.success
+                      ? isDark
+                        ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
+                        : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                      : isDark
+                      ? 'bg-rose-950/40 text-rose-200 border-rose-800'
+                      : 'bg-rose-50 text-rose-800 border-rose-200'
+                  }`}
+                >
+                  <div className="font-semibold flex items-center gap-1.5">
+                    {onlineTtsDiag.success ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <XCircle className="w-4 h-4 text-rose-500" />}
+                    <span>{onlineTtsDiag.message}</span>
+                  </div>
+                  {onlineTtsDiag.audioBase64 && (
+                    <div className="pt-1">
+                      <AudioPlayer base64Wav={onlineTtsDiag.audioBase64} label="Online Sample Playback" size="sm" />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* CUSTOM TTS CONFIG */}
+          {(form.tts.provider === 'custom' || (!['piper', 'online'].includes(form.tts.provider))) && (
+            <div
+              className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+                isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+              }`}
+            >
+              <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+                <h3 className="font-semibold text-sm uppercase">Custom TTS Endpoint</h3>
                 <button
                   type="button"
                   onClick={() => handleTestCustomTts(activeCustomTtsConfig)}
                   disabled={testingCustomTts}
-                  className={
-                    isMinimal
-                      ? 'px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors'
-                      : 'px-4 py-2 bg-[#FFD93D] hover:bg-[#ffe066] text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_#000000] flex items-center gap-1.5 cursor-pointer'
-                  }
+                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
-                  {testingCustomTts ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                  <span>Test Voice</span>
+                  <Zap className={`w-3.5 h-3.5 ${testingCustomTts ? 'animate-spin' : ''}`} />
+                  <span>Test Custom TTS</span>
                 </button>
-
-                {customTtsTestResult && customTtsTestResult.normalAudioBase64 && (
-                  <div className={isMinimal ? 'flex items-center gap-3 bg-slate-50 dark:bg-zinc-800 p-2 rounded-md border border-slate-200 dark:border-zinc-700' : 'flex items-center gap-3 bg-zinc-100 p-2 border-2 border-black'}>
-                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">✓ Audio Generated:</span>
-                    <AudioPlayer base64={customTtsTestResult.normalAudioBase64} label="Normal" />
-                    {customTtsTestResult.slowAudioBase64 && (
-                      <AudioPlayer base64={customTtsTestResult.slowAudioBase64} label="Slow" />
-                    )}
-                  </div>
-                )}
-                {customTtsTestResult && customTtsTestResult.error && (
-                  <div className={isMinimal ? 'text-xs font-medium text-rose-600 bg-rose-50 dark:bg-rose-950/40 p-2 rounded border border-rose-200 dark:border-rose-800' : 'text-xs font-bold text-red-600 bg-red-50 p-2 border-2 border-black'}>
-                    ✕ {customTtsTestResult.error}
-                  </div>
-                )}
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>TTS Endpoint</label>
+                  <input
+                    type="text"
+                    value={activeCustomTtsConfig.endpoint}
+                    onChange={(e) => {
+                      const updated = (form.tts.customProviders || []).map((p) =>
+                        p.id === activeCustomTtsConfig.id ? { ...p, endpoint: e.target.value } : p
+                      );
+                      setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
+                    }}
+                    placeholder="https://api.openai.com/v1/audio/speech"
+                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                      isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className={`block text-xs font-semibold uppercase ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>API Key</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKeyCustomTts(!showApiKeyCustomTts)}
+                      className="text-[10px] text-blue-500 hover:underline"
+                    >
+                      {showApiKeyCustomTts ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                  <input
+                    type={showApiKeyCustomTts ? 'text' : 'password'}
+                    value={activeCustomTtsConfig.apiKey || ''}
+                    onChange={(e) => {
+                      const updated = (form.tts.customProviders || []).map((p) =>
+                        p.id === activeCustomTtsConfig.id ? { ...p, apiKey: e.target.value } : p
+                      );
+                      setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
+                    }}
+                    placeholder="sk-..."
+                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                      isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>Voice Name</label>
+                  <input
+                    type="text"
+                    value={activeCustomTtsConfig.voice || 'alloy'}
+                    onChange={(e) => {
+                      const updated = (form.tts.customProviders || []).map((p) =>
+                        p.id === activeCustomTtsConfig.id ? { ...p, voice: e.target.value } : p
+                      );
+                      setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
+                    }}
+                    placeholder="alloy, nova, shimmer, echo"
+                    className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                      isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>Model</label>
+                  <input
+                    type="text"
+                    value={activeCustomTtsConfig.model || 'tts-1'}
+                    onChange={(e) => {
+                      const updated = (form.tts.customProviders || []).map((p) =>
+                        p.id === activeCustomTtsConfig.id ? { ...p, model: e.target.value } : p
+                      );
+                      setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
+                    }}
+                    placeholder="tts-1, tts-1-hd"
+                    className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                      isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              {customTtsTestResult && (
+                <div
+                  className={`p-3 border rounded-md text-xs space-y-1.5 ${
+                    customTtsTestResult.success
+                      ? isDark
+                        ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
+                        : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                      : isDark
+                      ? 'bg-rose-950/40 text-rose-200 border-rose-800'
+                      : 'bg-rose-50 text-rose-800 border-rose-200'
+                  }`}
+                >
+                  <div className="font-semibold flex items-center gap-1.5">
+                    {customTtsTestResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <XCircle className="w-4 h-4 text-rose-500" />}
+                    <span>{customTtsTestResult.success ? 'Custom TTS Synthesis Succeeded!' : `Error: ${customTtsTestResult.error}`}</span>
+                  </div>
+                  {customTtsTestResult.normalAudioBase64 && (
+                    <div className="pt-1">
+                      <AudioPlayer base64Wav={customTtsTestResult.normalAudioBase64} label="Custom TTS Output" size="sm" />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1245,129 +1364,94 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       {/* SUBTAB 3: DICTIONARIES */}
       {activeSubTab === 'dictionary' && (
         <div
-          className={
-            isMinimalLight
-              ? 'bg-white p-5 sm:p-6 border border-slate-200 rounded-lg shadow-sm space-y-5 text-slate-800'
-              : isMinimalDark
-              ? 'bg-[#27272A] p-5 sm:p-6 border border-zinc-700 rounded-lg shadow-sm space-y-5 text-zinc-100'
-              : 'bg-white p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-5 text-black'
-          }
+          className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+          }`}
         >
-          <div className={`pb-2 ${isMinimal ? 'border-b border-slate-200 dark:border-zinc-700' : 'border-b-2 border-black'}`}>
-            <h3 className={`flex items-center gap-2 ${isMinimal ? 'font-bold text-sm uppercase' : 'font-black text-base uppercase'}`}>
-              <BookOpen className="w-4 h-4 text-blue-500" />
-              <span>Multi-Source Dictionary Configuration</span>
-            </h3>
+          <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+            <h3 className="font-semibold text-sm uppercase">Dictionary Sources</h3>
+            <span className="text-xs text-zinc-500 font-medium">Automatic Fallback Engine</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className={isMinimal ? 'p-3.5 bg-slate-50 dark:bg-zinc-800/60 rounded-md border border-slate-200 dark:border-zinc-700' : 'p-3.5 bg-zinc-50 border-2 border-black'}>
-              <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>Persian Meaning Source</label>
-              <select
-                value={form.dictionary.meaningFaSource}
+          <div className="space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.dictionaries?.abadis ?? true}
                 onChange={(e) =>
                   setForm({
                     ...form,
-                    dictionary: { ...form.dictionary, meaningFaSource: e.target.value as any },
+                    dictionaries: { ...form.dictionaries, abadis: e.target.checked },
                   })
                 }
-                className={
-                  isMinimalLight
-                    ? 'w-full bg-white text-slate-900 text-xs font-medium p-2 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
-                    : isMinimalDark
-                    ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-medium p-2 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
-                    : 'w-full bg-white text-black text-xs font-bold p-2 border-2 border-black cursor-pointer'
-                }
-              >
-                <option value="ai">AI Provider (Configured AI Provider)</option>
-                <option value="abadis">Abadis Persian Dictionary (دیکشنری آبادیس)</option>
-                <option value="freedict">Free Dictionary API</option>
-              </select>
-            </div>
+                className="w-4 h-4 accent-blue-600 rounded"
+              />
+              <div>
+                <span className="text-xs font-semibold block">Abadis Persian Dictionary (آبادیس)</span>
+                <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  Fetches verified Persian definitions and accurate phonetic transcriptions.
+                </span>
+              </div>
+            </label>
 
-            <div className={isMinimal ? 'p-3.5 bg-slate-50 dark:bg-zinc-800/60 rounded-md border border-slate-200 dark:border-zinc-700' : 'p-3.5 bg-zinc-50 border-2 border-black'}>
-              <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>English Definition / IPA Source</label>
-              <select
-                value={form.dictionary.definitionEnSource}
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.dictionaries?.freeDictionary ?? true}
                 onChange={(e) =>
                   setForm({
                     ...form,
-                    dictionary: { ...form.dictionary, definitionEnSource: e.target.value as any },
+                    dictionaries: { ...form.dictionaries, freeDictionary: e.target.checked },
                   })
                 }
-                className={
-                  isMinimalLight
-                    ? 'w-full bg-white text-slate-900 text-xs font-medium p-2 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
-                    : isMinimalDark
-                    ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-medium p-2 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
-                    : 'w-full bg-white text-black text-xs font-bold p-2 border-2 border-black cursor-pointer'
-                }
-              >
-                <option value="ai">AI Provider</option>
-                <option value="freedict">Free Dictionary API</option>
-                <option value="wiktionary">Wiktionary API</option>
-              </select>
-            </div>
+                className="w-4 h-4 accent-blue-600 rounded"
+              />
+              <div>
+                <span className="text-xs font-semibold block">FreeDictionary API (English IPA & POS)</span>
+                <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  Authoritative English phonetics, parts of speech, and sample sentences.
+                </span>
+              </div>
+            </label>
           </div>
 
-          {/* Interactive Dictionary Live Test */}
-          <div className={isMinimal ? 'p-4 bg-slate-50 dark:bg-zinc-800/60 rounded-md border border-slate-200 dark:border-zinc-700 space-y-3' : 'p-4 bg-blue-50 border-2 border-black space-y-3'}>
-            <span className={isMinimal ? 'text-xs font-semibold uppercase text-slate-700 dark:text-zinc-300 block' : 'text-xs font-black uppercase text-blue-900 block'}>
-              Live Dictionary Source Test (Abadis & Free Dictionary)
-            </span>
+          {/* Test Dictionary lookup */}
+          <div className={`pt-3 border-t space-y-2 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+            <label className={`block text-xs font-semibold uppercase ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+              Test Dictionary Lookup
+            </label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={dictTestWord}
                 onChange={(e) => setDictTestWord(e.target.value)}
-                className={
-                  isMinimalLight
-                    ? 'bg-white text-slate-900 text-xs font-medium p-2 border border-slate-300 rounded-md w-40 focus:outline-none focus:ring-1 focus:ring-blue-500'
-                    : isMinimalDark
-                    ? 'bg-zinc-800 text-zinc-100 text-xs font-medium p-2 border border-zinc-700 rounded-md w-40 focus:outline-none focus:ring-1 focus:ring-blue-500'
-                    : 'bg-white text-black text-xs font-bold p-2 border-2 border-black w-40'
-                }
-                placeholder="e.g. apple, bank"
+                placeholder="e.g. abandon, diligent"
+                className={`w-48 text-xs font-medium p-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                }`}
               />
               <button
                 type="button"
                 onClick={async () => {
                   setTestingDict(true);
-                  const res = await lookupAbadisDict(dictTestWord);
-                  setDictTestResult(res);
+                  const abRes = await lookupAbadisDict(dictTestWord);
+                  const freeRes = await lookupFreeDict(dictTestWord);
+                  setDictTestResult({ abadis: abRes, freeDictionary: freeRes });
                   setTestingDict(false);
                 }}
-                disabled={testingDict}
-                className={
-                  isMinimal
-                    ? 'px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-sm cursor-pointer transition-colors'
-                    : 'px-3 py-1.5 bg-[#FFD93D] text-black font-black text-xs uppercase border-2 border-black cursor-pointer'
-                }
+                disabled={testingDict || !dictTestWord.trim()}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
               >
-                Test Abadis
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  setTestingDict(true);
-                  const res = await lookupFreeDict(dictTestWord);
-                  setDictTestResult(res);
-                  setTestingDict(false);
-                }}
-                disabled={testingDict}
-                className={
-                  isMinimal
-                    ? 'px-3 py-1.5 bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-750 text-slate-700 dark:text-zinc-200 font-medium text-xs rounded-md border border-slate-300 dark:border-zinc-700 cursor-pointer transition-colors'
-                    : 'px-3 py-1.5 bg-white text-black font-black text-xs uppercase border-2 border-black cursor-pointer'
-                }
-              >
-                Test FreeDict
+                <Zap className={`w-3.5 h-3.5 ${testingDict ? 'animate-spin' : ''}`} />
+                <span>Test Lookup</span>
               </button>
             </div>
+
             {dictTestResult && (
-              <pre className={isMinimal ? 'p-2.5 bg-white dark:bg-zinc-900 text-slate-800 dark:text-zinc-200 text-[11px] font-mono rounded border border-slate-200 dark:border-zinc-700 overflow-x-auto max-h-40' : 'p-2.5 bg-white text-black text-[11px] font-mono border-2 border-black overflow-x-auto max-h-40'}>
-                {JSON.stringify(dictTestResult, null, 2)}
-              </pre>
+              <div className={`p-3 border rounded-md text-xs font-mono space-y-1 ${isDark ? 'bg-zinc-900 border-zinc-700 text-zinc-200' : 'bg-zinc-50 border-zinc-200 text-zinc-800'}`}>
+                <div>Abadis: {dictTestResult.abadis?.meaningFa || 'No match'}</div>
+                <div>FreeDict Phonetic: {dictTestResult.freeDictionary?.phonetic || 'None'}</div>
+              </div>
             )}
           </div>
         </div>
@@ -1376,415 +1460,217 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       {/* SUBTAB 4: SMART IMAGES */}
       {activeSubTab === 'smartImages' && (
         <div
-          className={
-            isMinimalLight
-              ? 'bg-white p-5 sm:p-6 border border-slate-200 rounded-lg shadow-sm space-y-5 text-slate-800'
-              : isMinimalDark
-              ? 'bg-[#27272A] p-5 sm:p-6 border border-zinc-700 rounded-lg shadow-sm space-y-5 text-zinc-100'
-              : 'bg-white p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-5 text-black'
-          }
+          className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+          }`}
         >
-          <div className={`pb-2 ${isMinimal ? 'border-b border-slate-200 dark:border-zinc-700' : 'border-b-2 border-black'}`}>
-            <h3 className={`flex items-center gap-2 ${isMinimal ? 'font-bold text-sm uppercase' : 'font-black text-base uppercase'}`}>
-              <ImageIcon className="w-4 h-4 text-emerald-600" />
-              <span>Smart Images Configuration</span>
-            </h3>
+          <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+            <h3 className="font-semibold text-sm uppercase">Smart Image Search</h3>
+            <span className="text-xs text-zinc-500 font-medium">Automatic & Manual Photo Mode</span>
           </div>
 
-          <div className="space-y-4">
-            <label className="flex items-center gap-2 cursor-pointer">
+          <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+            Images are retrieved via high-speed Unsplash & Wikimedia APIs with offline SVG fallback generation.
+          </p>
+
+          <div className="space-y-2">
+            <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
-                checked={form.smartImages.enabled}
+                checked={form.smartImages?.enabled ?? true}
                 onChange={(e) =>
                   setForm({
                     ...form,
                     smartImages: { ...form.smartImages, enabled: e.target.checked },
                   })
                 }
-                className="w-4 h-4 accent-blue-600"
+                className="w-4 h-4 accent-blue-600 rounded"
               />
-              <span className={isMinimal ? 'text-xs font-semibold' : 'text-xs font-black uppercase'}>
-                Automatically decide whether an image is useful for each vocabulary word
-              </span>
+              <span className="text-xs font-semibold">Enable Smart Images System</span>
             </label>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>Image Decision Provider</label>
-                <select
-                  value={form.smartImages.decisionProvider || 'heuristic'}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      smartImages: { ...form.smartImages, decisionProvider: e.target.value },
-                    })
-                  }
-                  className={
-                    isMinimalLight
-                      ? 'w-full bg-white text-slate-900 text-xs font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
-                      : isMinimalDark
-                      ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
-                      : 'w-full bg-zinc-50 text-black text-xs font-bold p-2.5 border-2 border-black cursor-pointer'
-                  }
-                >
-                  <option value="heuristic">Smart Concrete/Abstract Heuristic (Fast & Reliable)</option>
-                  <option value="ollama">Ollama AI Decision</option>
-                  <option value="gemini">Gemini AI Decision</option>
-                  <option value="custom">Custom AI Decision</option>
-                </select>
-              </div>
-
-              <div>
-                <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>Image Search Provider</label>
-                <select
-                  value={form.smartImages.searchProvider || 'wikimedia'}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      smartImages: { ...form.smartImages, searchProvider: e.target.value as any },
-                    })
-                  }
-                  className={
-                    isMinimalLight
-                      ? 'w-full bg-white text-slate-900 text-xs font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
-                      : isMinimalDark
-                      ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer'
-                      : 'w-full bg-zinc-50 text-black text-xs font-bold p-2.5 border-2 border-black cursor-pointer'
-                  }
-                >
-                  <option value="wikimedia">Wikimedia Commons / Wikipedia (Public Domain / CC)</option>
-                  <option value="google">Google Image Search API</option>
-                  <option value="custom">Custom Image Search API</option>
-                </select>
-              </div>
+          {/* Test Image Search */}
+          <div className={`pt-3 border-t space-y-2 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+            <label className={`block text-xs font-semibold uppercase ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+              Test Image Retrieval
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={imgTestWord}
+                onChange={(e) => setImgTestWord(e.target.value)}
+                placeholder="e.g. apple, bicycle"
+                className={`w-48 text-xs font-medium p-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                }`}
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  setTestingImg(true);
+                  const res = await testSmartImage(imgTestWord);
+                  setImgTestResult(res);
+                  setTestingImg(false);
+                }}
+                disabled={testingImg || !imgTestWord.trim()}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <Zap className={`w-3.5 h-3.5 ${testingImg ? 'animate-spin' : ''}`} />
+                <span>Search Image</span>
+              </button>
             </div>
 
-            {/* Live Image Test */}
-            <div className={isMinimal ? 'p-4 bg-slate-50 dark:bg-zinc-800/60 rounded-md border border-slate-200 dark:border-zinc-700 space-y-3' : 'p-4 bg-emerald-50 border-2 border-black space-y-3'}>
-              <span className={isMinimal ? 'text-xs font-semibold uppercase text-slate-700 dark:text-zinc-300 block' : 'text-xs font-black uppercase text-emerald-900 block'}>
-                Test Smart Image Decision & Retrieval
-              </span>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={imgTestWord}
-                  onChange={(e) => setImgTestWord(e.target.value)}
-                  className={
-                    isMinimalLight
-                      ? 'bg-white text-slate-900 text-xs font-medium p-2 border border-slate-300 rounded-md w-44 focus:outline-none focus:ring-1 focus:ring-blue-500'
-                      : isMinimalDark
-                      ? 'bg-zinc-800 text-zinc-100 text-xs font-medium p-2 border border-zinc-700 rounded-md w-44 focus:outline-none focus:ring-1 focus:ring-blue-500'
-                      : 'bg-white text-black text-xs font-bold p-2 border-2 border-black w-44'
-                  }
-                  placeholder="e.g. eraser, apple, abandon"
-                />
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setTestingImg(true);
-                    const res = await testSmartImage(imgTestWord);
-                    setImgTestResult(res);
-                    setTestingImg(false);
-                  }}
-                  disabled={testingImg}
-                  className={
-                    isMinimal
-                      ? 'px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-sm cursor-pointer flex items-center gap-1.5 transition-colors'
-                      : 'px-4 py-2 bg-[#FFD93D] text-black font-black text-xs uppercase border-2 border-black cursor-pointer flex items-center gap-1.5'
-                  }
-                >
-                  {testingImg ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                  <span>Evaluate Word</span>
-                </button>
-              </div>
-
-              {imgTestResult && (
-                <div className={isMinimal ? 'bg-white dark:bg-zinc-900 p-3 rounded-md border border-slate-200 dark:border-zinc-700 flex flex-col sm:flex-row items-start sm:items-center gap-4' : 'bg-white p-3 border-2 border-black flex flex-col sm:flex-row items-start sm:items-center gap-4'}>
-                  {imgTestResult.imageBase64 && (
-                    <img
-                      src={`data:image/jpeg;base64,${imgTestResult.imageBase64}`}
-                      alt="Preview"
-                      className={isMinimal ? 'w-24 h-24 object-cover rounded border border-slate-300 dark:border-zinc-700' : 'w-24 h-24 object-cover border-2 border-black'}
-                    />
-                  )}
-                  <div className="text-xs">
-                    <div className={isMinimal ? 'font-semibold text-slate-900 dark:text-zinc-100' : 'font-black text-black'}>
-                      Needs Image: {imgTestResult.needsImage ? '✓ YES (Concrete)' : '✕ NO (Abstract/Verb)'}
-                    </div>
-                    <div className="text-slate-500 dark:text-zinc-400 mt-1">{imgTestResult.reason}</div>
-                    {imgTestResult.imageFileName && (
-                      <div className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 mt-1">
-                        Saved as: {imgTestResult.imageFileName}
-                      </div>
-                    )}
-                  </div>
+            {imgTestResult && imgTestResult.imageUrl && (
+              <div className={`p-3 border rounded-md flex items-center gap-3 ${isDark ? 'bg-zinc-900 border-zinc-700' : 'bg-zinc-50 border-zinc-200'}`}>
+                <img src={imgTestResult.imageUrl} alt={imgTestWord} className="w-16 h-16 object-cover rounded border" />
+                <div className="text-xs">
+                  <span className="font-semibold block">Found Image: {imgTestWord}</span>
+                  <span className="text-zinc-500 text-[11px]">{imgTestResult.source}</span>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* SUBTAB 5: DEFAULT CARD */}
+      {/* SUBTAB 5: DEFAULT CARD CONFIG */}
       {activeSubTab === 'defaultCard' && (
         <div
-          className={
-            isMinimalLight
-              ? 'bg-white p-5 sm:p-6 border border-slate-200 rounded-lg shadow-sm space-y-5 text-slate-800'
-              : isMinimalDark
-              ? 'bg-[#27272A] p-5 sm:p-6 border border-zinc-700 rounded-lg shadow-sm space-y-5 text-zinc-100'
-              : 'bg-white p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-5 text-black'
-          }
+          className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+          }`}
         >
-          <div className={`pb-2 ${isMinimal ? 'border-b border-slate-200 dark:border-zinc-700' : 'border-b-2 border-black'}`}>
-            <h3 className={`flex items-center gap-2 ${isMinimal ? 'font-bold text-sm uppercase' : 'font-black text-base uppercase'}`}>
-              <CheckSquare className="w-4 h-4" />
-              <span>Default Card & Audio Selection Settings</span>
-            </h3>
+          <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+            <h3 className="font-semibold text-sm uppercase">Default Card Creation Settings</h3>
           </div>
 
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>Default Flashcard Type</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className={isMinimal ? 'flex items-center gap-2 p-3 border rounded-md bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 cursor-pointer' : 'flex items-center gap-2 p-3 border-2 border-black bg-zinc-50 cursor-pointer'}>
-                  <input
-                    type="radio"
-                    name="card_type"
-                    checked={form.defaultCard.cardType === 'normal'}
-                    onChange={() =>
-                      setForm({
-                        ...form,
-                        defaultCard: { ...form.defaultCard, cardType: 'normal' },
-                      })
-                    }
-                    className="w-4 h-4 accent-blue-600"
-                  />
-                  <span className={isMinimal ? 'text-xs font-semibold' : 'text-xs font-black uppercase'}>Normal Vocabulary Card</span>
-                </label>
-                <label className={isMinimal ? 'flex items-center gap-2 p-3 border rounded-md bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700 cursor-pointer' : 'flex items-center gap-2 p-3 border-2 border-black bg-zinc-50 cursor-pointer'}>
-                  <input
-                    type="radio"
-                    name="card_type"
-                    checked={form.defaultCard.cardType === 'spelling'}
-                    onChange={() =>
-                      setForm({
-                        ...form,
-                        defaultCard: { ...form.defaultCard, cardType: 'spelling' },
-                      })
-                    }
-                    className="w-4 h-4 accent-blue-600"
-                  />
-                  <span className={isMinimal ? 'text-xs font-semibold' : 'text-xs font-black uppercase'}>Interactive Spelling Challenge</span>
-                </label>
-              </div>
+              <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                Default Card Type
+              </label>
+              <select
+                value={form.defaultCard?.cardType || 'normal'}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    defaultCard: { ...form.defaultCard, cardType: e.target.value as any },
+                  })
+                }
+                className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                  isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                }`}
+              >
+                <option value="normal">Normal Vocab Card</option>
+                <option value="spelling">Spelling Challenge Card</option>
+              </select>
             </div>
 
-            <div className={`pt-3 ${isMinimal ? 'border-t border-slate-200 dark:border-zinc-700' : 'border-t-2 border-black'}`}>
-              <span className={isMinimal ? 'text-xs font-semibold uppercase text-slate-700 dark:text-zinc-300 block mb-2' : 'text-xs font-black uppercase block mb-2'}>
-                Audio Generation Checkboxes (Only selected files are generated)
-              </span>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.tts.generateAmericanNormal}
-                    onChange={(e) =>
-                      setForm({ ...form, tts: { ...form.tts, generateAmericanNormal: e.target.checked } })
-                    }
-                    className="w-4 h-4 accent-blue-600"
-                  />
-                  <span className="text-xs font-medium">🇺🇸 American Normal</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.tts.generateAmericanSlow}
-                    onChange={(e) =>
-                      setForm({ ...form, tts: { ...form.tts, generateAmericanSlow: e.target.checked } })
-                    }
-                    className="w-4 h-4 accent-blue-600"
-                  />
-                  <span className="text-xs font-medium">🇺🇸 American Slow</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.tts.generateBritishNormal}
-                    onChange={(e) =>
-                      setForm({ ...form, tts: { ...form.tts, generateBritishNormal: e.target.checked } })
-                    }
-                    className="w-4 h-4 accent-blue-600"
-                  />
-                  <span className="text-xs font-medium">🇬🇧 British Normal</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.tts.generateBritishSlow}
-                    onChange={(e) =>
-                      setForm({ ...form, tts: { ...form.tts, generateBritishSlow: e.target.checked } })
-                    }
-                    className="w-4 h-4 accent-blue-600"
-                  />
-                  <span className="text-xs font-medium">🇬🇧 British Slow</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.tts.generateExampleUs}
-                    onChange={(e) =>
-                      setForm({ ...form, tts: { ...form.tts, generateExampleUs: e.target.checked } })
-                    }
-                    className="w-4 h-4 accent-blue-600"
-                  />
-                  <span className="text-xs font-medium">🇺🇸 Sentence Audio</span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.tts.generateExampleUk}
-                    onChange={(e) =>
-                      setForm({ ...form, tts: { ...form.tts, generateExampleUk: e.target.checked } })
-                    }
-                    className="w-4 h-4 accent-blue-600"
-                  />
-                  <span className="text-xs font-medium">🇬🇧 UK Sentence</span>
-                </label>
-              </div>
+            <div>
+              <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                Default Deck
+              </label>
+              <input
+                type="text"
+                value={form.anki.defaultDeck || 'English::B1'}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    anki: { ...form.anki, defaultDeck: e.target.value },
+                  })
+                }
+                className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                }`}
+              />
             </div>
           </div>
         </div>
       )}
 
-      {/* SUBTAB 6: CARD THEMES */}
+      {/* SUBTAB 6: APPEARANCE & THEMES */}
       {activeSubTab === 'appearance' && (
         <div className="space-y-6">
-          {/* 1. APPLICATION UI THEME SELECTOR */}
+          {/* 1. APPLICATION UI THEME SELECTOR - ONLY ANKI LIGHT AND ANKI DARK */}
           <div
-            className={
-              isMinimalLight
-                ? 'bg-white p-5 border border-slate-200 rounded-lg shadow-sm text-slate-800'
-                : isMinimalDark
-                ? 'bg-[#27272A] p-5 border border-zinc-700 rounded-lg shadow-sm text-zinc-100'
-                : 'bg-white p-5 border-4 border-black shadow-[6px_6px_0px_#000000] text-black'
-            }
+            className={`p-5 border rounded-lg shadow-xs ${
+              isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+            }`}
           >
-            <h3 className={isMinimal ? 'font-bold text-sm uppercase mb-3 flex items-center gap-2' : 'font-black text-sm uppercase mb-3 flex items-center gap-2'}>
+            <h3 className="font-semibold text-sm uppercase mb-3 flex items-center gap-2">
               <Sliders className="w-4 h-4 text-blue-500" />
               <span>Application Theme</span>
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Option 1: Comic */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Option 1: Anki Light */}
               <button
                 type="button"
-                onClick={() => setForm({ ...form, appTheme: 'comic' })}
-                className={
-                  isMinimal
-                    ? `p-3.5 border text-left cursor-pointer transition-all rounded-md ${
-                        (form.appTheme || 'comic') === 'comic'
-                          ? 'bg-blue-50 text-blue-950 border-blue-600 font-semibold shadow-xs'
-                          : isMinimalDark
-                          ? 'bg-zinc-900 text-zinc-300 border-zinc-700 hover:bg-zinc-800'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                      }`
-                    : `p-3.5 border-2 text-left cursor-pointer transition-all ${
-                        (form.appTheme || 'comic') === 'comic'
-                          ? 'bg-[#FFD93D] text-black border-black font-black shadow-[3px_3px_0px_#000000]'
-                          : 'bg-white text-black border-zinc-300 hover:bg-zinc-50'
-                      }`
-                }
+                onClick={() => setForm({ ...form, appTheme: 'anki-light' })}
+                className={`p-3.5 border text-left cursor-pointer transition-all rounded-md ${
+                  form.appTheme !== 'anki-dark'
+                    ? 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
+                    : isDark
+                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className={isMinimal ? 'text-xs font-bold' : 'text-xs font-black'}>Comic</span>
-                  {(form.appTheme || 'comic') === 'comic' && (
-                    <span className={isMinimal ? 'text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded' : 'text-[10px] font-black bg-black text-[#FFD93D] px-1.5 py-0.5'}>ACTIVE</span>
+                  <span className="text-xs font-semibold">Anki Light</span>
+                  {form.appTheme !== 'anki-dark' && (
+                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                      ACTIVE
+                    </span>
                   )}
                 </div>
-                <div className={isMinimal ? 'text-[11px] text-slate-500 dark:text-zinc-400 mt-1' : 'text-[11px] opacity-80 mt-1'}>Colorful comic styling with bold outlines.</div>
+                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  Clean light desktop interface with functional styling.
+                </div>
               </button>
 
-              {/* Option 2: Minimal Light */}
+              {/* Option 2: Anki Dark */}
               <button
                 type="button"
-                onClick={() => setForm({ ...form, appTheme: 'minimal-light' })}
-                className={
-                  isMinimal
-                    ? `p-3.5 border text-left cursor-pointer transition-all rounded-md ${
-                        form.appTheme === 'minimal-light'
-                          ? 'bg-blue-50 text-blue-950 border-blue-600 font-semibold shadow-xs dark:bg-blue-950/40 dark:border-blue-500 dark:text-blue-200'
-                          : isMinimalDark
-                          ? 'bg-zinc-900 text-zinc-300 border-zinc-700 hover:bg-zinc-800'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                      }`
-                    : `p-3.5 border text-left cursor-pointer transition-all rounded-md ${
-                        form.appTheme === 'minimal-light'
-                          ? 'bg-blue-50 text-blue-950 border-blue-600 font-semibold shadow-sm'
-                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                      }`
-                }
+                onClick={() => setForm({ ...form, appTheme: 'anki-dark' })}
+                className={`p-3.5 border text-left cursor-pointer transition-all rounded-md ${
+                  form.appTheme === 'anki-dark'
+                    ? 'bg-blue-950/40 text-blue-200 border-blue-500 font-semibold shadow-xs'
+                    : isDark
+                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className={isMinimal ? 'text-xs font-bold' : 'text-xs font-bold'}>Minimal Light</span>
-                  {form.appTheme === 'minimal-light' && (
-                    <span className={isMinimal ? 'text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded' : 'text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded'}>ACTIVE</span>
+                  <span className="text-xs font-semibold">Anki Dark</span>
+                  {form.appTheme === 'anki-dark' && (
+                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                      ACTIVE
+                    </span>
                   )}
                 </div>
-                <div className={isMinimal ? 'text-[11px] text-slate-500 dark:text-zinc-400 mt-1' : 'text-[11px] text-slate-500 mt-1'}>Clean light interface with restrained styling.</div>
-              </button>
-
-              {/* Option 3: Minimal Dark */}
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, appTheme: 'minimal-dark' })}
-                className={
-                  isMinimal
-                    ? `p-3.5 border text-left cursor-pointer transition-all rounded-md ${
-                        form.appTheme === 'minimal-dark'
-                          ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
-                          : isMinimalDark
-                          ? 'bg-zinc-900 text-zinc-300 border-zinc-700 hover:bg-zinc-800'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                      }`
-                    : `p-3.5 border text-left cursor-pointer transition-all rounded-md ${
-                        form.appTheme === 'minimal-dark'
-                          ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-sm'
-                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                      }`
-                }
-              >
-                <div className="flex items-center justify-between">
-                  <span className={isMinimal ? 'text-xs font-bold' : 'text-xs font-bold'}>Minimal Dark</span>
-                  {form.appTheme === 'minimal-dark' && (
-                    <span className={isMinimal ? 'text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded' : 'text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded'}>ACTIVE</span>
-                  )}
+                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  Clean dark desktop interface with restrained contrast.
                 </div>
-                <div className={isMinimal ? 'text-[11px] text-slate-400 dark:text-zinc-400 mt-1' : 'text-[11px] text-zinc-400 mt-1'}>Clean dark interface with restrained colors.</div>
               </button>
             </div>
           </div>
 
-          {/* 2. FLASHCARD NOTE THEMES */}
+          {/* 2. FLASHCARD NOTE THEMES (All 12 Note Themes preserved) */}
           <div
-            className={
-              isMinimalLight
-                ? 'bg-white p-5 border border-slate-200 rounded-lg shadow-sm text-slate-800'
-                : isMinimalDark
-                ? 'bg-[#27272A] p-5 border border-zinc-700 rounded-lg shadow-sm text-zinc-100'
-                : 'bg-white p-5 border-4 border-black shadow-[6px_6px_0px_#000000] text-black'
-            }
+            className={`p-5 border rounded-lg shadow-xs ${
+              isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+            }`}
           >
-            <h3 className={isMinimal ? 'font-bold text-sm uppercase mb-4 flex items-center gap-2' : 'font-black text-sm uppercase mb-4 flex items-center gap-2'}>
+            <h3 className="font-semibold text-sm uppercase mb-4 flex items-center gap-2">
               <Palette className="w-4 h-4 text-blue-500" />
-              <span>Card Themes</span>
+              <span>Card Note Themes (Applied inside Anki)</span>
             </h3>
 
-            {/* Light Themes */}
+            {/* Light Card Themes */}
             <div className="mb-5">
-              <div className={isMinimal ? 'text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-2' : 'text-xs font-black uppercase text-amber-800 bg-[#FEF9C3] px-3 py-1 border-2 border-black inline-block mb-3'}>
-                Light Themes
+              <div className={`text-xs font-semibold uppercase mb-2 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                Light Card Themes
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {THEME_GROUPS.light.map((th) => {
@@ -1794,37 +1680,37 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       key={th.id}
                       type="button"
                       onClick={() => setForm({ ...form, theme: th.id as ThemeId })}
-                      className={
-                        isMinimal
-                          ? `p-3 border rounded-md text-left cursor-pointer transition-all ${
-                              isSelected
-                                ? 'bg-blue-50 text-blue-950 border-blue-600 font-semibold shadow-xs dark:bg-blue-950/40 dark:border-blue-500 dark:text-blue-200'
-                                : isMinimalDark
-                                ? 'bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border-zinc-700'
-                                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
-                            }`
-                          : `p-3 border-3 border-black text-left cursor-pointer transition-all ${
-                              isSelected
-                                ? 'bg-[#FFD93D] text-black shadow-[4px_4px_0px_#000000] -translate-y-0.5'
-                                : 'bg-white hover:bg-zinc-50 text-black shadow-[2px_2px_0px_#000000]'
-                            }`
-                      }
+                      className={`p-3 border rounded-md text-left cursor-pointer transition-all ${
+                        isSelected
+                          ? isDark
+                            ? 'bg-blue-950/40 border-blue-500 text-white shadow-xs'
+                            : 'bg-blue-50 text-blue-950 border-blue-600 shadow-xs'
+                          : isDark
+                          ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                      }`}
                     >
                       <div className="flex items-center justify-between">
-                        <div className={isMinimal ? 'text-xs font-bold' : 'text-xs font-black'}>{th.name}</div>
-                        {isSelected && <span className={isMinimal ? 'text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded' : 'text-[10px] font-black bg-black text-[#FFD93D] px-1.5 py-0.5'}>ACTIVE</span>}
+                        <span className="text-xs font-semibold">{th.name}</span>
+                        {isSelected && (
+                          <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                            SELECTED
+                          </span>
+                        )}
                       </div>
-                      <div className={isMinimal ? 'text-[11px] text-slate-500 dark:text-zinc-400 mt-1 line-clamp-2' : 'text-[11px] text-zinc-600 font-bold mt-1 line-clamp-2'}>{th.desc}</div>
+                      <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        {th.description}
+                      </div>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Dark Themes */}
+            {/* Dark Card Themes */}
             <div>
-              <div className={isMinimal ? 'text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-2' : 'text-xs font-black uppercase text-cyan-400 bg-black px-3 py-1 border-2 border-black inline-block mb-3'}>
-                Dark Themes
+              <div className={`text-xs font-semibold uppercase mb-2 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                Dark Card Themes
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {THEME_GROUPS.dark.map((th) => {
@@ -1834,59 +1720,32 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       key={th.id}
                       type="button"
                       onClick={() => setForm({ ...form, theme: th.id as ThemeId })}
-                      className={
-                        isMinimal
-                          ? `p-3 border rounded-md text-left cursor-pointer transition-all ${
-                              isSelected
-                                ? 'bg-blue-50 text-blue-950 border-blue-600 font-semibold shadow-xs dark:bg-blue-950/40 dark:border-blue-500 dark:text-blue-200'
-                                : isMinimalDark
-                                ? 'bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border-zinc-700'
-                                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
-                            }`
-                          : `p-3 border-3 border-black text-left cursor-pointer transition-all ${
-                              isSelected
-                                ? 'bg-black text-[#38BDF8] shadow-[4px_4px_0px_#38BDF8] -translate-y-0.5'
-                                : 'bg-zinc-900 hover:bg-zinc-800 text-white shadow-[2px_2px_0px_#000000]'
-                            }`
-                      }
+                      className={`p-3 border rounded-md text-left cursor-pointer transition-all ${
+                        isSelected
+                          ? isDark
+                            ? 'bg-blue-950/40 border-blue-500 text-white shadow-xs'
+                            : 'bg-blue-50 text-blue-950 border-blue-600 shadow-xs'
+                          : isDark
+                          ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                      }`}
                     >
                       <div className="flex items-center justify-between">
-                        <div className={isMinimal ? 'text-xs font-bold' : 'text-xs font-black'}>{th.name}</div>
-                        {isSelected && <span className={isMinimal ? 'text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded' : 'text-[10px] font-black bg-[#38BDF8] text-black px-1.5 py-0.5'}>ACTIVE</span>}
+                        <span className="text-xs font-semibold">{th.name}</span>
+                        {isSelected && (
+                          <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                            SELECTED
+                          </span>
+                        )}
                       </div>
-                      <div className={isMinimal ? 'text-[11px] text-slate-400 dark:text-zinc-400 mt-1 line-clamp-2' : 'text-[11px] text-zinc-400 font-bold mt-1 line-clamp-2'}>{th.desc}</div>
+                      <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        {th.description}
+                      </div>
                     </button>
                   );
                 })}
               </div>
             </div>
-          </div>
-
-          {/* Live Card Preview */}
-          <div
-            className={
-              isMinimalLight
-                ? 'bg-slate-50 p-4 sm:p-6 border border-slate-200 rounded-lg shadow-sm'
-                : isMinimalDark
-                ? 'bg-[#1F1F23] p-4 sm:p-6 border border-zinc-700 rounded-lg shadow-sm'
-                : 'bg-[#F5F2EB] p-4 sm:p-6 border-4 border-black shadow-[6px_6px_0px_#000000]'
-            }
-          >
-            <CardPreview
-              cardData={{
-                word: 'abandon',
-                phonetic: '/əˈbændən/',
-                partOfSpeech: 'verb',
-                meaningFa: 'ترک کردن، رها کردن',
-                example: 'He had to abandon his car in the heavy snowstorm.',
-                translationFa: 'او مجبور شد ماشین خود را در کولاک شدید رها کند.',
-                mnemonic: 'A-BAND-ON: The band put their instruments on the ground and abandoned the concert.',
-                cardType: form.defaultCard.cardType,
-                spellingSentence: 'He had to ______ his car in the heavy snowstorm.',
-              }}
-              themeId={form.theme}
-              appTheme={form.appTheme || appTheme}
-            />
           </div>
         </div>
       )}
@@ -1894,83 +1753,111 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       {/* SUBTAB 7: ANKI */}
       {activeSubTab === 'anki' && (
         <div
-          className={
-            isMinimalLight
-              ? 'bg-white p-5 sm:p-6 border border-slate-200 rounded-lg shadow-sm space-y-4 text-slate-800'
-              : isMinimalDark
-              ? 'bg-[#27272A] p-5 sm:p-6 border border-zinc-700 rounded-lg shadow-sm space-y-4 text-zinc-100'
-              : 'bg-white p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-4 text-black'
-          }
+          className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+          }`}
         >
-          <h3 className={`pb-2 ${isMinimal ? 'font-bold text-sm uppercase border-b border-slate-200 dark:border-zinc-700' : 'font-black text-sm uppercase border-b-2 border-black'}`}>AnkiConnect Settings</h3>
+          <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+            <h3 className="font-semibold text-sm uppercase">AnkiConnect Integration</h3>
+            <button
+              type="button"
+              onClick={refreshAnkiInfo}
+              className={`px-3 py-1 font-medium text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                isDark
+                  ? 'bg-zinc-800 text-zinc-200 border-zinc-700 hover:bg-zinc-750'
+                  : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
+              }`}
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Check Connection</span>
+            </button>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>AnkiConnect URL</label>
+              <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                AnkiConnect URL
+              </label>
               <input
                 type="text"
-                value={form.anki.url || 'http://127.0.0.1:8765'}
-                onChange={(e) => setForm({ ...form, anki: { ...form.anki, url: e.target.value } })}
-                className={
-                  isMinimalLight
-                    ? 'w-full bg-white text-slate-900 text-xs font-mono font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                    : isMinimalDark
-                    ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-mono font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                    : 'w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black'
-                }
-                placeholder="http://127.0.0.1:8765"
+                value={form.anki.url}
+                onChange={(e) => setForm({ ...form, ai: form.ai, anki: { ...form.anki, url: e.target.value } })}
+                className={`w-full text-xs font-mono font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                }`}
               />
             </div>
 
             <div>
-              <label className={isMinimal ? 'block text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase mb-1' : 'block text-xs font-black uppercase mb-1'}>Default Target Deck</label>
+              <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                Default Deck
+              </label>
               <input
                 type="text"
-                value={form.anki.defaultDeck || 'English::B1'}
+                value={form.anki.defaultDeck}
                 onChange={(e) => setForm({ ...form, anki: { ...form.anki, defaultDeck: e.target.value } })}
-                className={
-                  isMinimalLight
-                    ? 'w-full bg-white text-slate-900 text-xs font-medium p-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                    : isMinimalDark
-                    ? 'w-full bg-zinc-800 text-zinc-100 text-xs font-medium p-2.5 border border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500'
-                    : 'w-full bg-zinc-50 text-black text-xs font-bold p-2.5 border-2 border-black'
-                }
-                placeholder="English::B1"
+                className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                }`}
               />
             </div>
           </div>
 
-          <div className={`pt-3 flex items-center gap-3 ${isMinimal ? 'border-t border-slate-200 dark:border-zinc-700' : 'border-t-2 border-black'}`}>
+          {/* Sync Note Type Button */}
+          <div className="flex items-center gap-3 pt-2">
             <button
               type="button"
               onClick={handleSyncAnkiModel}
-              className={
-                isMinimal
-                  ? 'px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors'
-                  : 'px-4 py-2 bg-[#FFD93D] hover:bg-[#ffe066] text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_#000000] flex items-center gap-1.5 cursor-pointer'
-              }
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Sync Note Model & Templates with Anki</span>
+              <Bookmark className="w-3.5 h-3.5" />
+              <span>Sync Note Model to Anki</span>
             </button>
-            {ankiModelSyncMsg && <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">{ankiModelSyncMsg}</span>}
+            {ankiModelSyncMsg && (
+              <span className={`text-xs font-mono ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                {ankiModelSyncMsg}
+              </span>
+            )}
           </div>
+
+          {ankiStatus && (
+            <div
+              className={`p-3 border rounded-md text-xs flex items-center justify-between ${
+                ankiStatus.connected
+                  ? isDark
+                    ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
+                    : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                  : isDark
+                  ? 'bg-rose-950/40 text-rose-200 border-rose-800'
+                  : 'bg-rose-50 text-rose-800 border-rose-200'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                {ankiStatus.connected ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-rose-500" />
+                )}
+                <span>
+                  {ankiStatus.connected
+                    ? `AnkiConnect is connected (Version: ${ankiStatus.version})`
+                    : `AnkiConnect offline: ${ankiStatus.error}`}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* SUBTAB 8: DIAGNOSTICS */}
       {activeSubTab === 'diagnostics' && (
         <div
-          className={
-            isMinimalLight
-              ? 'bg-white p-5 sm:p-6 border border-slate-200 rounded-lg shadow-sm space-y-4 text-slate-800'
-              : isMinimalDark
-              ? 'bg-[#27272A] p-5 sm:p-6 border border-zinc-700 rounded-lg shadow-sm space-y-4 text-zinc-100'
-              : 'bg-white p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-4 text-black'
-          }
+          className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+          }`}
         >
-          <div className={`flex items-center justify-between pb-2 ${isMinimal ? 'border-b border-slate-200 dark:border-zinc-700' : 'border-b-2 border-black'}`}>
-            <h3 className={isMinimal ? 'font-bold text-sm uppercase' : 'font-black text-sm uppercase'}>Diagnostics</h3>
+          <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+            <h3 className="font-semibold text-sm uppercase">System Health & Diagnostics</h3>
             <button
               type="button"
               onClick={async () => {
@@ -1980,21 +1867,41 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 setRunningDiag(false);
               }}
               disabled={runningDiag}
-              className={
-                isMinimal
-                  ? 'px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-sm cursor-pointer flex items-center gap-1.5 transition-colors'
-                  : 'px-3 py-1.5 bg-[#FFD93D] text-black font-black text-xs uppercase border-2 border-black cursor-pointer flex items-center gap-1.5'
-              }
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
             >
-              {runningDiag ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-              <span>Run Diagnostic Test</span>
+              <Activity className={`w-3.5 h-3.5 ${runningDiag ? 'animate-spin' : ''}`} />
+              <span>Run Full System Diagnostic</span>
             </button>
           </div>
 
           {fullReport && (
-            <pre className={isMinimal ? 'p-3 bg-slate-50 dark:bg-zinc-900 text-slate-800 dark:text-zinc-200 text-xs font-mono rounded border border-slate-200 dark:border-zinc-700 overflow-x-auto max-h-72' : 'p-3 bg-zinc-50 text-black text-xs font-mono border-2 border-black overflow-x-auto max-h-72'}>
-              {JSON.stringify(fullReport, null, 2)}
-            </pre>
+            <div className="space-y-3 text-xs">
+              <div className={`p-3 border rounded-md ${isDark ? 'bg-zinc-900 border-zinc-700' : 'bg-zinc-50 border-zinc-200'}`}>
+                <div className="font-semibold uppercase mb-1">System Status Overview</div>
+                <div>Status: <span className="font-semibold uppercase">{fullReport.status}</span></div>
+                <div>Timestamp: {fullReport.timestamp}</div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {Object.entries(fullReport.services).map(([srv, info]: [string, any]) => (
+                  <div
+                    key={srv}
+                    className={`p-3 border rounded-md ${
+                      info.connected || info.ready
+                        ? isDark
+                          ? 'bg-emerald-950/20 border-emerald-900 text-emerald-200'
+                          : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                        : isDark
+                        ? 'bg-rose-950/20 border-rose-900 text-rose-200'
+                        : 'bg-rose-50 border-rose-200 text-rose-900'
+                    }`}
+                  >
+                    <div className="font-semibold uppercase">{srv}</div>
+                    <div className="text-[11px] opacity-80">{info.connected || info.ready ? 'Online' : 'Offline'}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -2002,27 +1909,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       {/* SUBTAB 9: GUIDE */}
       {activeSubTab === 'guide' && (
         <div
-          className={
-            isMinimalLight
-              ? 'bg-white p-5 sm:p-6 border border-slate-200 rounded-lg shadow-sm space-y-4 text-xs font-medium leading-relaxed text-slate-700'
-              : isMinimalDark
-              ? 'bg-[#27272A] p-5 sm:p-6 border border-zinc-700 rounded-lg shadow-sm space-y-4 text-xs font-medium leading-relaxed text-zinc-300'
-              : 'bg-white p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-4 text-xs font-bold leading-relaxed text-black'
-          }
+          className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+          }`}
         >
-          <h3 className={`pb-2 ${isMinimal ? 'font-bold text-sm uppercase text-slate-900 dark:text-zinc-100 border-b border-slate-200 dark:border-zinc-700' : 'font-black text-sm uppercase border-b-2 border-black'}`}>User Guide</h3>
-          <p>
-            • <strong>AI Providers:</strong> Use local Ollama for complete privacy, Google Gemini for cloud speed, or add any custom OpenAI-compatible endpoint (OpenRouter, Groq, DeepSeek).
-          </p>
-          <p>
-            • <strong>TTS:</strong> Piper runs offline with American & British voices. Adjust the Slowdown factor to generate genuinely slower pronunciations. Test audio using the generic pronunciation test sentence.
-          </p>
-          <p>
-            • <strong>Smart Images:</strong> Concrete physical objects automatically receive high-quality illustrations from Wikimedia Commons/Google, while abstract concepts remain clean.
-          </p>
-          <p>
-            • <strong>Anki:</strong> The exact HTML & CSS is directly synchronized to the Anki note model, ensuring cards in Anki Desktop and AnkiDroid match the live preview pixel-for-pixel.
-          </p>
+          <div className={`pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+            <h3 className="font-semibold text-sm uppercase">Application Setup & Quick Start Guide</h3>
+          </div>
+
+          <div className="space-y-3 text-xs leading-relaxed">
+            <div>
+              <h4 className="font-semibold mb-1">1. Anki Desktop Integration</h4>
+              <p className={isDark ? 'text-zinc-400' : 'text-zinc-500'}>
+                Install the <code>AnkiConnect</code> add-on in Anki Desktop (code: <code>2055492159</code>). Make sure Anki is open whenever you generate cards.
+              </p>
+            </div>
+
+            <div>
+              <h4 className="font-semibold mb-1">2. Local or Online AI</h4>
+              <p className={isDark ? 'text-zinc-400' : 'text-zinc-500'}>
+                Use Ollama locally for 100% offline generation, or enter a Google Gemini / Custom AI API key for high-speed cloud generation.
+              </p>
+            </div>
+
+            <div>
+              <h4 className="font-semibold mb-1">3. Card Theme Rendering</h4>
+              <p className={isDark ? 'text-zinc-400' : 'text-zinc-500'}>
+                All card themes are completely embedded into Anki note styling. Cards look identical inside Anki and on mobile Anki apps.
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </div>

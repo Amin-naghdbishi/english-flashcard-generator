@@ -5,10 +5,10 @@ import { CreateCardView } from './components/CreateCardView';
 import { BatchCardView } from './components/BatchCardView';
 import { SettingsView } from './components/SettingsView';
 import { fetchConfig, checkOllama, checkGemini, checkTTS, checkOnlineTTS, checkAnki } from './services/api';
-import { AppThemeProvider } from './context/ThemeContext';
+import { AppThemeProvider, normalizeAppTheme } from './context/ThemeContext';
 
 const defaultSettings: AppSettings = {
-  appTheme: 'comic',
+  appTheme: 'anki-light',
   ai: {
     provider: 'ollama',
     ollama: {
@@ -75,10 +75,8 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [loadingConfig, setLoadingConfig] = useState(true);
 
-  const activeAppTheme: AppTheme = settings.appTheme || 'comic';
-  const isMinimalLight = activeAppTheme === 'minimal-light';
-  const isMinimalDark = activeAppTheme === 'minimal-dark';
-  const isMinimal = isMinimalLight || isMinimalDark;
+  const activeAppTheme: AppTheme = normalizeAppTheme(settings.appTheme);
+  const isDark = activeAppTheme === 'anki-dark';
 
   // Status for header
   const [status, setStatus] = useState<{
@@ -174,11 +172,9 @@ export default function App() {
     >
       <div
         className={`min-h-screen flex flex-col font-sans transition-colors duration-150 ${
-          isMinimalLight
-            ? 'bg-[#F8FAFC] text-slate-900 selection:bg-blue-500 selection:text-white'
-            : isMinimalDark
+          isDark
             ? 'bg-[#18181B] text-zinc-100 dark selection:bg-blue-600 selection:text-white'
-            : 'bg-[#FAF8F5] text-black selection:bg-[#FFD93D] selection:text-black'
+            : 'bg-[#F4F4F5] text-zinc-900 selection:bg-blue-500 selection:text-white'
         }`}
       >
         {/* Top Navigation Header */}
@@ -218,26 +214,24 @@ export default function App() {
           )}
         </main>
 
-        {/* Footer */}
+        {/* Desktop Footer */}
         <footer
-          className={
-            isMinimalLight
-              ? 'w-full border-t border-slate-200 bg-white py-3 px-4 text-center text-slate-600 text-xs shadow-xs'
-              : isMinimalDark
-              ? 'w-full border-t border-zinc-800 bg-[#1F1F23] py-3 px-4 text-center text-zinc-400 text-xs'
-              : 'w-full border-t-4 border-black bg-[#FFFFFF] py-3 px-4 text-center text-black text-xs'
-          }
+          className={`w-full py-3 px-4 text-xs ${
+            isDark
+              ? 'border-t border-zinc-800 bg-[#1F1F23] text-zinc-400'
+              : 'border-t border-zinc-200 bg-white text-zinc-600'
+          }`}
         >
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className={isMinimal ? 'font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider' : 'font-black text-[#4ADE80] uppercase tracking-wider'}>
+              <span className="font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
                 Pipeline:
               </span>
-              <span className={isMinimal ? 'font-mono text-xs opacity-80' : 'font-mono text-zinc-700 font-bold'}>
-                Word → AI ({settings.ai.provider}) → TTS ({settings.tts.provider}) → 12 Themes → AnkiConnect
+              <span className="font-mono text-xs opacity-80">
+                Word → AI ({settings.ai.provider}) → TTS ({settings.tts.provider}) → 12 Note Themes → AnkiConnect
               </span>
             </div>
-            <div className={isMinimal ? 'text-xs font-medium text-slate-500 dark:text-zinc-400' : 'text-xs text-black font-black uppercase tracking-wider'}>
+            <div className="text-xs font-medium opacity-80">
               English Flashcard Generator • 12 Note Designs
             </div>
           </div>

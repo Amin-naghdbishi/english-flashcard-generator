@@ -72,7 +72,7 @@ export interface ManualOverrides {
   needsPhoto?: boolean;
 }
 
-export type AppTheme = 'comic' | 'minimal-light' | 'minimal-dark';
+export type AppTheme = 'anki-light' | 'anki-dark';
 
 export type AIProvider = 'ollama' | 'gemini' | 'custom' | string;
 export type TTSProvider = 'piper' | 'online' | 'custom' | string;

@@ -22,5 +22,6 @@
     "defaultDeck": "English::B1",
     "noteType": "AI Vocabulary"
   },
-  "theme": "comic-light"
+  "theme": "comic-pop-light",
+  "appTheme": "anki-light"
 }

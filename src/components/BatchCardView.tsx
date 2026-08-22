@@ -10,6 +10,7 @@ import {
   checkAnki,
 } from '../services/api';
 import { CardPreview } from './CardPreview';
+import { useAppTheme } from '../context/ThemeContext';
 import {
   FileText,
   Upload,
@@ -79,11 +80,6 @@ Persian Meaning=ساحل رودخانه
 Photo=true
 --`;
 
-/**
- * Automatically detects whether the TXT input is Format A (simple word list)
- * or Format B (structured key-value entries separated by --).
- * User does NOT need to manually select a format.
- */
 export function autoDetectAndParseBatchInput(
   rawText: string,
   defaultDeck: string
@@ -98,16 +94,13 @@ export function autoDetectAndParseBatchInput(
     };
   }
 
-  // 1. Detection heuristic for Format B:
-  // Check for '--' block separators or structured key-value patterns (e.g. Word=, Persian Meaning=, Photo=, etc.)
   const hasSeparator = /(?:^|\r?\n)\s*--\s*(?:\r?\n|$)/m.test(trimmed);
   const hasKeyValuePairs = /(?:^|\r?\n)\s*(?:word|deck|phonetic|ipa|part\s*of\s*speech|pos|persian\s*meaning|meaning|example\s*sentence|example|memory\s*aid|mnemonic|photo|image|picture)\s*[:=]/i.test(trimmed);
 
   if (hasSeparator || hasKeyValuePairs) {
-    // FORMAT B: Structured Entries
     const rawBlocks = hasSeparator
       ? trimmed.split(/(?:^|\r?\n)\s*--\s*(?:\r?\n|$)/m)
-      : trimmed.split(/\r?\n\s*\r?\n/); // fallback split on blank lines
+      : trimmed.split(/\r?\n\s*\r?\n/);
 
     const blocks = rawBlocks.map((b) => b.trim()).filter(Boolean);
     const results: Array<{ word: string; deck: string; parsedFields: Partial<CardData> & { needsPhoto?: boolean } }> = [];
@@ -166,7 +159,6 @@ export function autoDetectAndParseBatchInput(
     }
   }
 
-  // 2. FORMAT A: Simple Word List (one word per line, duplicates fully allowed)
   const lines = trimmed.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const items = lines.map((w) => ({
     word: w,
@@ -182,7 +174,10 @@ export function autoDetectAndParseBatchInput(
   };
 }
 
-export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme = settings.appTheme || 'comic' }) => {
+export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme: propTheme }) => {
+  const themeContext = useAppTheme();
+  const isDark = (propTheme || themeContext.appTheme) === 'anki-dark';
+
   const [inputText, setInputText] = useState<string>(DEFAULT_SAMPLE_FORMAT_A);
   const [fileName, setFileName] = useState<string>('sample_words.txt');
   const [deck, setDeck] = useState<string>(settings.anki.defaultDeck || 'English::B1');
@@ -203,11 +198,6 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme
   const [preflightError, setPreflightError] = useState<string | null>(null);
   const [showFieldConfig, setShowFieldConfig] = useState<boolean>(false);
 
-  const isMinimalLight = appTheme === 'minimal-light';
-  const isMinimalDark = appTheme === 'minimal-dark';
-  const isMinimal = isMinimalLight || isMinimalDark;
-
-  // User-Controlled Fields Config
   const [fieldConfig, setFieldConfig] = useState<BatchFieldConfig>({
     word: true,
     deck: true,
@@ -219,41 +209,35 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme
     mnemonic: true,
   });
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load Decks
   useEffect(() => {
     getAnkiDecks(settings.anki.url).then((res) => {
       if (res.success && res.decks.length > 0) {
         setAvailableDecks(res.decks);
-        if (!res.decks.includes(deck)) {
-          setDeck(res.decks[0]);
-        }
       }
-    }).catch(() => {});
+    });
   }, [settings.anki.url]);
 
-  // Sync Input and Auto-Parse Items Whenever Input or Deck changes
   useEffect(() => {
-    const parsed = autoDetectAndParseBatchInput(inputText, deck);
+    const parseResult = autoDetectAndParseBatchInput(inputText, deck);
     setDetectedFormatInfo({
-      format: parsed.format,
-      formatLabel: parsed.formatLabel,
-      formatDescription: parsed.formatDescription,
+      format: parseResult.format,
+      formatLabel: parseResult.formatLabel,
+      formatDescription: parseResult.formatDescription,
     });
 
-    setItems(
-      parsed.items.map((it, idx) => ({
-        id: `batch-${idx}-${it.word}`,
-        word: it.word,
-        deck: it.deck,
-        status: 'idle',
-        parsedFields: it.parsedFields,
-      }))
-    );
+    const newItems: BatchItem[] = parseResult.items.map((parsed, idx) => ({
+      id: `${parsed.word}_${idx}_${Date.now()}`,
+      word: parsed.word,
+      deck: parsed.deck || deck,
+      status: 'idle',
+      parsedFields: parsed.parsedFields,
+    }));
+
+    setItems(newItems);
   }, [inputText, deck]);
 
-  // File Upload Handler
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -269,164 +253,210 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme
     reader.readAsText(file);
   };
 
-  // Preflight Health Checks
-  const runPreflightCheck = async (): Promise<boolean> => {
+  const runPreflightChecks = async (): Promise<boolean> => {
     setPreflightError(null);
 
-    // 1. AI Check
-    if (settings.ai.provider === 'gemini') {
-      const geminiCheck = await checkGemini(settings.ai.gemini.apiKey, settings.ai.gemini.model);
-      if (!geminiCheck.connected) {
-        setPreflightError(`Preflight Failed: Gemini API error: ${geminiCheck.error}. Check your API key in Settings.`);
-        return false;
-      }
-    } else {
-      const aiCheck = await checkOllama(settings.ai.ollama.url);
-      if (!aiCheck.connected) {
-        setPreflightError(`Preflight Failed: Ollama is unreachable at ${settings.ai.ollama.url}.`);
-        return false;
-      }
-    }
-
-    // 2. TTS Check
-    if (settings.tts.provider === 'online') {
-      const onlineCheck = await checkOnlineTTS();
-      if (!onlineCheck.connected) {
-        setPreflightError(`Preflight Failed: Online TTS unreachable (${onlineCheck.error}).`);
-        return false;
-      }
-    } else {
-      const ttsCheck = await checkTTS(settings.tts.endpoint);
-      if (!ttsCheck.ready) {
-        setPreflightError(`Preflight Failed: Piper TTS is offline at ${settings.tts.endpoint}.`);
-        return false;
-      }
-    }
-
-    // 3. AnkiConnect Check
-    const ankiCheck = await checkAnki(settings.anki.url);
-    if (!ankiCheck.connected) {
-      setPreflightError(`Preflight Failed: AnkiConnect is unreachable at ${settings.anki.url}. Make sure Anki is running.`);
+    const ankiRes = await checkAnki(settings.anki.url);
+    if (!ankiRes.connected) {
+      setPreflightError(`AnkiConnect is offline at ${settings.anki.url}. Please open Anki Desktop with AnkiConnect.`);
       return false;
+    }
+
+    if (settings.ai.provider === 'ollama') {
+      const ollamaRes = await checkOllama(settings.ai.ollama.url);
+      if (!ollamaRes.connected) {
+        setPreflightError(`Ollama is offline at ${settings.ai.ollama.url}. Please start Ollama or switch to Gemini.`);
+        return false;
+      }
+    } else if (settings.ai.provider === 'gemini') {
+      const geminiRes = await checkGemini(settings.ai.gemini.apiKey, settings.ai.gemini.model);
+      if (!geminiRes.connected) {
+        setPreflightError(`Google Gemini is not reachable: ${geminiRes.error || 'Check API Key'}`);
+        return false;
+      }
+    }
+
+    if (settings.tts.provider === 'piper') {
+      const ttsRes = await checkTTS(settings.tts.endpoint);
+      if (!ttsRes.ready) {
+        setPreflightError(`Piper TTS service is not reachable at ${settings.tts.endpoint}.`);
+        return false;
+      }
+    } else if (settings.tts.provider === 'online') {
+      const onlineTtsRes = await checkOnlineTTS();
+      if (!onlineTtsRes.connected) {
+        setPreflightError(`Online TTS service error: ${onlineTtsRes.error}`);
+        return false;
+      }
     }
 
     return true;
   };
 
-  // Process a single item respecting user-controlled field configuration & duplicate allowance
-  const processItem = async (item: BatchItem): Promise<BatchItem> => {
-    const targetDeck = item.deck || deck;
-
-    // Build manual overrides from parsedFields based on user field config
-    const overrides: ManualOverrides = {};
-    if (item.parsedFields) {
-      if (fieldConfig.phonetic && item.parsedFields.phonetic) overrides.phonetic = item.parsedFields.phonetic;
-      if (fieldConfig.partOfSpeech && item.parsedFields.partOfSpeech) overrides.partOfSpeech = item.parsedFields.partOfSpeech;
-      if (fieldConfig.meaningFa && item.parsedFields.meaningFa) overrides.meaningFa = item.parsedFields.meaningFa;
-      if (fieldConfig.example && item.parsedFields.example) overrides.example = item.parsedFields.example;
-      if (fieldConfig.translationFa && item.parsedFields.translationFa) overrides.translationFa = item.parsedFields.translationFa;
-      if (fieldConfig.mnemonic && item.parsedFields.mnemonic) overrides.mnemonic = item.parsedFields.mnemonic;
-      if (item.parsedFields.needsPhoto !== undefined) overrides.needsPhoto = item.parsedFields.needsPhoto;
-    }
-
-    // Run Pipeline with allowDuplicate: true so duplicate words with distinct meanings create separate cards
-    const res = await runFullPipeline({
-      word: item.word,
-      deck: targetDeck,
-      manualOverrides: overrides,
-      cardType: settings.defaultCard?.cardType || 'normal',
-      createInAnki: true,
-    });
-
-    if (res.success && res.cardData) {
-      return {
-        ...item,
-        status: 'success',
-        cardData: res.cardData,
-        noteId: res.noteId,
-      };
-    } else {
-      return {
-        ...item,
-        status: 'error',
-        error: res.error || 'Failed during processing',
-      };
-    }
-  };
-
-  // Build All Cards sequentially
   const handleBuildAll = async () => {
     if (items.length === 0 || isProcessing) return;
 
-    const preflightPassed = await runPreflightCheck();
-    if (!preflightPassed) return;
+    const preflightOk = await runPreflightChecks();
+    if (!preflightOk) return;
 
     setIsProcessing(true);
 
-    const updatedItems = [...items];
+    for (let i = 0; i < items.length; i++) {
+      const currentItem = items[i];
 
-    for (let i = 0; i < updatedItems.length; i++) {
-      if (updatedItems[i].status === 'success') continue;
+      setItems((prev) =>
+        prev.map((item, idx) => (idx === i ? { ...item, status: 'generating_ai' } : item))
+      );
 
-      updatedItems[i] = { ...updatedItems[i], status: 'generating_ai' };
-      setItems([...updatedItems]);
+      try {
+        const customOverrides: ManualOverrides = {};
+        if (currentItem.parsedFields) {
+          if (fieldConfig.phonetic && currentItem.parsedFields.phonetic) {
+            customOverrides.phonetic = currentItem.parsedFields.phonetic;
+          }
+          if (fieldConfig.partOfSpeech && currentItem.parsedFields.partOfSpeech) {
+            customOverrides.partOfSpeech = currentItem.parsedFields.partOfSpeech;
+          }
+          if (fieldConfig.meaningFa && currentItem.parsedFields.meaningFa) {
+            customOverrides.meaningFa = currentItem.parsedFields.meaningFa;
+          }
+          if (fieldConfig.example && currentItem.parsedFields.example) {
+            customOverrides.example = currentItem.parsedFields.example;
+          }
+          if (fieldConfig.translationFa && currentItem.parsedFields.translationFa) {
+            customOverrides.translationFa = currentItem.parsedFields.translationFa;
+          }
+          if (fieldConfig.mnemonic && currentItem.parsedFields.mnemonic) {
+            customOverrides.mnemonic = currentItem.parsedFields.mnemonic;
+          }
+          if (currentItem.parsedFields.needsPhoto !== undefined) {
+            customOverrides.needsPhoto = currentItem.parsedFields.needsPhoto;
+          }
+        }
 
-      const processed = await processItem(updatedItems[i]);
-      updatedItems[i] = processed;
-      setItems([...updatedItems]);
+        const targetDeck = currentItem.deck || deck;
 
-      if (processed.cardData) {
-        setPreviewCard(processed.cardData);
+        const res = await runFullPipeline({
+          word: currentItem.word,
+          deck: targetDeck,
+          manualOverrides: customOverrides,
+          cardType: settings.defaultCard?.cardType || 'normal',
+          createInAnki: true,
+        });
+
+        if (!res.success || !res.cardData) {
+          throw new Error(res.error || 'Card generation failed');
+        }
+
+        setItems((prev) =>
+          prev.map((item, idx) =>
+            idx === i
+              ? {
+                  ...item,
+                  status: 'success',
+                  cardData: res.cardData,
+                  noteId: res.noteId,
+                }
+              : item
+          )
+        );
+
+        setPreviewCard(res.cardData);
+      } catch (err: any) {
+        setItems((prev) =>
+          prev.map((item, idx) =>
+            idx === i
+              ? {
+                  ...item,
+                  status: 'error',
+                  error: err.message || 'Error occurred',
+                }
+              : item
+          )
+        );
       }
     }
 
     setIsProcessing(false);
   };
 
-  // Retry single item
   const handleRetrySingle = async (index: number) => {
-    if (isProcessing) return;
-    const targetItem = items[index];
-    if (!targetItem) return;
+    const itemToRetry = items[index];
+    if (!itemToRetry || isProcessing) return;
 
-    const preflightPassed = await runPreflightCheck();
-    if (!preflightPassed) return;
+    setItems((prev) =>
+      prev.map((it, idx) => (idx === index ? { ...it, status: 'generating_ai', error: undefined } : it))
+    );
 
-    const updated = [...items];
-    updated[index] = { ...targetItem, status: 'generating_ai', error: undefined };
-    setItems(updated);
+    try {
+      const customOverrides: ManualOverrides = {};
+      if (itemToRetry.parsedFields) {
+        if (fieldConfig.phonetic && itemToRetry.parsedFields.phonetic) customOverrides.phonetic = itemToRetry.parsedFields.phonetic;
+        if (fieldConfig.partOfSpeech && itemToRetry.parsedFields.partOfSpeech) customOverrides.partOfSpeech = itemToRetry.parsedFields.partOfSpeech;
+        if (fieldConfig.meaningFa && itemToRetry.parsedFields.meaningFa) customOverrides.meaningFa = itemToRetry.parsedFields.meaningFa;
+        if (fieldConfig.example && itemToRetry.parsedFields.example) customOverrides.example = itemToRetry.parsedFields.example;
+        if (fieldConfig.translationFa && itemToRetry.parsedFields.translationFa) customOverrides.translationFa = itemToRetry.parsedFields.translationFa;
+        if (fieldConfig.mnemonic && itemToRetry.parsedFields.mnemonic) customOverrides.mnemonic = itemToRetry.parsedFields.mnemonic;
+        if (itemToRetry.parsedFields.needsPhoto !== undefined) customOverrides.needsPhoto = itemToRetry.parsedFields.needsPhoto;
+      }
 
-    const processed = await processItem(targetItem);
-    updated[index] = processed;
-    setItems([...updated]);
+      const res = await runFullPipeline({
+        word: itemToRetry.word,
+        deck: itemToRetry.deck || deck,
+        manualOverrides: customOverrides,
+        cardType: settings.defaultCard?.cardType || 'normal',
+        createInAnki: true,
+      });
 
-    if (processed.cardData) {
-      setPreviewCard(processed.cardData);
+      if (!res.success || !res.cardData) {
+        throw new Error(res.error || 'Failed retry');
+      }
+
+      setItems((prev) =>
+        prev.map((it, idx) =>
+          idx === index
+            ? {
+                ...it,
+                status: 'success',
+                cardData: res.cardData,
+                noteId: res.noteId,
+              }
+            : it
+        )
+      );
+
+      setPreviewCard(res.cardData);
+    } catch (e: any) {
+      setItems((prev) =>
+        prev.map((it, idx) =>
+          idx === index
+            ? {
+                ...it,
+                status: 'error',
+                error: e.message || 'Error occurred',
+              }
+            : it
+        )
+      );
     }
   };
 
-  const completedCount = items.filter((it) => it.status === 'success').length;
-  const errorCount = items.filter((it) => it.status === 'error').length;
+  const completedCount = items.filter((i) => i.status === 'success').length;
+  const errorCount = items.filter((i) => i.status === 'error').length;
   const totalParsedFieldsCount = items.reduce((acc, it) => {
     return acc + Object.keys(it.parsedFields || {}).length;
   }, 0);
 
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 p-4 sm:p-6 min-w-0">
-      {/* LEFT COLUMN: TXT Batch Input & Queue */}
       <section className="w-full lg:w-[480px] flex flex-col gap-6 shrink-0 min-w-0">
-        {/* Batch File Box */}
         <div
-          className={
-            isMinimalLight
-              ? 'bg-white p-5 sm:p-6 border border-slate-200 rounded-lg shadow-sm text-slate-800'
-              : isMinimalDark
-              ? 'bg-[#27272A] p-5 sm:p-6 border border-zinc-700 rounded-lg shadow-sm text-zinc-100'
-              : 'bg-[#4ADE80] p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-black'
-          }
+          className={`p-4 sm:p-5 border rounded-lg shadow-xs ${
+            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+          }`}
         >
-          <div className={isMinimal ? 'flex items-center justify-between border-b pb-3 mb-4 border-slate-200 dark:border-zinc-700' : 'flex items-center justify-between border-b-4 border-black pb-3 mb-4'}>
-            <h2 className={isMinimal ? 'text-lg font-bold tracking-tight' : 'text-xl sm:text-2xl font-black uppercase italic tracking-tight flex items-center gap-2'}>
+          <div className={`flex items-center justify-between border-b pb-3 mb-4 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+            <h2 className="text-base sm:text-lg font-bold tracking-tight flex items-center gap-2">
               Batch Import (TXT)
             </h2>
             <div className="flex items-center gap-2">
@@ -440,11 +470,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className={
-                  isMinimal
-                    ? 'px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-sm flex items-center gap-1.5 cursor-pointer'
-                    : 'px-3 py-1.5 bg-[#FFD93D] hover:bg-[#ffe066] text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000000] flex items-center gap-1.5 cursor-pointer uppercase active:translate-y-0.5'
-                }
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>Upload TXT</span>
@@ -452,87 +478,67 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme
             </div>
           </div>
 
-          {/* AUTO-DETECTED FORMAT BANNER */}
           <div
-            className={
-              isMinimalLight
-                ? 'bg-slate-50 text-slate-800 p-3 border border-slate-200 rounded-md shadow-sm mb-3'
-                : isMinimalDark
-                ? 'bg-zinc-900 text-zinc-200 p-3 border border-zinc-700 rounded-md shadow-sm mb-3'
-                : 'bg-black text-white p-3 border-4 border-black shadow-[3px_3px_0px_#000000] mb-3'
-            }
+            className={`p-3 border rounded-md shadow-xs mb-3 ${
+              isDark ? 'bg-zinc-900 border-zinc-700 text-zinc-200' : 'bg-zinc-50 border-zinc-200 text-zinc-800'
+            }`}
           >
             <div className="flex items-center justify-between gap-2 mb-1">
               <div className="flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-[#FFD93D]" />
-                <span className={isMinimal ? 'text-xs font-semibold' : 'text-xs font-black uppercase text-[#FFD93D] tracking-wider'}>
-                  Auto-Detected Format:
+                <Sparkles className="w-4 h-4 text-blue-500" />
+                <span className="text-xs font-semibold">
+                  Detected Format:
                 </span>
               </div>
               <span
-                className={`px-2 py-0.5 text-[10px] font-bold uppercase border ${
+                className={`px-2 py-0.5 text-[10px] font-semibold rounded border ${
                   detectedFormatInfo.format === 'formatB_structured'
-                    ? 'bg-purple-600 text-white border-purple-700'
-                    : 'bg-blue-600 text-white border-blue-700'
-                } ${isMinimal ? 'rounded' : ''}`}
+                    ? 'bg-purple-900/40 text-purple-300 border-purple-800'
+                    : 'bg-blue-900/40 text-blue-300 border-blue-800'
+                }`}
               >
                 {detectedFormatInfo.format === 'formatB_structured' ? 'Format B (Structured)' : 'Format A (Simple List)'}
               </span>
             </div>
-            <p className={isMinimal ? 'text-xs text-slate-500 dark:text-zinc-400' : 'text-[11px] text-zinc-300 font-bold'}>
+            <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
               {detectedFormatInfo.formatDescription}
             </p>
           </div>
 
-          {/* TXT File Status & Default Deck */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
             <div
-              className={
-                isMinimalLight
-                  ? 'bg-white p-2.5 border border-slate-200 rounded-md flex items-center justify-between'
-                  : isMinimalDark
-                  ? 'bg-zinc-900 p-2.5 border border-zinc-700 rounded-md flex items-center justify-between'
-                  : 'bg-white p-2.5 border-4 border-black flex items-center justify-between'
-              }
+              className={`p-2.5 border rounded-md flex items-center justify-between ${
+                isDark ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-zinc-200'
+              }`}
             >
               <div className="flex items-center gap-2 min-w-0">
-                <FileText className="w-4 h-4 text-black dark:text-zinc-300 shrink-0" />
-                <span className="text-xs font-bold truncate max-w-[120px]">
+                <FileText className="w-4 h-4 text-zinc-400 shrink-0" />
+                <span className="text-xs font-semibold truncate max-w-[120px]">
                   {fileName}
                 </span>
               </div>
               <span
-                className={
-                  isMinimal
-                    ? 'text-xs font-semibold bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 px-2 py-0.5 rounded'
-                    : 'text-xs font-black bg-black text-[#4ADE80] px-2 py-0.5 border border-black'
-                }
+                className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                  isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-zinc-100 text-zinc-700'
+                }`}
               >
                 {items.length} cards
               </span>
             </div>
 
             <div
-              className={
-                isMinimalLight
-                  ? 'bg-white p-2.5 border border-slate-200 rounded-md flex items-center justify-between gap-1'
-                  : isMinimalDark
-                  ? 'bg-zinc-900 p-2.5 border border-zinc-700 rounded-md flex items-center justify-between gap-1'
-                  : 'bg-white p-2.5 border-4 border-black flex items-center justify-between gap-1'
-              }
+              className={`p-2.5 border rounded-md flex items-center justify-between gap-1 ${
+                isDark ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-zinc-200'
+              }`}
             >
-              <label className="text-xs font-bold uppercase">Deck:</label>
+              <label className="text-xs font-semibold">Deck:</label>
               <select
                 value={deck}
                 onChange={(e) => setDeck(e.target.value)}
                 disabled={isProcessing}
-                className={
-                  isMinimalLight
-                    ? 'flex-1 bg-white text-slate-900 text-xs font-medium px-1 py-0.5 focus:outline-none cursor-pointer'
-                    : isMinimalDark
-                    ? 'flex-1 bg-zinc-900 text-zinc-100 text-xs font-medium px-1 py-0.5 focus:outline-none cursor-pointer'
-                    : 'flex-1 bg-white text-black text-xs font-bold px-1 py-0.5 focus:outline-none cursor-pointer'
-                }
+                className={`flex-1 text-xs font-medium px-1 py-0.5 focus:outline-none cursor-pointer ${
+                  isDark ? 'bg-zinc-900 text-zinc-100' : 'bg-white text-zinc-900'
+                }`}
               >
                 {availableDecks.map((d) => (
                   <option key={d} value={d}>
@@ -543,7 +549,6 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme
             </div>
           </div>
 
-          {/* Helper Example Loaders (One-Click Testing) */}
           <div className="flex gap-2 mb-3">
             <button
               type="button"
@@ -551,14 +556,14 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme
                 setFileName('sample_simple_list.txt');
                 setInputText(DEFAULT_SAMPLE_FORMAT_A);
               }}
-              className={
-                isMinimal
-                  ? 'flex-1 py-1.5 px-2 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 text-xs font-medium rounded border border-slate-200 dark:border-zinc-700 cursor-pointer flex items-center justify-center gap-1 transition-colors'
-                  : 'flex-1 py-1.5 px-2 bg-white hover:bg-zinc-100 text-black text-[11px] font-black uppercase border-2 border-black cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center justify-center gap-1'
-              }
+              className={`flex-1 py-1.5 px-2 text-xs font-medium rounded border cursor-pointer flex items-center justify-center gap-1 transition-colors ${
+                isDark
+                  ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-200 border-zinc-700'
+                  : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-800 border-zinc-200'
+              }`}
             >
-              <List className="w-3.5 h-3.5 text-blue-600" />
-              <span>Load Format A Example</span>
+              <List className="w-3.5 h-3.5 text-blue-500" />
+              <span>Format A Example</span>
             </button>
             <button
               type="button"
@@ -566,49 +571,41 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme
                 setFileName('sample_structured_blocks.txt');
                 setInputText(DEFAULT_SAMPLE_FORMAT_B);
               }}
-              className={
-                isMinimal
-                  ? 'flex-1 py-1.5 px-2 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 text-xs font-medium rounded border border-slate-200 dark:border-zinc-700 cursor-pointer flex items-center justify-center gap-1 transition-colors'
-                  : 'flex-1 py-1.5 px-2 bg-white hover:bg-zinc-100 text-black text-[11px] font-black uppercase border-2 border-black cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center justify-center gap-1'
-              }
+              className={`flex-1 py-1.5 px-2 text-xs font-medium rounded border cursor-pointer flex items-center justify-center gap-1 transition-colors ${
+                isDark
+                  ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-200 border-zinc-700'
+                  : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-800 border-zinc-200'
+              }`}
             >
-              <Layers className="w-3.5 h-3.5 text-purple-600" />
-              <span>Load Format B Example</span>
+              <Layers className="w-3.5 h-3.5 text-purple-500" />
+              <span>Format B Example</span>
             </button>
           </div>
 
-          {/* TXT Input Area */}
           <div className="mb-3">
             <textarea
               rows={6}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               disabled={isProcessing}
-              className={
-                isMinimalLight
-                  ? 'w-full bg-white text-slate-900 text-xs font-medium font-mono p-3 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
-                  : isMinimalDark
-                  ? 'w-full bg-zinc-950 text-zinc-100 text-xs font-medium font-mono p-3 border border-zinc-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
-                  : 'w-full bg-white text-black text-xs font-bold font-mono p-3 border-4 border-black focus:outline-none'
-              }
+              className={`w-full text-xs font-medium font-mono p-3 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                isDark
+                  ? 'bg-[#18181B] border-zinc-700 text-zinc-100 placeholder:text-zinc-500'
+                  : 'bg-white border-zinc-300 text-zinc-900 placeholder:text-zinc-400'
+              }`}
               placeholder="Paste words or upload TXT file. Format is auto-detected automatically!"
             />
           </div>
 
-          {/* Field Settings Collapsible */}
           <div
-            className={
-              isMinimalLight
-                ? 'bg-white border border-slate-200 rounded-md p-3 mb-4 shadow-sm'
-                : isMinimalDark
-                ? 'bg-zinc-900 border border-zinc-700 rounded-md p-3 mb-4 shadow-sm'
-                : 'bg-white border-4 border-black p-3 mb-4'
-            }
+            className={`border rounded-md p-3 mb-4 shadow-xs ${
+              isDark ? 'bg-zinc-900/40 border-zinc-700' : 'bg-zinc-50 border-zinc-200'
+            }`}
           >
             <button
               type="button"
               onClick={() => setShowFieldConfig(!showFieldConfig)}
-              className="w-full flex items-center justify-between text-xs font-bold uppercase tracking-wider cursor-pointer hover:opacity-80"
+              className="w-full flex items-center justify-between text-xs font-semibold cursor-pointer hover:opacity-80"
             >
               <span className="flex items-center gap-1.5">
                 <Sliders className="w-3.5 h-3.5" />
@@ -618,81 +615,41 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme
             </button>
 
             {showFieldConfig && (
-              <div className="mt-3 pt-3 border-t border-slate-200 dark:border-zinc-700 text-xs space-y-2">
-                <p className={isMinimal ? 'text-[11px] text-slate-500 dark:text-zinc-400 mb-2' : 'text-[10px] text-zinc-600 font-bold mb-2'}>
+              <div className={`mt-3 pt-3 border-t text-xs space-y-2 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+                <p className={`text-[11px] mb-2 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                   * If present in TXT, the file's data is preserved with top priority. Missing fields are generated by AI / dictionary.
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={fieldConfig.word}
-                      disabled
-                      className="w-3.5 h-3.5 accent-blue-600"
-                    />
-                    <span className="text-[11px] font-medium">Word (Always)</span>
+                    <input type="checkbox" checked={fieldConfig.word} disabled className="w-3.5 h-3.5" />
+                    <span className="text-[11px] font-medium">Word</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={fieldConfig.deck}
-                      onChange={(e) => setFieldConfig({ ...fieldConfig, deck: e.target.checked })}
-                      className="w-3.5 h-3.5 accent-blue-600"
-                    />
+                    <input type="checkbox" checked={fieldConfig.deck} onChange={(e) => setFieldConfig({ ...fieldConfig, deck: e.target.checked })} className="w-3.5 h-3.5" />
                     <span className="text-[11px] font-medium">Deck</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={fieldConfig.phonetic}
-                      onChange={(e) => setFieldConfig({ ...fieldConfig, phonetic: e.target.checked })}
-                      className="w-3.5 h-3.5 accent-blue-600"
-                    />
+                    <input type="checkbox" checked={fieldConfig.phonetic} onChange={(e) => setFieldConfig({ ...fieldConfig, phonetic: e.target.checked })} className="w-3.5 h-3.5" />
                     <span className="text-[11px] font-medium">Phonetic</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={fieldConfig.partOfSpeech}
-                      onChange={(e) => setFieldConfig({ ...fieldConfig, partOfSpeech: e.target.checked })}
-                      className="w-3.5 h-3.5 accent-blue-600"
-                    />
+                    <input type="checkbox" checked={fieldConfig.partOfSpeech} onChange={(e) => setFieldConfig({ ...fieldConfig, partOfSpeech: e.target.checked })} className="w-3.5 h-3.5" />
                     <span className="text-[11px] font-medium">Part of Speech</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={fieldConfig.meaningFa}
-                      onChange={(e) => setFieldConfig({ ...fieldConfig, meaningFa: e.target.checked })}
-                      className="w-3.5 h-3.5 accent-blue-600"
-                    />
+                    <input type="checkbox" checked={fieldConfig.meaningFa} onChange={(e) => setFieldConfig({ ...fieldConfig, meaningFa: e.target.checked })} className="w-3.5 h-3.5" />
                     <span className="text-[11px] font-medium">Persian Meaning</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={fieldConfig.example}
-                      onChange={(e) => setFieldConfig({ ...fieldConfig, example: e.target.checked })}
-                      className="w-3.5 h-3.5 accent-blue-600"
-                    />
+                    <input type="checkbox" checked={fieldConfig.example} onChange={(e) => setFieldConfig({ ...fieldConfig, example: e.target.checked })} className="w-3.5 h-3.5" />
                     <span className="text-[11px] font-medium">Example Sentence</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={fieldConfig.translationFa}
-                      onChange={(e) => setFieldConfig({ ...fieldConfig, translationFa: e.target.checked })}
-                      className="w-3.5 h-3.5 accent-blue-600"
-                    />
+                    <input type="checkbox" checked={fieldConfig.translationFa} onChange={(e) => setFieldConfig({ ...fieldConfig, translationFa: e.target.checked })} className="w-3.5 h-3.5" />
                     <span className="text-[11px] font-medium">Example Translation</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={fieldConfig.mnemonic}
-                      onChange={(e) => setFieldConfig({ ...fieldConfig, mnemonic: e.target.checked })}
-                      className="w-3.5 h-3.5 accent-blue-600"
-                    />
+                    <input type="checkbox" checked={fieldConfig.mnemonic} onChange={(e) => setFieldConfig({ ...fieldConfig, mnemonic: e.target.checked })} className="w-3.5 h-3.5" />
                     <span className="text-[11px] font-medium">Memory Aid</span>
                   </label>
                 </div>
@@ -700,64 +657,45 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme
             )}
           </div>
 
-          {/* Preflight Error Banner */}
           {preflightError && (
-            <div className="mb-3 p-3 bg-red-600 text-white text-xs flex items-center gap-2 font-bold shadow-sm rounded-md">
-              <AlertTriangle className="w-4 h-4 text-white shrink-0" />
+            <div className="mb-3 p-3 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800 text-xs flex items-center gap-2 font-medium shadow-xs rounded-md">
+              <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
               <span>{preflightError}</span>
             </div>
           )}
 
-          {/* Build All Button */}
           <button
             type="button"
             onClick={handleBuildAll}
             disabled={isProcessing || items.length === 0}
-            className={
-              isMinimal
-                ? `w-full py-3 px-4 font-semibold text-sm rounded-md shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-colors ${
-                    isProcessing
-                      ? 'bg-blue-400 text-white cursor-wait'
-                      : isMinimalDark
-                      ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  }`
-                : `w-full bg-[#FF4B4B] text-white font-black py-4 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-xl uppercase tracking-wider hover:translate-y-0.5 active:translate-y-1 transition-transform flex items-center justify-center gap-2 select-none ${
-                    isProcessing ? 'opacity-80 cursor-wait' : 'cursor-pointer'
-                  }`
-            }
+            className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isProcessing ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin text-white" />
-                <span>PROCESSING ({completedCount} / {items.length})...</span>
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                <span>Processing ({completedCount} / {items.length})...</span>
               </>
             ) : (
               <>
-                <Play className="w-5 h-5" />
-                <span>GENERATE BATCH CARDS</span>
+                <Play className="w-4 h-4" />
+                <span>Generate Batch Cards</span>
               </>
             )}
           </button>
         </div>
 
-        {/* Batch Queue List */}
         <div
-          className={
-            isMinimalLight
-              ? 'bg-white border border-slate-200 rounded-lg p-4 sm:p-5 shadow-sm flex flex-col text-slate-800'
-              : isMinimalDark
-              ? 'bg-[#27272A] border border-zinc-700 rounded-lg p-4 sm:p-5 shadow-sm flex flex-col text-zinc-100'
-              : 'bg-white border-4 border-black p-4 sm:p-5 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col text-black'
-          }
+          className={`border rounded-lg p-4 sm:p-5 shadow-xs flex flex-col ${
+            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+          }`}
         >
-          <div className="flex items-center justify-between border-b pb-2 mb-3 border-slate-200 dark:border-zinc-700">
-            <span className="text-xs font-bold uppercase tracking-wider">
+          <div className={`flex items-center justify-between border-b pb-2 mb-3 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+            <span className="text-xs font-semibold uppercase tracking-wider">
               Batch Queue ({completedCount} / {items.length})
             </span>
             <div className="flex items-center gap-2 text-xs font-semibold">
-              {completedCount > 0 && <span className="text-emerald-600">{completedCount} ✓</span>}
-              {errorCount > 0 && <span className="text-red-500">{errorCount} ✕</span>}
+              {completedCount > 0 && <span className="text-emerald-600 dark:text-emerald-400">{completedCount} ✓</span>}
+              {errorCount > 0 && <span className="text-rose-600 dark:text-rose-400">{errorCount} ✕</span>}
             </div>
           </div>
 
@@ -772,57 +710,53 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme
                 <div
                   key={item.id}
                   onClick={() => item.cardData && setPreviewCard(item.cardData)}
-                  className={
-                    isMinimal
-                      ? `p-2.5 border rounded-md flex items-center justify-between gap-3 text-xs transition-colors cursor-pointer ${
-                          isSuccess
-                            ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200'
-                            : isFailed
-                            ? 'bg-red-50 dark:bg-red-950/40 border-red-300 dark:border-red-800 text-red-950 dark:text-red-200'
-                            : isRunning
-                            ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-300 dark:border-sky-800 text-sky-950 dark:text-sky-200 animate-pulse'
-                            : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-zinc-200'
-                        }`
-                      : `p-2.5 border-2 border-black flex items-center justify-between gap-3 text-xs transition-colors cursor-pointer ${
-                          isSuccess
-                            ? 'bg-emerald-50 text-black'
-                            : isFailed
-                            ? 'bg-red-50 text-black'
-                            : isRunning
-                            ? 'bg-sky-50 text-black animate-pulse'
-                            : 'bg-white text-black'
-                        }`
-                  }
+                  className={`p-2.5 border rounded-md flex items-center justify-between gap-3 text-xs transition-colors cursor-pointer ${
+                    isSuccess
+                      ? isDark
+                        ? 'bg-emerald-950/20 border-emerald-900 text-emerald-200'
+                        : 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                      : isFailed
+                      ? isDark
+                        ? 'bg-rose-950/20 border-rose-900 text-rose-200'
+                        : 'bg-rose-50 border-rose-200 text-rose-950'
+                      : isRunning
+                      ? isDark
+                        ? 'bg-blue-950/20 border-blue-900 text-blue-200 animate-pulse'
+                        : 'bg-blue-50 border-blue-200 text-blue-950 animate-pulse'
+                      : isDark
+                      ? 'bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-850'
+                      : 'bg-white border-zinc-200 text-zinc-800 hover:bg-zinc-50'
+                  }`}
                 >
-                  {/* Left: Word & Info */}
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-mono text-xs font-bold text-zinc-400 w-5 text-right">
+                    <span className="font-mono text-xs text-zinc-500 w-5 text-right">
                       {idx + 1}.
                     </span>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-sm truncate">{item.word}</span>
+                        <span className="font-semibold text-sm truncate">{item.word}</span>
                         {item.noteId && (
-                          <span className="text-[10px] bg-slate-800 text-emerald-400 font-bold px-1.5 py-0.2 rounded">
+                          <span className={`text-[10px] font-mono font-medium px-1.5 py-0.2 rounded ${
+                            isDark ? 'bg-zinc-800 text-emerald-400' : 'bg-zinc-100 text-emerald-700'
+                          }`}>
                             #{item.noteId}
                           </span>
                         )}
                       </div>
                       {customMeaning && (
-                        <span className="text-[10px] text-zinc-500 font-medium block truncate max-w-[200px]" dir="rtl">
+                        <span className="text-[11px] text-zinc-500 font-normal block truncate max-w-[200px]" dir="rtl">
                           {customMeaning}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Right: Actions */}
                   <div className="flex items-center gap-2 shrink-0">
                     {isSuccess && (
-                      <span className="text-emerald-600 font-bold text-sm">✓</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold text-sm">✓</span>
                     )}
                     {isRunning && (
-                      <span className="text-blue-600 font-bold text-xs">generating...</span>
+                      <span className="text-blue-600 dark:text-blue-400 font-medium text-xs">generating...</span>
                     )}
                     {isFailed && (
                       <button
@@ -832,14 +766,11 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme
                           handleRetrySingle(idx);
                         }}
                         disabled={isProcessing}
-                        className="px-2 py-0.5 bg-red-600 text-white font-medium text-[10px] rounded flex items-center gap-1 cursor-pointer"
+                        className="px-2 py-0.5 bg-rose-600 text-white font-medium text-[10px] rounded flex items-center gap-1 cursor-pointer"
                       >
                         <RotateCcw className="w-2.5 h-2.5" />
                         <span>Retry</span>
                       </button>
-                    )}
-                    {item.status === 'idle' && (
-                      <span className="text-zinc-400 font-medium text-xs">ready</span>
                     )}
                     {item.cardData && (
                       <button
@@ -848,7 +779,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme
                           e.stopPropagation();
                           setPreviewCard(item.cardData!);
                         }}
-                        className="p-1 hover:opacity-70 cursor-pointer"
+                        className="p-1 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
                         title="Inspect Card"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -862,23 +793,18 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme
         </div>
       </section>
 
-      {/* RIGHT COLUMN: Live Card Preview Frame */}
       <section className="flex-1 flex flex-col min-h-[560px] min-w-0">
         <div
-          className={
-            isMinimalLight
-              ? 'flex-1 bg-slate-50 border border-slate-200 rounded-lg p-4 sm:p-6 relative overflow-hidden shadow-sm flex flex-col'
-              : isMinimalDark
-              ? 'flex-1 bg-[#1F1F23] border border-zinc-700 rounded-lg p-4 sm:p-6 relative overflow-hidden shadow-sm flex flex-col'
-              : 'flex-1 bg-[#F5F2EB] border-4 border-black p-4 sm:p-8 relative overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col'
-          }
+          className={`flex-1 border rounded-lg p-4 sm:p-6 relative overflow-hidden shadow-xs flex flex-col ${
+            isDark ? 'bg-[#1F1F23] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+          }`}
         >
           <div className="relative z-10 w-full flex-1 flex flex-col justify-center min-w-0">
             <CardPreview
               cardData={previewCard}
               themeId={settings.theme}
               emptyWordPlaceholder={items[0]?.word || 'batch card'}
-              appTheme={appTheme}
+              appTheme={isDark ? 'anki-dark' : 'anki-light'}
             />
           </div>
         </div>

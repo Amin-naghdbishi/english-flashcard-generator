@@ -40,6 +40,7 @@ import { THEMES, makeSpellingSentence } from './src/themes';
 const SETTINGS_FILE = path.join(process.cwd(), 'user-settings.json');
 
 const defaultSettings: AppSettings = {
+  appTheme: 'anki-light',
   ai: {
     provider: 'ollama',
     ollama: {
@@ -223,9 +224,11 @@ function normalizeSettings(raw: any): AppSettings {
   if (merged.theme === 'comic-light') merged.theme = 'comic-pop-light';
   if (!THEMES[merged.theme]) merged.theme = 'comic-pop-dark';
 
-  // Normalize Application UI Theme (Comic vs Minimal Light vs Minimal Dark)
-  if (merged.appTheme !== 'minimal-light' && merged.appTheme !== 'minimal-dark' && merged.appTheme !== 'comic') {
-    merged.appTheme = 'comic';
+  // Normalize Application UI Theme (strictly Anki Light vs Anki Dark)
+  if (merged.appTheme === 'anki-dark' || merged.appTheme === 'minimal-dark') {
+    merged.appTheme = 'anki-dark';
+  } else {
+    merged.appTheme = 'anki-light';
   }
 
   return merged;

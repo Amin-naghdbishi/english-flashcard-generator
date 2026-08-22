@@ -1,43 +1,62 @@
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useEffect } from 'react';
 import { AppTheme } from '../types';
 
 interface AppThemeContextType {
   appTheme: AppTheme;
   setAppTheme: (theme: AppTheme) => void;
-  isComic: boolean;
-  isMinimalLight: boolean;
-  isMinimalDark: boolean;
-  isMinimal: boolean;
+  isDark: boolean;
+  isLight: boolean;
+  isAnkiLight: boolean;
+  isAnkiDark: boolean;
+}
+
+export function normalizeAppTheme(theme?: string): AppTheme {
+  if (theme === 'anki-dark' || theme === 'minimal-dark') {
+    return 'anki-dark';
+  }
+  return 'anki-light';
 }
 
 const AppThemeContext = createContext<AppThemeContextType>({
-  appTheme: 'comic',
+  appTheme: 'anki-light',
   setAppTheme: () => {},
-  isComic: true,
-  isMinimalLight: false,
-  isMinimalDark: false,
-  isMinimal: false,
+  isDark: false,
+  isLight: true,
+  isAnkiLight: true,
+  isAnkiDark: false,
 });
 
 export const AppThemeProvider: React.FC<{
   appTheme: AppTheme;
   setAppTheme: (theme: AppTheme) => void;
   children: React.ReactNode;
-}> = ({ appTheme, setAppTheme, children }) => {
-  const isComic = appTheme === 'comic';
-  const isMinimalLight = appTheme === 'minimal-light';
-  const isMinimalDark = appTheme === 'minimal-dark';
-  const isMinimal = isMinimalLight || isMinimalDark;
+}> = ({ appTheme: propAppTheme, setAppTheme, children }) => {
+  const appTheme = normalizeAppTheme(propAppTheme);
+  const isDark = appTheme === 'anki-dark';
+  const isLight = !isDark;
+  const isAnkiLight = isLight;
+  const isAnkiDark = isDark;
+
+  // Ensure DOM html class reflects dark/light mode
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.style.colorScheme = 'dark';
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.style.colorScheme = 'light';
+    }
+  }, [isDark]);
 
   return (
     <AppThemeContext.Provider
       value={{
         appTheme,
         setAppTheme,
-        isComic,
-        isMinimalLight,
-        isMinimalDark,
-        isMinimal,
+        isDark,
+        isLight,
+        isAnkiLight,
+        isAnkiDark,
       }}
     >
       {children}
