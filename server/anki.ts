@@ -111,10 +111,21 @@ export async function getAnkiDecks(baseUrl: string = 'http://127.0.0.1:8765'): P
   };
 }
 
+export function getThemedModelName(
+  themeId: ThemeId = 'comic-pop-dark',
+  cardType: CardType = 'normal'
+): string {
+  const theme = THEMES[themeId] || THEMES['comic-pop-dark'];
+  const cleanName = theme?.name || themeId;
+  const spellingSuffix = cardType === 'spelling' ? ' (Spelling)' : '';
+  return `AI Vocabulary - ${cleanName}${spellingSuffix}`;
+}
+
 export async function ensureAnkiModel(
   baseUrl: string = 'http://127.0.0.1:8765',
   themeId: ThemeId = 'comic-pop-dark',
-  cardType: CardType = 'normal'
+  cardType: CardType = 'normal',
+  specificModelName?: string
 ): Promise<{
   success: boolean;
   modelCreatedOrUpdated: boolean;
@@ -129,7 +140,9 @@ export async function ensureAnkiModel(
   const fullFrontHtml = `<style>\n${theme.css}\n</style>\n${frontHtml}`;
   const fullBackHtml = `<style>\n${theme.css}\n</style>\n${backHtml}`;
 
-  // Check if model exists
+  const targetModel = specificModelName || getThemedModelName(themeId, cardType);
+
+  // Check existing models from Anki
   const modelsRes = await callAnkiConnect(baseUrl, 'modelNames');
   if (!modelsRes.success) {
     return {
@@ -141,12 +154,12 @@ export async function ensureAnkiModel(
   }
 
   const existingModels: string[] = modelsRes.result || [];
-  const modelExists = existingModels.includes(ANKI_NOTE_TYPE_NAME);
+  const modelExists = existingModels.includes(targetModel);
 
   if (!modelExists) {
     // Create new model with full styling and templates
     const createRes = await callAnkiConnect(baseUrl, 'createModel', {
-      modelName: ANKI_NOTE_TYPE_NAME,
+      modelName: targetModel,
       inOrderFields: ANKI_MODEL_FIELDS,
       css: theme.css,
       cardTemplates: [
@@ -167,7 +180,7 @@ export async function ensureAnkiModel(
       return {
         success: false,
         modelCreatedOrUpdated: false,
-        message: 'Could not create AI Vocabulary note type in Anki',
+        message: `Could not create note type '${targetModel}' in Anki`,
         error: createRes.error,
       };
     }
@@ -175,19 +188,19 @@ export async function ensureAnkiModel(
     return {
       success: true,
       modelCreatedOrUpdated: true,
-      message: `Created '${ANKI_NOTE_TYPE_NAME}' model in Anki with ${theme.name} templates and CSS.`,
+      message: `Created '${targetModel}' model in Anki with ${theme.name} templates and CSS.`,
     };
   } else {
     // 1. Ensure all required fields exist in Anki note type
     const fieldsRes = await callAnkiConnect(baseUrl, 'modelFieldNames', {
-      modelName: ANKI_NOTE_TYPE_NAME,
+      modelName: targetModel,
     });
     if (fieldsRes.success && Array.isArray(fieldsRes.result)) {
       const currentFields: string[] = fieldsRes.result;
       for (const requiredField of ANKI_MODEL_FIELDS) {
         if (!currentFields.includes(requiredField)) {
           await callAnkiConnect(baseUrl, 'modelFieldAdd', {
-            model: { name: ANKI_NOTE_TYPE_NAME },
+            model: { name: targetModel },
             field: requiredField,
           });
         }
@@ -197,14 +210,14 @@ export async function ensureAnkiModel(
     // 2. Update model CSS styling
     await callAnkiConnect(baseUrl, 'updateModelStyling', {
       model: {
-        name: ANKI_NOTE_TYPE_NAME,
+        name: targetModel,
         css: theme.css,
       },
     });
 
     // 3. Find template card names and update all of them
     const templatesRes = await callAnkiConnect(baseUrl, 'modelTemplates', {
-      modelName: ANKI_NOTE_TYPE_NAME,
+      modelName: targetModel,
     });
 
     const templateUpdates: Record<string, { Front: string; Back: string }> = {
@@ -225,7 +238,7 @@ export async function ensureAnkiModel(
 
     await callAnkiConnect(baseUrl, 'updateModelTemplates', {
       model: {
-        name: ANKI_NOTE_TYPE_NAME,
+        name: targetModel,
         templates: templateUpdates,
       },
     });
@@ -233,7 +246,7 @@ export async function ensureAnkiModel(
     return {
       success: true,
       modelCreatedOrUpdated: true,
-      message: `Updated '${ANKI_NOTE_TYPE_NAME}' model in Anki with latest ${theme.name} CSS and templates.`,
+      message: `Updated '${targetModel}' model in Anki with latest ${theme.name} CSS and templates.`,
     };
   }
 }
@@ -368,8 +381,10 @@ export async function createAnkiNote(
   const targetDeck = deckName.trim();
   const effectiveCardType = cardData.cardType || cardType || 'normal';
 
-  // 1. Ensure Model exists in Anki
-  const modelRes = await ensureAnkiModel(baseUrl, themeId, effectiveCardType);
+  const targetModelName = getThemedModelName(themeId, effectiveCardType);
+
+  // 1. Ensure Model exists in Anki with complete HTML/CSS templates
+  const modelRes = await ensureAnkiModel(baseUrl, themeId, effectiveCardType, targetModelName);
   if (!modelRes.success) {
     return {
       success: false,
@@ -492,7 +507,7 @@ export async function createAnkiNote(
   const addRes = await callAnkiConnect(baseUrl, 'addNote', {
     note: {
       deckName: targetDeck,
-      modelName: ANKI_NOTE_TYPE_NAME,
+      modelName: targetModelName,
       fields: fields,
       options: {
         allowDuplicate: true,
