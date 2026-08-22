@@ -3,13 +3,11 @@ import { AppSettings, BatchItem, CardData, BatchFieldConfig, ManualOverrides } f
 import {
   runFullPipeline,
   getAnkiDecks,
-  checkDuplicate,
   checkOllama,
   checkGemini,
   checkTTS,
   checkOnlineTTS,
   checkAnki,
-  openInAnki,
 } from '../services/api';
 import { CardPreview } from './CardPreview';
 import {
@@ -17,30 +15,38 @@ import {
   Upload,
   Play,
   RotateCcw,
-  CheckCircle2,
-  XCircle,
   AlertTriangle,
   Loader2,
   Eye,
   Sliders,
-  Check,
   ChevronDown,
   ChevronUp,
-  ExternalLink,
+  Sparkles,
+  Layers,
+  List,
 } from 'lucide-react';
 
 interface BatchCardViewProps {
   settings: AppSettings;
 }
 
-const DEFAULT_SAMPLE_TEXT = `apple
+export type BatchFormatType = 'formatA_simple' | 'formatB_structured';
+
+export interface BatchParsedResult {
+  format: BatchFormatType;
+  formatLabel: string;
+  formatDescription: string;
+  items: Array<{ word: string; deck: string; parsedFields: Partial<CardData> }>;
+}
+
+const DEFAULT_SAMPLE_FORMAT_A = `apple
 bank
 photo
 abandon
 accurate
 ancient`;
 
-const DEFAULT_STRUCTURED_SAMPLE = `--
+const DEFAULT_SAMPLE_FORMAT_B = `--
 Word=apple
 Deck=English::B1
 Phonetic=/ˈæpəl/
@@ -60,25 +66,50 @@ Persian Meaning=بانک
 Example Sentence=She went to the bank to deposit some cash.
 ExampleTranslation=او برای واریز مقداری پول نقد به بانک رفت.
 Memory Aid=Imagine the building where money is kept safely.
+--
+
+--
+Word=bank
+Deck=English::B1
+Phonetic=/bæŋk/
+Part of Speech=noun
+Persian Meaning=ساحل رودخانه
+Example Sentence=We walked along the river bank.
+ExampleTranslation=ما در امتداد ساحل رودخانه قدم زدیم.
+Memory Aid=Bank of a river.
 --`;
 
 /**
- * Parses either Format A (simple list) or Format B (structured cards with -- separator).
+ * Automatically detects whether the TXT input is Format A (simple word list)
+ * or Format B (structured key-value entries separated by --).
+ * User does NOT need to manually select a format.
  */
-function parseBatchInput(
+export function autoDetectAndParseBatchInput(
   rawText: string,
   defaultDeck: string
-): Array<{ word: string; deck: string; parsedFields: Partial<CardData> }> {
+): BatchParsedResult {
   const trimmed = rawText.trim();
-  if (!trimmed) return [];
+  if (!trimmed) {
+    return {
+      format: 'formatA_simple',
+      formatLabel: 'Format A (Simple Word List)',
+      formatDescription: 'One English word per line. AI and dictionaries will automatically generate all details.',
+      items: [],
+    };
+  }
 
-  // Check if Format B: contains '--' separator
-  if (trimmed.includes('--')) {
-    const blocks = trimmed
-      .split(/(?:^|\n)--(?:\n|$)/)
-      .map((b) => b.trim())
-      .filter(Boolean);
+  // 1. Detection heuristic for Format B:
+  // Check for '--' block separators or structured key-value patterns (e.g. Word=, Persian Meaning=, etc.)
+  const hasSeparator = /(?:^|\r?\n)\s*--\s*(?:\r?\n|$)/m.test(trimmed);
+  const hasKeyValuePairs = /(?:^|\r?\n)\s*(?:word|deck|phonetic|ipa|part\s*of\s*speech|pos|persian\s*meaning|meaning|example\s*sentence|example|memory\s*aid|mnemonic)\s*[:=]/i.test(trimmed);
 
+  if (hasSeparator || hasKeyValuePairs) {
+    // FORMAT B: Structured Entries
+    const rawBlocks = hasSeparator
+      ? trimmed.split(/(?:^|\r?\n)\s*--\s*(?:\r?\n|$)/m)
+      : trimmed.split(/\r?\n\s*\r?\n/); // fallback split on blank lines
+
+    const blocks = rawBlocks.map((b) => b.trim()).filter(Boolean);
     const results: Array<{ word: string; deck: string; parsedFields: Partial<CardData> }> = [];
 
     for (const block of blocks) {
@@ -91,53 +122,76 @@ function parseBatchInput(
           const rawKey = line.slice(0, sepIndex).trim().toLowerCase().replace(/[\s_-]/g, '');
           const val = line.slice(sepIndex + 1).trim();
           fields[rawKey] = val;
-        } else if (!fields['word'] && line) {
+        } else if (!fields['word'] && line && !line.startsWith('--')) {
           fields['word'] = line.trim();
         }
       }
 
-      const word = fields['word'] || '';
+      const word = fields['word'] || fields['english'] || fields['term'] || '';
       if (!word) continue;
 
-      const deck = fields['deck'] || defaultDeck;
+      const deck = fields['deck'] || fields['deckname'] || fields['targetdeck'] || defaultDeck;
       const parsedFields: Partial<CardData> = {
         word,
-        phonetic: fields['phonetic'] || fields['ipa'] || undefined,
-        partOfSpeech: fields['partofspeech'] || fields['pos'] || undefined,
-        meaningFa: fields['persianmeaning'] || fields['meaning'] || fields['meaningfa'] || undefined,
-        example: fields['examplesentence'] || fields['example'] || fields['sentence'] || undefined,
-        translationFa: fields['exampletranslation'] || fields['translation'] || fields['translationfa'] || undefined,
-        mnemonic: fields['memoryaid'] || fields['mnemonic'] || undefined,
+        phonetic: fields['phonetic'] || fields['ipa'] || fields['pronunciation'] || undefined,
+        partOfSpeech: fields['partofspeech'] || fields['pos'] || fields['type'] || undefined,
+        meaningFa: fields['persianmeaning'] || fields['meaning'] || fields['meaningfa'] || fields['persian'] || fields['farsi'] || undefined,
+        example: fields['examplesentence'] || fields['example'] || fields['sentence'] || fields['sample'] || undefined,
+        translationFa: fields['exampletranslation'] || fields['translation'] || fields['translationfa'] || fields['sentencefa'] || undefined,
+        mnemonic: fields['memoryaid'] || fields['mnemonic'] || fields['aid'] || fields['code'] || undefined,
       };
 
       results.push({ word, deck, parsedFields });
     }
 
-    if (results.length > 0) return results;
+    if (results.length > 0) {
+      return {
+        format: 'formatB_structured',
+        formatLabel: 'Format B (Structured Blocks with --)',
+        formatDescription: 'Key-value pairs separated by "--". Custom fields are preserved with highest priority.',
+        items: results,
+      };
+    }
   }
 
-  // Format A: Simple word list (one word per line, duplicates fully allowed)
+  // 2. FORMAT A: Simple Word List (one word per line, duplicates fully allowed)
   const lines = trimmed.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-
-  return lines.map((w) => ({
+  const items = lines.map((w) => ({
     word: w,
     deck: defaultDeck,
     parsedFields: { word: w },
   }));
+
+  return {
+    format: 'formatA_simple',
+    formatLabel: 'Format A (Simple Word List)',
+    formatDescription: 'One English word per line. AI and selected dictionaries will generate all fields.',
+    items,
+  };
 }
 
 export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
-  const [inputText, setInputText] = useState<string>(DEFAULT_SAMPLE_TEXT);
+  const [inputText, setInputText] = useState<string>(DEFAULT_SAMPLE_FORMAT_A);
   const [fileName, setFileName] = useState<string>('sample_words.txt');
   const [deck, setDeck] = useState<string>(settings.anki.defaultDeck || 'English::B1');
   const [availableDecks, setAvailableDecks] = useState<string[]>(['English::B1', 'English::B2', 'IELTS']);
   const [items, setItems] = useState<BatchItem[]>([]);
+  const [detectedFormatInfo, setDetectedFormatInfo] = useState<{
+    format: BatchFormatType;
+    formatLabel: string;
+    formatDescription: string;
+  }>({
+    format: 'formatA_simple',
+    formatLabel: 'Format A (Simple Word List)',
+    formatDescription: 'One English word per line. AI and dictionaries will automatically generate all details.',
+  });
+
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [previewCard, setPreviewCard] = useState<CardData | null>(null);
   const [preflightError, setPreflightError] = useState<string | null>(null);
   const [showFieldConfig, setShowFieldConfig] = useState<boolean>(false);
 
-  // User-Controlled Fields Config (Requirement 8)
+  // User-Controlled Fields Config
   const [fieldConfig, setFieldConfig] = useState<BatchFieldConfig>({
     word: true,
     deck: true,
@@ -163,12 +217,18 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
     }).catch(() => {});
   }, [settings.anki.url]);
 
-  // Update Items whenever input text or deck changes
+  // Automatically detect format and update parsed items whenever input text or deck changes
   useEffect(() => {
-    const parsed = parseBatchInput(inputText, deck);
+    const parseResult = autoDetectAndParseBatchInput(inputText, deck);
+    setDetectedFormatInfo({
+      format: parseResult.format,
+      formatLabel: parseResult.formatLabel,
+      formatDescription: parseResult.formatDescription,
+    });
+
     setItems(
-      parsed.map((p, idx) => ({
-        id: `${p.word}_${idx}`,
+      parseResult.items.map((p, idx) => ({
+        id: `${p.word}_${idx}_${Date.now()}`,
         word: p.word,
         deck: p.deck || deck,
         status: 'idle',
@@ -235,7 +295,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
     return true;
   };
 
-  // Process a single item respecting user-controlled field configuration
+  // Process a single item respecting user-controlled field configuration & duplicate allowance
   const processItem = async (item: BatchItem): Promise<BatchItem> => {
     const targetDeck = item.deck || deck;
 
@@ -250,7 +310,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
       if (fieldConfig.mnemonic && item.parsedFields.mnemonic) overrides.mnemonic = item.parsedFields.mnemonic;
     }
 
-    // Run Pipeline
+    // Run Pipeline with allowDuplicate: true so duplicate words with distinct meanings create separate cards
     const res = await runFullPipeline({
       word: item.word,
       deck: targetDeck,
@@ -275,7 +335,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
     }
   };
 
-  // Build All Cards
+  // Build All Cards sequentially
   const handleBuildAll = async () => {
     if (items.length === 0 || isProcessing) return;
 
@@ -285,18 +345,16 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
     setIsProcessing(true);
 
     for (let i = 0; i < items.length; i++) {
-      const current = items[i];
-      if (current.status === 'success') continue;
+      if (items[i].status === 'success') continue;
 
-      // Mark generating
       setItems((prev) =>
         prev.map((it, idx) =>
-          idx === i ? { ...it, status: 'generating_ai' } : it
+          idx === i ? { ...it, status: 'generating_ai', error: undefined } : it
         )
       );
 
       try {
-        const resultItem = await processItem(current);
+        const resultItem = await processItem(items[i]);
         setItems((prev) =>
           prev.map((it, idx) => (idx === i ? resultItem : it))
         );
@@ -345,6 +403,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
         word: item.word,
         deck: targetDeck,
         manualOverrides: overrides,
+        cardType: settings.defaultCard?.cardType || 'normal',
         createInAnki: true,
       });
 
@@ -381,13 +440,14 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
 
   const completedCount = items.filter((it) => it.status === 'success').length;
   const errorCount = items.filter((it) => it.status === 'error').length;
-  const duplicateCount = items.filter((it) => it.status === 'duplicate').length;
-  const inProgressItem = items.find((it) => it.status === 'generating_ai');
+  const totalParsedFieldsCount = items.reduce((acc, it) => {
+    return acc + Object.keys(it.parsedFields || {}).length;
+  }, 0);
 
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 p-4 sm:p-6">
-      {/* LEFT COLUMN: TXT Batch Input & Clean Queue */}
-      <section className="w-full lg:w-[460px] flex flex-col gap-6 shrink-0">
+      {/* LEFT COLUMN: TXT Batch Input & Queue */}
+      <section className="w-full lg:w-[480px] flex flex-col gap-6 shrink-0">
         {/* Batch File Box (#4ADE80) */}
         <div className="bg-[#4ADE80] p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-black">
           <div className="flex items-center justify-between border-b-4 border-black pb-3 mb-4">
@@ -413,7 +473,31 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             </div>
           </div>
 
-          {/* TXT Format Switcher & Deck */}
+          {/* AUTO-DETECTED FORMAT BANNER */}
+          <div className="bg-black text-white p-3 border-4 border-black shadow-[3px_3px_0px_#000000] mb-3">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-[#FFD93D]" />
+                <span className="text-xs font-black uppercase text-[#FFD93D] tracking-wider">
+                  Auto-Detected Format:
+                </span>
+              </div>
+              <span
+                className={`px-2 py-0.5 text-[10px] font-black uppercase border border-white ${
+                  detectedFormatInfo.format === 'formatB_structured'
+                    ? 'bg-[#C084FC] text-black'
+                    : 'bg-[#38BDF8] text-black'
+                }`}
+              >
+                {detectedFormatInfo.format === 'formatB_structured' ? 'Format B (Structured)' : 'Format A (Simple List)'}
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-300 font-bold">
+              {detectedFormatInfo.formatDescription}
+            </p>
+          </div>
+
+          {/* TXT File Status & Default Deck */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
             <div className="bg-white p-2.5 border-4 border-black flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">
@@ -423,7 +507,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                 </span>
               </div>
               <span className="text-xs font-black bg-black text-[#4ADE80] px-2 py-0.5 border border-black">
-                {items.length} words
+                {items.length} cards
               </span>
             </div>
 
@@ -444,37 +528,45 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             </div>
           </div>
 
-          {/* Quick Format Presets */}
+          {/* Helper Example Loaders (One-Click Testing) */}
           <div className="flex gap-2 mb-3">
             <button
               type="button"
-              onClick={() => setInputText(DEFAULT_SAMPLE_TEXT)}
-              className="flex-1 py-1 px-2 bg-white hover:bg-zinc-100 text-black text-[11px] font-black uppercase border-2 border-black cursor-pointer"
+              onClick={() => {
+                setFileName('sample_simple_list.txt');
+                setInputText(DEFAULT_SAMPLE_FORMAT_A);
+              }}
+              className="flex-1 py-1.5 px-2 bg-white hover:bg-zinc-100 text-black text-[11px] font-black uppercase border-2 border-black cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center justify-center gap-1"
             >
-              Format A (Simple List)
+              <List className="w-3.5 h-3.5 text-[#2563EB]" />
+              <span>Load Format A Example</span>
             </button>
             <button
               type="button"
-              onClick={() => setInputText(DEFAULT_STRUCTURED_SAMPLE)}
-              className="flex-1 py-1 px-2 bg-white hover:bg-zinc-100 text-black text-[11px] font-black uppercase border-2 border-black cursor-pointer"
+              onClick={() => {
+                setFileName('sample_structured_blocks.txt');
+                setInputText(DEFAULT_SAMPLE_FORMAT_B);
+              }}
+              className="flex-1 py-1.5 px-2 bg-white hover:bg-zinc-100 text-black text-[11px] font-black uppercase border-2 border-black cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center justify-center gap-1"
             >
-              Format B (Structured --)
+              <Layers className="w-3.5 h-3.5 text-[#7C3AED]" />
+              <span>Load Format B Example</span>
             </button>
           </div>
 
           {/* TXT Input Area */}
           <div className="mb-3">
             <textarea
-              rows={5}
+              rows={6}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               disabled={isProcessing}
               className="w-full bg-white text-black text-xs font-bold font-mono p-3 border-4 border-black focus:outline-none"
-              placeholder="Format A (apple\nbank) or Format B (--\nWord=apple\nDeck=English::B1\n--)..."
+              placeholder="Paste words or upload TXT file. Format is auto-detected automatically!"
             />
           </div>
 
-          {/* User-Controlled Fields Collapsible (Requirement 8) */}
+          {/* Field Settings Collapsible */}
           <div className="bg-white border-4 border-black p-3 mb-4">
             <button
               type="button"
@@ -483,7 +575,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             >
               <span className="flex items-center gap-1.5">
                 <Sliders className="w-3.5 h-3.5" />
-                <span>Field Settings (Use TXT vs Generate AI)</span>
+                <span>Field Settings ({totalParsedFieldsCount} parsed values found)</span>
               </span>
               {showFieldConfig ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
@@ -491,7 +583,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             {showFieldConfig && (
               <div className="mt-3 pt-3 border-t-2 border-black text-xs space-y-2">
                 <p className="text-[10px] text-zinc-600 font-bold mb-2">
-                  * If checked and present in TXT, the file's data is used. Missing or unchecked fields are generated by AI.
+                  * If present in TXT, the file's data is preserved with top priority. Missing fields are generated by AI / dictionary.
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="flex items-center gap-1.5 cursor-pointer">
@@ -602,16 +694,15 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
           </button>
         </div>
 
-        {/* Clean Batch Progress List (Requirement 9) */}
+        {/* Batch Queue List */}
         <div className="bg-white border-4 border-black p-4 sm:p-5 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col text-black">
           <div className="flex items-center justify-between border-b-2 border-black pb-2 mb-3">
             <span className="text-xs font-black text-black uppercase tracking-wider">
-              Batch Progress ({completedCount} / {items.length})
+              Batch Queue ({completedCount} / {items.length})
             </span>
             <div className="flex items-center gap-2 text-[11px] font-black">
               {completedCount > 0 && <span className="text-emerald-700">{completedCount} ✓</span>}
               {errorCount > 0 && <span className="text-red-600">{errorCount} ✕</span>}
-              {duplicateCount > 0 && <span className="text-amber-600">{duplicateCount} dup</span>}
             </div>
           </div>
 
@@ -620,52 +711,51 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
               const isSuccess = item.status === 'success';
               const isRunning = item.status === 'generating_ai';
               const isFailed = item.status === 'error';
-              const isDuplicate = item.status === 'duplicate';
+              const customMeaning = item.parsedFields?.meaningFa;
 
               return (
                 <div
                   key={item.id}
                   onClick={() => item.cardData && setPreviewCard(item.cardData)}
-                  className={`p-2 border-2 border-black flex items-center justify-between gap-3 text-xs transition-colors cursor-pointer ${
+                  className={`p-2.5 border-2 border-black flex items-center justify-between gap-3 text-xs transition-colors cursor-pointer ${
                     isSuccess
                       ? 'bg-emerald-50 text-black'
                       : isFailed
                       ? 'bg-red-50 text-black'
-                      : isDuplicate
-                      ? 'bg-amber-50 text-black'
                       : isRunning
                       ? 'bg-sky-50 text-black animate-pulse'
                       : 'bg-white text-black'
                   }`}
                 >
-                  {/* Left: Word Name */}
+                  {/* Left: Word & Info */}
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="font-mono text-xs font-bold text-zinc-400 w-5 text-right">
                       {idx + 1}.
                     </span>
-                    <span className="font-black text-black text-sm truncate">{item.word}</span>
-                    {item.noteId && (
-                      <span className="text-[10px] bg-black text-[#4ADE80] font-black px-1.5 py-0.2 border border-black">
-                        #{item.noteId}
-                      </span>
-                    )}
-                    {item.error && (
-                      <span className="text-[10px] text-red-600 font-bold truncate max-w-[140px]">
-                        {item.error}
-                      </span>
-                    )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-black text-black text-sm truncate">{item.word}</span>
+                        {item.noteId && (
+                          <span className="text-[10px] bg-black text-[#4ADE80] font-black px-1.5 py-0.2 border border-black">
+                            #{item.noteId}
+                          </span>
+                        )}
+                      </div>
+                      {customMeaning && (
+                        <span className="text-[10px] text-zinc-600 font-bold block truncate max-w-[200px]" dir="rtl">
+                          {customMeaning}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Right: Simple Status Indicator */}
+                  {/* Right: Actions */}
                   <div className="flex items-center gap-2 shrink-0">
                     {isSuccess && (
                       <span className="text-emerald-700 font-black text-sm">✓</span>
                     )}
                     {isRunning && (
                       <span className="text-blue-700 font-black text-xs">generating...</span>
-                    )}
-                    {isDuplicate && (
-                      <span className="text-amber-700 font-black text-xs">duplicate</span>
                     )}
                     {isFailed && (
                       <button
@@ -682,7 +772,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                       </button>
                     )}
                     {item.status === 'idle' && (
-                      <span className="text-zinc-400 font-bold text-xs">waiting...</span>
+                      <span className="text-zinc-400 font-bold text-xs">ready</span>
                     )}
                     {item.cardData && (
                       <button
@@ -707,7 +797,6 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
 
       {/* RIGHT COLUMN: Live Card Preview Frame */}
       <section className="flex-1 flex flex-col min-h-[560px]">
-        {/* Bento Stage Container (Warm Ivory #F5F2EB) */}
         <div className="flex-1 bg-[#F5F2EB] border-4 border-black p-4 sm:p-8 relative overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col">
           <div className="relative z-10 w-full flex-1 flex flex-col justify-center">
             <CardPreview
