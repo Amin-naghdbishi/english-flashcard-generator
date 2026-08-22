@@ -1,6 +1,7 @@
-import { AppSettings, CardData, DiagnosticsReport, ManualOverrides, AnkiCardVerificationDetails } from '../types';
+import { AppSettings, CardData, DiagnosticsReport, ManualOverrides, AnkiCardVerificationDetails, ThemeId } from '../types';
 import { OllamaModelTag } from '../../server/ollama';
 import { PiperVoice, PiperDiagnosticResult } from '../../server/piper';
+import { OnlineTTSDiagnosticResult } from '../../server/onlineTts';
 
 export async function fetchConfig(): Promise<AppSettings> {
   const res = await fetch('/api/config');
@@ -28,6 +29,20 @@ export async function checkOllama(url?: string): Promise<{ connected: boolean; v
 export async function getOllamaModels(url?: string): Promise<{ success: boolean; models: OllamaModelTag[]; error?: string }> {
   const q = url ? `?url=${encodeURIComponent(url)}` : '';
   const res = await fetch(`/api/ollama/models${q}`);
+  return res.json();
+}
+
+export async function checkGemini(apiKey: string, model?: string): Promise<{ connected: boolean; model?: string; error?: string }> {
+  const res = await fetch('/api/gemini/health', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ apiKey, model }),
+  });
+  return res.json();
+}
+
+export async function getGeminiModels(): Promise<{ success: boolean; models: Array<{ id: string; name: string }> }> {
+  const res = await fetch('/api/gemini/models');
   return res.json();
 }
 
@@ -66,6 +81,19 @@ export async function controlPiperService(action: 'start' | 'stop' | 'restart'):
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action }),
+  });
+  return res.json();
+}
+
+export async function checkOnlineTTS(): Promise<{ connected: boolean; error?: string }> {
+  const res = await fetch('/api/tts/online/health');
+  return res.json();
+}
+
+export async function runOnlineTTSDiagnostics(): Promise<OnlineTTSDiagnosticResult> {
+  const res = await fetch('/api/tts/online/diagnostics', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
   });
   return res.json();
 }
@@ -115,7 +143,7 @@ export async function checkDuplicate(deck: string, word: string, url?: string): 
   return res.json();
 }
 
-export async function setupAnkiModel(themeId?: 'comic-dark' | 'comic-light', url?: string) {
+export async function setupAnkiModel(themeId?: ThemeId, url?: string) {
   const res = await fetch('/api/anki/setup-model', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -124,7 +152,7 @@ export async function setupAnkiModel(themeId?: 'comic-dark' | 'comic-light', url
   return res.json();
 }
 
-export async function runAnkiPipelineTest(deck?: string, themeId?: 'comic-dark' | 'comic-light', url?: string): Promise<{
+export async function runAnkiPipelineTest(deck?: string, themeId?: ThemeId, url?: string): Promise<{
   success: boolean;
   steps: Array<{ step: string; status: 'ok' | 'error'; message: string; details?: any }>;
   testNoteId?: number;
@@ -169,7 +197,7 @@ export async function openInAnki(params: { noteId?: number; query?: string; url?
 export async function createDirectAnkiNote(params: {
   deck: string;
   cardData: CardData;
-  themeId?: 'comic-dark' | 'comic-light';
+  themeId?: ThemeId;
   url?: string;
 }): Promise<{
   success: boolean;

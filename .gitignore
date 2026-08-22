@@ -1,8 +1,116 @@
+# ==============================================================================
+# Flashcard Generator .gitignore
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Dependencies & Package Managers
+# ------------------------------------------------------------------------------
 node_modules/
-build/
+.pnp
+.pnp.js
+.pnpm-store/
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# ------------------------------------------------------------------------------
+# Build & Distribution Outputs
+# ------------------------------------------------------------------------------
 dist/
-coverage/
-.DS_Store
-*.log
-.env*
+dist-ssr/
+build/
+out/
+.vite/
+*.tsbuildinfo
+.parcel-cache/
+.turbo/
+
+# ------------------------------------------------------------------------------
+# Environment Variables, Secrets & API Keys
+# ------------------------------------------------------------------------------
+.env
+.env.*
 !.env.example
+*.local
+*.pem
+*.key
+*.cert
+*.crt
+credentials.json
+service-account*.json
+
+# ------------------------------------------------------------------------------
+# Python Environments & Caches (Piper TTS / Local Scripts)
+# ------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.mypy_cache/
+
+# ------------------------------------------------------------------------------
+# Generated Media & Large Model Files (TTS Audio & Piper ONNX models)
+# ------------------------------------------------------------------------------
+*.wav
+*.mp3
+*.ogg
+*.flac
+*.onnx
+*.onnx.json
+audio_cache/
+temp_audio/
+recordings/
+models/
+
+# ------------------------------------------------------------------------------
+# Logs & Runtime Temporary Files
+# ------------------------------------------------------------------------------
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+temp/
+tmp/
+coverage/
+.nyc_output/
+
+# ------------------------------------------------------------------------------
+# IDE & Code Editor Temporary Files
+# ------------------------------------------------------------------------------
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+*.bak
+
+# ------------------------------------------------------------------------------
+# OS-Generated Files
+# ------------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/

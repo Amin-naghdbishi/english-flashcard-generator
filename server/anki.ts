@@ -1,5 +1,5 @@
 import { THEMES } from '../src/themes';
-import { CardData } from '../src/types';
+import { CardData, ThemeId } from '../src/types';
 
 export const ANKI_NOTE_TYPE_NAME = 'AI Vocabulary';
 export const ANKI_MODEL_FIELDS = [
@@ -110,7 +110,7 @@ export async function getAnkiDecks(baseUrl: string = 'http://127.0.0.1:8765'): P
 
 export async function ensureAnkiModel(
   baseUrl: string = 'http://127.0.0.1:8765',
-  themeId: 'comic-dark' | 'comic-light' = 'comic-dark'
+  themeId: ThemeId = 'comic-pop-dark'
 ): Promise<{
   success: boolean;
   modelCreatedOrUpdated: boolean;
@@ -438,7 +438,7 @@ export async function createAnkiNote(
   baseUrl: string,
   deckName: string,
   cardData: CardData,
-  themeId: 'comic-dark' | 'comic-light' = 'comic-dark'
+  themeId: ThemeId = 'comic-pop-dark'
 ): Promise<{
   success: boolean;
   noteId?: number;
@@ -608,7 +608,7 @@ export async function createAnkiNote(
 export async function runAnkiPipelineDiagnostic(
   baseUrl: string = 'http://127.0.0.1:8765',
   targetDeck: string = 'English::B1',
-  themeId: 'comic-dark' | 'comic-light' = 'comic-dark'
+  themeId: ThemeId = 'comic-pop-dark'
 ) {
   const steps: Array<{ step: string; status: 'ok' | 'error'; message: string; details?: any }> = [];
 

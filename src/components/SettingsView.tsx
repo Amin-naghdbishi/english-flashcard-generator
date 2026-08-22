@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { AppSettings, DiagnosticsReport, AnkiCardVerificationDetails } from '../types';
+import { AppSettings, DiagnosticsReport, AnkiCardVerificationDetails, ThemeId, AIProvider, TTSProvider } from '../types';
 import {
   saveConfig,
   checkOllama,
   getOllamaModels,
+  checkGemini,
+  getGeminiModels,
   checkTTS,
   getTTSVoices,
   getPiperServiceStatus,
   controlPiperService,
   synthesizeAudio,
   runTTSDiagnostics,
+  checkOnlineTTS,
+  runOnlineTTSDiagnostics,
   checkAnki,
   getAnkiDecks,
   setupAnkiModel,
@@ -20,6 +24,8 @@ import {
 } from '../services/api';
 import { OllamaModelTag } from '../../server/ollama';
 import { PiperVoice, PiperDiagnosticResult } from '../../server/piper';
+import { OnlineTTSDiagnosticResult } from '../../server/onlineTts';
+import { THEME_GROUPS } from '../themes';
 import { AudioPlayer } from './AudioPlayer';
 import {
   Sliders,
@@ -44,6 +50,9 @@ import {
   Info,
   Power,
   PowerOff,
+  Globe,
+  HardDrive,
+  Key,
 } from 'lucide-react';
 
 interface SettingsViewProps {
@@ -61,6 +70,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [ollamaModels, setOllamaModels] = useState<OllamaModelTag[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
 
+  // Gemini states
+  const [geminiStatus, setGeminiStatus] = useState<{ connected: boolean; model?: string; error?: string } | null>(null);
+  const [geminiModels, setGeminiModels] = useState<Array<{ id: string; name: string }>>([]);
+  const [testingGemini, setTestingGemini] = useState(false);
+
   // Piper TTS states
   const [piperVoices, setPiperVoices] = useState<PiperVoice[]>([]);
   const [piperDiag, setPiperDiag] = useState<PiperDiagnosticResult | null>(null);
@@ -68,6 +82,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [testUsWavBase64, setTestUsWavBase64] = useState<string | null>(null);
   const [testUkWavBase64, setTestUkWavBase64] = useState<string | null>(null);
   const [testSlowWavBase64, setTestSlowWavBase64] = useState<string | null>(null);
+
+  // Online TTS states
+  const [onlineTtsStatus, setOnlineTtsStatus] = useState<{ connected: boolean; error?: string } | null>(null);
+  const [onlineTtsDiag, setOnlineTtsDiag] = useState<OnlineTTSDiagnosticResult | null>(null);
+  const [testingOnlineTts, setTestingOnlineTts] = useState(false);
 
   // Piper Systemd Service states
   const [serviceStatus, setServiceStatus] = useState<{
@@ -113,7 +132,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   useEffect(() => {
     setForm(settings);
     refreshOllamaInfo();
+    refreshGeminiInfo();
     refreshTTSInfo();
+    refreshOnlineTtsInfo();
     refreshPiperServiceStatus();
     refreshAnkiInfo();
   }, [settings]);
@@ -122,10 +143,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const refreshOllamaInfo = async () => {
     setLoadingModels(true);
     try {
-      const conn = await checkOllama(form.ai.url);
+      const conn = await checkOllama(form.ai.ollama.url);
       setOllamaStatus(conn);
 
-      const modelsRes = await getOllamaModels(form.ai.url);
+      const modelsRes = await getOllamaModels(form.ai.ollama.url);
       if (modelsRes.success) {
         setOllamaModels(modelsRes.models);
       }
@@ -136,7 +157,35 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     }
   };
 
-  // Piper Service refresh (systemctl --user is-active piper.service)
+  // Gemini refresh
+  const refreshGeminiInfo = async () => {
+    try {
+      const modelsRes = await getGeminiModels();
+      if (modelsRes.success) {
+        setGeminiModels(modelsRes.models);
+      }
+      if (form.ai.gemini.apiKey) {
+        const conn = await checkGemini(form.ai.gemini.apiKey, form.ai.gemini.model);
+        setGeminiStatus(conn);
+      }
+    } catch {
+      setGeminiStatus({ connected: false, error: 'Gemini check failed' });
+    }
+  };
+
+  const handleTestGemini = async () => {
+    setTestingGemini(true);
+    try {
+      const conn = await checkGemini(form.ai.gemini.apiKey, form.ai.gemini.model);
+      setGeminiStatus(conn);
+    } catch (e: any) {
+      setGeminiStatus({ connected: false, error: e?.message });
+    } finally {
+      setTestingGemini(false);
+    }
+  };
+
+  // Piper Service refresh
   const refreshPiperServiceStatus = async () => {
     setCheckingService(true);
     try {
@@ -149,7 +198,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     }
   };
 
-  // Toggle Piper Service (systemctl --user start/stop piper.service)
+  // Toggle Piper Service
   const handleToggleService = async (targetAction: 'start' | 'stop') => {
     setTogglingService(true);
     setServiceErrorMsg(null);
@@ -167,11 +216,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       } else {
         setServiceSuccessMsg(
           targetAction === 'start'
-            ? '✓ piper.service started successfully (systemctl --user start piper.service)'
-            : '✓ piper.service stopped successfully (systemctl --user stop piper.service)'
+            ? '✓ piper.service started successfully'
+            : '✓ piper.service stopped successfully'
         );
         setTimeout(() => setServiceSuccessMsg(null), 4000);
-        // Refresh TTS API diagnostics as well
         refreshTTSInfo();
       }
     } catch (err: any) {
@@ -194,6 +242,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       console.error(e);
     }
     refreshPiperServiceStatus();
+  };
+
+  // Online TTS refresh
+  const refreshOnlineTtsInfo = async () => {
+    try {
+      const res = await checkOnlineTTS();
+      setOnlineTtsStatus(res);
+    } catch {
+      setOnlineTtsStatus({ connected: false, error: 'Online TTS unreachable' });
+    }
+  };
+
+  const handleTestOnlineTts = async () => {
+    setTestingOnlineTts(true);
+    try {
+      const res = await runOnlineTTSDiagnostics();
+      setOnlineTtsDiag(res);
+      setOnlineTtsStatus({ connected: res.ready });
+    } catch (e: any) {
+      console.error('Online TTS diagnostic error:', e);
+    } finally {
+      setTestingOnlineTts(false);
+    }
   };
 
   // Anki refresh
@@ -353,7 +424,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             }`}
           >
             <Cpu className="w-4 h-4" />
-            <span>AI (Ollama)</span>
+            <span>AI Provider ({form.ai.provider === 'gemini' ? 'Gemini' : 'Ollama'})</span>
           </button>
 
           <button
@@ -366,7 +437,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             }`}
           >
             <Volume2 className="w-4 h-4" />
-            <span>TTS (Piper)</span>
+            <span>TTS ({form.tts.provider === 'online' ? 'Online' : 'Piper'})</span>
           </button>
 
           <button
@@ -392,7 +463,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             }`}
           >
             <Palette className="w-4 h-4" />
-            <span>Appearance</span>
+            <span>Card Designs (10 Themes)</span>
           </button>
 
           <button
@@ -444,496 +515,552 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
         </div>
       )}
 
-      {/* SUB-TAB 1: AI (Ollama) */}
+      {/* SUB-TAB 1: AI PROVIDER (Ollama & Gemini) */}
       {activeSubTab === 'ai' && (
         <div className="bg-[#38bdf8] border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-5 sm:p-6 flex flex-col gap-5 text-black">
-          <div className="flex items-center justify-between border-b-4 border-black pb-3">
+          <div className="flex flex-wrap items-center justify-between border-b-4 border-black pb-3 gap-3">
             <div>
               <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-                Ollama Local AI Configuration
+                AI Provider Configuration
               </h3>
               <p className="text-xs font-bold text-black opacity-80">
-                Direct structured JSON output generation without cloud dependencies.
+                Choose between Local Ollama (100% offline) or Google Gemini (Online cloud AI).
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <span
-                className={`px-3 py-1 text-xs font-black border-2 border-black ${
-                  ollamaStatus?.connected ? 'bg-[#4ADE80] text-black' : 'bg-[#FF4B4B] text-white'
-                }`}
-              >
-                {ollamaStatus?.connected ? `● ${ollamaStatus.version}` : '○ Unreachable'}
-              </span>
+
+            {/* Provider Selector Switch */}
+            <div className="inline-flex border-4 border-black bg-white p-1 shadow-[3px_3px_0px_#000000]">
               <button
                 type="button"
-                onClick={refreshOllamaInfo}
-                disabled={loadingModels}
-                className="p-1.5 bg-white hover:bg-zinc-100 text-black border-2 border-black shadow-[2px_2px_0px_#000000] cursor-pointer"
-                title="Test Connection & Refresh Models"
+                onClick={() => setForm({ ...form, ai: { ...form.ai, provider: 'ollama' } })}
+                className={`px-4 py-2 text-xs font-black uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all ${
+                  form.ai.provider === 'ollama'
+                    ? 'bg-[#FFD93D] text-black shadow-inner'
+                    : 'bg-zinc-100 text-black hover:bg-zinc-200'
+                }`}
               >
-                <RefreshCw className={`w-4 h-4 ${loadingModels ? 'animate-spin' : ''}`} />
+                <HardDrive className="w-4 h-4" />
+                <span>Local Ollama</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, ai: { ...form.ai, provider: 'gemini' } })}
+                className={`px-4 py-2 text-xs font-black uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all ${
+                  form.ai.provider === 'gemini'
+                    ? 'bg-[#FFD93D] text-black shadow-inner'
+                    : 'bg-zinc-100 text-black hover:bg-zinc-200'
+                }`}
+              >
+                <Globe className="w-4 h-4" />
+                <span>Google Gemini</span>
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold">
-            {/* URL */}
-            <div className="bg-white p-4 border-4 border-black">
-              <label className="block text-black font-black uppercase mb-1">
-                Ollama Endpoint URL:
-              </label>
-              <input
-                type="text"
-                value={form.ai.url}
-                onChange={(e) => setForm({ ...form, ai: { ...form.ai, url: e.target.value } })}
-                className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-mono focus:outline-none"
-              />
-              <span className="text-[10px] text-zinc-600 font-bold mt-1 block">
-                Default: http://127.0.0.1:11434
-              </span>
-            </div>
-
-            {/* Model Selector */}
-            <div className="bg-white p-4 border-4 border-black">
-              <label className="block text-black font-black uppercase mb-1">
-                Selected AI Model:
-              </label>
-              {ollamaModels.length > 0 ? (
-                <select
-                  value={form.ai.model}
-                  onChange={(e) => setForm({ ...form, ai: { ...form.ai, model: e.target.value } })}
-                  className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-black focus:outline-none cursor-pointer"
-                >
-                  {ollamaModels.map((m) => (
-                    <option key={m.name} value={m.name}>
-                      {m.name} ({(m.size / 1024 / 1024 / 1024).toFixed(1)} GB)
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={form.ai.model}
-                  onChange={(e) => setForm({ ...form, ai: { ...form.ai, model: e.target.value } })}
-                  placeholder="e.g. qwen3:4b, gemma3:4b, llama3.2:3b"
-                  className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-black focus:outline-none"
-                />
-              )}
-              <span className="text-[10px] text-zinc-600 font-bold mt-1 block">
-                Recommended: qwen3:4b, gemma3:4b, llama3.2:3b
-              </span>
-            </div>
-
-            {/* Temperature */}
-            <div className="bg-white p-4 border-4 border-black">
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-black font-black uppercase">Temperature:</label>
-                <span className="font-mono bg-black text-[#FFD93D] px-2 py-0.5 text-xs font-black">
-                  {form.ai.temperature}
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0.0"
-                max="1.0"
-                step="0.05"
-                value={form.ai.temperature}
-                onChange={(e) =>
-                  setForm({ ...form, ai: { ...form.ai, temperature: parseFloat(e.target.value) } })
-                }
-                className="w-full cursor-pointer accent-black"
-              />
-              <span className="text-[10px] text-zinc-600 font-bold block mt-1">
-                Keep low (0.1 - 0.3) for strict JSON adherence and accurate IPA.
-              </span>
-            </div>
-
-            {/* Context Length */}
-            <div className="bg-white p-4 border-4 border-black">
-              <label className="block text-black font-black uppercase mb-1">
-                Context Length (num_ctx):
-              </label>
-              <input
-                type="number"
-                value={form.ai.contextLength}
-                onChange={(e) =>
-                  setForm({ ...form, ai: { ...form.ai, contextLength: parseInt(e.target.value, 10) || 2048 } })
-                }
-                className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-mono font-bold focus:outline-none"
-              />
-              <span className="text-[10px] text-zinc-600 font-bold mt-1 block">
-                Default: 2048 tokens
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SUB-TAB 2: TTS (Piper) */}
-      {activeSubTab === 'tts' && (
-        <div className="bg-[#FFD93D] border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-5 sm:p-6 flex flex-col gap-5 text-black">
-          <div className="flex items-center justify-between border-b-4 border-black pb-3">
-            <div>
-              <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-                Piper Local Offline TTS Engine
-              </h3>
-              <p className="text-xs font-bold text-black opacity-80">
-                Official local Piper HTTP API (<code className="bg-black text-[#FFD93D] px-1 py-0.5 font-mono">POST /synthesize</code>) with real American & British voices.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span
-                className={`px-3 py-1 text-xs font-black border-2 border-black ${
-                  piperDiag?.ready ? 'bg-[#4ADE80] text-black' : 'bg-[#FF4B4B] text-white'
-                }`}
-              >
-                {piperDiag?.ready ? '● PIPER READY' : '○ PIPER OFFLINE'}
-              </span>
-              <button
-                type="button"
-                onClick={handleTestPiper}
-                disabled={testingPiper}
-                className="px-4 py-1.5 bg-[#FF4B4B] hover:bg-red-500 text-white font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000000] flex items-center gap-1.5 cursor-pointer uppercase active:translate-y-0.5"
-              >
-                {testingPiper ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                <span>{testingPiper ? 'Testing Piper...' : 'Test Piper'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* PIPER SYSTEMD SERVICE CONTROL */}
-          <div className="bg-white p-4 sm:p-5 border-4 border-black shadow-[4px_4px_0px_#000000] flex flex-col gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
+          {/* OLLAMA SECTION */}
+          {form.ai.provider === 'ollama' && (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between bg-white p-3 border-4 border-black">
                 <div className="flex items-center gap-2">
-                  <Power className="w-5 h-5 text-black" />
-                  <h4 className="text-sm font-black uppercase tracking-tight">Piper Service Control</h4>
-                  <code className="bg-black text-[#FFD93D] px-1.5 py-0.5 text-[11px] font-mono font-bold">piper.service</code>
-                </div>
-                <p className="text-[11px] text-zinc-600 font-bold mt-0.5">
-                  Controls the native Linux systemd user service via <code className="bg-zinc-100 px-1 font-mono">systemctl --user</code>
-                </p>
-              </div>
-
-              {/* Real-time Status Badge & Refresh */}
-              <div className="flex items-center gap-2">
-                <div
-                  className={`px-3 py-1 text-xs font-black border-2 border-black flex items-center gap-1.5 shadow-[2px_2px_0px_#000000] ${
-                    serviceStatus?.active
-                      ? 'bg-[#4ADE80] text-black'
-                      : serviceStatus?.status === 'failed'
-                      ? 'bg-[#FF4B4B] text-white'
-                      : 'bg-zinc-200 text-zinc-800'
-                  }`}
-                >
-                  <span className={`w-2.5 h-2.5 rounded-full ${serviceStatus?.active ? 'bg-black animate-pulse' : 'bg-zinc-500'}`} />
-                  <span>
-                    {checkingService
-                      ? 'CHECKING...'
-                      : serviceStatus?.active
-                      ? 'RUNNING (ON)'
-                      : serviceStatus?.status === 'failed'
-                      ? 'FAILED (OFF)'
-                      : 'STOPPED (OFF)'}
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={refreshPiperServiceStatus}
-                  disabled={checkingService || togglingService}
-                  className="p-1.5 bg-zinc-100 hover:bg-zinc-200 text-black border-2 border-black shadow-[2px_2px_0px_#000000] cursor-pointer disabled:opacity-50 active:translate-y-0.5"
-                  title="Check actual service status with systemctl --user is-active piper.service"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${checkingService ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
-            </div>
-
-            {/* Main ON / OFF Toggle Action Bar */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 bg-zinc-50 border-2 border-black">
-              <div className="text-xs font-bold">
-                <div className="text-black font-black uppercase flex items-center gap-2">
-                  <span>Piper Service:</span>
+                  <HardDrive className="w-5 h-5 text-black" />
+                  <span className="font-black text-xs uppercase">Local Ollama Status:</span>
                   <span
-                    className={`px-2.5 py-0.5 text-xs font-mono font-black border-2 border-black shadow-[1px_1px_0px_#000000] ${
-                      serviceStatus?.active ? 'bg-[#4ADE80] text-black' : 'bg-[#FF4B4B] text-white'
+                    className={`px-2.5 py-0.5 text-xs font-black border-2 border-black ${
+                      ollamaStatus?.connected ? 'bg-[#4ADE80] text-black' : 'bg-[#FF4B4B] text-white'
                     }`}
                   >
-                    {serviceStatus?.active ? 'ON' : 'OFF'}
+                    {ollamaStatus?.connected ? `● ${ollamaStatus.version}` : '○ Offline / Unreachable'}
                   </span>
-                  <span className="text-[11px] text-zinc-500 font-mono">
-                    (status: {serviceStatus?.status || 'unknown'})
-                  </span>
-                </div>
-                <div className="text-[11px] text-zinc-600 font-mono mt-1">
-                  Executes: {serviceStatus?.active ? 'systemctl --user stop piper.service' : 'systemctl --user start piper.service'}
-                </div>
-              </div>
-
-              {/* Toggle Switch / Button */}
-              <div className="flex items-center gap-2">
-                {serviceStatus?.active ? (
-                  <button
-                    type="button"
-                    onClick={() => handleToggleService('stop')}
-                    disabled={togglingService}
-                    className="w-full sm:w-auto px-5 py-2.5 bg-[#FF4B4B] hover:bg-red-600 text-white font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000000] flex items-center justify-center gap-2 cursor-pointer uppercase active:translate-y-0.5 disabled:opacity-50"
-                  >
-                    {togglingService ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Stopping Service...</span>
-                      </>
-                    ) : (
-                      <>
-                        <PowerOff className="w-4 h-4" />
-                        <span>Turn OFF (systemctl --user stop)</span>
-                      </>
-                    )}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleToggleService('start')}
-                    disabled={togglingService}
-                    className="w-full sm:w-auto px-5 py-2.5 bg-[#4ADE80] hover:bg-emerald-400 text-black font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000000] flex items-center justify-center gap-2 cursor-pointer uppercase active:translate-y-0.5 disabled:opacity-50"
-                  >
-                    {togglingService ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Starting Service...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Power className="w-4 h-4" />
-                        <span>Turn ON (systemctl --user start)</span>
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Service Error Alert */}
-            {serviceErrorMsg && (
-              <div className="p-3 bg-red-100 border-2 border-[#FF4B4B] text-black text-xs font-bold flex items-start gap-2 shadow-[2px_2px_0px_#000000]">
-                <AlertTriangle className="w-4 h-4 text-[#FF4B4B] shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <div className="font-black text-red-700 uppercase">systemctl Error:</div>
-                  <div className="font-mono text-[11px] mt-0.5 text-red-900 break-all">{serviceErrorMsg}</div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setServiceErrorMsg(null)}
-                  className="text-xs font-black text-red-700 hover:text-black cursor-pointer px-1"
+                  onClick={refreshOllamaInfo}
+                  disabled={loadingModels}
+                  className="px-3 py-1 bg-zinc-100 hover:bg-zinc-200 text-black font-black text-xs border-2 border-black flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
                 >
-                  ✕
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingModels ? 'animate-spin' : ''}`} />
+                  <span>Detect Local Models</span>
                 </button>
               </div>
-            )}
 
-            {/* Service Success Notification */}
-            {serviceSuccessMsg && (
-              <div className="p-2.5 bg-green-100 border-2 border-[#4ADE80] text-black text-xs font-bold flex items-center justify-between gap-2 shadow-[2px_2px_0px_#000000]">
-                <div className="flex items-center gap-1.5 text-emerald-900">
-                  <CheckCircle2 className="w-4 h-4 text-[#4ADE80]" />
-                  <span>{serviceSuccessMsg}</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold">
+                {/* URL */}
+                <div className="bg-white p-4 border-4 border-black">
+                  <label className="block text-black font-black uppercase mb-1">
+                    Ollama Server URL:
+                  </label>
+                  <input
+                    type="text"
+                    value={form.ai.ollama.url}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        ai: { ...form.ai, ollama: { ...form.ai.ollama, url: e.target.value }, url: e.target.value },
+                      })
+                    }
+                    className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-mono focus:outline-none"
+                  />
+                  <span className="text-[10px] text-zinc-600 font-bold mt-1 block">
+                    Default: http://127.0.0.1:11434
+                  </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setServiceSuccessMsg(null)}
-                  className="text-xs font-black text-emerald-900 hover:text-black cursor-pointer px-1"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold">
-            {/* Piper Endpoint URL */}
-            <div className="bg-white p-4 border-4 border-black">
-              <label className="block text-black font-black uppercase mb-1">
-                Piper Server URL:
-              </label>
-              <input
-                type="text"
-                value={form.tts.endpoint}
-                onChange={(e) => setForm({ ...form, tts: { ...form.tts, endpoint: e.target.value } })}
-                className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-mono focus:outline-none"
-              />
-              <span className="text-[10px] text-zinc-600 font-bold mt-1 block">
-                Local Piper HTTP Server (Default: http://127.0.0.1:5000)
-              </span>
-            </div>
+                {/* Model Selector */}
+                <div className="bg-white p-4 border-4 border-black">
+                  <label className="block text-black font-black uppercase mb-1">
+                    Select Local Model:
+                  </label>
+                  {ollamaModels.length > 0 ? (
+                    <select
+                      value={form.ai.ollama.model}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          ai: { ...form.ai, ollama: { ...form.ai.ollama, model: e.target.value }, model: e.target.value },
+                        })
+                      }
+                      className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-black focus:outline-none cursor-pointer"
+                    >
+                      {ollamaModels.map((m) => (
+                        <option key={m.name} value={m.name}>
+                          {m.name} ({(m.size / 1024 / 1024 / 1024).toFixed(1)} GB)
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={form.ai.ollama.model}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          ai: { ...form.ai, ollama: { ...form.ai.ollama, model: e.target.value }, model: e.target.value },
+                        })
+                      }
+                      placeholder="e.g. qwen3:4b, gemma3:4b, llama3.2:3b"
+                      className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-black focus:outline-none"
+                    />
+                  )}
+                  <span className="text-[10px] text-zinc-600 font-bold mt-1 block">
+                    {ollamaModels.length} local model(s) detected.
+                  </span>
+                </div>
 
-            {/* American Voice */}
-            <div className="bg-white p-4 border-4 border-black">
-              <label className="block text-black font-black uppercase mb-1">
-                American English Voice (US):
-              </label>
-              <input
-                type="text"
-                value={form.tts.americanVoice}
-                onChange={(e) => setForm({ ...form, tts: { ...form.tts, americanVoice: e.target.value } })}
-                className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-mono font-bold focus:outline-none"
-                placeholder="en_US-lessac-high"
-              />
-              <span className="text-[10px] text-zinc-600 font-bold mt-1 block">
-                Installed model: <code className="font-mono font-black">en_US-lessac-high</code>
-              </span>
-            </div>
+                {/* Temperature */}
+                <div className="bg-white p-4 border-4 border-black">
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-black font-black uppercase">Temperature:</label>
+                    <span className="font-mono bg-black text-[#FFD93D] px-2 py-0.5 text-xs font-black">
+                      {form.ai.ollama.temperature}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.0"
+                    max="1.0"
+                    step="0.05"
+                    value={form.ai.ollama.temperature}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        ai: {
+                          ...form.ai,
+                          ollama: { ...form.ai.ollama, temperature: parseFloat(e.target.value) },
+                          temperature: parseFloat(e.target.value),
+                        },
+                      })
+                    }
+                    className="w-full cursor-pointer accent-black"
+                  />
+                </div>
 
-            {/* British Voice */}
-            <div className="bg-white p-4 border-4 border-black">
-              <label className="block text-black font-black uppercase mb-1">
-                British English Voice (UK):
-              </label>
-              <input
-                type="text"
-                value={form.tts.britishVoice}
-                onChange={(e) => setForm({ ...form, tts: { ...form.tts, britishVoice: e.target.value } })}
-                className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-mono font-bold focus:outline-none"
-                placeholder="en_GB-cori-high"
-              />
-              <span className="text-[10px] text-zinc-600 font-bold mt-1 block">
-                Installed model: <code className="font-mono font-black">en_GB-cori-high</code>
-              </span>
-            </div>
-
-            {/* Speeds */}
-            <div className="bg-white p-4 border-4 border-black">
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-black font-black uppercase">Normal Speed (length_scale = 1.0):</label>
-                <span className="font-mono bg-black text-[#4ADE80] px-2 py-0.5 text-xs font-black">
-                  {form.tts.normalSpeed}x
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0.8"
-                max="1.2"
-                step="0.05"
-                value={form.tts.normalSpeed}
-                onChange={(e) =>
-                  setForm({ ...form, tts: { ...form.tts, normalSpeed: parseFloat(e.target.value) } })
-                }
-                className="w-full cursor-pointer accent-black mb-3"
-              />
-
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-black font-black uppercase">Slow Speed (length_scale = 1.25):</label>
-                <span className="font-mono bg-black text-[#FFD93D] px-2 py-0.5 text-xs font-black">
-                  {form.tts.slowSpeed}x
-                </span>
-              </div>
-              <input
-                type="range"
-                min="1.1"
-                max="1.5"
-                step="0.05"
-                value={form.tts.slowSpeed}
-                onChange={(e) =>
-                  setForm({ ...form, tts: { ...form.tts, slowSpeed: parseFloat(e.target.value) } })
-                }
-                className="w-full cursor-pointer accent-black"
-              />
-            </div>
-          </div>
-
-          {/* Pronunciation Generation Toggles */}
-          <div className="bg-white p-4 border-4 border-black">
-            <h4 className="text-xs font-black text-black uppercase tracking-wider mb-3">
-              Audio Generation Rules for Flashcards:
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <label className="flex items-center gap-2 p-2 border-2 border-black bg-zinc-50 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.tts.generateAmerican !== false}
-                  onChange={(e) => setForm({ ...form, tts: { ...form.tts, generateAmerican: e.target.checked } })}
-                  className="w-4 h-4 accent-black"
-                />
-                <span className="text-xs font-black">🇺🇸 American (US)</span>
-              </label>
-
-              <label className="flex items-center gap-2 p-2 border-2 border-black bg-zinc-50 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.tts.generateBritish !== false}
-                  onChange={(e) => setForm({ ...form, tts: { ...form.tts, generateBritish: e.target.checked } })}
-                  className="w-4 h-4 accent-black"
-                />
-                <span className="text-xs font-black">🇬🇧 British (UK)</span>
-              </label>
-
-              <label className="flex items-center gap-2 p-2 border-2 border-black bg-zinc-50 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.tts.generateSlow !== false}
-                  onChange={(e) => setForm({ ...form, tts: { ...form.tts, generateSlow: e.target.checked } })}
-                  className="w-4 h-4 accent-black"
-                />
-                <span className="text-xs font-black">🐢 Slow Pronunciation (1.25x)</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Test Audio Clips & Player */}
-          {(testUsWavBase64 || testUkWavBase64 || testSlowWavBase64) && (
-            <div className="bg-white p-4 border-4 border-black flex flex-wrap items-center justify-between gap-3">
-              <span className="text-xs font-black uppercase text-black">
-                Generated Piper Test Audio:
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {testUsWavBase64 && (
-                  <AudioPlayer base64Wav={testUsWavBase64} label="🇺🇸 US Normal (1.0x)" size="sm" />
-                )}
-                {testSlowWavBase64 && (
-                  <AudioPlayer base64Wav={testSlowWavBase64} label="🐢 US Slow (1.25x)" size="sm" />
-                )}
-                {testUkWavBase64 && (
-                  <AudioPlayer base64Wav={testUkWavBase64} label="🇬🇧 UK Normal (1.0x)" size="sm" />
-                )}
+                {/* Context Length */}
+                <div className="bg-white p-4 border-4 border-black">
+                  <label className="block text-black font-black uppercase mb-1">
+                    Context Length (tokens):
+                  </label>
+                  <input
+                    type="number"
+                    value={form.ai.ollama.contextLength}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        ai: {
+                          ...form.ai,
+                          ollama: { ...form.ai.ollama, contextLength: parseInt(e.target.value, 10) || 2048 },
+                          contextLength: parseInt(e.target.value, 10) || 2048,
+                        },
+                      })
+                    }
+                    className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-mono font-bold focus:outline-none"
+                  />
+                </div>
               </div>
             </div>
           )}
 
-          {/* 5-Step Piper Diagnostic Report */}
-          {piperDiag && (
-            <div className="bg-white p-4 border-4 border-black">
-              <h4 className="text-xs font-black text-black uppercase tracking-wider mb-2 flex items-center justify-between">
-                <span>Piper Diagnostic Test Results:</span>
-                {piperDiag.ready ? (
-                  <span className="bg-[#4ADE80] text-black text-[10px] font-black px-2 py-0.5 border border-black uppercase">
-                    ALL CHECKS PASSED
+          {/* GEMINI SECTION */}
+          {form.ai.provider === 'gemini' && (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between bg-white p-3 border-4 border-black">
+                <div className="flex items-center gap-2">
+                  <Globe className="w-5 h-5 text-black" />
+                  <span className="font-black text-xs uppercase">Google Gemini Status:</span>
+                  <span
+                    className={`px-2.5 py-0.5 text-xs font-black border-2 border-black ${
+                      geminiStatus?.connected ? 'bg-[#4ADE80] text-black' : 'bg-[#FF4B4B] text-white'
+                    }`}
+                  >
+                    {geminiStatus?.connected ? '● Gemini Connected' : '○ Not Connected / Invalid Key'}
                   </span>
-                ) : (
-                  <span className="bg-[#FF4B4B] text-white text-[10px] font-black px-2 py-0.5 border border-black uppercase">
-                    PIPER NOT REACHABLE
+                </div>
+                <button
+                  type="button"
+                  onClick={handleTestGemini}
+                  disabled={testingGemini || !form.ai.gemini.apiKey}
+                  className="px-3 py-1 bg-[#FFD93D] hover:bg-[#ffe066] text-black font-black text-xs border-2 border-black flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] disabled:opacity-50"
+                >
+                  {testingGemini ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Key className="w-3.5 h-3.5" />}
+                  <span>Test Gemini Key</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold">
+                {/* API Key */}
+                <div className="bg-white p-4 border-4 border-black">
+                  <label className="block text-black font-black uppercase mb-1">
+                    Google Gemini API Key:
+                  </label>
+                  <input
+                    type="password"
+                    value={form.ai.gemini.apiKey}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        ai: { ...form.ai, gemini: { ...form.ai.gemini, apiKey: e.target.value } },
+                      })
+                    }
+                    placeholder="Enter your Gemini API Key..."
+                    className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-mono focus:outline-none"
+                  />
+                  <span className="text-[10px] text-zinc-600 font-bold mt-1 block">
+                    Get an API key from Google AI Studio (aistudio.google.com).
                   </span>
-                )}
-              </h4>
-              <div className="space-y-2 text-xs">
-                {piperDiag.steps.map((s) => (
-                  <div key={s.step} className="flex items-center justify-between bg-zinc-50 p-2 border border-black font-mono">
-                    <div className="flex items-center gap-2">
-                      {s.status === 'ok' ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      ) : (
-                        <XCircle className="w-4 h-4 text-red-600 shrink-0" />
-                      )}
-                      <span className="font-black text-black font-sans">
-                        Step {s.step}: {s.title}
-                      </span>
-                    </div>
-                    <span className="text-zinc-700 font-sans text-xs truncate max-w-[320px]">
-                      {s.message}
+                </div>
+
+                {/* Model Selector */}
+                <div className="bg-white p-4 border-4 border-black">
+                  <label className="block text-black font-black uppercase mb-1">
+                    Gemini Model:
+                  </label>
+                  <select
+                    value={form.ai.gemini.model}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        ai: { ...form.ai, gemini: { ...form.ai.gemini, model: e.target.value } },
+                      })
+                    }
+                    className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-black focus:outline-none cursor-pointer"
+                  >
+                    {geminiModels.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} ({m.id})
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-[10px] text-zinc-600 font-bold mt-1 block">
+                    Recommended: <code className="font-mono font-black">gemini-2.5-flash</code> (ultra fast)
+                  </span>
+                </div>
+
+                {/* Temperature */}
+                <div className="bg-white p-4 border-4 border-black md:col-span-2">
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-black font-black uppercase">Gemini Temperature:</label>
+                    <span className="font-mono bg-black text-[#FFD93D] px-2 py-0.5 text-xs font-black">
+                      {form.ai.gemini.temperature}
                     </span>
                   </div>
-                ))}
+                  <input
+                    type="range"
+                    min="0.0"
+                    max="1.0"
+                    step="0.05"
+                    value={form.ai.gemini.temperature}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        ai: {
+                          ...form.ai,
+                          gemini: { ...form.ai.gemini, temperature: parseFloat(e.target.value) },
+                        },
+                      })
+                    }
+                    className="w-full cursor-pointer accent-black"
+                  />
+                </div>
               </div>
+
+              {geminiStatus && !geminiStatus.connected && (
+                <div className="p-3 bg-red-100 border-2 border-red-600 text-red-900 text-xs font-bold">
+                  {geminiStatus.error}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SUB-TAB 2: TTS (Piper Offline & Online TTS) */}
+      {activeSubTab === 'tts' && (
+        <div className="bg-[#FFD93D] border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-5 sm:p-6 flex flex-col gap-5 text-black">
+          <div className="flex flex-wrap items-center justify-between border-b-4 border-black pb-3 gap-3">
+            <div>
+              <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
+                TTS Voice Engine Selection
+              </h3>
+              <p className="text-xs font-bold text-black opacity-80">
+                Choose between Local Piper TTS (100% offline) or High-Quality Online English TTS.
+              </p>
+            </div>
+
+            {/* TTS Provider Switch */}
+            <div className="inline-flex border-4 border-black bg-white p-1 shadow-[3px_3px_0px_#000000]">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, tts: { ...form.tts, provider: 'piper', engine: 'piper' } })}
+                className={`px-4 py-2 text-xs font-black uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all ${
+                  form.tts.provider === 'piper'
+                    ? 'bg-[#38BDF8] text-black shadow-inner'
+                    : 'bg-zinc-100 text-black hover:bg-zinc-200'
+                }`}
+              >
+                <HardDrive className="w-4 h-4" />
+                <span>Piper (Local Offline)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, tts: { ...form.tts, provider: 'online', engine: 'online' } })}
+                className={`px-4 py-2 text-xs font-black uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all ${
+                  form.tts.provider === 'online'
+                    ? 'bg-[#38BDF8] text-black shadow-inner'
+                    : 'bg-zinc-100 text-black hover:bg-zinc-200'
+                }`}
+              >
+                <Globe className="w-4 h-4" />
+                <span>Online TTS (High Quality)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* ONLINE TTS CONFIGURATION */}
+          {form.tts.provider === 'online' && (
+            <div className="flex flex-col gap-4">
+              <div className="bg-white p-4 border-4 border-black shadow-[4px_4px_0px_#000000] flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Globe className="w-5 h-5 text-black" />
+                  <div>
+                    <h4 className="text-sm font-black uppercase">Online High-Quality English TTS</h4>
+                    <p className="text-[11px] text-zinc-600 font-bold">
+                      Generates pristine American & British audio (Normal & Slow) with zero local dependencies.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`px-3 py-1 text-xs font-black border-2 border-black ${
+                      onlineTtsStatus?.connected ? 'bg-[#4ADE80] text-black' : 'bg-[#FF4B4B] text-white'
+                    }`}
+                  >
+                    {onlineTtsStatus?.connected ? '● ONLINE TTS READY' : '○ OFFLINE'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleTestOnlineTts}
+                    disabled={testingOnlineTts}
+                    className="px-4 py-1.5 bg-[#FF4B4B] hover:bg-red-500 text-white font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000000] flex items-center gap-1.5 cursor-pointer uppercase active:translate-y-0.5"
+                  >
+                    {testingOnlineTts ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                    <span>{testingOnlineTts ? 'Testing...' : 'Test Online TTS'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Online TTS Diagnostic Test Results */}
+              {onlineTtsDiag && (
+                <div className="bg-white p-4 border-4 border-black space-y-2 text-xs">
+                  <h4 className="font-black text-xs uppercase mb-2">Online TTS Test Report:</h4>
+                  {onlineTtsDiag.steps.map((st) => (
+                    <div key={st.step} className="flex items-center justify-between p-2 bg-zinc-50 border border-black">
+                      <span className="font-bold">{st.step}. {st.title}</span>
+                      <span className={st.status === 'ok' ? 'text-emerald-700 font-bold' : 'text-red-700 font-bold'}>
+                        {st.message}
+                      </span>
+                    </div>
+                  ))}
+                  {onlineTtsDiag.testAudios && (
+                    <div className="pt-2 border-t border-zinc-300 flex flex-wrap gap-2">
+                      {onlineTtsDiag.testAudios.usNormalBase64 && (
+                        <AudioPlayer base64Wav={onlineTtsDiag.testAudios.usNormalBase64} label="🇺🇸 US Normal (1.0x)" size="sm" />
+                      )}
+                      {onlineTtsDiag.testAudios.usSlowBase64 && (
+                        <AudioPlayer base64Wav={onlineTtsDiag.testAudios.usSlowBase64} label="🇺🇸 US Slow (0.75x)" size="sm" />
+                      )}
+                      {onlineTtsDiag.testAudios.ukNormalBase64 && (
+                        <AudioPlayer base64Wav={onlineTtsDiag.testAudios.ukNormalBase64} label="🇬🇧 UK Normal (1.0x)" size="sm" />
+                      )}
+                      {onlineTtsDiag.testAudios.ukSlowBase64 && (
+                        <AudioPlayer base64Wav={onlineTtsDiag.testAudios.ukSlowBase64} label="🇬🇧 UK Slow (0.75x)" size="sm" />
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* PIPER OFFLINE TTS CONFIGURATION */}
+          {form.tts.provider === 'piper' && (
+            <div className="flex flex-col gap-4">
+              {/* PIPER SYSTEMD SERVICE CONTROL */}
+              <div className="bg-white p-4 sm:p-5 border-4 border-black shadow-[4px_4px_0px_#000000] flex flex-col gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Power className="w-5 h-5 text-black" />
+                      <h4 className="text-sm font-black uppercase tracking-tight">Piper Local Service Control</h4>
+                      <code className="bg-black text-[#FFD93D] px-1.5 py-0.5 text-[11px] font-mono font-bold">piper.service</code>
+                    </div>
+                    <p className="text-[11px] text-zinc-600 font-bold mt-0.5">
+                      Controls the Linux systemd user service via <code className="bg-zinc-100 px-1 font-mono">systemctl --user</code>
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`px-3 py-1 text-xs font-black border-2 border-black flex items-center gap-1.5 shadow-[2px_2px_0px_#000000] ${
+                        serviceStatus?.active
+                          ? 'bg-[#4ADE80] text-black'
+                          : serviceStatus?.status === 'failed'
+                          ? 'bg-[#FF4B4B] text-white'
+                          : 'bg-zinc-200 text-zinc-800'
+                      }`}
+                    >
+                      <span>
+                        {checkingService
+                          ? 'CHECKING...'
+                          : serviceStatus?.active
+                          ? 'RUNNING (ON)'
+                          : 'STOPPED (OFF)'}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={refreshPiperServiceStatus}
+                      disabled={checkingService || togglingService}
+                      className="p-1.5 bg-zinc-100 hover:bg-zinc-200 text-black border-2 border-black shadow-[2px_2px_0px_#000000] cursor-pointer"
+                      title="Check Service Status"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${checkingService ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 bg-zinc-50 border-2 border-black">
+                  <div className="text-xs font-bold">
+                    <div className="text-black font-black uppercase flex items-center gap-2">
+                      <span>Service State:</span>
+                      <span className={`px-2 py-0.5 text-xs font-black border border-black ${serviceStatus?.active ? 'bg-[#4ADE80]' : 'bg-[#FF4B4B] text-white'}`}>
+                        {serviceStatus?.active ? 'ON' : 'OFF'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {serviceStatus?.active ? (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleService('stop')}
+                        disabled={togglingService}
+                        className="px-4 py-2 bg-[#FF4B4B] hover:bg-red-600 text-white font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000000] flex items-center gap-1.5 cursor-pointer uppercase active:translate-y-0.5"
+                      >
+                        <PowerOff className="w-4 h-4" />
+                        <span>Stop Service</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleService('start')}
+                        disabled={togglingService}
+                        className="px-4 py-2 bg-[#4ADE80] hover:bg-emerald-400 text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000000] flex items-center gap-1.5 cursor-pointer uppercase active:translate-y-0.5"
+                      >
+                        <Power className="w-4 h-4" />
+                        <span>Start Service</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold">
+                {/* Piper Endpoint */}
+                <div className="bg-white p-4 border-4 border-black">
+                  <label className="block text-black font-black uppercase mb-1">
+                    Piper Server URL:
+                  </label>
+                  <input
+                    type="text"
+                    value={form.tts.endpoint}
+                    onChange={(e) => setForm({ ...form, tts: { ...form.tts, endpoint: e.target.value } })}
+                    className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-mono focus:outline-none"
+                  />
+                  <span className="text-[10px] text-zinc-600 font-bold mt-1 block">
+                    Default: http://127.0.0.1:5000
+                  </span>
+                </div>
+
+                {/* Actions */}
+                <div className="bg-white p-4 border-4 border-black flex flex-col justify-between gap-2">
+                  <label className="block text-black font-black uppercase">
+                    Test Piper Offline TTS:
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleTestPiper}
+                    disabled={testingPiper}
+                    className="w-full py-2 bg-[#FF4B4B] hover:bg-red-500 text-white font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_#000000] flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    {testingPiper ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                    <span>Run Piper Diagnostics</span>
+                  </button>
+                </div>
+              </div>
+
+              {piperDiag && (
+                <div className="bg-white p-4 border-4 border-black space-y-2 text-xs">
+                  <h4 className="font-black text-xs uppercase mb-2">Piper Test Results:</h4>
+                  {piperDiag.steps.map((s) => (
+                    <div key={s.step} className="flex items-center justify-between p-2 bg-zinc-50 border border-black">
+                      <span className="font-bold">{s.step}. {s.title}</span>
+                      <span className={s.status === 'ok' ? 'text-emerald-700 font-bold' : 'text-red-700 font-bold'}>
+                        {s.message}
+                      </span>
+                    </div>
+                  ))}
+                  {(testUsWavBase64 || testUkWavBase64 || testSlowWavBase64) && (
+                    <div className="pt-2 border-t border-zinc-300 flex flex-wrap gap-2">
+                      {testUsWavBase64 && <AudioPlayer base64Wav={testUsWavBase64} label="🇺🇸 US Normal" size="sm" />}
+                      {testSlowWavBase64 && <AudioPlayer base64Wav={testSlowWavBase64} label="🐢 US Slow" size="sm" />}
+                      {testUkWavBase64 && <AudioPlayer base64Wav={testUkWavBase64} label="🇬🇧 UK Normal" size="sm" />}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -948,7 +1075,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 AnkiConnect Integration
               </h3>
               <p className="text-xs font-bold text-black opacity-80">
-                Direct note injection, media storage, and automatic Comic Note Type configuration.
+                Direct card creation, media syncing, and comic template setup in Anki.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -971,7 +1098,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold">
-            {/* AnkiConnect URL */}
+            {/* URL */}
             <div className="bg-white p-4 border-4 border-black">
               <label className="block text-black font-black uppercase mb-1">
                 AnkiConnect URL:
@@ -987,7 +1114,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               </span>
             </div>
 
-            {/* Default Deck */}
+            {/* Deck */}
             <div className="bg-white p-4 border-4 border-black">
               <label className="block text-black font-black uppercase mb-1">
                 Default Deck:
@@ -1014,19 +1141,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               )}
             </div>
 
-            {/* Note Type Name */}
-            <div className="bg-white p-4 border-4 border-black">
-              <label className="block text-black font-black uppercase mb-1">
-                Note Type Name in Anki:
-              </label>
-              <input
-                type="text"
-                disabled
-                value={form.anki.noteType}
-                className="w-full bg-zinc-200 text-zinc-700 p-2 border-2 border-black font-bold cursor-not-allowed"
-              />
-            </div>
-
             {/* Actions Bar */}
             <div className="md:col-span-2 flex flex-wrap gap-3">
               <button
@@ -1035,11 +1149,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 disabled={testingAnkiConn}
                 className="flex-1 py-3 px-4 bg-white hover:bg-zinc-100 text-black font-black text-xs uppercase border-3 border-black shadow-[3px_3px_0px_#000000] flex items-center justify-center gap-2 cursor-pointer active:translate-y-0.5"
               >
-                {testingAnkiConn ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-black" />
-                ) : (
-                  <RefreshCw className="w-4 h-4 text-black" />
-                )}
+                {testingAnkiConn ? <Loader2 className="w-4 h-4 animate-spin text-black" /> : <RefreshCw className="w-4 h-4 text-black" />}
                 <span>Test Connection</span>
               </button>
 
@@ -1049,11 +1159,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 disabled={runningAnkiPipeline}
                 className="flex-1 py-3 px-4 bg-black hover:bg-zinc-800 text-white font-black text-xs uppercase border-3 border-black shadow-[3px_3px_0px_#000000] flex items-center justify-center gap-2 cursor-pointer active:translate-y-0.5"
               >
-                {runningAnkiPipeline ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-[#4ADE80]" />
-                ) : (
-                  <Zap className="w-4 h-4 text-[#FFD93D]" />
-                )}
+                {runningAnkiPipeline ? <Loader2 className="w-4 h-4 animate-spin text-[#4ADE80]" /> : <Zap className="w-4 h-4 text-[#FFD93D]" />}
                 <span>Create Test Card in Anki</span>
               </button>
 
@@ -1068,105 +1174,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             </div>
           </div>
 
-          {/* Unreachable Notice if Anki is not connected */}
-          {ankiStatus && !ankiStatus.connected && (
-            <div className="p-4 bg-[#FF4B4B] text-white border-4 border-black shadow-[4px_4px_0px_#000000] text-xs font-bold space-y-2">
-              <div className="flex items-center gap-2 font-black uppercase text-sm">
-                <AlertTriangle className="w-5 h-5 text-white shrink-0" />
-                <span>AnkiConnect is not reachable</span>
-              </div>
-              <p>
-                Ensure Anki desktop application is running and the AnkiConnect addon (code <code className="bg-black text-[#FFD93D] px-1 py-0.5 font-mono">2055492159</code>) is installed and enabled.
-              </p>
-              {ankiStatus.error && (
-                <div className="bg-black/30 p-2 font-mono text-[11px]">
-                  Error: {ankiStatus.error}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Test Pipeline Diagnostic Report */}
-          {ankiPipelineReport && (
-            <div className="p-4 bg-white border-4 border-black text-black shadow-[4px_4px_0px_#000000] space-y-3">
-              <div className="flex items-center justify-between border-b-2 border-black pb-2">
-                <h4 className="font-black text-sm uppercase flex items-center gap-2">
-                  <span>Anki Card Creation Diagnostic Pipeline</span>
-                  {ankiPipelineReport.success ? (
-                    <span className="text-[10px] bg-[#4ADE80] text-black px-2 py-0.5 border border-black font-black uppercase">
-                      ALL CHECKS PASSED
-                    </span>
-                  ) : (
-                    <span className="text-[10px] bg-[#FF4B4B] text-white px-2 py-0.5 border border-black font-black uppercase">
-                      PIPELINE FAILED
-                    </span>
-                  )}
-                </h4>
-                {ankiPipelineReport.testNoteId && (
-                  <span className="font-mono text-xs font-black bg-zinc-100 px-2 py-1 border border-black">
-                    Note ID #{ankiPipelineReport.testNoteId}
-                  </span>
-                )}
-              </div>
-
-              <div className="space-y-2 text-xs">
-                {ankiPipelineReport.steps.map((st, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-2 bg-zinc-50 border border-black font-mono">
-                    <div className="flex items-center gap-2">
-                      {st.status === 'ok' ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      ) : (
-                        <XCircle className="w-4 h-4 text-red-600 shrink-0" />
-                      )}
-                      <span className="font-bold text-black">{st.step}</span>
-                    </div>
-                    <span className="text-zinc-700 font-sans text-xs text-right truncate max-w-[320px]">
-                      {st.message}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {ankiPipelineReport.testCardIds && ankiPipelineReport.testCardIds.length > 0 && (
-                <div className="p-2 bg-[#4ADE80]/30 border border-black text-xs font-black flex items-center justify-between">
-                  <span>Generated Card IDs in Anki:</span>
-                  <span className="font-mono bg-white px-2 py-0.5 border border-black">
-                    {ankiPipelineReport.testCardIds.map((id) => `#${id}`).join(', ')}
-                  </span>
-                </div>
-              )}
-
-              {/* Open in Anki action for test note */}
-              {ankiPipelineReport.testNoteId && (
-                <div className="pt-2 border-t border-zinc-200 flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => handleOpenInAnkiFromSettings(ankiPipelineReport.testNoteId!)}
-                    disabled={openingAnkiNoteId === ankiPipelineReport.testNoteId}
-                    className="py-1.5 px-3 bg-black hover:bg-zinc-800 text-white font-black text-xs uppercase border-2 border-black flex items-center gap-1.5 shadow-[2px_2px_0px_#000000] cursor-pointer"
-                  >
-                    {openingAnkiNoteId === ankiPipelineReport.testNoteId ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#4ADE80]" />
-                    ) : (
-                      <ExternalLink className="w-3.5 h-3.5 text-[#FFD93D]" />
-                    )}
-                    <span>Open Test Note in Anki Browser</span>
-                  </button>
-
-                  <span className="text-[11px] font-mono text-zinc-600">
-                    Query: nid:{ankiPipelineReport.testNoteId}
-                  </span>
-                </div>
-              )}
-
-              {ankiActionFeedback && (
-                <div className="p-2 bg-emerald-50 border border-black text-[11px] font-mono text-black">
-                  {ankiActionFeedback}
-                </div>
-              )}
-            </div>
-          )}
-
           {ankiModelSyncMsg && (
             <div className="p-3 bg-white border-4 border-black text-black font-black text-xs shadow-[3px_3px_0px_#000000]">
               {ankiModelSyncMsg}
@@ -1175,75 +1182,93 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
         </div>
       )}
 
-      {/* SUB-TAB 4: Appearance (Comic Theme) */}
+      {/* SUB-TAB 4: Appearance (10 Distinct Comic Themes) */}
       {activeSubTab === 'appearance' && (
-        <div className="bg-[#c084fc] border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-5 sm:p-6 flex flex-col gap-5 text-black">
+        <div className="bg-[#c084fc] border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-5 sm:p-6 flex flex-col gap-6 text-black">
           <div className="border-b-4 border-black pb-3">
             <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-              Comic Theme Selection
+              Comic Card Designs (10 Templates)
             </h3>
             <p className="text-xs font-bold text-black opacity-80">
-              Zero SaaS clichés, bold comic panels, sharp ink borders, and Bento style.
+              Select one of 5 Light or 5 Dark comic styles. The exact chosen HTML/CSS is sent to Anki!
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {/* Comic Dark */}
-            <div
-              onClick={() => setForm({ ...form, theme: 'comic-dark' })}
-              className={`p-5 border-4 border-black cursor-pointer transition-all ${
-                form.theme === 'comic-dark'
-                  ? 'bg-black text-white shadow-[6px_6px_0px_#FFD93D] -translate-y-1'
-                  : 'bg-zinc-900 text-white opacity-80 hover:opacity-100'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-base font-black text-[#FFD93D] uppercase">Dark Comic Theme</span>
-                {form.theme === 'comic-dark' && (
-                  <span className="text-xs bg-[#FFD93D] text-black font-black px-2 py-0.5 border-2 border-black">
-                    ACTIVE
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-zinc-300 mb-4 font-bold">
-                Deep ink dark canvas, vibrant yellow & sky badges, high-contrast comic panels.
-              </p>
-              <div className="flex gap-2">
-                <span className="w-5 h-5 bg-[#FFD93D] border-2 border-white" />
-                <span className="w-5 h-5 bg-[#38bdf8] border-2 border-white" />
-                <span className="w-5 h-5 bg-[#4ade80] border-2 border-white" />
-                <span className="w-5 h-5 bg-[#FF4B4B] border-2 border-white" />
-                <span className="w-5 h-5 bg-[#c084fc] border-2 border-white" />
-              </div>
+          {/* LIGHT DESIGNS (5 Designs) */}
+          <div>
+            <h4 className="text-sm font-black uppercase mb-3 flex items-center gap-2">
+              <span className="w-3 h-3 bg-white border-2 border-black"></span>
+              <span>5 Light Card Designs</span>
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {THEME_GROUPS.light.map((t) => (
+                <div
+                  key={t.id}
+                  onClick={() => setForm({ ...form, theme: t.id as ThemeId })}
+                  className={`p-4 border-4 border-black cursor-pointer transition-all ${
+                    form.theme === t.id
+                      ? 'bg-white text-black shadow-[5px_5px_0px_#000000] -translate-y-1 ring-2 ring-black'
+                      : 'bg-zinc-100 text-black hover:bg-white opacity-85 hover:opacity-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-black uppercase">{t.name}</span>
+                    {form.theme === t.id && (
+                      <span className="text-[10px] bg-[#4ADE80] text-black font-black px-1.5 py-0.2 border border-black">
+                        ACTIVE
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-zinc-600 font-bold mb-3">
+                    {t.desc}
+                  </p>
+                  <div className="flex gap-1.5">
+                    <span className="w-4 h-4 bg-[#FFD93D] border border-black" />
+                    <span className="w-4 h-4 bg-[#38BDF8] border border-black" />
+                    <span className="w-4 h-4 bg-[#4ADE80] border border-black" />
+                    <span className="w-4 h-4 bg-[#FB923C] border border-black" />
+                  </div>
+                </div>
+              ))}
             </div>
+          </div>
 
-            {/* Comic Light */}
-            <div
-              onClick={() => setForm({ ...form, theme: 'comic-light' })}
-              className={`p-5 border-4 border-black cursor-pointer transition-all ${
-                form.theme === 'comic-light'
-                  ? 'bg-white text-black shadow-[6px_6px_0px_#38bdf8] -translate-y-1'
-                  : 'bg-zinc-100 text-black opacity-80 hover:opacity-100'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-base font-black text-black uppercase">Light Comic Theme</span>
-                {form.theme === 'comic-light' && (
-                  <span className="text-xs bg-[#38bdf8] text-black font-black px-2 py-0.5 border-2 border-black">
-                    ACTIVE
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-zinc-700 mb-4 font-bold">
-                Warm comic page paper, crisp dark ink outlines, and clean readable font hierarchy.
-              </p>
-              <div className="flex gap-2">
-                <span className="w-5 h-5 bg-[#bae6fd] border-2 border-black" />
-                <span className="w-5 h-5 bg-[#fef08a] border-2 border-black" />
-                <span className="w-5 h-5 bg-[#bbf7d0] border-2 border-black" />
-                <span className="w-5 h-5 bg-[#fed7aa] border-2 border-black" />
-                <span className="w-5 h-5 bg-[#e9d5ff] border-2 border-black" />
-              </div>
+          {/* DARK DESIGNS (5 Designs) */}
+          <div>
+            <h4 className="text-sm font-black uppercase mb-3 flex items-center gap-2">
+              <span className="w-3 h-3 bg-black border-2 border-white"></span>
+              <span>5 Dark Card Designs</span>
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {THEME_GROUPS.dark.map((t) => (
+                <div
+                  key={t.id}
+                  onClick={() => setForm({ ...form, theme: t.id as ThemeId })}
+                  className={`p-4 border-4 border-black cursor-pointer transition-all ${
+                    form.theme === t.id
+                      ? 'bg-black text-white shadow-[5px_5px_0px_#FFD93D] -translate-y-1 ring-2 ring-yellow-400'
+                      : 'bg-zinc-900 text-white hover:bg-zinc-800 opacity-85 hover:opacity-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-black uppercase text-[#FFD93D]">{t.name}</span>
+                    {form.theme === t.id && (
+                      <span className="text-[10px] bg-[#FFD93D] text-black font-black px-1.5 py-0.2 border border-black">
+                        ACTIVE
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-zinc-300 font-bold mb-3">
+                    {t.desc}
+                  </p>
+                  <div className="flex gap-1.5">
+                    <span className="w-4 h-4 bg-[#FFD93D] border border-white" />
+                    <span className="w-4 h-4 bg-[#38BDF8] border border-white" />
+                    <span className="w-4 h-4 bg-[#4ADE80] border border-white" />
+                    <span className="w-4 h-4 bg-[#C084FC] border border-white" />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -1258,7 +1283,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 Full System Diagnostics
               </h3>
               <p className="text-xs font-bold text-white opacity-90">
-                Rigorous real-time check across AI, TTS, AnkiConnect, and Template renderers.
+                Rigorous real-time check across AI, TTS, AnkiConnect, and 10 Card Templates.
               </p>
             </div>
             <button
@@ -1291,7 +1316,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               {/* AI */}
               <div className="bg-white p-4 border-4 border-black">
                 <span className="font-black text-black uppercase tracking-wider block mb-2 border-b-2 border-black pb-1">
-                  Ollama AI
+                  AI Provider Status
                 </span>
                 {fullReport.ai.map((item, i) => (
                   <div key={i} className="flex items-center gap-2 mb-1">
@@ -1311,7 +1336,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               {/* TTS */}
               <div className="bg-white p-4 border-4 border-black">
                 <span className="font-black text-black uppercase tracking-wider block mb-2 border-b-2 border-black pb-1">
-                  Piper TTS Engine
+                  TTS Voice Engine Status
                 </span>
                 {fullReport.tts.map((item, i) => (
                   <div key={i} className="flex items-center gap-2 mb-1">
@@ -1343,6 +1368,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   </div>
                 ))}
               </div>
+
+              {/* TEMPLATES */}
+              <div className="bg-white p-4 border-4 border-black md:col-span-2">
+                <span className="font-black text-black uppercase tracking-wider block mb-2 border-b-2 border-black pb-1">
+                  Template Renderers
+                </span>
+                {fullReport.templates.map((item, i) => (
+                  <div key={i} className="flex items-center gap-2 mb-1">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="text-black font-black">{item.name}:</span>
+                    <span className="text-zinc-700">{item.message}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -1353,17 +1392,32 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
         <div className="bg-[#2dd4bf] border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-5 sm:p-6 flex flex-col gap-5 text-black text-xs font-bold">
           <div className="border-b-4 border-black pb-3">
             <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-              Local Setup & Installation Guide
+              Setup & Configuration Guide
             </h3>
             <p className="text-xs font-bold text-black opacity-80">
-              Zero-cloud local infrastructure commands for Linux, macOS, and Windows.
+              Quick reference for setting up Ollama, Gemini API, Piper TTS, and AnkiConnect.
             </p>
           </div>
 
-          {/* 1. Piper TTS Setup */}
+          {/* 1. Gemini Setup */}
+          <div className="bg-white p-4 border-4 border-black">
+            <h4 className="font-black text-black uppercase tracking-wider mb-2">
+              1. Google Gemini Online AI Setup
+            </h4>
+            <p className="text-zinc-700 font-bold mb-2">
+              To use Google Gemini online mode:
+            </p>
+            <ol className="list-decimal list-inside space-y-1 text-black font-bold">
+              <li>Visit <span className="underline">aistudio.google.com</span> and create a free Gemini API key.</li>
+              <li>In Settings → AI Provider, select <b>Google Gemini</b> and paste your API key.</li>
+              <li>Click <b>Test Gemini Key</b> and <b>Save Changes</b>.</li>
+            </ol>
+          </div>
+
+          {/* 2. Piper TTS Setup */}
           <div className="bg-white p-4 border-4 border-black">
             <h4 className="font-black text-black uppercase tracking-wider mb-2 flex items-center justify-between">
-              <span>1. Piper Linux User Service (systemctl)</span>
+              <span>2. Piper Offline TTS Linux Service</span>
               <button
                 type="button"
                 onClick={() =>
@@ -1378,65 +1432,42 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 <span>{copiedCmd === 'piper' ? 'Copied' : 'Copy Commands'}</span>
               </button>
             </h4>
-            <p className="text-zinc-700 font-bold mb-2">
-              Control the existing <code className="font-mono font-black">piper.service</code> user service directly with systemctl:
-            </p>
             <pre className="bg-black text-[#FFD93D] p-3 font-mono text-xs overflow-x-auto border-2 border-black leading-relaxed font-bold">
 {`# Start Piper service
 systemctl --user start piper.service
 
 # Check real-time service status
-systemctl --user status piper.service
 systemctl --user is-active piper.service
 
 # Stop Piper service
-systemctl --user stop piper.service
-
-# Restart Piper service
-systemctl --user restart piper.service`}
+systemctl --user stop piper.service`}
             </pre>
           </div>
 
-          {/* 2. Ollama Setup */}
+          {/* 3. Ollama Setup */}
           <div className="bg-white p-4 border-4 border-black">
-            <h4 className="font-black text-black uppercase tracking-wider mb-2 flex items-center justify-between">
-              <span>2. Install & Run Ollama</span>
-              <button
-                type="button"
-                onClick={() =>
-                  copyToClipboard(
-                    'curl -fsSL https://ollama.com/install.sh | sh\nollama serve\nollama pull qwen3:4b',
-                    'ollama'
-                  )
-                }
-                className="text-[11px] font-black bg-[#FFD93D] text-black px-2.5 py-1 border-2 border-black flex items-center gap-1 hover:bg-[#ffe066] cursor-pointer"
-              >
-                {copiedCmd === 'ollama' ? <Check className="w-3.5 h-3.5 text-black" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copiedCmd === 'ollama' ? 'Copied' : 'Copy Commands'}</span>
-              </button>
+            <h4 className="font-black text-black uppercase tracking-wider mb-2">
+              3. Ollama Local Offline AI
             </h4>
             <pre className="bg-black text-[#4ADE80] p-3 font-mono text-xs overflow-x-auto border-2 border-black leading-relaxed font-bold">
-{`# Install Ollama (Linux/macOS)
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Start Ollama service
+{`# Start Ollama service
 ollama serve
 
-# Pull recommended vocabulary model
+# Pull recommended model
 ollama pull qwen3:4b`}
             </pre>
           </div>
 
-          {/* 3. Anki & AnkiConnect Setup */}
+          {/* 4. Anki & AnkiConnect */}
           <div className="bg-white p-4 border-4 border-black">
             <h4 className="font-black text-black uppercase tracking-wider mb-2">
-              3. Install Anki & AnkiConnect Addon
+              4. Anki & AnkiConnect Setup
             </h4>
             <ol className="list-decimal list-inside space-y-1.5 text-black font-bold">
-              <li>Download and open <b>Anki</b> from <span className="underline">apps.ankiweb.net</span></li>
+              <li>Open Anki Desktop.</li>
               <li>Go to <b>Tools → Add-ons → Get Add-ons...</b></li>
               <li>Enter Code: <code className="bg-[#FFD93D] text-black px-2 py-0.5 font-mono font-black border-2 border-black">2055492159</code> (AnkiConnect)</li>
-              <li>Restart Anki so AnkiConnect starts listening on port <code className="font-mono font-black">8765</code>.</li>
+              <li>Restart Anki so AnkiConnect listens on port <code className="font-mono font-black">8765</code>.</li>
             </ol>
           </div>
         </div>

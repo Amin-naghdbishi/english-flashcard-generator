@@ -17,7 +17,7 @@ export interface CardData {
   translationFa: string;
   mnemonic: string;
 
-  // Piper multi-audio files
+  // Multi-audio files
   wordAudioUsNormalBase64?: string;
   wordAudioUsSlowBase64?: string;
   wordAudioUkNormalBase64?: string;
@@ -51,6 +51,23 @@ export interface ManualOverrides {
   mnemonic?: string;
 }
 
+export type AIProvider = 'ollama' | 'gemini';
+export type TTSProvider = 'piper' | 'online';
+
+export type ThemeId =
+  | 'comic-pop-light'
+  | 'comic-pop-dark'
+  | 'comic-strip-light'
+  | 'comic-strip-dark'
+  | 'comic-manga-light'
+  | 'comic-manga-dark'
+  | 'comic-minimal-light'
+  | 'comic-minimal-dark'
+  | 'comic-arcade-light'
+  | 'comic-arcade-dark'
+  | 'comic-dark'
+  | 'comic-light';
+
 export interface OllamaConfig {
   url: string;
   model: string;
@@ -58,13 +75,31 @@ export interface OllamaConfig {
   contextLength: number;
 }
 
+export interface GeminiConfig {
+  apiKey: string;
+  model: string;
+  temperature: number;
+}
+
+export interface AIConfig {
+  provider: AIProvider;
+  ollama: OllamaConfig;
+  gemini: GeminiConfig;
+  // Legacy / fallback flat properties
+  url?: string;
+  model?: string;
+  temperature?: number;
+  contextLength?: number;
+}
+
 export interface TTSConfig {
-  engine: 'piper';
-  endpoint: string; // http://127.0.0.1:5000
+  provider: TTSProvider;
+  engine?: TTSProvider; // backwards compatibility
+  endpoint: string; // http://127.0.0.1:5000 (for Piper)
   americanVoice: string; // en_US-lessac-high
   britishVoice: string; // en_GB-cori-high
-  normalSpeed: number; // 1.0 (length_scale = 1.0)
-  slowSpeed: number; // 1.25 (length_scale = 1.25)
+  normalSpeed: number;
+  slowSpeed: number;
   generateSlow: boolean;
   generateBritish: boolean;
   generateAmerican: boolean;
@@ -82,59 +117,31 @@ export interface AnkiConfig {
   tags?: string[];
 }
 
-export interface PiperVoice {
-  id: string;
-  name: string;
-  accent: 'american' | 'british';
-  defaultModel: string;
-}
-
-export interface PiperTestAudioClips {
-  usNormalBase64?: string;
-  usSlowBase64?: string;
-  ukNormalBase64?: string;
-  ukSlowBase64?: string;
-}
-
-export interface PiperDiagnosticStep {
-  step: number;
-  title: string;
-  status: 'ok' | 'error' | 'pending' | 'warning';
-  message: string;
-  details?: any;
-}
-
-export interface PiperDiagnosticResult {
-  engine: 'piper';
-  ready: boolean;
-  endpoint: string;
-  steps: PiperDiagnosticStep[];
-  testAudios?: PiperTestAudioClips;
-  testUsAudioBase64?: string;
-  testUkAudioBase64?: string;
-  testSlowAudioBase64?: string;
-  checklist: {
-    piperConnected: boolean;
-    americanVoiceWorking: boolean;
-    britishVoiceWorking: boolean;
-    normalSpeedWorking: boolean;
-    slowSpeedWorking: boolean;
-  };
-  error?: string;
-}
-
 export interface AppSettings {
-  ai: OllamaConfig;
+  ai: AIConfig;
   tts: TTSConfig;
   anki: AnkiConfig;
-  theme: 'comic-dark' | 'comic-light';
+  theme: ThemeId;
+}
+
+export interface BatchFieldConfig {
+  word: boolean;
+  deck: boolean;
+  phonetic: boolean;
+  partOfSpeech: boolean;
+  meaningFa: boolean;
+  example: boolean;
+  translationFa: boolean;
+  mnemonic: boolean;
 }
 
 export interface BatchItem {
   id: string;
   word: string;
+  deck?: string;
   status: 'idle' | 'checking_duplicate' | 'generating_ai' | 'generating_audio' | 'creating_anki' | 'success' | 'error' | 'duplicate';
   cardData?: CardData;
+  parsedFields?: Partial<CardData>;
   error?: string;
   noteId?: number;
   isDuplicate?: boolean;
@@ -194,7 +201,7 @@ export interface DiagnosticsReport {
 }
 
 export interface ThemeDefinition {
-  id: 'comic-dark' | 'comic-light';
+  id: ThemeId;
   name: string;
   description: string;
   frontHtml: string;

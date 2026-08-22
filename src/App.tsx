@@ -9,16 +9,29 @@ import { NavigationStrip, NavTab } from './components/NavigationStrip';
 import { CreateCardView } from './components/CreateCardView';
 import { BatchCardView } from './components/BatchCardView';
 import { SettingsView } from './components/SettingsView';
-import { fetchConfig, checkOllama, checkTTS, checkAnki } from './services/api';
+import { fetchConfig, checkOllama, checkGemini, checkTTS, checkOnlineTTS, checkAnki } from './services/api';
 
 const defaultSettings: AppSettings = {
   ai: {
+    provider: 'ollama',
+    ollama: {
+      url: 'http://127.0.0.1:11434',
+      model: 'qwen3:4b',
+      temperature: 0.2,
+      contextLength: 2048,
+    },
+    gemini: {
+      apiKey: '',
+      model: 'gemini-2.5-flash',
+      temperature: 0.2,
+    },
     url: 'http://127.0.0.1:11434',
     model: 'qwen3:4b',
     temperature: 0.2,
     contextLength: 2048,
   },
   tts: {
+    provider: 'piper',
     engine: 'piper',
     endpoint: 'http://127.0.0.1:5000',
     americanVoice: 'en_US-lessac-high',
@@ -31,13 +44,11 @@ const defaultSettings: AppSettings = {
     generateSlowExample: false,
   },
   anki: {
-    endpoint: 'http://127.0.0.1:8765',
-    deck: 'English::B1',
-    model: 'English Bento Comic',
-    autoSync: true,
-    tags: ['ai_vocab', 'piper_tts'],
+    url: 'http://127.0.0.1:8765',
+    defaultDeck: 'English::B1',
+    noteType: 'AI Vocabulary',
   },
-  theme: 'comic-dark',
+  theme: 'comic-pop-dark',
 };
 
 export default function App() {
@@ -47,12 +58,12 @@ export default function App() {
 
   // Status for header
   const [status, setStatus] = useState<{
-    ollama: { connected: boolean; version?: string; loading?: boolean };
-    tts: { ready: boolean; voice?: string; loading?: boolean };
-    anki: { connected: boolean; version?: number; loading?: boolean };
+    ai: { connected: boolean; label?: string };
+    tts: { ready: boolean; label?: string };
+    anki: { connected: boolean; version?: number };
   }>({
-    ollama: { connected: false },
-    tts: { ready: true, voice: 'af_sarah' },
+    ai: { connected: false, label: 'Ollama' },
+    tts: { ready: false, label: 'Piper' },
     anki: { connected: false },
   });
 
@@ -73,20 +84,42 @@ export default function App() {
   // Check connection status
   const refreshStatuses = async () => {
     try {
-      const [aiRes, ttsRes, ankiRes] = await Promise.all([
-        checkOllama(settings.ai.url).catch(() => ({ connected: false, version: undefined })),
-        checkTTS(settings.tts.endpoint, settings.tts.voice).catch(() => ({ ready: true, voice: settings.tts.voice, engine: 'kokoro' as const, endpoint: settings.tts.endpoint, steps: [] })),
-        checkAnki(settings.anki.url).catch(() => ({ connected: false, version: undefined })),
-      ]);
+      let aiConnected = false;
+      let aiLabel = 'Ollama';
+      if (settings.ai.provider === 'gemini') {
+        aiLabel = 'Gemini';
+        if (settings.ai.gemini.apiKey) {
+          const geminiRes = await checkGemini(settings.ai.gemini.apiKey, settings.ai.gemini.model).catch(() => ({ connected: false }));
+          aiConnected = !!geminiRes.connected;
+        }
+      } else {
+        const ollamaRes = await checkOllama(settings.ai.ollama.url).catch(() => ({ connected: false }));
+        aiConnected = !!ollamaRes.connected;
+        aiLabel = 'Ollama';
+      }
+
+      let ttsReady = false;
+      let ttsLabel = 'Piper';
+      if (settings.tts.provider === 'online') {
+        ttsLabel = 'Online TTS';
+        const onlineRes = await checkOnlineTTS().catch(() => ({ connected: false }));
+        ttsReady = !!onlineRes.connected;
+      } else {
+        const piperRes = await checkTTS(settings.tts.endpoint).catch(() => ({ ready: false }));
+        ttsReady = !!piperRes.ready;
+        ttsLabel = 'Piper';
+      }
+
+      const ankiRes = await checkAnki(settings.anki.url).catch(() => ({ connected: false, version: undefined }));
 
       setStatus({
-        ollama: {
-          connected: !!aiRes.connected,
-          version: aiRes.version,
+        ai: {
+          connected: aiConnected,
+          label: aiLabel,
         },
         tts: {
-          ready: !!ttsRes.ready,
-          voice: settings.tts.voice,
+          ready: ttsReady,
+          label: ttsLabel,
         },
         anki: {
           connected: !!ankiRes.connected,
@@ -102,11 +135,11 @@ export default function App() {
     refreshStatuses();
     const interval = setInterval(refreshStatuses, 15000);
     return () => clearInterval(interval);
-  }, [settings.ai.url, settings.tts.endpoint, settings.tts.voice, settings.anki.url]);
+  }, [settings.ai, settings.tts, settings.anki]);
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-black flex flex-col font-sans selection:bg-[#FFD93D] selection:text-black">
-      {/* Top 3-Color Strip Header */}
+      {/* Top Navigation Header */}
       <NavigationStrip
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
@@ -139,15 +172,17 @@ export default function App() {
         )}
       </main>
 
-      {/* Bento Grid Tool Footer */}
+      {/* Footer */}
       <footer className="w-full border-t-4 border-black bg-[#FFFFFF] py-3 px-4 text-center text-black text-xs">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="font-black text-[#4ADE80] uppercase tracking-wider">Pipeline:</span>
-            <span className="font-mono text-zinc-700 font-bold">Word → Ollama JSON → Kokoro WAV → Bento / Comic CSS → AnkiConnect</span>
+            <span className="font-mono text-zinc-700 font-bold">
+              Word → AI ({settings.ai.provider === 'gemini' ? 'Gemini' : 'Ollama'}) → TTS ({settings.tts.provider === 'online' ? 'Online' : 'Piper'}) → Comic Template → AnkiConnect
+            </span>
           </div>
           <div className="text-xs text-black font-black uppercase tracking-wider">
-            Local-First AI Flashcard Generator • 100% Offline
+            English Flashcard Generator • 10 Card Designs
           </div>
         </div>
       </footer>

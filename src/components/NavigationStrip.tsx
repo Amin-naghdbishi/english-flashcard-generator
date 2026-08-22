@@ -7,9 +7,9 @@ interface NavigationStripProps {
   currentTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
   status: {
-    ollama: { connected: boolean; version?: string; loading?: boolean };
-    tts: { ready: boolean; voice?: string; loading?: boolean };
-    anki: { connected: boolean; version?: number; loading?: boolean };
+    ai: { connected: boolean; label?: string };
+    tts: { ready: boolean; label?: string };
+    anki: { connected: boolean; version?: number };
   };
   onRefreshStatus: () => void;
 }
@@ -67,22 +67,22 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
 
         {/* Compact Live Status Dots & Refresh (Right Corner) */}
         <div className="hidden md:flex items-center gap-2 px-3 sm:px-4 bg-[#FBF9F5] shrink-0">
-          <div className="flex items-center gap-1.5" title={`Ollama: ${status.ollama.connected ? 'Connected' : 'Offline'}`}>
+          <div className="flex items-center gap-1.5" title={`${status.ai.label || 'AI'}: ${status.ai.connected ? 'Connected' : 'Offline'}`}>
             <span
               className={`w-2.5 h-2.5 border border-black ${
-                status.ollama.connected ? 'bg-[#4ADE80]' : 'bg-[#FF4B4B]'
+                status.ai.connected ? 'bg-[#4ADE80]' : 'bg-[#FF4B4B]'
               }`}
             />
-            <span className="text-[10px] font-black uppercase text-black">AI</span>
+            <span className="text-[10px] font-black uppercase text-black">{status.ai.label || 'AI'}</span>
           </div>
 
-          <div className="flex items-center gap-1.5" title={`Kokoro TTS: ${status.tts.ready ? 'Ready' : 'Standby'}`}>
+          <div className="flex items-center gap-1.5" title={`${status.tts.label || 'TTS'}: ${status.tts.ready ? 'Ready' : 'Standby'}`}>
             <span
               className={`w-2.5 h-2.5 border border-black ${
                 status.tts.ready ? 'bg-[#4ADE80]' : 'bg-[#FFD93D]'
               }`}
             />
-            <span className="text-[10px] font-black uppercase text-black">TTS</span>
+            <span className="text-[10px] font-black uppercase text-black">{status.tts.label || 'TTS'}</span>
           </div>
 
           <div className="flex items-center gap-1.5" title={`AnkiConnect: ${status.anki.connected ? 'Connected' : 'Offline'}`}>

@@ -34,17 +34,17 @@ interface CreateCardViewProps {
 const DEFAULT_STEPS: Array<{ step: number; name: string }> = [
   { step: 1, name: 'Word received' },
   { step: 2, name: 'Deck validated' },
-  { step: 3, name: 'Ollama connected' },
+  { step: 3, name: 'AI Provider Connected' },
   { step: 4, name: 'AI data generated' },
-  { step: 5, name: 'TTS word audio generated' },
-  { step: 6, name: 'TTS example audio generated' },
-  { step: 7, name: 'AnkiConnect connected' },
-  { step: 8, name: 'Deck found/ensured' },
-  { step: 9, name: 'Note Type found/created' },
-  { step: 10, name: 'Fields prepared' },
-  { step: 11, name: 'Media uploaded' },
-  { step: 12, name: 'Note created' },
-  { step: 13, name: 'Card created & verified' },
+  { step: 5, name: 'TTS Service Reachable' },
+  { step: 6, name: 'Audio Generated' },
+  { step: 7, name: 'AnkiConnect Connected' },
+  { step: 8, name: 'Deck Ensured' },
+  { step: 9, name: 'Note Type Configured' },
+  { step: 10, name: 'Fields Prepared' },
+  { step: 11, name: 'Media Uploaded' },
+  { step: 12, name: 'Note Created' },
+  { step: 13, name: 'Card Verified' },
 ];
 
 export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCardCreated }) => {
@@ -798,37 +798,10 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
         </div>
       </section>
 
-      {/* RIGHT COLUMN: Bento Live Card Preview Frame */}
+      {/* RIGHT COLUMN: Live Card Preview Frame */}
       <section className="flex-1 flex flex-col min-h-[560px]">
-        {/* Preview Frame Bar */}
-        <div className="flex justify-between items-end mb-2">
-          <span className="text-xs font-black uppercase tracking-widest bg-white text-black px-2.5 py-1 border-2 border-black">
-            Live Card Preview (1:1 Template Fidelity)
-          </span>
-          <div className="flex gap-2 sm:gap-3 flex-wrap">
-            <div className="flex items-center gap-1.5 bg-white px-2 py-0.5 border border-black">
-              <div className="w-2.5 h-2.5 bg-[#4ADE80] border border-black"></div>
-              <span className="text-[10px] font-black uppercase text-black">Ollama</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-white px-2 py-0.5 border border-black">
-              <div className="w-2.5 h-2.5 bg-[#4ADE80] border border-black"></div>
-              <span className="text-[10px] font-black uppercase text-black">Kokoro</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-white px-2 py-0.5 border border-black">
-              <div className={`w-2.5 h-2.5 border border-black ${createdNoteId ? 'bg-[#4ADE80]' : 'bg-[#FFD93D]'}`}></div>
-              <span className="text-[10px] font-black uppercase text-black">
-                {createdNoteId ? `Anki (#${createdNoteId})` : 'Anki'}
-              </span>
-            </div>
-          </div>
-        </div>
-
         {/* Bento Stage Container (Warm Ivory #F5F2EB) */}
         <div className="flex-1 bg-[#F5F2EB] border-4 border-black p-4 sm:p-8 relative overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col">
-          <div className="absolute top-0 right-0 p-4 opacity-5 font-black text-6xl text-black pointer-events-none select-none">
-            ANKI
-          </div>
-
           <div className="relative z-10 w-full flex-1 flex flex-col justify-center">
             <CardPreview
               cardData={generatedCard}
