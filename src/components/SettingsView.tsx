@@ -38,7 +38,7 @@ import { PiperVoice, PiperDiagnosticResult } from '../../server/piper';
 import { OnlineTTSDiagnosticResult } from '../../server/onlineTts';
 import { THEME_GROUPS, THEMES } from '../themes';
 import { AudioPlayer } from './AudioPlayer';
-import { useAppTheme } from '../context/ThemeContext';
+import { useAppTheme, normalizeAppTheme } from '../context/ThemeContext';
 import {
   Sliders,
   Cpu,
@@ -78,7 +78,7 @@ interface SettingsViewProps {
   appTheme?: AppTheme;
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSettings, appTheme: propTheme }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSettings }) => {
   const themeContext = useAppTheme();
   const [form, setForm] = useState<AppSettings>(settings);
   const [activeSubTab, setActiveSubTab] = useState<
@@ -86,7 +86,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   >('ai');
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
-  const isDark = (form.appTheme || propTheme || themeContext.appTheme) === 'anki-dark';
+  const isDark = themeContext.isDark;
+
+  // Immediate app theme selector that synchronizes context, parent, and storage
+  const handleAppThemeSelect = (newTheme: AppTheme) => {
+    const normalized = normalizeAppTheme(newTheme);
+    const updated = { ...form, appTheme: normalized };
+    setForm(updated);
+    themeContext.setAppTheme(normalized);
+    onUpdateSettings(updated);
+    saveConfig(updated).catch(() => {});
+  };
 
   // Ollama states
   const [ollamaStatus, setOllamaStatus] = useState<{ connected: boolean; version?: string; error?: string } | null>(null);
@@ -1607,18 +1617,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               {/* Option 1: Anki Light */}
               <button
                 type="button"
-                onClick={() => setForm({ ...form, appTheme: 'anki-light' })}
+                onClick={() => handleAppThemeSelect('anki-light')}
                 className={`p-3.5 border text-left cursor-pointer transition-all rounded-md ${
-                  form.appTheme !== 'anki-dark'
+                  !isDark
                     ? 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
-                    : isDark
-                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
-                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                    : 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold">Anki Light</span>
-                  {form.appTheme !== 'anki-dark' && (
+                  {!isDark && (
                     <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
                       ACTIVE
                     </span>
@@ -1632,18 +1640,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               {/* Option 2: Anki Dark */}
               <button
                 type="button"
-                onClick={() => setForm({ ...form, appTheme: 'anki-dark' })}
+                onClick={() => handleAppThemeSelect('anki-dark')}
                 className={`p-3.5 border text-left cursor-pointer transition-all rounded-md ${
-                  form.appTheme === 'anki-dark'
+                  isDark
                     ? 'bg-blue-950/40 text-blue-200 border-blue-500 font-semibold shadow-xs'
-                    : isDark
-                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
                     : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold">Anki Dark</span>
-                  {form.appTheme === 'anki-dark' && (
+                  {isDark && (
                     <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
                       ACTIVE
                     </span>

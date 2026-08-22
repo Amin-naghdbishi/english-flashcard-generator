@@ -159,16 +159,19 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    refreshStatuses();
-    const interval = setInterval(refreshStatuses, 15000);
-    return () => clearInterval(interval);
-  }, [settings.ai, settings.tts, settings.anki]);
+  const handleSetAppTheme = (newTheme: AppTheme) => {
+    const normalized = normalizeAppTheme(newTheme);
+    setSettings((prev) => {
+      const updated = { ...prev, appTheme: normalized };
+      saveConfig(updated).catch(() => {});
+      return updated;
+    });
+  };
 
   return (
     <AppThemeProvider
       appTheme={activeAppTheme}
-      setAppTheme={(newTheme) => setSettings({ ...settings, appTheme: newTheme })}
+      setAppTheme={handleSetAppTheme}
     >
       <div
         className={`min-h-screen flex flex-col font-sans transition-colors duration-150 ${

@@ -49,9 +49,9 @@ const DEFAULT_STEPS: Array<{ step: number; name: string }> = [
   { step: 14, name: 'Card Verified' },
 ];
 
-export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCardCreated, appTheme: propTheme }) => {
+export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCardCreated }) => {
   const themeContext = useAppTheme();
-  const isDark = (propTheme || themeContext.appTheme) === 'anki-dark';
+  const isDark = themeContext.isDark;
 
   const [word, setWord] = useState('abandon');
   const [deck, setDeck] = useState(settings.anki.defaultDeck || 'English::B1');

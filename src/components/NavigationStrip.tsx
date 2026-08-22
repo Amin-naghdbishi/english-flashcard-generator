@@ -150,8 +150,33 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
           >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
+
+          {/* Quick Anki Light / Anki Dark Theme Toggle */}
+          <button
+            type="button"
+            onClick={() => themeContext.toggleTheme()}
+            title={isDark ? 'Switch to Anki Light' : 'Switch to Anki Dark'}
+            className={`px-2 py-1 rounded border text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
+              isDark
+                ? 'border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-750'
+                : 'border-zinc-300 bg-zinc-100 text-zinc-800 hover:bg-zinc-200'
+            }`}
+          >
+            {isDark ? (
+              <>
+                <span className="text-amber-400">☀️</span>
+                <span className="hidden md:inline">Light</span>
+              </>
+            ) : (
+              <>
+                <span className="text-blue-500">🌙</span>
+                <span className="hidden md:inline">Dark</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
     </header>
   );
 };
+

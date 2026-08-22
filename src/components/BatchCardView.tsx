@@ -174,9 +174,9 @@ export function autoDetectAndParseBatchInput(
   };
 }
 
-export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme: propTheme }) => {
+export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
   const themeContext = useAppTheme();
-  const isDark = (propTheme || themeContext.appTheme) === 'anki-dark';
+  const isDark = themeContext.isDark;
 
   const [inputText, setInputText] = useState<string>(DEFAULT_SAMPLE_FORMAT_A);
   const [fileName, setFileName] = useState<string>('sample_words.txt');

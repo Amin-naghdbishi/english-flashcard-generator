@@ -4,6 +4,7 @@ import { AppTheme } from '../types';
 interface AppThemeContextType {
   appTheme: AppTheme;
   setAppTheme: (theme: AppTheme) => void;
+  toggleTheme: () => void;
   isDark: boolean;
   isLight: boolean;
   isAnkiLight: boolean;
@@ -20,6 +21,7 @@ export function normalizeAppTheme(theme?: string): AppTheme {
 const AppThemeContext = createContext<AppThemeContextType>({
   appTheme: 'anki-light',
   setAppTheme: () => {},
+  toggleTheme: () => {},
   isDark: false,
   isLight: true,
   isAnkiLight: true,
@@ -37,6 +39,11 @@ export const AppThemeProvider: React.FC<{
   const isAnkiLight = isLight;
   const isAnkiDark = isDark;
 
+  const toggleTheme = () => {
+    const next = isDark ? 'anki-light' : 'anki-dark';
+    setAppTheme(next);
+  };
+
   // Ensure DOM html class reflects dark/light mode
   useEffect(() => {
     if (isDark) {
@@ -53,6 +60,7 @@ export const AppThemeProvider: React.FC<{
       value={{
         appTheme,
         setAppTheme,
+        toggleTheme,
         isDark,
         isLight,
         isAnkiLight,
@@ -65,3 +73,4 @@ export const AppThemeProvider: React.FC<{
 };
 
 export const useAppTheme = () => useContext(AppThemeContext);
+
