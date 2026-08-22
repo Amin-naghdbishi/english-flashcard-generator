@@ -471,7 +471,7 @@ export async function runPiperDiagnostics(params?: {
   const normalSpeed = params?.normalSpeed || 1.0;
   const slowSpeed = params?.slowSpeed || 1.25;
 
-  const testPhrase = 'Hello Amin, this is Stitch.';
+  const testPhrase = 'The quick brown fox jumps over the lazy dog.';
   const steps: PiperDiagnosticStep[] = [];
 
   const checklist = {

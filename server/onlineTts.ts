@@ -341,7 +341,7 @@ export async function generateAllOnlineCardAudios(params: {
  * Diagnostic test for Online TTS in Settings
  */
 export async function runOnlineTtsDiagnostics(): Promise<OnlineTTSDiagnosticResult> {
-  const testPhrase = 'Hello Amin, this is Stitch.';
+  const testPhrase = 'The quick brown fox jumps over the lazy dog.';
   const steps: OnlineTTSDiagnosticStep[] = [];
 
   const checklist = {

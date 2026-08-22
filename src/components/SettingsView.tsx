@@ -8,6 +8,8 @@ import {
   TTSProvider,
   CardType,
   CardData,
+  CustomAIProviderConfig,
+  CustomTTSProviderConfig,
 } from '../types';
 import {
   saveConfig,
@@ -15,6 +17,9 @@ import {
   getOllamaModels,
   checkGemini,
   getGeminiModels,
+  checkCustomAI,
+  getCustomAIModels,
+  testCustomTTS,
   checkTTS,
   getTTSVoices,
   getPiperServiceStatus,
@@ -25,7 +30,7 @@ import {
   runOnlineTTSDiagnostics,
   checkAnki,
   getAnkiDecks,
-  setupAnkiModel,
+  ensureModelInAnki,
   runFullDiagnostics,
   runAnkiPipelineTest,
   testSmartImage,
@@ -68,6 +73,11 @@ import {
   Image as ImageIcon,
   CheckSquare,
   Sparkles,
+  Plus,
+  Trash2,
+  Eye,
+  EyeOff,
+  Radio,
 } from 'lucide-react';
 
 interface SettingsViewProps {
@@ -92,6 +102,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [geminiModels, setGeminiModels] = useState<Array<{ id: string; name: string }>>([]);
   const [testingGemini, setTestingGemini] = useState(false);
 
+  // Custom AI states
+  const [selectedCustomAiId, setSelectedCustomAiId] = useState<string>(
+    form.ai.customProviders?.[0]?.id || 'openrouter'
+  );
+  const [customAiTestResult, setCustomAiTestResult] = useState<{
+    connected?: boolean;
+    message?: string;
+    models?: string[];
+    error?: string;
+  } | null>(null);
+  const [testingCustomAi, setTestingCustomAi] = useState(false);
+  const [fetchingCustomAiModels, setFetchingCustomAiModels] = useState(false);
+  const [showApiKeyCustomAi, setShowApiKeyCustomAi] = useState(false);
+
   // Piper TTS states
   const [piperVoices, setPiperVoices] = useState<PiperVoice[]>([]);
   const [piperDiag, setPiperDiag] = useState<PiperDiagnosticResult | null>(null);
@@ -102,7 +126,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [onlineTtsDiag, setOnlineTtsDiag] = useState<OnlineTTSDiagnosticResult | null>(null);
   const [testingOnlineTts, setTestingOnlineTts] = useState(false);
 
-  // Piper Systemd Service states
+  // Custom TTS states
+  const [selectedCustomTtsId, setSelectedCustomTtsId] = useState<string>(
+    form.tts.customProviders?.[0]?.id || 'openai_speech'
+  );
+  const [customTtsTestResult, setCustomTtsTestResult] = useState<{
+    success?: boolean;
+    normalAudioBase64?: string;
+    slowAudioBase64?: string;
+    durationSeconds?: number;
+    error?: string;
+  } | null>(null);
+  const [testingCustomTts, setTestingCustomTts] = useState(false);
+  const [showApiKeyCustomTts, setShowApiKeyCustomTts] = useState(false);
+
+  // Piper Service states
   const [serviceStatus, setServiceStatus] = useState<{
     active: boolean;
     status: string;
@@ -158,11 +196,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       setOllamaStatus(conn);
       const modelsRes = await getOllamaModels(form.ai.ollama.url);
       if (modelsRes.success) setOllamaModels(modelsRes.models);
-    } catch {
-      setOllamaStatus({ connected: false, error: 'Cannot connect to Ollama' });
-    } finally {
-      setLoadingModels(false);
-    }
+    } catch {}
+    setLoadingModels(false);
   };
 
   const refreshGeminiInfo = async () => {
@@ -176,22 +211,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     } catch {}
   };
 
-  const handleTestGemini = async () => {
-    if (!form.ai.gemini.apiKey) {
-      setGeminiStatus({ connected: false, error: 'Please enter a Gemini API Key first' });
-      return;
-    }
-    setTestingGemini(true);
-    try {
-      const conn = await checkGemini(form.ai.gemini.apiKey, form.ai.gemini.model);
-      setGeminiStatus(conn);
-    } catch (e: any) {
-      setGeminiStatus({ connected: false, error: e?.message || 'Gemini connection failed' });
-    } finally {
-      setTestingGemini(false);
-    }
-  };
-
   const refreshTTSInfo = async () => {
     try {
       const voicesRes = await getTTSVoices();
@@ -201,22 +220,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
   const refreshOnlineTtsInfo = async () => {
     try {
-      const res = await checkOnlineTTS();
-      setOnlineTtsStatus(res);
+      const conn = await checkOnlineTTS();
+      setOnlineTtsStatus(conn);
     } catch {}
-  };
-
-  const handleTestOnlineTts = async () => {
-    setTestingOnlineTts(true);
-    try {
-      const res = await runOnlineTTSDiagnostics();
-      setOnlineTtsDiag(res);
-      setOnlineTtsStatus({ connected: res.ready });
-    } catch (e: any) {
-      setOnlineTtsStatus({ connected: false, error: e?.message });
-    } finally {
-      setTestingOnlineTts(false);
-    }
   };
 
   const refreshPiperServiceStatus = async () => {
@@ -224,35 +230,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     try {
       const st = await getPiperServiceStatus();
       setServiceStatus(st);
-    } catch {} finally {
-      setCheckingService(false);
-    }
-  };
-
-  const handleToggleService = async (action: 'start' | 'stop' | 'restart') => {
-    setTogglingService(true);
-    try {
-      const res = await controlPiperService(action);
-      setServiceStatus({ active: res.active, status: res.status });
-    } catch {} finally {
-      setTogglingService(false);
-    }
-  };
-
-  const handleTestPiper = async () => {
-    setTestingPiper(true);
-    try {
-      const res = await runTTSDiagnostics({
-        endpoint: form.tts.endpoint,
-        americanVoice: form.tts.americanVoice,
-        britishVoice: form.tts.britishVoice,
-        normalSpeed: form.tts.normalSpeed,
-        slowSpeed: form.tts.slowSpeed,
-      });
-      setPiperDiag(res);
-    } catch {} finally {
-      setTestingPiper(false);
-    }
+    } catch {}
+    setCheckingService(false);
   };
 
   const refreshAnkiInfo = async () => {
@@ -263,131 +242,158 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
         const decksRes = await getAnkiDecks(form.anki.url);
         if (decksRes.success) setAnkiDecks(decksRes.decks);
       }
-    } catch {
-      setAnkiStatus({ connected: false, error: 'Cannot reach AnkiConnect' });
-    }
+    } catch {}
   };
 
-  const handleTestAnkiConn = async () => {
-    setTestingAnkiConn(true);
-    await refreshAnkiInfo();
-    setTestingAnkiConn(false);
-  };
-
-  const handleSyncAnkiModel = async () => {
+  // Test Custom AI Connection
+  const handleTestCustomAi = async (customConfig: CustomAIProviderConfig) => {
+    setTestingCustomAi(true);
+    setCustomAiTestResult(null);
     try {
-      const res = await setupAnkiModel(form.theme, form.defaultCard.cardType, form.anki.url);
-      if (res.success) {
-        setAnkiModelSyncMsg(`✓ ${res.message}`);
+      const res = await checkCustomAI(customConfig);
+      setCustomAiTestResult(res);
+    } catch (err: any) {
+      setCustomAiTestResult({ connected: false, message: err.message, error: err.message });
+    }
+    setTestingCustomAi(false);
+  };
+
+  // Fetch Custom AI Models from endpoint
+  const handleFetchCustomAiModels = async (customConfig: CustomAIProviderConfig) => {
+    setFetchingCustomAiModels(true);
+    try {
+      const res = await getCustomAIModels(customConfig);
+      if (res.success && res.models.length > 0) {
+        setCustomAiTestResult({
+          connected: true,
+          message: `Retrieved ${res.models.length} models from endpoint.`,
+          models: res.models,
+        });
       } else {
-        setAnkiModelSyncMsg(`✕ Sync failed: ${res.error || res.message}`);
+        setCustomAiTestResult({
+          connected: false,
+          message: res.error || 'No models returned from /models endpoint.',
+        });
       }
-    } catch (e: any) {
-      setAnkiModelSyncMsg(`✕ Error: ${e?.message}`);
+    } catch (err: any) {
+      setCustomAiTestResult({ connected: false, message: err.message });
     }
+    setFetchingCustomAiModels(false);
   };
 
-  const handleRunAnkiPipelineTest = async () => {
-    setRunningAnkiPipeline(true);
+  // Test Custom TTS Audio Synthesis
+  const handleTestCustomTts = async (customConfig: CustomTTSProviderConfig) => {
+    setTestingCustomTts(true);
+    setCustomTtsTestResult(null);
     try {
-      await runAnkiPipelineTest(form.anki.defaultDeck, form.theme, form.anki.url);
-    } catch {} finally {
-      setRunningAnkiPipeline(false);
+      const res = await testCustomTTS(customConfig);
+      setCustomTtsTestResult(res);
+    } catch (err: any) {
+      setCustomTtsTestResult({ success: false, error: err.message });
     }
+    setTestingCustomTts(false);
   };
 
-  const handleTestDictionary = async () => {
-    setTestingDict(true);
-    setDictTestResult(null);
-    try {
-      const abadis = await lookupAbadisDict(dictTestWord);
-      const freedict = await lookupFreeDict(dictTestWord);
-      setDictTestResult({ abadis, freedict });
-    } catch (e: any) {
-      setDictTestResult({ error: e?.message });
-    } finally {
-      setTestingDict(false);
-    }
-  };
-
-  const handleTestSmartImage = async () => {
-    setTestingImg(true);
-    setImgTestResult(null);
-    try {
-      const res = await testSmartImage(imgTestWord, 'noun', 'پاک‌کن');
-      setImgTestResult(res);
-    } catch (e: any) {
-      setImgTestResult({ error: e?.message });
-    } finally {
-      setTestingImg(false);
-    }
-  };
-
-  const handleRunFullDiagnostics = async () => {
-    setRunningDiag(true);
-    try {
-      const report = await runFullDiagnostics();
-      setFullReport(report);
-    } catch {} finally {
-      setRunningDiag(false);
-    }
-  };
-
+  // Save Settings
   const handleSave = async () => {
+    setSaveStatus('Saving...');
     try {
       const updated = await saveConfig(form);
-      setForm(updated);
       onUpdateSettings(updated);
       setSaveStatus('✓ Settings saved successfully!');
       setTimeout(() => setSaveStatus(null), 3000);
-    } catch (e: any) {
-      setSaveStatus(`✕ Failed to save: ${e?.message}`);
+    } catch (err: any) {
+      setSaveStatus(`✕ Error saving: ${err.message}`);
     }
   };
 
+  // Sync Anki Note Model
+  const handleSyncAnkiModel = async () => {
+    setAnkiModelSyncMsg('Syncing HTML & CSS template with Anki...');
+    try {
+      const res = await ensureModelInAnki(form.anki.url, form.theme, form.defaultCard?.cardType || 'normal');
+      if (res.success) {
+        setAnkiModelSyncMsg(`✓ ${res.message}`);
+      } else {
+        setAnkiModelSyncMsg(`✕ Failed: ${res.error || res.message}`);
+      }
+    } catch (err: any) {
+      setAnkiModelSyncMsg(`✕ Error: ${err.message}`);
+    }
+    setTimeout(() => setAnkiModelSyncMsg(null), 5000);
+  };
+
+  const activeCustomAiConfig =
+    form.ai.customProviders?.find((p) => p.id === selectedCustomAiId) ||
+    form.ai.customProviders?.[0] || {
+      id: 'custom_1',
+      name: 'Custom OpenAI-Compatible Provider',
+      protocol: 'openai-compatible' as const,
+      baseUrl: 'https://api.openai.com/v1',
+      apiKey: '',
+      model: 'gpt-4o-mini',
+      temperature: 0.2,
+      authType: 'bearer' as const,
+    };
+
+  const activeCustomTtsConfig =
+    form.tts.customProviders?.find((p) => p.id === selectedCustomTtsId) ||
+    form.tts.customProviders?.[0] || {
+      id: 'custom_tts_1',
+      name: 'Custom OpenAI Speech TTS',
+      protocol: 'openai-speech' as const,
+      endpoint: 'https://api.openai.com/v1/audio/speech',
+      apiKey: '',
+      voice: 'alloy',
+      model: 'tts-1',
+      audioFormat: 'mp3' as const,
+      authType: 'bearer' as const,
+      httpMethod: 'POST' as const,
+    };
+
   return (
-    <div className="w-full max-w-6xl mx-auto p-4 sm:p-6 flex flex-col gap-6 text-black">
-      {/* Header Banner */}
-      <div className="bg-[#FFD93D] border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-5 flex flex-wrap items-center justify-between gap-4 text-black">
+    <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+      {/* Header with Save Button */}
+      <div className="bg-[#FFD93D] p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight flex items-center gap-2">
-            <Sliders className="w-7 h-7 text-black" />
-            <span>Settings & Preferences</span>
-          </h2>
-          <p className="text-xs font-bold text-black opacity-80 mt-1">
-            Configure AI Provider, TTS Speech, Online Dictionaries, Smart Images, and 10 Card Themes.
+          <h1 className="text-2xl sm:text-3xl font-black uppercase italic tracking-tight text-black flex items-center gap-2">
+            <Sliders className="w-8 h-8" />
+            <span>Settings & Providers</span>
+          </h1>
+          <p className="text-xs sm:text-sm font-bold text-zinc-800 mt-1">
+            Configure flexible AI providers (Ollama / Gemini / 9Router-style Custom APIs), TTS voices & speed, dictionaries, smart images, and card themes.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           {saveStatus && (
-            <span className="text-xs font-black bg-black text-[#FFD93D] px-3 py-1.5 border-2 border-black">
+            <span className="text-xs font-black px-3 py-1.5 bg-black text-[#4ADE80] border-2 border-black">
               {saveStatus}
             </span>
           )}
           <button
             type="button"
             onClick={handleSave}
-            className="px-6 py-2.5 bg-[#4ADE80] hover:bg-[#3ecb73] text-black font-black text-sm uppercase border-3 border-black shadow-[3px_3px_0px_#000000] flex items-center gap-2 cursor-pointer active:translate-y-0.5"
+            className="px-5 py-2.5 bg-[#FF4B4B] hover:bg-[#ff6161] text-white font-black text-sm uppercase border-4 border-black shadow-[4px_4px_0px_#000000] flex items-center gap-2 cursor-pointer active:translate-y-0.5"
           >
             <Save className="w-4 h-4" />
-            <span>Save Changes</span>
+            <span>Save Settings</span>
           </button>
         </div>
       </div>
 
-      {/* Settings Navigation Sub-Tabs */}
+      {/* Navigation Sub-Tabs */}
       <div className="flex flex-wrap gap-2 border-b-4 border-black pb-2">
         {[
-          { id: 'ai', label: 'AI Provider', icon: Cpu, color: '#38BDF8' },
-          { id: 'tts', label: 'TTS Engine & Speed', icon: Volume2, color: '#F472B6' },
-          { id: 'dictionary', label: 'Dictionary Sources', icon: BookOpen, color: '#FACC15' },
-          { id: 'smartImages', label: 'Smart Images', icon: ImageIcon, color: '#FB923C' },
-          { id: 'defaultCard', label: 'Default Card Settings', icon: CheckSquare, color: '#A78BFA' },
-          { id: 'appearance', label: '10 Card Themes', icon: Palette, color: '#C084FC' },
-          { id: 'anki', label: 'AnkiConnect', icon: Bookmark, color: '#4ADE80' },
-          { id: 'diagnostics', label: 'Diagnostics', icon: Activity, color: '#FF4B4B' },
-          { id: 'guide', label: 'Setup Guide', icon: HelpCircle, color: '#2DD4BF' },
+          { id: 'ai', label: 'AI Provider', icon: Cpu },
+          { id: 'tts', label: 'TTS & Speed', icon: Volume2 },
+          { id: 'dictionary', label: 'Dictionary Sources', icon: BookOpen },
+          { id: 'smartImages', label: 'Smart Images', icon: ImageIcon },
+          { id: 'defaultCard', label: 'Default Card Settings', icon: CheckSquare },
+          { id: 'appearance', label: '10 Themes & Live Preview', icon: Palette },
+          { id: 'anki', label: 'AnkiConnect', icon: Bookmark },
+          { id: 'diagnostics', label: 'Diagnostics', icon: Activity },
+          { id: 'guide', label: 'User Guide', icon: HelpCircle },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSubTab === tab.id;
@@ -396,147 +402,197 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               key={tab.id}
               type="button"
               onClick={() => setActiveSubTab(tab.id as any)}
-              className={`px-3.5 py-2 font-black text-xs uppercase border-3 border-black flex items-center gap-1.5 cursor-pointer transition-all ${
+              className={`px-3.5 py-2 font-black text-xs uppercase border-4 border-black flex items-center gap-1.5 transition-transform cursor-pointer ${
                 isActive
-                  ? 'bg-black text-white shadow-[3px_3px_0px_#000000] -translate-y-0.5'
-                  : 'bg-white text-black hover:bg-zinc-100'
+                  ? 'bg-black text-[#FFD93D] shadow-[4px_4px_0px_0px_rgba(255,217,61,1)] -translate-y-0.5'
+                  : 'bg-white hover:bg-zinc-100 text-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
               }`}
             >
-              <Icon className="w-3.5 h-3.5" style={{ color: isActive ? tab.color : '#000000' }} />
+              <Icon className="w-4 h-4" />
               <span>{tab.label}</span>
             </button>
           );
         })}
       </div>
 
-      {/* 1. AI PROVIDER TAB */}
+      {/* SUBTAB 1: AI PROVIDER */}
       {activeSubTab === 'ai' && (
-        <div className="bg-[#38BDF8] border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-5 sm:p-6 flex flex-col gap-5 text-black">
-          <div className="flex flex-wrap items-center justify-between border-b-4 border-black pb-3 gap-3">
-            <div>
-              <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-                AI Generation Provider
-              </h3>
-              <p className="text-xs font-bold text-black opacity-80">
-                Choose between Local Ollama (100% offline) or Google Gemini (online high intelligence).
+        <div className="space-y-6">
+          {/* Provider Selection Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Ollama Option */}
+            <div
+              onClick={() => setForm({ ...form, ai: { ...form.ai, provider: 'ollama' } })}
+              className={`p-4 border-4 border-black cursor-pointer shadow-[4px_4px_0px_#000000] transition-all ${
+                form.ai.provider === 'ollama' ? 'bg-[#4ADE80] text-black font-black' : 'bg-white text-black'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-base font-black uppercase">Local Ollama</span>
+                <input
+                  type="radio"
+                  name="ai_provider"
+                  checked={form.ai.provider === 'ollama'}
+                  onChange={() => {}}
+                  className="w-4 h-4 accent-black"
+                />
+              </div>
+              <p className="text-xs font-bold opacity-90">
+                100% offline AI running locally on your computer (e.g. qwen3:4b, llama3.2).
               </p>
             </div>
 
-            <div className="inline-flex border-4 border-black bg-white p-1 shadow-[3px_3px_0px_#000000]">
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, ai: { ...form.ai, provider: 'ollama' } })}
-                className={`px-4 py-2 text-xs font-black uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all ${
-                  form.ai.provider === 'ollama' ? 'bg-[#38BDF8] text-black shadow-inner' : 'bg-zinc-100 text-black hover:bg-zinc-200'
-                }`}
-              >
-                <HardDrive className="w-4 h-4" />
-                <span>Ollama (Local Offline)</span>
-              </button>
+            {/* Gemini Option */}
+            <div
+              onClick={() => setForm({ ...form, ai: { ...form.ai, provider: 'gemini' } })}
+              className={`p-4 border-4 border-black cursor-pointer shadow-[4px_4px_0px_#000000] transition-all ${
+                form.ai.provider === 'gemini' ? 'bg-[#38BDF8] text-black font-black' : 'bg-white text-black'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-base font-black uppercase">Google Gemini</span>
+                <input
+                  type="radio"
+                  name="ai_provider"
+                  checked={form.ai.provider === 'gemini'}
+                  onChange={() => {}}
+                  className="w-4 h-4 accent-black"
+                />
+              </div>
+              <p className="text-xs font-bold opacity-90">
+                Fast, high-quality cloud AI (gemini-2.5-flash, gemini-1.5-pro).
+              </p>
+            </div>
 
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, ai: { ...form.ai, provider: 'gemini' } })}
-                className={`px-4 py-2 text-xs font-black uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all ${
-                  form.ai.provider === 'gemini' ? 'bg-[#38BDF8] text-black shadow-inner' : 'bg-zinc-100 text-black hover:bg-zinc-200'
-                }`}
-              >
-                <Globe className="w-4 h-4" />
-                <span>Google Gemini (Online)</span>
-              </button>
+            {/* Custom AI Option (9Router style) */}
+            <div
+              onClick={() => setForm({ ...form, ai: { ...form.ai, provider: 'custom' } })}
+              className={`p-4 border-4 border-black cursor-pointer shadow-[4px_4px_0px_#000000] transition-all ${
+                form.ai.provider === 'custom' || (!['ollama', 'gemini'].includes(form.ai.provider))
+                  ? 'bg-[#C084FC] text-black font-black'
+                  : 'bg-white text-black'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-base font-black uppercase">Custom AI / 9Router</span>
+                <input
+                  type="radio"
+                  name="ai_provider"
+                  checked={form.ai.provider === 'custom' || (!['ollama', 'gemini'].includes(form.ai.provider))}
+                  onChange={() => {}}
+                  className="w-4 h-4 accent-black"
+                />
+              </div>
+              <p className="text-xs font-bold opacity-90">
+                Connect ANY OpenAI-compatible endpoint, OpenRouter, Groq, DeepSeek, vLLM, or LMStudio.
+              </p>
             </div>
           </div>
 
-          {/* OLLAMA */}
+          {/* OLLAMA CONFIGURATION */}
           {form.ai.provider === 'ollama' && (
-            <div className="bg-white p-4 sm:p-5 border-4 border-black space-y-4">
+            <div className="bg-white p-5 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-4">
               <div className="flex items-center justify-between border-b-2 border-black pb-2">
-                <span className="font-black text-sm uppercase">Ollama Local Settings</span>
-                <span className={`px-2.5 py-0.5 text-xs font-black border border-black ${ollamaStatus?.connected ? 'bg-[#4ADE80]' : 'bg-[#FF4B4B] text-white'}`}>
-                  {ollamaStatus?.connected ? `● Online (${ollamaStatus.version || 'Active'})` : '○ Unreachable'}
-                </span>
+                <h3 className="font-black text-sm uppercase">Ollama Settings</h3>
+                <button
+                  type="button"
+                  onClick={refreshOllamaInfo}
+                  className="px-2.5 py-1 bg-[#FFD93D] text-black font-black text-xs border-2 border-black flex items-center gap-1 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingModels ? 'animate-spin' : ''}`} />
+                  <span>Refresh Models</span>
+                </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-black font-black uppercase mb-1">Ollama URL:</label>
+                  <label className="block text-xs font-black uppercase mb-1">Ollama Base URL</label>
                   <input
                     type="text"
                     value={form.ai.ollama.url}
-                    onChange={(e) => setForm({ ...form, ai: { ...form.ai, ollama: { ...form.ai.ollama, url: e.target.value } } })}
-                    className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-mono focus:outline-none"
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        ai: {
+                          ...form.ai,
+                          ollama: { ...form.ai.ollama, url: e.target.value },
+                          url: e.target.value,
+                        },
+                      })
+                    }
+                    className="w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black"
+                    placeholder="http://127.0.0.1:11434"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-black font-black uppercase mb-1">Local Model:</label>
-                  {ollamaModels.length > 0 ? (
-                    <select
-                      value={form.ai.ollama.model}
-                      onChange={(e) => setForm({ ...form, ai: { ...form.ai, ollama: { ...form.ai.ollama, model: e.target.value } } })}
-                      className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-black focus:outline-none cursor-pointer"
-                    >
-                      {ollamaModels.map((m) => (
+                  <label className="block text-xs font-black uppercase mb-1">Model Name</label>
+                  <select
+                    value={form.ai.ollama.model}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        ai: {
+                          ...form.ai,
+                          ollama: { ...form.ai.ollama, model: e.target.value },
+                          model: e.target.value,
+                        },
+                      })
+                    }
+                    className="w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black cursor-pointer"
+                  >
+                    {ollamaModels.length > 0 ? (
+                      ollamaModels.map((m) => (
                         <option key={m.name} value={m.name}>
-                          {m.name} ({m.size ? `${(m.size / 1e9).toFixed(1)}GB` : 'local'})
+                          {m.name} ({Math.round(m.size / 1024 / 1024 / 1024)}GB)
                         </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      value={form.ai.ollama.model}
-                      onChange={(e) => setForm({ ...form, ai: { ...form.ai, ollama: { ...form.ai.ollama, model: e.target.value } } })}
-                      className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-mono focus:outline-none"
-                    />
-                  )}
+                      ))
+                    ) : (
+                      <option value={form.ai.ollama.model}>{form.ai.ollama.model}</option>
+                    )}
+                  </select>
                 </div>
               </div>
             </div>
           )}
 
-          {/* GEMINI */}
+          {/* GEMINI CONFIGURATION */}
           {form.ai.provider === 'gemini' && (
-            <div className="bg-white p-4 sm:p-5 border-4 border-black space-y-4">
-              <div className="flex items-center justify-between border-b-2 border-black pb-2">
-                <span className="font-black text-sm uppercase">Google Gemini Settings</span>
-                <span className={`px-2.5 py-0.5 text-xs font-black border border-black ${geminiStatus?.connected ? 'bg-[#4ADE80]' : 'bg-[#FF4B4B] text-white'}`}>
-                  {geminiStatus?.connected ? '● API Key Verified' : '○ Not Verified'}
-                </span>
-              </div>
+            <div className="bg-white p-5 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-4">
+              <h3 className="font-black text-sm uppercase border-b-2 border-black pb-2">Gemini API Settings</h3>
 
-              <div className="space-y-3 text-xs font-bold">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-black font-black uppercase mb-1">Gemini API Key:</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="password"
-                      placeholder="AIzaSy..."
-                      value={form.ai.gemini.apiKey}
-                      onChange={(e) => setForm({ ...form, ai: { ...form.ai, gemini: { ...form.ai.gemini, apiKey: e.target.value } } })}
-                      className="flex-1 bg-zinc-100 text-black p-2 border-2 border-black font-mono focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleTestGemini}
-                      disabled={testingGemini}
-                      className="px-4 py-2 bg-[#4ADE80] text-black font-black uppercase border-2 border-black cursor-pointer"
-                    >
-                      {testingGemini ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Test Key'}
-                    </button>
-                  </div>
+                  <label className="block text-xs font-black uppercase mb-1">Gemini API Key</label>
+                  <input
+                    type="password"
+                    value={form.ai.gemini.apiKey}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        ai: { ...form.ai, gemini: { ...form.ai.gemini, apiKey: e.target.value } },
+                      })
+                    }
+                    className="w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black"
+                    placeholder="AIzaSy..."
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-black font-black uppercase mb-1">Gemini Model:</label>
+                  <label className="block text-xs font-black uppercase mb-1">Gemini Model</label>
                   <select
                     value={form.ai.gemini.model}
-                    onChange={(e) => setForm({ ...form, ai: { ...form.ai, gemini: { ...form.ai.gemini, model: e.target.value } } })}
-                    className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-black focus:outline-none cursor-pointer"
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        ai: { ...form.ai, gemini: { ...form.ai.gemini, model: e.target.value } },
+                      })
+                    }
+                    className="w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black cursor-pointer"
                   >
                     {geminiModels.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.name} ({m.id})
+                        {m.name}
                       </option>
                     ))}
                   </select>
@@ -544,679 +600,888 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               </div>
             </div>
           )}
+
+          {/* CUSTOM AI PROVIDER (9Router Style) */}
+          {(form.ai.provider === 'custom' || (!['ollama', 'gemini'].includes(form.ai.provider))) && (
+            <div className="bg-white p-5 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-4">
+              <div className="flex items-center justify-between border-b-2 border-black pb-2">
+                <h3 className="font-black text-sm uppercase flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-[#7C3AED]" />
+                  <span>Custom AI Provider Configuration (9Router Flexibility)</span>
+                </h3>
+              </div>
+
+              {/* Provider Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black uppercase mb-1">Provider Name / Label</label>
+                  <input
+                    type="text"
+                    value={activeCustomAiConfig.name}
+                    onChange={(e) => {
+                      const updated = (form.ai.customProviders || [activeCustomAiConfig]).map((p) =>
+                        p.id === activeCustomAiConfig.id ? { ...p, name: e.target.value } : p
+                      );
+                      setForm({ ...form, ai: { ...form.ai, customProviders: updated } });
+                    }}
+                    className="w-full bg-zinc-50 text-black text-xs font-bold p-2.5 border-2 border-black"
+                    placeholder="e.g. OpenRouter / DeepSeek V3"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black uppercase mb-1">Protocol / Format</label>
+                  <select
+                    value={activeCustomAiConfig.protocol}
+                    onChange={(e) => {
+                      const updated = (form.ai.customProviders || [activeCustomAiConfig]).map((p) =>
+                        p.id === activeCustomAiConfig.id ? { ...p, protocol: e.target.value as any } : p
+                      );
+                      setForm({ ...form, ai: { ...form.ai, customProviders: updated } });
+                    }}
+                    className="w-full bg-zinc-50 text-black text-xs font-bold p-2.5 border-2 border-black cursor-pointer"
+                  >
+                    <option value="openai-compatible">OpenAI-Compatible (/chat/completions)</option>
+                    <option value="gemini">Gemini Compatible</option>
+                    <option value="ollama">Ollama Compatible</option>
+                    <option value="custom-rest">Custom REST JSON</option>
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-black uppercase mb-1">
+                    API Endpoint / Base URL (e.g. https://openrouter.ai/api/v1 or https://api.groq.com/openai/v1)
+                  </label>
+                  <input
+                    type="text"
+                    value={activeCustomAiConfig.baseUrl}
+                    onChange={(e) => {
+                      const updated = (form.ai.customProviders || [activeCustomAiConfig]).map((p) =>
+                        p.id === activeCustomAiConfig.id ? { ...p, baseUrl: e.target.value } : p
+                      );
+                      setForm({ ...form, ai: { ...form.ai, customProviders: updated } });
+                    }}
+                    className="w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black"
+                    placeholder="https://openrouter.ai/api/v1"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black uppercase mb-1">API Key / Token</label>
+                  <div className="relative">
+                    <input
+                      type={showApiKeyCustomAi ? 'text' : 'password'}
+                      value={activeCustomAiConfig.apiKey || ''}
+                      onChange={(e) => {
+                        const updated = (form.ai.customProviders || [activeCustomAiConfig]).map((p) =>
+                          p.id === activeCustomAiConfig.id ? { ...p, apiKey: e.target.value } : p
+                        );
+                        setForm({ ...form, ai: { ...form.ai, customProviders: updated } });
+                      }}
+                      className="w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black pr-9"
+                      placeholder="sk-..."
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKeyCustomAi(!showApiKeyCustomAi)}
+                      className="absolute right-2.5 top-2.5 text-zinc-500 hover:text-black cursor-pointer"
+                    >
+                      {showApiKeyCustomAi ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-black uppercase">Model Identifier</label>
+                    <button
+                      type="button"
+                      onClick={() => handleFetchCustomAiModels(activeCustomAiConfig)}
+                      disabled={fetchingCustomAiModels}
+                      className="text-[10px] font-black text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${fetchingCustomAiModels ? 'animate-spin' : ''}`} />
+                      <span>Fetch /models</span>
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={activeCustomAiConfig.model}
+                    onChange={(e) => {
+                      const updated = (form.ai.customProviders || [activeCustomAiConfig]).map((p) =>
+                        p.id === activeCustomAiConfig.id ? { ...p, model: e.target.value } : p
+                      );
+                      setForm({ ...form, ai: { ...form.ai, customProviders: updated } });
+                    }}
+                    className="w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black"
+                    placeholder="e.g. deepseek/deepseek-chat, gpt-4o-mini, llama-3.3-70b-versatile"
+                  />
+                </div>
+              </div>
+
+              {/* Action: Test Custom AI Connection */}
+              <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t-2 border-black">
+                <button
+                  type="button"
+                  onClick={() => handleTestCustomAi(activeCustomAiConfig)}
+                  disabled={testingCustomAi}
+                  className="px-4 py-2 bg-[#FFD93D] hover:bg-[#ffe066] text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_#000000] flex items-center gap-1.5 cursor-pointer"
+                >
+                  {testingCustomAi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                  <span>Test Custom AI Connection & Generation</span>
+                </button>
+
+                {customAiTestResult && (
+                  <div
+                    className={`text-xs font-bold px-3 py-1.5 border-2 border-black ${
+                      customAiTestResult.connected ? 'bg-emerald-100 text-emerald-900' : 'bg-red-100 text-red-900'
+                    }`}
+                  >
+                    {customAiTestResult.message || customAiTestResult.error}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* 2. TTS ENGINE & SPEED TAB */}
+      {/* SUBTAB 2: TTS & SPEED */}
       {activeSubTab === 'tts' && (
-        <div className="bg-[#F472B6] border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-5 sm:p-6 flex flex-col gap-5 text-black">
-          <div className="flex flex-wrap items-center justify-between border-b-4 border-black pb-3 gap-3">
-            <div>
-              <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-                TTS Voice Engine & Speed Factor
-              </h3>
-              <p className="text-xs font-bold text-black opacity-80">
-                Choose TTS provider and calibrate numerical slow-speech length factor.
-              </p>
+        <div className="space-y-6">
+          {/* TTS Provider Selection */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div
+              onClick={() => setForm({ ...form, tts: { ...form.tts, provider: 'piper' } })}
+              className={`p-4 border-4 border-black cursor-pointer shadow-[4px_4px_0px_#000000] ${
+                form.tts.provider === 'piper' ? 'bg-[#4ADE80] text-black font-black' : 'bg-white text-black'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-base font-black uppercase">Local Piper TTS</span>
+                <input
+                  type="radio"
+                  name="tts_provider"
+                  checked={form.tts.provider === 'piper'}
+                  onChange={() => {}}
+                  className="w-4 h-4 accent-black"
+                />
+              </div>
+              <p className="text-xs font-bold opacity-90">Fast offline neural speech with American & British voices.</p>
             </div>
 
-            <div className="inline-flex border-4 border-black bg-white p-1 shadow-[3px_3px_0px_#000000]">
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, tts: { ...form.tts, provider: 'piper', engine: 'piper' } })}
-                className={`px-4 py-2 text-xs font-black uppercase tracking-wider cursor-pointer ${
-                  form.tts.provider === 'piper' ? 'bg-[#38BDF8] text-black shadow-inner' : 'bg-zinc-100 text-black hover:bg-zinc-200'
-                }`}
-              >
-                Piper (Offline)
-              </button>
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, tts: { ...form.tts, provider: 'online', engine: 'online' } })}
-                className={`px-4 py-2 text-xs font-black uppercase tracking-wider cursor-pointer ${
-                  form.tts.provider === 'online' ? 'bg-[#38BDF8] text-black shadow-inner' : 'bg-zinc-100 text-black hover:bg-zinc-200'
-                }`}
-              >
-                Online TTS (High Quality)
-              </button>
+            <div
+              onClick={() => setForm({ ...form, tts: { ...form.tts, provider: 'online' } })}
+              className={`p-4 border-4 border-black cursor-pointer shadow-[4px_4px_0px_#000000] ${
+                form.tts.provider === 'online' ? 'bg-[#38BDF8] text-black font-black' : 'bg-white text-black'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-base font-black uppercase">Online TTS</span>
+                <input
+                  type="radio"
+                  name="tts_provider"
+                  checked={form.tts.provider === 'online'}
+                  onChange={() => {}}
+                  className="w-4 h-4 accent-black"
+                />
+              </div>
+              <p className="text-xs font-bold opacity-90">Cloud TTS with zero local Piper setup required.</p>
+            </div>
+
+            <div
+              onClick={() => setForm({ ...form, tts: { ...form.tts, provider: 'custom' } })}
+              className={`p-4 border-4 border-black cursor-pointer shadow-[4px_4px_0px_#000000] ${
+                form.tts.provider === 'custom' || (!['piper', 'online'].includes(form.tts.provider))
+                  ? 'bg-[#C084FC] text-black font-black'
+                  : 'bg-white text-black'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-base font-black uppercase">Custom TTS Provider</span>
+                <input
+                  type="radio"
+                  name="tts_provider"
+                  checked={form.tts.provider === 'custom' || (!['piper', 'online'].includes(form.tts.provider))}
+                  onChange={() => {}}
+                  className="w-4 h-4 accent-black"
+                />
+              </div>
+              <p className="text-xs font-bold opacity-90">OpenAI Speech, ElevenLabs, or Custom Audio Endpoint.</p>
             </div>
           </div>
 
-          {/* TTS SPEED CONFIGURATION (Requirement 5) */}
-          <div className="bg-white p-4 sm:p-5 border-4 border-black space-y-3">
-            <h4 className="text-sm font-black uppercase">TTS Slowdown Factor / Length Scale (Requirement 5)</h4>
-            <p className="text-xs text-zinc-700 font-bold">
-              Configurable slowdown factor for slow pronunciations. In Piper, higher values (e.g. 1.25 or 1.30) stretch phonemes for clearer listening.
-            </p>
+          {/* NUMERIC SLOW SPEED / LENGTH SCALE CONFIGURATION (Requirement 3) */}
+          <div className="bg-white p-5 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-4">
+            <h3 className="font-black text-sm uppercase border-b-2 border-black pb-2 flex items-center gap-2">
+              <Volume2 className="w-4 h-4" />
+              <span>Slow Audio Speed Factor / Length Scale</span>
+            </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
               <div>
-                <label className="block text-xs font-black uppercase mb-1">Slowdown Factor (Length Scale):</label>
+                <label className="block text-xs font-black uppercase mb-1">
+                  Slowdown Factor (Length Scale: {form.tts.slowSpeed}x)
+                </label>
                 <div className="flex items-center gap-3">
                   <input
                     type="range"
                     min="1.05"
-                    max="1.75"
+                    max="1.80"
                     step="0.05"
                     value={form.tts.slowSpeed}
-                    onChange={(e) => setForm({ ...form, tts: { ...form.tts, slowSpeed: parseFloat(e.target.value) } })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        tts: { ...form.tts, slowSpeed: parseFloat(e.target.value) },
+                      })
+                    }
                     className="flex-1 accent-black cursor-pointer"
                   />
-                  <span className="font-mono font-black text-sm bg-black text-[#FFD93D] px-2.5 py-1 border border-black">
-                    {form.tts.slowSpeed.toFixed(2)}x
-                  </span>
+                  <input
+                    type="number"
+                    min="1.05"
+                    max="2.00"
+                    step="0.05"
+                    value={form.tts.slowSpeed}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        tts: { ...form.tts, slowSpeed: parseFloat(e.target.value) || 1.25 },
+                      })
+                    }
+                    className="w-20 bg-zinc-50 text-black text-xs font-mono font-bold p-2 border-2 border-black text-center"
+                  />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-black uppercase mb-1">Normal Speech Factor:</label>
-                <input
-                  type="text"
-                  disabled
-                  value="1.00x (Standard Speed)"
-                  className="w-full bg-zinc-100 text-black p-2 border-2 border-black font-mono text-xs font-bold"
-                />
+              <div className="bg-zinc-50 p-3 border-2 border-black text-xs text-zinc-700 font-bold">
+                💡 Higher value (e.g. 1.25 – 1.40) produces genuinely slower, clearer audio pronunciation for learning.
               </div>
             </div>
           </div>
 
-          {/* PIPER SERVICE & VOICES */}
-          {form.tts.provider === 'piper' && (
-            <div className="bg-white p-4 sm:p-5 border-4 border-black space-y-4">
+          {/* CUSTOM TTS CONFIGURATION & TEST VOICE BUTTON (Requirement 2 & 4) */}
+          {(form.tts.provider === 'custom' || (!['piper', 'online'].includes(form.tts.provider))) && (
+            <div className="bg-white p-5 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-4">
               <div className="flex items-center justify-between border-b-2 border-black pb-2">
-                <span className="font-black text-sm uppercase">Piper Service Control</span>
-                <span className={`px-2.5 py-0.5 text-xs font-black border border-black ${serviceStatus?.active ? 'bg-[#4ADE80]' : 'bg-[#FF4B4B] text-white'}`}>
-                  {serviceStatus?.active ? 'RUNNING' : 'STOPPED'}
-                </span>
+                <h3 className="font-black text-sm uppercase">Custom TTS Provider Settings</h3>
               </div>
 
-              <div className="flex items-center gap-2">
-                {serviceStatus?.active ? (
-                  <button
-                    type="button"
-                    onClick={() => handleToggleService('stop')}
-                    disabled={togglingService}
-                    className="px-4 py-2 bg-[#FF4B4B] text-white font-black text-xs uppercase border-2 border-black cursor-pointer"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black uppercase mb-1">Provider Name</label>
+                  <input
+                    type="text"
+                    value={activeCustomTtsConfig.name}
+                    onChange={(e) => {
+                      const updated = (form.tts.customProviders || [activeCustomTtsConfig]).map((p) =>
+                        p.id === activeCustomTtsConfig.id ? { ...p, name: e.target.value } : p
+                      );
+                      setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
+                    }}
+                    className="w-full bg-zinc-50 text-black text-xs font-bold p-2.5 border-2 border-black"
+                    placeholder="e.g. OpenAI Speech TTS"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black uppercase mb-1">Protocol / Format</label>
+                  <select
+                    value={activeCustomTtsConfig.protocol}
+                    onChange={(e) => {
+                      const updated = (form.tts.customProviders || [activeCustomTtsConfig]).map((p) =>
+                        p.id === activeCustomTtsConfig.id ? { ...p, protocol: e.target.value as any } : p
+                      );
+                      setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
+                    }}
+                    className="w-full bg-zinc-50 text-black text-xs font-bold p-2.5 border-2 border-black cursor-pointer"
                   >
-                    Stop Service
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleToggleService('start')}
-                    disabled={togglingService}
-                    className="px-4 py-2 bg-[#4ADE80] text-black font-black text-xs uppercase border-2 border-black cursor-pointer"
-                  >
-                    Start Service
-                  </button>
-                )}
+                    <option value="openai-speech">OpenAI Speech (/v1/audio/speech)</option>
+                    <option value="elevenlabs">ElevenLabs TTS</option>
+                    <option value="google-translate">Google Translate Web TTS</option>
+                    <option value="piper-http">Piper HTTP Daemon</option>
+                    <option value="custom-http">Custom REST POST/GET</option>
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-black uppercase mb-1">Endpoint URL</label>
+                  <input
+                    type="text"
+                    value={activeCustomTtsConfig.endpoint}
+                    onChange={(e) => {
+                      const updated = (form.tts.customProviders || [activeCustomTtsConfig]).map((p) =>
+                        p.id === activeCustomTtsConfig.id ? { ...p, endpoint: e.target.value } : p
+                      );
+                      setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
+                    }}
+                    className="w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black"
+                    placeholder="https://api.openai.com/v1/audio/speech"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black uppercase mb-1">API Key</label>
+                  <div className="relative">
+                    <input
+                      type={showApiKeyCustomTts ? 'text' : 'password'}
+                      value={activeCustomTtsConfig.apiKey || ''}
+                      onChange={(e) => {
+                        const updated = (form.tts.customProviders || [activeCustomTtsConfig]).map((p) =>
+                          p.id === activeCustomTtsConfig.id ? { ...p, apiKey: e.target.value } : p
+                        );
+                        setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
+                      }}
+                      className="w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black pr-9"
+                      placeholder="sk-..."
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKeyCustomTts(!showApiKeyCustomTts)}
+                      className="absolute right-2.5 top-2.5 text-zinc-500 hover:text-black cursor-pointer"
+                    >
+                      {showApiKeyCustomTts ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black uppercase mb-1">Voice Identifier</label>
+                  <input
+                    type="text"
+                    value={activeCustomTtsConfig.voice}
+                    onChange={(e) => {
+                      const updated = (form.tts.customProviders || [activeCustomTtsConfig]).map((p) =>
+                        p.id === activeCustomTtsConfig.id ? { ...p, voice: e.target.value } : p
+                      );
+                      setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
+                    }}
+                    className="w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black"
+                    placeholder="alloy, nova, echo, rachel..."
+                  />
+                </div>
+              </div>
+
+              {/* TEST VOICE BUTTON WITH GENERIC TEST PHRASE (Requirement 2 & 4) */}
+              <div className="pt-3 border-t-2 border-black flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <button
                   type="button"
-                  onClick={handleTestPiper}
-                  disabled={testingPiper}
-                  className="px-4 py-2 bg-[#38BDF8] text-black font-black text-xs uppercase border-2 border-black cursor-pointer"
+                  onClick={() => handleTestCustomTts(activeCustomTtsConfig)}
+                  disabled={testingCustomTts}
+                  className="px-4 py-2 bg-[#FFD93D] hover:bg-[#ffe066] text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_#000000] flex items-center gap-1.5 cursor-pointer"
                 >
-                  {testingPiper ? 'Testing...' : 'Test Piper TTS'}
+                  {testingCustomTts ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                  <span>Test Voice (Generic Pronunciation Sentence)</span>
                 </button>
-              </div>
-            </div>
-          )}
 
-          {/* ONLINE TTS */}
-          {form.tts.provider === 'online' && (
-            <div className="bg-white p-4 sm:p-5 border-4 border-black space-y-4">
-              <div className="flex items-center justify-between border-b-2 border-black pb-2">
-                <span className="font-black text-sm uppercase">Online English TTS</span>
-                <span className={`px-2.5 py-0.5 text-xs font-black border border-black ${onlineTtsStatus?.connected ? 'bg-[#4ADE80]' : 'bg-[#FF4B4B] text-white'}`}>
-                  {onlineTtsStatus?.connected ? 'ONLINE READY' : 'OFFLINE'}
-                </span>
+                {customTtsTestResult && customTtsTestResult.normalAudioBase64 && (
+                  <div className="flex items-center gap-3 bg-zinc-100 p-2 border-2 border-black">
+                    <span className="text-xs font-black text-emerald-700">✓ Real Audio Generated:</span>
+                    <AudioPlayer base64={customTtsTestResult.normalAudioBase64} label="Normal" />
+                    {customTtsTestResult.slowAudioBase64 && (
+                      <AudioPlayer base64={customTtsTestResult.slowAudioBase64} label="Slow" />
+                    )}
+                  </div>
+                )}
+                {customTtsTestResult && customTtsTestResult.error && (
+                  <div className="text-xs font-bold text-red-600 bg-red-50 p-2 border-2 border-black">
+                    ✕ {customTtsTestResult.error}
+                  </div>
+                )}
               </div>
-              <button
-                type="button"
-                onClick={handleTestOnlineTts}
-                disabled={testingOnlineTts}
-                className="px-4 py-2 bg-[#4ADE80] text-black font-black text-xs uppercase border-2 border-black cursor-pointer"
-              >
-                {testingOnlineTts ? 'Testing...' : 'Test Online TTS (US & UK)'}
-              </button>
             </div>
           )}
         </div>
       )}
 
-      {/* 3. DICTIONARY SOURCES TAB (Requirement 6) */}
+      {/* SUBTAB 3: DICTIONARY SOURCES (Requirement 5 & 6) */}
       {activeSubTab === 'dictionary' && (
-        <div className="bg-[#FACC15] border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-5 sm:p-6 flex flex-col gap-5 text-black">
-          <div className="border-b-4 border-black pb-3">
-            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-              Online & Dictionary Data Sources (Requirement 6)
+        <div className="bg-white p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-5">
+          <div className="border-b-2 border-black pb-2">
+            <h3 className="font-black text-base uppercase flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-[#2563EB]" />
+              <span>Multi-Source Dictionary Configuration</span>
             </h3>
-            <p className="text-xs font-bold text-black opacity-80">
-              Configure data providers for each flashcard field. Priority: User Overrides → Selected Dictionary → AI.
+            <p className="text-xs font-bold text-zinc-600 mt-0.5">
+              Choose the exact information source for each vocabulary field.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold">
-            {/* Persian Meaning Source */}
-            <div className="bg-white p-4 border-4 border-black">
-              <label className="block font-black uppercase mb-1">Persian Meaning Source (معنی فارسی):</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-3.5 bg-zinc-50 border-2 border-black">
+              <label className="block text-xs font-black uppercase mb-1">Persian Meaning Source</label>
               <select
                 value={form.dictionary.meaningFaSource}
-                onChange={(e) => setForm({ ...form, dictionary: { ...form.dictionary, meaningFaSource: e.target.value as any } })}
-                className="w-full bg-zinc-100 p-2 border-2 border-black font-black cursor-pointer"
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    dictionary: { ...form.dictionary, meaningFaSource: e.target.value as any },
+                  })
+                }
+                className="w-full bg-white text-black text-xs font-bold p-2 border-2 border-black cursor-pointer"
               >
-                <option value="ai">AI Provider (Gemini / Ollama)</option>
+                <option value="ai">AI Provider (Configured AI Provider)</option>
                 <option value="abadis">Abadis Persian Dictionary (دیکشنری آبادیس)</option>
                 <option value="freedict">Free Dictionary API</option>
               </select>
-              <span className="text-[10px] text-zinc-600 mt-1 block">
-                Abadis scraper parses rich verified Persian translations.
-              </span>
             </div>
 
-            {/* English Definition Source */}
-            <div className="bg-white p-4 border-4 border-black">
-              <label className="block font-black uppercase mb-1">English Definition & IPA Source:</label>
+            <div className="p-3.5 bg-zinc-50 border-2 border-black">
+              <label className="block text-xs font-black uppercase mb-1">English Definition / IPA Source</label>
               <select
                 value={form.dictionary.definitionEnSource}
-                onChange={(e) => setForm({ ...form, dictionary: { ...form.dictionary, definitionEnSource: e.target.value as any } })}
-                className="w-full bg-zinc-100 p-2 border-2 border-black font-black cursor-pointer"
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    dictionary: { ...form.dictionary, definitionEnSource: e.target.value as any },
+                  })
+                }
+                className="w-full bg-white text-black text-xs font-bold p-2 border-2 border-black cursor-pointer"
               >
-                <option value="ai">AI Provider (Gemini / Ollama)</option>
-                <option value="freedict">Free Dictionary API (Real IPA & Definitions)</option>
-                <option value="wiktionary">Wiktionary Public API</option>
+                <option value="ai">AI Provider</option>
+                <option value="freedict">Free Dictionary API</option>
+                <option value="wiktionary">Wiktionary API</option>
               </select>
             </div>
           </div>
 
-          {/* Dictionary Lookup Test */}
-          <div className="bg-white p-4 border-4 border-black space-y-3">
-            <h4 className="text-sm font-black uppercase">Test Dictionary Sources</h4>
+          {/* Interactive Dictionary Live Test */}
+          <div className="p-4 bg-blue-50 border-2 border-black space-y-3">
+            <span className="text-xs font-black uppercase text-blue-900 block">
+              Live Dictionary Source Test (Abadis & Free Dictionary)
+            </span>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={dictTestWord}
                 onChange={(e) => setDictTestWord(e.target.value)}
-                className="flex-1 bg-zinc-100 p-2 border-2 border-black font-bold text-xs"
-                placeholder="e.g. apple, accurate..."
+                className="bg-white text-black text-xs font-bold p-2 border-2 border-black w-40"
+                placeholder="e.g. apple, bank"
               />
               <button
                 type="button"
-                onClick={handleTestDictionary}
+                onClick={async () => {
+                  setTestingDict(true);
+                  const res = await lookupAbadisDict(dictTestWord);
+                  setDictTestResult(res);
+                  setTestingDict(false);
+                }}
                 disabled={testingDict}
-                className="px-4 py-2 bg-[#38BDF8] text-black font-black text-xs uppercase border-2 border-black cursor-pointer"
+                className="px-3 py-1.5 bg-[#FFD93D] text-black font-black text-xs uppercase border-2 border-black cursor-pointer"
               >
-                {testingDict ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Lookup Sources'}
+                Test Abadis
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setTestingDict(true);
+                  const res = await lookupFreeDict(dictTestWord);
+                  setDictTestResult(res);
+                  setTestingDict(false);
+                }}
+                disabled={testingDict}
+                className="px-3 py-1.5 bg-white text-black font-black text-xs uppercase border-2 border-black cursor-pointer"
+              >
+                Test FreeDict
               </button>
             </div>
-
             {dictTestResult && (
-              <div className="bg-zinc-50 p-3 border-2 border-black text-xs font-mono">
-                <pre className="overflow-x-auto">{JSON.stringify(dictTestResult, null, 2)}</pre>
-              </div>
+              <pre className="p-2.5 bg-white text-black text-[11px] font-mono border-2 border-black overflow-x-auto max-h-40">
+                {JSON.stringify(dictTestResult, null, 2)}
+              </pre>
             )}
           </div>
         </div>
       )}
 
-      {/* 4. SMART IMAGES TAB (Requirement 7) */}
+      {/* SUBTAB 4: SMART IMAGES (Requirement 7, 8, 9, 10) */}
       {activeSubTab === 'smartImages' && (
-        <div className="bg-[#FB923C] border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-5 sm:p-6 flex flex-col gap-5 text-black">
-          <div className="border-b-4 border-black pb-3">
-            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-              Smart Images in Online Mode (Requirement 7)
+        <div className="bg-white p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-5">
+          <div className="border-b-2 border-black pb-2">
+            <h3 className="font-black text-base uppercase flex items-center gap-2">
+              <ImageIcon className="w-5 h-5 text-emerald-600" />
+              <span>Smart Images Configuration</span>
             </h3>
-            <p className="text-xs font-bold text-black opacity-80">
-              AI automatically determines if a word represents a concrete object and attaches real public domain images.
+            <p className="text-xs font-bold text-zinc-600 mt-0.5">
+              Automatically evaluates whether words represent concrete physical objects vs abstract concepts.
             </p>
           </div>
 
-          <div className="bg-white p-4 sm:p-5 border-4 border-black space-y-4">
-            <label className="flex items-center gap-3 cursor-pointer select-none">
+          <div className="space-y-4">
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={form.smartImages.enabled}
-                onChange={(e) => setForm({ ...form, smartImages: { ...form.smartImages, enabled: e.target.checked } })}
-                className="w-5 h-5 accent-black cursor-pointer"
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    smartImages: { ...form.smartImages, enabled: e.target.checked },
+                  })
+                }
+                className="w-4 h-4 accent-black"
               />
-              <div>
-                <span className="font-black text-sm uppercase block">
-                  Automatically add useful images in online mode
-                </span>
-                <span className="text-xs text-zinc-600 font-bold block">
-                  Concrete nouns (e.g. eraser, telescope, bicycle) get images downloaded and stored in Anki media. Abstract concepts (e.g. abandon, freedom) are kept clean.
-                </span>
-              </div>
+              <span className="text-xs font-black uppercase">
+                Automatically decide whether an image is useful for each vocabulary word
+              </span>
             </label>
-          </div>
 
-          {/* Test Smart Image */}
-          <div className="bg-white p-4 border-4 border-black space-y-3">
-            <h4 className="text-sm font-black uppercase">Test Smart Image Decision & Search</h4>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={imgTestWord}
-                onChange={(e) => setImgTestWord(e.target.value)}
-                className="flex-1 bg-zinc-100 p-2 border-2 border-black font-bold text-xs"
-                placeholder="e.g. eraser, telescope, abandon..."
-              />
-              <button
-                type="button"
-                onClick={handleTestSmartImage}
-                disabled={testingImg}
-                className="px-4 py-2 bg-[#4ADE80] text-black font-black text-xs uppercase border-2 border-black cursor-pointer"
-              >
-                {testingImg ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Evaluate Image'}
-              </button>
-            </div>
-
-            {imgTestResult && (
-              <div className="bg-zinc-50 p-3 border-2 border-black text-xs font-bold">
-                <p>Needs Image: <span className={imgTestResult.needsImage ? 'text-emerald-600' : 'text-zinc-600'}>{imgTestResult.needsImage ? 'YES' : 'NO'}</span></p>
-                <p>Reason: {imgTestResult.reason}</p>
-                {imgTestResult.imageBase64 && (
-                  <div className="mt-2">
-                    <img src={`data:image/jpeg;base64,${imgTestResult.imageBase64}`} className="max-w-[200px] border-2 border-black" alt="test" />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 5. DEFAULT CARD SETTINGS TAB (Requirement 4 & 1) */}
-      {activeSubTab === 'defaultCard' && (
-        <div className="bg-[#A78BFA] border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-5 sm:p-6 flex flex-col gap-5 text-black">
-          <div className="border-b-4 border-black pb-3">
-            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-              Default Card & Audio Selection (Requirement 4)
-            </h3>
-            <p className="text-xs font-bold text-black opacity-80">
-              Configure default flashcard type and choose which audio clips to synthesize.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Default Card Type */}
-            <div className="bg-white p-4 border-4 border-black space-y-2">
-              <h4 className="text-sm font-black uppercase">Default Card Type (Requirement 2)</h4>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, defaultCard: { ...form.defaultCard, cardType: 'normal' } })}
-                  className={`py-2 px-3 border-2 border-black font-black text-xs uppercase cursor-pointer ${
-                    form.defaultCard.cardType === 'normal' ? 'bg-[#4ADE80] text-black ring-2 ring-black' : 'bg-zinc-100'
-                  }`}
-                >
-                  Normal Card
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, defaultCard: { ...form.defaultCard, cardType: 'spelling' } })}
-                  className={`py-2 px-3 border-2 border-black font-black text-xs uppercase cursor-pointer ${
-                    form.defaultCard.cardType === 'spelling' ? 'bg-[#C084FC] text-black ring-2 ring-black' : 'bg-zinc-100'
-                  }`}
-                >
-                  Spelling Card
-                </button>
-              </div>
-            </div>
-
-            {/* Duplicate Settings (Requirement 1) */}
-            <div className="bg-white p-4 border-4 border-black space-y-2">
-              <h4 className="text-sm font-black uppercase">Word Duplicate Handling (Requirement 1)</h4>
-              <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold">
-                <input
-                  type="checkbox"
-                  checked={form.defaultCard.allowDuplicateWords}
-                  onChange={(e) => setForm({ ...form, defaultCard: { ...form.defaultCard, allowDuplicateWords: e.target.checked } })}
-                  className="w-4 h-4 accent-black"
-                />
-                <span>Allow multiple cards for the same word (e.g. bank → بانک, bank → ساحل)</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Granular Audio Checkboxes (Requirement 4) */}
-          <div className="bg-white p-4 sm:p-5 border-4 border-black space-y-3">
-            <h4 className="text-sm font-black uppercase">Audio Selection (Requirement 4)</h4>
-            <p className="text-xs text-zinc-600 font-bold">
-              Only checked audio files will be generated and stored with your Anki cards.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs font-bold">
-              <label className="flex items-center gap-2 p-2 bg-zinc-50 border border-black cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.tts.generateAmericanNormal}
-                  onChange={(e) => setForm({ ...form, tts: { ...form.tts, generateAmericanNormal: e.target.checked } })}
-                  className="w-4 h-4 accent-black"
-                />
-                <span>🇺🇸 American Normal</span>
-              </label>
-
-              <label className="flex items-center gap-2 p-2 bg-zinc-50 border border-black cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.tts.generateAmericanSlow}
-                  onChange={(e) => setForm({ ...form, tts: { ...form.tts, generateAmericanSlow: e.target.checked } })}
-                  className="w-4 h-4 accent-black"
-                />
-                <span>🇺🇸 American Slow</span>
-              </label>
-
-              <label className="flex items-center gap-2 p-2 bg-zinc-50 border border-black cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.tts.generateBritishNormal}
-                  onChange={(e) => setForm({ ...form, tts: { ...form.tts, generateBritishNormal: e.target.checked } })}
-                  className="w-4 h-4 accent-black"
-                />
-                <span>🇬🇧 British Normal</span>
-              </label>
-
-              <label className="flex items-center gap-2 p-2 bg-zinc-50 border border-black cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.tts.generateBritishSlow}
-                  onChange={(e) => setForm({ ...form, tts: { ...form.tts, generateBritishSlow: e.target.checked } })}
-                  className="w-4 h-4 accent-black"
-                />
-                <span>🇬🇧 British Slow</span>
-              </label>
-
-              <label className="flex items-center gap-2 p-2 bg-zinc-50 border border-black cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.tts.generateExampleUs}
-                  onChange={(e) => setForm({ ...form, tts: { ...form.tts, generateExampleUs: e.target.checked } })}
-                  className="w-4 h-4 accent-black"
-                />
-                <span>🇺🇸 American Example Audio</span>
-              </label>
-
-              <label className="flex items-center gap-2 p-2 bg-zinc-50 border border-black cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.tts.generateExampleUk}
-                  onChange={(e) => setForm({ ...form, tts: { ...form.tts, generateExampleUk: e.target.checked } })}
-                  className="w-4 h-4 accent-black"
-                />
-                <span>🇬🇧 British Example Audio</span>
-              </label>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 6. 10 CARD THEMES & INTERACTIVE PREVIEW TAB (Requirement 8, 9, 10, 11) */}
-      {activeSubTab === 'appearance' && (
-        <div className="bg-[#C084FC] border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-5 sm:p-6 flex flex-col gap-6 text-black">
-          <div className="border-b-4 border-black pb-3">
-            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-              10 Genuinely Different Card Designs (Requirement 8 & 10)
-            </h3>
-            <p className="text-xs font-bold text-black opacity-80">
-              5 Light + 5 Dark completely distinct layouts, typographies, and visual hierarchies.
-            </p>
-          </div>
-
-          {/* LIGHT DESIGNS */}
-          <div>
-            <h4 className="text-sm font-black uppercase mb-3 flex items-center gap-2">
-              <span className="w-3 h-3 bg-white border-2 border-black" />
-              <span>5 Light Card Designs</span>
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {THEME_GROUPS.light.map((t) => (
-                <div
-                  key={t.id}
-                  onClick={() => setForm({ ...form, theme: t.id as ThemeId })}
-                  className={`p-3 border-3 border-black cursor-pointer transition-all ${
-                    form.theme === t.id
-                      ? 'bg-white text-black shadow-[4px_4px_0px_#000000] -translate-y-1 ring-2 ring-black'
-                      : 'bg-zinc-100 text-black hover:bg-white opacity-85 hover:opacity-100'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-black uppercase">{t.name}</span>
-                    {form.theme === t.id && (
-                      <span className="text-[10px] bg-[#4ADE80] text-black font-black px-1.5 py-0.2 border border-black">
-                        SELECTED
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-zinc-600 font-bold">{t.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* DARK DESIGNS */}
-          <div>
-            <h4 className="text-sm font-black uppercase mb-3 flex items-center gap-2">
-              <span className="w-3 h-3 bg-black border-2 border-white" />
-              <span>5 Dark Card Designs</span>
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {THEME_GROUPS.dark.map((t) => (
-                <div
-                  key={t.id}
-                  onClick={() => setForm({ ...form, theme: t.id as ThemeId })}
-                  className={`p-3 border-3 border-black cursor-pointer transition-all ${
-                    form.theme === t.id
-                      ? 'bg-black text-white shadow-[4px_4px_0px_#FFD93D] -translate-y-1 ring-2 ring-yellow-400'
-                      : 'bg-zinc-900 text-white hover:bg-zinc-800 opacity-85 hover:opacity-100'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-black uppercase text-[#FFD93D]">{t.name}</span>
-                    {form.theme === t.id && (
-                      <span className="text-[10px] bg-[#FFD93D] text-black font-black px-1.5 py-0.2 border border-black">
-                        SELECTED
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-zinc-300 font-bold">{t.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* LIVE REAL INTERACTIVE THEME PREVIEW CANVAS (Requirement 10) */}
-          <div className="bg-white p-4 sm:p-5 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-3">
-            <h4 className="text-sm font-black uppercase flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#FF4B4B]" />
-              <span>Live Interactive Theme Preview ({THEMES[form.theme]?.name})</span>
-            </h4>
-            <p className="text-xs text-zinc-600 font-bold">
-              Test Normal & Spelling interaction, audio triggers, and responsive layout exactly as rendered in Anki & AnkiDroid.
-            </p>
-
-            <div className="bg-zinc-100 p-4 border-2 border-black">
-              <CardPreview
-                cardData={null}
-                themeId={form.theme}
-                cardType={form.defaultCard.cardType}
-                emptyWordPlaceholder="eraser"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 7. ANKICONNECT TAB */}
-      {activeSubTab === 'anki' && (
-        <div className="bg-[#4ADE80] border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-5 sm:p-6 flex flex-col gap-5 text-black">
-          <div className="flex items-center justify-between border-b-4 border-black pb-3">
-            <div>
-              <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-                AnkiConnect Integration
-              </h3>
-              <p className="text-xs font-bold text-black opacity-80">
-                Direct card creation, media syncing, and comic template setup in Anki.
-              </p>
-            </div>
-            <span className={`px-3 py-1 text-xs font-black border-2 border-black ${ankiStatus?.connected ? 'bg-white' : 'bg-[#FF4B4B] text-white'}`}>
-              {ankiStatus?.connected ? `● Anki v${ankiStatus.version}` : '○ Unreachable'}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold">
-            <div className="bg-white p-4 border-4 border-black">
-              <label className="block font-black uppercase mb-1">AnkiConnect URL:</label>
-              <input
-                type="text"
-                value={form.anki.url}
-                onChange={(e) => setForm({ ...form, anki: { ...form.anki, url: e.target.value } })}
-                className="w-full bg-zinc-100 p-2 border-2 border-black font-mono focus:outline-none"
-              />
-            </div>
-
-            <div className="bg-white p-4 border-4 border-black">
-              <label className="block font-black uppercase mb-1">Default Deck:</label>
-              {ankiDecks.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-black uppercase mb-1">Image Decision Provider</label>
                 <select
-                  value={form.anki.defaultDeck}
-                  onChange={(e) => setForm({ ...form, anki: { ...form.anki, defaultDeck: e.target.value } })}
-                  className="w-full bg-zinc-100 p-2 border-2 border-black font-black cursor-pointer"
+                  value={form.smartImages.decisionProvider || 'heuristic'}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      smartImages: { ...form.smartImages, decisionProvider: e.target.value },
+                    })
+                  }
+                  className="w-full bg-zinc-50 text-black text-xs font-bold p-2.5 border-2 border-black cursor-pointer"
                 >
-                  {ankiDecks.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
+                  <option value="heuristic">Smart Concrete/Abstract Heuristic (Fast & Reliable)</option>
+                  <option value="ollama">Ollama AI Decision</option>
+                  <option value="gemini">Gemini AI Decision</option>
+                  <option value="custom">Custom AI Decision</option>
                 </select>
-              ) : (
+              </div>
+
+              <div>
+                <label className="block text-xs font-black uppercase mb-1">Image Search Provider</label>
+                <select
+                  value={form.smartImages.searchProvider || 'wikimedia'}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      smartImages: { ...form.smartImages, searchProvider: e.target.value as any },
+                    })
+                  }
+                  className="w-full bg-zinc-50 text-black text-xs font-bold p-2.5 border-2 border-black cursor-pointer"
+                >
+                  <option value="wikimedia">Wikimedia Commons / Wikipedia (Public Domain / CC)</option>
+                  <option value="google">Google Image Search API</option>
+                  <option value="custom">Custom Image Search API</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Live Image Test */}
+            <div className="p-4 bg-emerald-50 border-2 border-black space-y-3">
+              <span className="text-xs font-black uppercase text-emerald-900 block">
+                Test Smart Image Decision & Retrieval
+              </span>
+              <div className="flex gap-2">
                 <input
                   type="text"
-                  value={form.anki.defaultDeck}
-                  onChange={(e) => setForm({ ...form, anki: { ...form.anki, defaultDeck: e.target.value } })}
-                  className="w-full bg-zinc-100 p-2 border-2 border-black font-black"
+                  value={imgTestWord}
+                  onChange={(e) => setImgTestWord(e.target.value)}
+                  className="bg-white text-black text-xs font-bold p-2 border-2 border-black w-44"
+                  placeholder="e.g. eraser, apple, abandon"
                 />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setTestingImg(true);
+                    const res = await testSmartImage(imgTestWord);
+                    setImgTestResult(res);
+                    setTestingImg(false);
+                  }}
+                  disabled={testingImg}
+                  className="px-4 py-2 bg-[#FFD93D] text-black font-black text-xs uppercase border-2 border-black cursor-pointer flex items-center gap-1.5"
+                >
+                  {testingImg ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                  <span>Evaluate Word</span>
+                </button>
+              </div>
+
+              {imgTestResult && (
+                <div className="bg-white p-3 border-2 border-black flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  {imgTestResult.imageBase64 && (
+                    <img
+                      src={`data:image/jpeg;base64,${imgTestResult.imageBase64}`}
+                      alt="Preview"
+                      className="w-24 h-24 object-cover border-2 border-black"
+                    />
+                  )}
+                  <div className="text-xs">
+                    <div className="font-black text-black">
+                      Needs Image: {imgTestResult.needsImage ? '✓ YES (Concrete)' : '✕ NO (Abstract/Verb)'}
+                    </div>
+                    <div className="text-zinc-600 mt-1">{imgTestResult.reason}</div>
+                    {imgTestResult.imageFileName && (
+                      <div className="text-[10px] font-mono text-zinc-500 mt-1">
+                        Saved as: {imgTestResult.imageFileName}
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           </div>
-
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={handleTestAnkiConn}
-              disabled={testingAnkiConn}
-              className="flex-1 py-2.5 px-4 bg-white text-black font-black text-xs uppercase border-3 border-black shadow-[2px_2px_0px_#000000] cursor-pointer"
-            >
-              Test Connection
-            </button>
-            <button
-              type="button"
-              onClick={handleSyncAnkiModel}
-              className="flex-1 py-2.5 px-4 bg-black text-white font-black text-xs uppercase border-3 border-black shadow-[2px_2px_0px_#000000] cursor-pointer"
-            >
-              Sync Theme CSS & Templates
-            </button>
-          </div>
-
-          {ankiModelSyncMsg && (
-            <div className="p-3 bg-white border-4 border-black text-black font-black text-xs">
-              {ankiModelSyncMsg}
-            </div>
-          )}
         </div>
       )}
 
-      {/* 8. DIAGNOSTICS TAB */}
-      {activeSubTab === 'diagnostics' && (
-        <div className="bg-[#FF4B4B] border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-5 sm:p-6 flex flex-col gap-5 text-white">
-          <div className="flex items-center justify-between border-b-4 border-black pb-3">
+      {/* SUBTAB 5: DEFAULT CARD SETTINGS */}
+      {activeSubTab === 'defaultCard' && (
+        <div className="bg-white p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-5">
+          <div className="border-b-2 border-black pb-2">
+            <h3 className="font-black text-base uppercase flex items-center gap-2">
+              <CheckSquare className="w-5 h-5" />
+              <span>Default Card & Audio Selection Settings</span>
+            </h3>
+          </div>
+
+          <div className="space-y-4">
             <div>
-              <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-                Full System Diagnostics
-              </h3>
-              <p className="text-xs font-bold text-white opacity-90">
-                Rigorous real-time check across AI, TTS, AnkiConnect, and 10 Card Templates.
-              </p>
+              <label className="block text-xs font-black uppercase mb-1">Default Flashcard Type</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="flex items-center gap-2 p-3 border-2 border-black bg-zinc-50 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="card_type"
+                    checked={form.defaultCard.cardType === 'normal'}
+                    onChange={() =>
+                      setForm({
+                        ...form,
+                        defaultCard: { ...form.defaultCard, cardType: 'normal' },
+                      })
+                    }
+                    className="w-4 h-4 accent-black"
+                  />
+                  <span className="text-xs font-black uppercase">Normal Vocabulary Card</span>
+                </label>
+                <label className="flex items-center gap-2 p-3 border-2 border-black bg-zinc-50 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="card_type"
+                    checked={form.defaultCard.cardType === 'spelling'}
+                    onChange={() =>
+                      setForm({
+                        ...form,
+                        defaultCard: { ...form.defaultCard, cardType: 'spelling' },
+                      })
+                    }
+                    className="w-4 h-4 accent-black"
+                  />
+                  <span className="text-xs font-black uppercase">Interactive Spelling Challenge</span>
+                </label>
+              </div>
             </div>
+
+            <div className="pt-3 border-t-2 border-black">
+              <span className="text-xs font-black uppercase block mb-2">
+                Audio Generation Checkboxes (Only selected files are generated)
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.tts.generateAmericanNormal}
+                    onChange={(e) =>
+                      setForm({ ...form, tts: { ...form.tts, generateAmericanNormal: e.target.checked } })
+                    }
+                    className="w-4 h-4 accent-black"
+                  />
+                  <span className="text-xs font-bold">🇺🇸 American Normal</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.tts.generateAmericanSlow}
+                    onChange={(e) =>
+                      setForm({ ...form, tts: { ...form.tts, generateAmericanSlow: e.target.checked } })
+                    }
+                    className="w-4 h-4 accent-black"
+                  />
+                  <span className="text-xs font-bold">🇺🇸 American Slow</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.tts.generateBritishNormal}
+                    onChange={(e) =>
+                      setForm({ ...form, tts: { ...form.tts, generateBritishNormal: e.target.checked } })
+                    }
+                    className="w-4 h-4 accent-black"
+                  />
+                  <span className="text-xs font-bold">🇬🇧 British Normal</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.tts.generateBritishSlow}
+                    onChange={(e) =>
+                      setForm({ ...form, tts: { ...form.tts, generateBritishSlow: e.target.checked } })
+                    }
+                    className="w-4 h-4 accent-black"
+                  />
+                  <span className="text-xs font-bold">🇬🇧 British Slow</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.tts.generateExampleUs}
+                    onChange={(e) =>
+                      setForm({ ...form, tts: { ...form.tts, generateExampleUs: e.target.checked } })
+                    }
+                    className="w-4 h-4 accent-black"
+                  />
+                  <span className="text-xs font-bold">🇺🇸 Sentence Audio</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.tts.generateExampleUk}
+                    onChange={(e) =>
+                      setForm({ ...form, tts: { ...form.tts, generateExampleUk: e.target.checked } })
+                    }
+                    className="w-4 h-4 accent-black"
+                  />
+                  <span className="text-xs font-bold">🇬🇧 UK Sentence</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUBTAB 6: APPEARANCE & 10 THEMES */}
+      {activeSubTab === 'appearance' && (
+        <div className="space-y-6">
+          <div className="bg-white p-5 border-4 border-black shadow-[6px_6px_0px_#000000]">
+            <h3 className="font-black text-sm uppercase mb-3">Select One of 10 Distinct Card Themes</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {Object.keys(THEMES).map((themeKey) => {
+                const th = THEMES[themeKey as ThemeId];
+                if (!th) return null;
+                const isSelected = form.theme === themeKey;
+                return (
+                  <button
+                    key={themeKey}
+                    type="button"
+                    onClick={() => setForm({ ...form, theme: themeKey as ThemeId })}
+                    className={`p-3 border-3 border-black text-left cursor-pointer transition-transform ${
+                      isSelected
+                        ? 'bg-black text-[#FFD93D] shadow-[3px_3px_0px_#FFD93D] -translate-y-0.5'
+                        : 'bg-zinc-50 hover:bg-zinc-100 text-black'
+                    }`}
+                  >
+                    <div className="text-xs font-black truncate">{th.name}</div>
+                    <div className="text-[10px] opacity-80 mt-1">{themeKey.includes('dark') ? '🌙 Dark' : '☀️ Light'}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Live Card Preview */}
+          <div className="bg-[#F5F2EB] p-4 sm:p-6 border-4 border-black shadow-[6px_6px_0px_#000000]">
+            <CardPreview
+              cardData={{
+                word: 'abandon',
+                phonetic: '/əˈbændən/',
+                partOfSpeech: 'verb',
+                meaningFa: 'ترک کردن، رها کردن',
+                example: 'He had to abandon his car in the heavy snowstorm.',
+                translationFa: 'او مجبور شد ماشین خود را در کولاک شدید رها کند.',
+                mnemonic: 'A-BAND-ON: The band put their instruments on the ground and abandoned the concert.',
+                cardType: form.defaultCard.cardType,
+                spellingSentence: 'He had to ______ his car in the heavy snowstorm.',
+              }}
+              themeId={form.theme}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* SUBTAB 7: ANKICONNECT */}
+      {activeSubTab === 'anki' && (
+        <div className="bg-white p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-4">
+          <h3 className="font-black text-sm uppercase border-b-2 border-black pb-2">AnkiConnect Settings</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-black uppercase mb-1">AnkiConnect URL</label>
+              <input
+                type="text"
+                value={form.anki.url || 'http://127.0.0.1:8765'}
+                onChange={(e) => setForm({ ...form, anki: { ...form.anki, url: e.target.value } })}
+                className="w-full bg-zinc-50 text-black text-xs font-mono font-bold p-2.5 border-2 border-black"
+                placeholder="http://127.0.0.1:8765"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-black uppercase mb-1">Default Target Deck</label>
+              <input
+                type="text"
+                value={form.anki.defaultDeck || 'English::B1'}
+                onChange={(e) => setForm({ ...form, anki: { ...form.anki, defaultDeck: e.target.value } })}
+                className="w-full bg-zinc-50 text-black text-xs font-bold p-2.5 border-2 border-black"
+                placeholder="English::B1"
+              />
+            </div>
+          </div>
+
+          <div className="pt-3 border-t-2 border-black flex items-center gap-3">
             <button
               type="button"
-              onClick={handleRunFullDiagnostics}
-              disabled={runningDiag}
-              className="px-4 py-2 bg-white text-black font-black text-xs uppercase border-3 border-black shadow-[2px_2px_0px_#000000] cursor-pointer"
+              onClick={handleSyncAnkiModel}
+              className="px-4 py-2 bg-[#FFD93D] hover:bg-[#ffe066] text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_#000000] flex items-center gap-1.5 cursor-pointer"
             >
-              {runningDiag ? 'Running...' : 'Run Diagnostics'}
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Sync Note Model & Templates with Anki</span>
+            </button>
+            {ankiModelSyncMsg && <span className="text-xs font-bold text-black">{ankiModelSyncMsg}</span>}
+          </div>
+        </div>
+      )}
+
+      {/* SUBTAB 8: DIAGNOSTICS */}
+      {activeSubTab === 'diagnostics' && (
+        <div className="bg-white p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-4">
+          <div className="flex items-center justify-between border-b-2 border-black pb-2">
+            <h3 className="font-black text-sm uppercase">Full System Diagnostics</h3>
+            <button
+              type="button"
+              onClick={async () => {
+                setRunningDiag(true);
+                const rep = await runFullDiagnostics();
+                setFullReport(rep);
+                setRunningDiag(false);
+              }}
+              disabled={runningDiag}
+              className="px-3 py-1.5 bg-[#FFD93D] text-black font-black text-xs uppercase border-2 border-black cursor-pointer flex items-center gap-1.5"
+            >
+              {runningDiag ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+              <span>Run Diagnostic Test</span>
             </button>
           </div>
 
           {fullReport && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold text-black">
-              <div className="bg-white p-4 border-4 border-black">
-                <span className="font-black uppercase block mb-2 border-b-2 border-black pb-1">System Core</span>
-                {fullReport.system.map((item, i) => (
-                  <div key={i} className="flex items-center gap-2 mb-1">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>{item.name}: {item.message}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-white p-4 border-4 border-black">
-                <span className="font-black uppercase block mb-2 border-b-2 border-black pb-1">AI Provider</span>
-                {fullReport.ai.map((item, i) => (
-                  <div key={i} className="flex items-center gap-2 mb-1">
-                    {item.status === 'ok' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <XCircle className="w-4 h-4 text-red-600" />}
-                    <span>{item.name}: {item.message}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-white p-4 border-4 border-black">
-                <span className="font-black uppercase block mb-2 border-b-2 border-black pb-1">TTS Voice Engine</span>
-                {fullReport.tts.map((item, i) => (
-                  <div key={i} className="flex items-center gap-2 mb-1">
-                    {item.status === 'ok' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <XCircle className="w-4 h-4 text-red-600" />}
-                    <span>{item.name}: {item.message}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-white p-4 border-4 border-black">
-                <span className="font-black uppercase block mb-2 border-b-2 border-black pb-1">AnkiConnect</span>
-                {fullReport.anki.map((item, i) => (
-                  <div key={i} className="flex items-center gap-2 mb-1">
-                    {item.status === 'ok' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <XCircle className="w-4 h-4 text-red-600" />}
-                    <span>{item.name}: {item.message}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <pre className="p-3 bg-zinc-50 text-black text-xs font-mono border-2 border-black overflow-x-auto max-h-72">
+              {JSON.stringify(fullReport, null, 2)}
+            </pre>
           )}
         </div>
       )}
 
-      {/* 9. SETUP & ANKIDROID GUIDE TAB */}
+      {/* SUBTAB 9: USER GUIDE */}
       {activeSubTab === 'guide' && (
-        <div className="bg-[#2DD4BF] border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-5 sm:p-6 flex flex-col gap-5 text-black text-xs font-bold">
-          <div className="border-b-4 border-black pb-3">
-            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-              Setup & AnkiDroid Guide
-            </h3>
-            <p className="text-xs font-bold text-black opacity-80">
-              Instructions for Desktop, AnkiDroid, Spelling cards, and TTS.
-            </p>
-          </div>
-
-          <div className="bg-white p-4 border-4 border-black space-y-2">
-            <h4 className="font-black uppercase text-sm">Interactive Spelling Cards in Anki & AnkiDroid (Requirement 2 & 12)</h4>
-            <p className="text-zinc-700">
-              Spelling cards work seamlessly in both Anki Desktop and AnkiDroid without requiring any external plugins.
-            </p>
-            <ul className="list-disc list-inside space-y-1 text-zinc-800">
-              <li><b>On Front:</b> Type your spelling in the input box and tap <b>[ CHECK ]</b>.</li>
-              <li><b>Instant Feedback:</b> Green success state on correct spelling, or clear strikethrough comparison with correct word on spelling mistake.</li>
-              <li><b>AnkiDroid Safe:</b> Word break bug fixes prevent single letter line wrapping on all mobile screens.</li>
-            </ul>
-          </div>
+        <div className="bg-white p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_#000000] space-y-4 text-xs font-bold leading-relaxed text-black">
+          <h3 className="font-black text-sm uppercase border-b-2 border-black pb-2">Comprehensive Guide</h3>
+          <p>
+            • <strong>AI Providers:</strong> Use local Ollama for complete privacy, Google Gemini for cloud speed, or add any custom OpenAI-compatible endpoint (OpenRouter, Groq, DeepSeek).
+          </p>
+          <p>
+            • <strong>TTS & Speed:</strong> Piper runs offline with American & British voices. Adjust the Slowdown factor to generate genuinely slower pronunciations. Test audio using the generic pronunciation test sentence.
+          </p>
+          <p>
+            • <strong>Smart Images:</strong> Concrete physical objects (animals, tools, places) automatically receive high-quality public domain illustrations from Wikimedia Commons/Google, while abstract concepts remain clean.
+          </p>
+          <p>
+            • <strong>Anki Appearance:</strong> The exact HTML & CSS is directly synchronized to the Anki note model, ensuring cards in Anki Desktop and AnkiDroid match the live preview pixel-for-pixel.
+          </p>
         </div>
       )}
     </div>

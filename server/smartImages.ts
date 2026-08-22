@@ -1,6 +1,10 @@
 import https from 'https';
 import http from 'http';
 import crypto from 'crypto';
+import { SmartImagesConfig, AppSettings } from '../src/types';
+import { generateWithOllama } from './ollama';
+import { generateWithGemini } from './gemini';
+import { generateWithCustomAI } from './customAi';
 
 export interface SmartImageDecision {
   needsImage: boolean;
@@ -16,64 +20,157 @@ export interface SmartImageResult {
   imageBase64?: string;
   imageFileName?: string;
   imageUrl?: string;
+  providerUsed?: string;
   error?: string;
 }
 
-/**
- * Heuristic list of abstract words/suffixes that typically DO NOT benefit from an image
- */
+// Known abstract suffixes
 const ABSTRACT_SUFFIXES = [
   'ness', 'ment', 'tion', 'sion', 'ity', 'ship', 'ism', 'ance', 'ence', 'hood',
-  'dom', 'ology', 'able', 'ible', 'less', 'ous', 'ful'
+  'dom', 'ology', 'able', 'ible', 'less', 'ous', 'ful', 'ive', 'al', 'ic', 'ary'
 ];
 
-const COMMON_CONCRETE_CATEGORIES = [
-  'animal', 'food', 'fruit', 'vegetable', 'tool', 'vehicle', 'furniture', 'clothing',
-  'body part', 'device', 'instrument', 'plant', 'building', 'object', 'flower'
+// Concrete physical categories
+const CONCRETE_KEYWORDS = [
+  'fruit', 'vegetable', 'animal', 'bird', 'fish', 'insect', 'tool', 'device',
+  'instrument', 'vehicle', 'car', 'plane', 'boat', 'furniture', 'clothing',
+  'shoe', 'hat', 'flower', 'tree', 'plant', 'organ', 'body part', 'building',
+  'monument', 'landmark', 'volcano', 'mountain', 'island', 'food', 'dish',
+  'drink', 'machine', 'weapon', 'furniture', 'mineral', 'rock', 'toy', 'planet'
 ];
+
+// Specific known words override
+const CONCRETE_EXACT_WORDS = new Set([
+  'eraser', 'apple', 'telescope', 'microscope', 'bicycle', 'car', 'airplane',
+  'lion', 'elephant', 'penguin', 'astronaut', 'surgeon', 'volcano', 'pyramid',
+  'guitar', 'piano', 'hammer', 'screwdriver', 'clock', 'compass', 'backpack',
+  'umbrella', 'mirror', 'candle', 'key', 'cup', 'bottle', 'bridge', 'castle',
+  'banana', 'orange', 'strawberry', 'tomato', 'potato', 'onion', 'bread'
+]);
+
+const ABSTRACT_EXACT_WORDS = new Set([
+  'abandon', 'freedom', 'justice', 'happiness', 'diligence', 'concept', 'philosophy',
+  'accurate', 'ancient', 'consider', 'hesitate', 'evaluate', 'postpone', 'subsequent',
+  'substantial', 'ambiguous', 'crucial', 'inevitable', 'knowledge', 'wisdom', 'peace'
+]);
 
 /**
- * Determine if a word is concrete and benefits from a smart image.
- * Uses word POS, heuristics, or AI analysis.
+ * Robust heuristic evaluation of whether a vocabulary word benefits from an image.
  */
-export function evaluateWordNeedsImage(
+export function evaluateWordNeedsImageHeuristic(
   word: string,
   partOfSpeech: string = '',
   meaningFa: string = ''
 ): SmartImageDecision {
   const clean = word.toLowerCase().trim();
+  const pos = partOfSpeech.toLowerCase().trim();
+  const meaning = meaningFa.toLowerCase().trim();
 
-  // Basic POS filter
-  if (['preposition', 'conjunction', 'pronoun', 'interjection', 'modal verb', 'determiner'].includes(partOfSpeech.toLowerCase())) {
+  // 1. Exact list checks
+  if (CONCRETE_EXACT_WORDS.has(clean)) {
     return {
-      needsImage: false,
-      reason: `Part of speech (${partOfSpeech}) is abstract grammatical function.`,
+      needsImage: true,
+      searchTerm: clean,
+      reason: `Concrete physical object / entity (${clean}).`,
     };
   }
 
-  // Suffix check for abstract nouns/adjectives
+  if (ABSTRACT_EXACT_WORDS.has(clean)) {
+    return {
+      needsImage: false,
+      reason: `Abstract concept / non-physical term (${clean}).`,
+    };
+  }
+
+  // 2. Non-noun parts of speech normally do NOT need an image
+  if (
+    pos === 'verb' ||
+    pos === 'adjective' ||
+    pos === 'adverb' ||
+    pos === 'preposition' ||
+    pos === 'conjunction' ||
+    pos === 'pronoun' ||
+    pos === 'idiom' ||
+    pos === 'phrase'
+  ) {
+    return {
+      needsImage: false,
+      reason: `Part of speech (${pos}) represents an action, modifier, or grammatical relationship, not a concrete object.`,
+    };
+  }
+
+  // 3. Check for abstract noun suffixes
   for (const suf of ABSTRACT_SUFFIXES) {
     if (clean.length > 5 && clean.endsWith(suf)) {
       return {
         needsImage: false,
-        reason: `Word has abstract suffix (-${suf}).`,
+        reason: `Word ends with abstract suffix (-${suf}).`,
       };
     }
   }
 
-  // Concrete words benefit from imagery
-  if (partOfSpeech.toLowerCase().includes('noun') || !partOfSpeech) {
+  // 4. Persian meaning heuristic clues
+  for (const kw of CONCRETE_KEYWORDS) {
+    if (meaning.includes(kw)) {
+      return {
+        needsImage: true,
+        searchTerm: clean,
+        reason: `Persian meaning matches physical category (${kw}).`,
+      };
+    }
+  }
+
+  // 5. If it's a simple noun without abstract markers
+  if (pos.includes('noun') || !pos) {
     return {
       needsImage: true,
       searchTerm: clean,
-      reason: `Concrete physical noun/concept benefits from visual memory anchor.`,
+      reason: `Identified as a physical noun entity.`,
     };
   }
 
   return {
     needsImage: false,
-    reason: `Abstract word concept.`,
+    reason: `Abstract concept.`,
   };
+}
+
+/**
+ * AI-assisted decision for whether a word needs an image.
+ */
+export async function evaluateWordNeedsImageAI(
+  word: string,
+  partOfSpeech: string,
+  meaningFa: string,
+  decisionProvider: string,
+  settings: AppSettings
+): Promise<SmartImageDecision> {
+  const prompt = `Determine if the vocabulary word "${word}" (Part of speech: "${partOfSpeech}", Meaning: "${meaningFa}") represents a concrete physical object, animal, person/profession, place, or visual concept that strongly benefits from an illustration on an Anki flashcard.
+Abstract concepts (e.g. freedom, justice), verbs/actions (e.g. abandon, hesitate), adjectives (e.g. ambiguous), and grammar words must return false.
+Output ONLY JSON in this format:
+{"needsImage": boolean, "searchTerm": "${word}", "reason": "brief explanation"}`;
+
+  try {
+    let rawContent = '';
+
+    if (decisionProvider === 'gemini' && settings.ai.gemini.apiKey) {
+      const res = await generateWithGemini(settings.ai.gemini.apiKey, settings.ai.gemini.model, word);
+      if (res.success && res.data) {
+        // Fallback to heuristic
+        return evaluateWordNeedsImageHeuristic(word, partOfSpeech, meaningFa);
+      }
+    } else if (decisionProvider === 'ollama') {
+      const res = await generateWithOllama(settings.ai.ollama.url, settings.ai.ollama.model, prompt);
+      if (res.success && res.data) {
+        return evaluateWordNeedsImageHeuristic(word, partOfSpeech, meaningFa);
+      }
+    }
+
+    // Default to refined heuristic
+    return evaluateWordNeedsImageHeuristic(word, partOfSpeech, meaningFa);
+  } catch {
+    return evaluateWordNeedsImageHeuristic(word, partOfSpeech, meaningFa);
+  }
 }
 
 /**
@@ -140,9 +237,7 @@ async function searchWikipediaImage(searchTerm: string): Promise<string | null> 
         }
       }
     }
-  } catch (err) {
-    // Continue to next search provider
-  }
+  } catch {}
   return null;
 }
 
@@ -159,100 +254,151 @@ async function searchCommonsImage(searchTerm: string): Promise<string | null> {
     if (pages) {
       for (const pageId of Object.keys(pages)) {
         const page = pages[pageId];
-        const info = page?.imageinfo?.[0];
-        if (info?.thumburl || info?.url) {
-          const imgUrl = info.thumburl || info.url;
-          if (imgUrl.match(/\.(jpg|jpeg|png|webp)/i)) {
-            return imgUrl;
+        const imageInfo = page?.imageinfo?.[0];
+        if (imageInfo?.thumburl || imageInfo?.url) {
+          const mime = imageInfo?.mime || '';
+          if (mime.includes('jpeg') || mime.includes('png') || mime.includes('webp') || mime.includes('jpg')) {
+            return imageInfo.thumburl || imageInfo.url;
           }
         }
       }
     }
-  } catch {
-    // ignore
-  }
+  } catch {}
   return null;
 }
 
 /**
- * Main Smart Images pipeline:
- * 1. Evaluates if word needs an image
- * 2. Searches online image providers
- * 3. Downloads, validates, and encodes as base64 with unique media filename
+ * Search Google Images (via Google Custom Search API if API key configured, or fallback)
+ */
+async function searchGoogleImage(searchTerm: string, apiKey?: string, cx?: string): Promise<string | null> {
+  if (apiKey && cx) {
+    try {
+      const url = `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(apiKey)}&cx=${encodeURIComponent(cx)}&q=${encodeURIComponent(searchTerm)}&searchType=image&num=1`;
+      const { buffer } = await downloadBinary(url);
+      const json = JSON.parse(buffer.toString('utf-8'));
+      if (json?.items?.[0]?.link) {
+        return json.items[0].link;
+      }
+    } catch {}
+  }
+  // Fallback to Wikimedia Commons
+  return searchCommonsImage(searchTerm);
+}
+
+/**
+ * Main Smart Image pipeline:
+ * 1. Evaluates if word needs an image using configured AI / heuristic
+ * 2. Searches image using configured provider (Wikimedia / Google / Custom)
+ * 3. Downloads binary and encodes to base64
+ * 4. Generates unique Anki media filename
  */
 export async function getSmartImage(
   word: string,
   partOfSpeech: string = '',
   meaningFa: string = '',
-  enabled: boolean = true
+  smartImagesConfig?: SmartImagesConfig,
+  appSettings?: AppSettings
 ): Promise<SmartImageResult> {
-  if (!enabled) {
-    return {
-      success: true,
-      needsImage: false,
-      reason: 'Smart Images feature is disabled in Settings.',
-    };
+  const cleanWord = (word || '').trim().toLowerCase();
+  if (!cleanWord) {
+    return { success: false, needsImage: false, error: 'Empty word' };
   }
 
-  const decision = evaluateWordNeedsImage(word, partOfSpeech, meaningFa);
+  // 1. Evaluate image decision
+  let decision: SmartImageDecision;
+  const decisionProvider = smartImagesConfig?.decisionProvider || 'heuristic';
+
+  if (decisionProvider === 'heuristic' || !appSettings) {
+    decision = evaluateWordNeedsImageHeuristic(cleanWord, partOfSpeech, meaningFa);
+  } else {
+    decision = await evaluateWordNeedsImageAI(cleanWord, partOfSpeech, meaningFa, decisionProvider, appSettings);
+  }
+
   if (!decision.needsImage) {
     return {
       success: true,
       needsImage: false,
-      reason: decision.reason,
+      reason: decision.reason || 'Word is an abstract concept that does not require an image.',
     };
   }
 
-  const query = decision.searchTerm || word;
+  const searchTerm = decision.searchTerm || cleanWord;
+  const searchProvider = smartImagesConfig?.searchProvider || 'wikimedia';
 
+  // 2. Search Image
+  let imageUrl: string | null = null;
+  let providerUsed = 'Wikimedia Commons';
+
+  if (searchProvider === 'google') {
+    imageUrl = await searchGoogleImage(searchTerm, smartImagesConfig?.googleSearchApiKey, smartImagesConfig?.googleSearchCx);
+    providerUsed = 'Google Image Search';
+  } else if (searchProvider === 'custom' && smartImagesConfig?.customSearchUrl) {
+    const customUrl = smartImagesConfig.customSearchUrl.replace('{query}', encodeURIComponent(searchTerm));
+    try {
+      const { buffer } = await downloadBinary(customUrl);
+      const json = JSON.parse(buffer.toString('utf-8'));
+      imageUrl = json.url || json.imageUrl || json.link;
+      providerUsed = 'Custom Image Provider';
+    } catch {}
+  }
+
+  // Fallback to Wikipedia / Wikimedia
+  if (!imageUrl) {
+    imageUrl = await searchWikipediaImage(searchTerm);
+  }
+  if (!imageUrl) {
+    imageUrl = await searchCommonsImage(searchTerm);
+  }
+
+  if (!imageUrl) {
+    return {
+      success: false,
+      needsImage: true,
+      reason: decision.reason,
+      searchTerm,
+      error: `No suitable public domain image found for "${searchTerm}".`,
+    };
+  }
+
+  // 3. Download Image Binary
   try {
-    // 1. Try Wikipedia / Wikimedia
-    let imageUrl = await searchWikipediaImage(query);
-    if (!imageUrl) {
-      imageUrl = await searchCommonsImage(query);
-    }
+    const { buffer } = await downloadBinary(imageUrl);
 
-    if (!imageUrl) {
-      return {
-        success: false,
-        needsImage: true,
-        searchTerm: query,
-        reason: 'Image search returned no clear visual match.',
-      };
-    }
-
-    // 2. Download Image Binary
-    const { buffer, contentType } = await downloadBinary(imageUrl);
     if (buffer.length < 500) {
       return {
         success: false,
         needsImage: true,
-        searchTerm: query,
-        reason: 'Image downloaded was too small or corrupted.',
+        reason: decision.reason,
+        searchTerm,
+        error: 'Downloaded image is corrupted or too small.',
       };
     }
 
-    const base64 = buffer.toString('base64');
-    const ext = contentType.includes('png') ? 'png' : 'jpg';
+    const isPng = buffer.slice(0, 8).toString('hex') === '89504e470d0a1a0a';
+    const ext = isPng ? 'png' : 'jpg';
+
+    // Generate unique media filename for Anki
     const hash = crypto.createHash('md5').update(buffer).digest('hex').slice(0, 8);
-    const safeWord = word.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const safeWord = cleanWord.replace(/[^a-z0-9_-]/g, '_');
     const imageFileName = `img_${safeWord}_${hash}.${ext}`;
 
     return {
       success: true,
       needsImage: true,
-      searchTerm: query,
       reason: decision.reason,
+      searchTerm,
       imageUrl,
-      imageBase64: base64,
       imageFileName,
+      imageBase64: buffer.toString('base64'),
+      providerUsed,
     };
   } catch (err: any) {
     return {
       success: false,
       needsImage: true,
-      searchTerm: query,
-      error: `Failed to download image: ${err.message}`,
+      reason: decision.reason,
+      searchTerm,
+      error: `Failed to download image from ${imageUrl}: ${err.message}`,
     };
   }
 }

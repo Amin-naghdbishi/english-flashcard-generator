@@ -58,7 +58,8 @@ const defaultSettings: AppSettings = {
   },
   smartImages: {
     enabled: true,
-    provider: 'auto',
+    decisionProvider: 'heuristic',
+    searchProvider: 'wikimedia',
   },
   defaultCard: {
     cardType: 'normal',

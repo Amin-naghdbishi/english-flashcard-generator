@@ -67,8 +67,8 @@ export interface ManualOverrides {
   imageFileName?: string;
 }
 
-export type AIProvider = 'ollama' | 'gemini';
-export type TTSProvider = 'piper' | 'online';
+export type AIProvider = 'ollama' | 'gemini' | 'custom' | string;
+export type TTSProvider = 'piper' | 'online' | 'custom' | string;
 
 export type ThemeId =
   | 'comic-pop-light'
@@ -102,14 +102,49 @@ export interface GeminiConfig {
   temperature: number;
 }
 
+export interface CustomAIProviderConfig {
+  id: string;
+  name: string;
+  protocol: 'openai-compatible' | 'gemini' | 'ollama' | 'custom-rest';
+  baseUrl: string;
+  apiKey?: string;
+  model: string;
+  temperature: number;
+  authType: 'bearer' | 'api-key-header' | 'query-param' | 'none';
+  authHeaderName?: string;
+  customHeaders?: Record<string, string>;
+  customBodyParams?: Record<string, any>;
+  responseJsonPath?: string;
+}
+
 export interface AIConfig {
   provider: AIProvider;
   ollama: OllamaConfig;
   gemini: GeminiConfig;
+  customProviders?: CustomAIProviderConfig[];
+  activeCustomProviderId?: string;
   url?: string;
   model?: string;
   temperature?: number;
   contextLength?: number;
+}
+
+export interface CustomTTSProviderConfig {
+  id: string;
+  name: string;
+  protocol: 'openai-speech' | 'elevenlabs' | 'google-translate' | 'piper-http' | 'custom-http';
+  endpoint: string;
+  apiKey?: string;
+  voice: string;
+  model?: string;
+  audioFormat: 'mp3' | 'wav' | 'opus' | 'aac';
+  authType: 'bearer' | 'api-key-header' | 'query-param' | 'none';
+  authHeaderName?: string;
+  httpMethod: 'POST' | 'GET';
+  speedParamName?: string;
+  speedFactorType?: 'multiplier' | 'length_scale';
+  customHeaders?: Record<string, string>;
+  customBodyParams?: Record<string, any>;
 }
 
 export interface TTSConfig {
@@ -120,6 +155,8 @@ export interface TTSConfig {
   britishVoice: string; // en_GB-cori-high
   normalSpeed: number; // 1.0
   slowSpeed: number; // 1.25 (higher = slower for Piper length scale)
+  customProviders?: CustomTTSProviderConfig[];
+  activeCustomProviderId?: string;
   generateAmericanNormal: boolean;
   generateAmericanSlow: boolean;
   generateBritishNormal: boolean;
@@ -139,11 +176,17 @@ export interface DictionaryConfig {
   exampleSource: 'ai' | 'freedict';
   translationSource: 'ai';
   mnemonicSource: 'ai';
+  enableFallback?: boolean;
 }
 
 export interface SmartImagesConfig {
   enabled: boolean;
-  provider: 'auto' | 'wikimedia' | 'unsplash';
+  decisionProvider: 'main' | 'ollama' | 'gemini' | 'heuristic' | string;
+  searchProvider: 'wikimedia' | 'google' | 'custom';
+  customSearchUrl?: string;
+  customSearchApiKey?: string;
+  googleSearchApiKey?: string;
+  googleSearchCx?: string;
 }
 
 export interface DefaultCardConfig {

@@ -200,7 +200,12 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
     setTestAnkiResult(null);
     setAnkiActionMessage(null);
     try {
-      const res = await runAnkiPipelineTest(deck.trim(), settings.theme, settings.anki.url);
+      const res = await runAnkiPipelineTest({
+        deck: deck.trim(),
+        theme: settings.theme,
+        url: settings.anki.url,
+        cardType,
+      });
       setTestAnkiResult(res);
       if (res.success && res.testNoteId) {
         setCreatedNoteId(res.testNoteId);

@@ -1,4 +1,15 @@
-import { AppSettings, CardData, DiagnosticsReport, ManualOverrides, AnkiCardVerificationDetails, ThemeId, CardType } from '../types';
+import {
+  AppSettings,
+  CardData,
+  DiagnosticsReport,
+  ManualOverrides,
+  AnkiCardVerificationDetails,
+  ThemeId,
+  CardType,
+  CustomAIProviderConfig,
+  CustomTTSProviderConfig,
+  SmartImagesConfig,
+} from '../types';
 import { OllamaModelTag } from '../../server/ollama';
 import { PiperVoice, PiperDiagnosticResult } from '../../server/piper';
 import { OnlineTTSDiagnosticResult } from '../../server/onlineTts';
@@ -20,6 +31,7 @@ export async function saveConfig(settings: Partial<AppSettings>): Promise<AppSet
   return data.settings;
 }
 
+// --- Ollama ---
 export async function checkOllama(url?: string): Promise<{ connected: boolean; version?: string; error?: string }> {
   const q = url ? `?url=${encodeURIComponent(url)}` : '';
   const res = await fetch(`/api/ollama/health${q}`);
@@ -32,6 +44,7 @@ export async function getOllamaModels(url?: string): Promise<{ success: boolean;
   return res.json();
 }
 
+// --- Gemini ---
 export async function checkGemini(apiKey: string, model?: string): Promise<{ connected: boolean; model?: string; error?: string }> {
   const res = await fetch('/api/gemini/health', {
     method: 'POST',
@@ -46,6 +59,55 @@ export async function getGeminiModels(): Promise<{ success: boolean; models: Arr
   return res.json();
 }
 
+// --- Custom AI Provider ---
+export async function checkCustomAI(config: CustomAIProviderConfig): Promise<{
+  connected: boolean;
+  message: string;
+  models?: string[];
+  error?: string;
+}> {
+  const res = await fetch('/api/custom-ai/health', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ config }),
+  });
+  return res.json();
+}
+
+export async function getCustomAIModels(config: CustomAIProviderConfig): Promise<{
+  success: boolean;
+  models: string[];
+  error?: string;
+}> {
+  const res = await fetch('/api/custom-ai/models', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ config }),
+  });
+  return res.json();
+}
+
+// --- Custom TTS Provider ---
+export async function testCustomTTS(
+  config: CustomTTSProviderConfig,
+  testSentence?: string
+): Promise<{
+  success: boolean;
+  normalAudioBase64?: string;
+  slowAudioBase64?: string;
+  durationSeconds?: number;
+  format?: string;
+  error?: string;
+}> {
+  const res = await fetch('/api/custom-tts/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ config, testSentence }),
+  });
+  return res.json();
+}
+
+// --- Piper TTS ---
 export async function checkTTS(endpoint?: string, voice?: string): Promise<PiperDiagnosticResult> {
   const params = new URLSearchParams();
   if (endpoint) params.set('endpoint', endpoint);
@@ -85,38 +147,6 @@ export async function controlPiperService(action: 'start' | 'stop' | 'restart'):
   return res.json();
 }
 
-export async function checkOnlineTTS(): Promise<{ connected: boolean; error?: string }> {
-  const res = await fetch('/api/tts/online/health');
-  return res.json();
-}
-
-export async function runOnlineTTSDiagnostics(): Promise<OnlineTTSDiagnosticResult> {
-  const res = await fetch('/api/tts/online/diagnostics', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  return res.json();
-}
-
-export async function testSmartImage(word: string, partOfSpeech?: string, meaningFa?: string) {
-  const res = await fetch('/api/smart-images/test', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ word, partOfSpeech, meaningFa }),
-  });
-  return res.json();
-}
-
-export async function lookupAbadisDict(word: string) {
-  const res = await fetch(`/api/dictionary/abadis?word=${encodeURIComponent(word)}`);
-  return res.json();
-}
-
-export async function lookupFreeDict(word: string) {
-  const res = await fetch(`/api/dictionary/freedict?word=${encodeURIComponent(word)}`);
-  return res.json();
-}
-
 export async function synthesizeAudio(text: string, voice?: string, speed?: number, endpoint?: string) {
   const res = await fetch('/api/tts/synthesize', {
     method: 'POST',
@@ -141,6 +171,44 @@ export async function runTTSDiagnostics(params?: {
   return res.json();
 }
 
+// --- Online TTS ---
+export async function checkOnlineTTS(): Promise<{ connected: boolean; error?: string }> {
+  const res = await fetch('/api/online-tts/health');
+  return res.json();
+}
+
+export async function runOnlineTTSDiagnostics(): Promise<OnlineTTSDiagnosticResult> {
+  const res = await fetch('/api/online-tts/diagnostics');
+  return res.json();
+}
+
+// --- Smart Images ---
+export async function testSmartImage(
+  word: string,
+  partOfSpeech?: string,
+  meaningFa?: string,
+  config?: SmartImagesConfig
+) {
+  const res = await fetch('/api/smart-images/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ word, partOfSpeech, meaningFa, config }),
+  });
+  return res.json();
+}
+
+// --- Dictionary Sources ---
+export async function lookupAbadisDict(word: string) {
+  const res = await fetch(`/api/dictionary/abadis?word=${encodeURIComponent(word)}`);
+  return res.json();
+}
+
+export async function lookupFreeDict(word: string) {
+  const res = await fetch(`/api/dictionary/freedict?word=${encodeURIComponent(word)}`);
+  return res.json();
+}
+
+// --- Anki ---
 export async function checkAnki(url?: string): Promise<{ connected: boolean; version?: number; error?: string }> {
   const q = url ? `?url=${encodeURIComponent(url)}` : '';
   const res = await fetch(`/api/anki/health${q}`);
@@ -153,7 +221,11 @@ export async function getAnkiDecks(url?: string): Promise<{ success: boolean; de
   return res.json();
 }
 
-export async function checkDuplicate(deck: string, word: string, url?: string): Promise<{ isDuplicate: boolean; existingNoteIds: number[]; error?: string }> {
+export async function checkDuplicate(
+  deck: string,
+  word: string,
+  url?: string
+): Promise<{ isDuplicate: boolean; existingNoteIds: number[]; error?: string }> {
   const res = await fetch('/api/anki/check-duplicate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -162,41 +234,39 @@ export async function checkDuplicate(deck: string, word: string, url?: string): 
   return res.json();
 }
 
-export async function setupAnkiModel(themeId?: ThemeId, cardType?: CardType, url?: string) {
-  const res = await fetch('/api/anki/setup-model', {
+export async function ensureModelInAnki(url?: string, theme?: ThemeId, cardType?: CardType) {
+  const res = await fetch('/api/anki/model', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ themeId, cardType, url }),
+    body: JSON.stringify({ url, theme, cardType }),
   });
   return res.json();
 }
 
-export async function runAnkiPipelineTest(deck?: string, themeId?: ThemeId, url?: string): Promise<{
-  success: boolean;
-  steps: Array<{ step: string; status: 'ok' | 'error'; message: string; details?: any }>;
-  testNoteId?: number;
-  testCardIds?: number[];
-  verification?: AnkiCardVerificationDetails;
-}> {
-  const res = await fetch('/api/anki/test-pipeline', {
+export async function runAnkiPipelineTest(params: {
+  word?: string;
+  deck?: string;
+  url?: string;
+  theme?: ThemeId;
+  cardType?: CardType;
+}) {
+  const res = await fetch('/api/anki/diagnostics/pipeline', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ deck, themeId, url }),
+    body: JSON.stringify(params),
   });
   return res.json();
 }
 
 export async function verifyNoteInAnki(noteId: number, deck?: string, url?: string): Promise<{
   success: boolean;
-  isVerified: boolean;
-  error?: string;
   verification?: AnkiCardVerificationDetails;
+  error?: string;
 }> {
-  const res = await fetch('/api/anki/verify-note', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ noteId, deck, url }),
-  });
+  const params = new URLSearchParams();
+  if (deck) params.set('deck', deck);
+  if (url) params.set('url', url);
+  const res = await fetch(`/api/anki/verify/${noteId}?${params.toString()}`);
   return res.json();
 }
 
@@ -205,7 +275,7 @@ export async function openInAnki(params: { noteId?: number; query?: string; url?
   query?: string;
   error?: string;
 }> {
-  const res = await fetch('/api/anki/open-in-anki', {
+  const res = await fetch('/api/anki/open-browser', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
@@ -216,7 +286,7 @@ export async function openInAnki(params: { noteId?: number; query?: string; url?
 export async function createDirectAnkiNote(params: {
   deck: string;
   cardData: CardData;
-  themeId?: ThemeId;
+  theme?: ThemeId;
   cardType?: CardType;
   url?: string;
 }): Promise<{
@@ -246,6 +316,7 @@ export async function runFullPipeline(params: {
   noteId?: number;
   cardIds?: number[];
   deck?: string;
+  cardType?: CardType;
   stage?: string;
   error?: string;
   verification?: AnkiCardVerificationDetails;
@@ -258,7 +329,7 @@ export async function runFullPipeline(params: {
     timestamp?: number;
   }>;
 }> {
-  const res = await fetch('/api/pipeline/generate-card', {
+  const res = await fetch('/api/pipeline', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
@@ -267,9 +338,6 @@ export async function runFullPipeline(params: {
 }
 
 export async function runFullDiagnostics(): Promise<DiagnosticsReport> {
-  const res = await fetch('/api/diagnostics/all', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  });
+  const res = await fetch('/api/diagnostics');
   return res.json();
 }
