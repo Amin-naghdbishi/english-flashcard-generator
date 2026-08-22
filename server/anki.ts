@@ -117,8 +117,8 @@ export function getThemedModelName(
 ): string {
   const theme = THEMES[themeId] || THEMES['comic-pop-dark'];
   const cleanName = theme?.name || themeId;
-  const spellingSuffix = cardType === 'spelling' ? ' (Spelling)' : '';
-  return `AI Vocabulary - ${cleanName}${spellingSuffix}`;
+  const suffix = cardType === 'spelling' ? ' (Spelling)' : ' (Normal)';
+  return `AI Vocabulary - ${cleanName}${suffix}`;
 }
 
 export async function ensureAnkiModel(
@@ -141,6 +141,7 @@ export async function ensureAnkiModel(
   const fullBackHtml = `<style>\n${theme.css}\n</style>\n${backHtml}`;
 
   const targetModel = specificModelName || getThemedModelName(themeId, cardType);
+  const cardTemplateName = cardType === 'spelling' ? 'Spelling Card' : 'Vocabulary Card';
 
   // Check existing models from Anki
   const modelsRes = await callAnkiConnect(baseUrl, 'modelNames');
@@ -157,19 +158,14 @@ export async function ensureAnkiModel(
   const modelExists = existingModels.includes(targetModel);
 
   if (!modelExists) {
-    // Create new model with full styling and templates
+    // Create new model with full styling and EXACTLY ONE required template
     const createRes = await callAnkiConnect(baseUrl, 'createModel', {
       modelName: targetModel,
       inOrderFields: ANKI_MODEL_FIELDS,
       css: theme.css,
       cardTemplates: [
         {
-          Name: 'Card 1',
-          Front: fullFrontHtml,
-          Back: fullBackHtml,
-        },
-        {
-          Name: 'Vocabulary Card',
+          Name: cardTemplateName,
           Front: fullFrontHtml,
           Back: fullBackHtml,
         },
@@ -215,33 +211,30 @@ export async function ensureAnkiModel(
       },
     });
 
-    // 3. Find template card names and update all of them
+    // 3. Find template card names and update ONLY the primary template (avoiding duplicate identical templates)
     const templatesRes = await callAnkiConnect(baseUrl, 'modelTemplates', {
       modelName: targetModel,
     });
 
-    const templateUpdates: Record<string, { Front: string; Back: string }> = {
-      'Card 1': { Front: fullFrontHtml, Back: fullBackHtml },
-      'Vocabulary Card': { Front: fullFrontHtml, Back: fullBackHtml },
-      'Comic Vocabulary Card': { Front: fullFrontHtml, Back: fullBackHtml },
-    };
-
     if (templatesRes.success && typeof templatesRes.result === 'object' && templatesRes.result !== null) {
       const existingTemplateNames = Object.keys(templatesRes.result);
-      for (const tName of existingTemplateNames) {
-        templateUpdates[tName] = {
-          Front: fullFrontHtml,
-          Back: fullBackHtml,
+      if (existingTemplateNames.length > 0) {
+        const primaryTemplateName = existingTemplateNames[0];
+        const templateUpdates: Record<string, { Front: string; Back: string }> = {
+          [primaryTemplateName]: {
+            Front: fullFrontHtml,
+            Back: fullBackHtml,
+          },
         };
+
+        await callAnkiConnect(baseUrl, 'updateModelTemplates', {
+          model: {
+            name: targetModel,
+            templates: templateUpdates,
+          },
+        });
       }
     }
-
-    await callAnkiConnect(baseUrl, 'updateModelTemplates', {
-      model: {
-        name: targetModel,
-        templates: templateUpdates,
-      },
-    });
 
     return {
       success: true,
