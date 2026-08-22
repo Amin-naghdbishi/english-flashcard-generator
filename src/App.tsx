@@ -168,7 +168,10 @@ export default function App() {
   }, [settings.ai, settings.tts, settings.anki]);
 
   return (
-    <AppThemeProvider initialTheme={activeAppTheme}>
+    <AppThemeProvider
+      appTheme={activeAppTheme}
+      setAppTheme={(newTheme) => setSettings({ ...settings, appTheme: newTheme })}
+    >
       <div
         className={`min-h-screen flex flex-col font-sans transition-colors duration-150 ${
           isMinimalLight

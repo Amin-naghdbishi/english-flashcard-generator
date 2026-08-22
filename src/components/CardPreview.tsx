@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { CardData, ThemeDefinition, ThemeId, CardType, AppTheme } from '../types';
 import { THEMES, renderThemeHtml, getSpellingFrontHtml } from '../themes';
 import { Eye, Sparkles, Volume2, Smartphone, Monitor, CheckCircle, HelpCircle } from 'lucide-react';
