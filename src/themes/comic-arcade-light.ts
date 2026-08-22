@@ -3,21 +3,27 @@ import { arcadeRetroFrontNormalHtml, arcadeRetroBackHtml } from './templates';
 
 const css = `/* THEME 5: ARCADE RETRO LIGHT */
 .card {
-  background-color: #FEF08A;
-  color: #000000;
-  font-family: "Courier New", Courier, monospace, sans-serif;
-  margin: 0;
-  padding: 16px 12px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  box-sizing: border-box;
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  margin: 0 !important;
+  padding: 16px 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  align-items: stretch !important;
+  min-height: 100vh !important;
+  box-sizing: border-box !important;
+}
+
+.nightMode .card, .nightMode.card {
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
 }
 
 .comic-card-wrapper.theme-arcade {
   width: 100%;
-  max-width: 480px;
+  max-width: 900px !important; flex: 1 !important; display: flex !important; flex-direction: column !important;
   margin: 0 auto;
   box-sizing: border-box;
 }

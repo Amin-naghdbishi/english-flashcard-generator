@@ -685,3 +685,125 @@ export const arcadeRetroBackHtml = `
   </div>
 </div>
 `;
+
+/**
+ * 6. MINIMAL TEMPLATES (Theme 6 - Clean, Distraction-Free Anki Style)
+ */
+export const minimalFrontNormalHtml = `
+<div class="minimal-card-wrapper theme-minimal">
+  <div class="minimal-card">
+    <div class="minimal-header">
+      <span class="minimal-pos">{{PartOfSpeech}}</span>
+    </div>
+
+    {{CardImage}}
+
+    <div class="minimal-word-block">
+      <h1 class="minimal-word">{{Word}}</h1>
+      <div class="minimal-phonetic">{{Phonetic}}</div>
+    </div>
+
+    <div class="minimal-audio-row">
+      <div class="minimal-audio-group">
+        <span class="minimal-audio-label">US:</span> {{WordAudioUsNormal}} {{WordAudioUsSlow}}
+      </div>
+      <div class="minimal-audio-group">
+        <span class="minimal-audio-label">UK:</span> {{WordAudioUkNormal}} {{WordAudioUkSlow}}
+      </div>
+    </div>
+
+    <div class="minimal-example-block">
+      <p class="minimal-example">{{Example}}</p>
+    </div>
+  </div>
+</div>
+`;
+
+export const minimalFrontSpellingHtml = `
+<div class="minimal-card-wrapper theme-minimal">
+  <div class="minimal-card spelling-minimal">
+    <div class="minimal-header">
+      <span class="minimal-pos">Spelling Challenge • {{PartOfSpeech}}</span>
+    </div>
+
+    {{CardImage}}
+
+    <div id="spelling-target-word" style="display: none;">{{Word}}</div>
+
+    <div class="minimal-spelling-prompt">
+      <div class="minimal-prompt-title">Spell the missing word:</div>
+      <div class="minimal-spelling-sentence">{{SpellingSentence}}</div>
+    </div>
+
+    <div class="minimal-audio-row">
+      <span class="minimal-audio-label">Audio:</span> {{WordAudioUsNormal}} {{ExampleAudioUsNormal}}
+    </div>
+
+    <div class="spelling-interactive-area">
+      <input
+        type="text"
+        id="spelling-input"
+        class="spelling-input minimal-input"
+        placeholder="Type the spelling here..."
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+      />
+      <button type="button" class="spelling-check-btn minimal-btn" onclick="checkSpelling()">
+        Check Spelling
+      </button>
+    </div>
+
+    <div id="spelling-result" class="spelling-result minimal-result"></div>
+  </div>
+</div>
+${spellingScript}
+`;
+
+export const minimalBackHtml = `
+<div class="minimal-card-wrapper theme-minimal">
+  <div class="minimal-card">
+    <div class="minimal-header">
+      <span class="minimal-pos">{{PartOfSpeech}}</span>
+    </div>
+
+    {{CardImage}}
+
+    <div class="minimal-word-block">
+      <h1 class="minimal-word">{{Word}}</h1>
+      <div class="minimal-phonetic">{{Phonetic}}</div>
+    </div>
+
+    <div class="minimal-audio-row">
+      <div class="minimal-audio-group">
+        <span class="minimal-audio-label">US:</span> {{WordAudioUsNormal}} {{WordAudioUsSlow}}
+      </div>
+      <div class="minimal-audio-group">
+        <span class="minimal-audio-label">UK:</span> {{WordAudioUkNormal}} {{WordAudioUkSlow}}
+      </div>
+    </div>
+
+    <hr class="minimal-divider" />
+
+    <div class="minimal-meaning-block" dir="rtl">
+      <div class="minimal-meaning-label">معنی</div>
+      <p class="minimal-meaning-text">{{Meaning}}</p>
+    </div>
+
+    <div class="minimal-example-block">
+      <div class="minimal-example-header">
+        <span class="minimal-example-label">Example & Translation</span>
+        <div class="minimal-example-audio">{{ExampleAudioUsNormal}} {{ExampleAudioUkNormal}}</div>
+      </div>
+      <p class="minimal-example">{{Example}}</p>
+      <p class="minimal-translation" dir="rtl">{{Translation}}</p>
+    </div>
+
+    <div class="minimal-mnemonic-block">
+      <div class="minimal-mnemonic-label">Memory Aid</div>
+      <p class="minimal-mnemonic">{{Mnemonic}}</p>
+    </div>
+  </div>
+</div>
+`;

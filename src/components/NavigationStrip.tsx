@@ -66,39 +66,39 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
         </button>
 
         {/* Compact Live Status Dots & Refresh (Right Corner) */}
-        <div className="hidden md:flex items-center gap-2 px-3 sm:px-4 bg-[#FBF9F5] shrink-0">
-          <div className="flex items-center gap-1.5" title={`${status.ai.label || 'AI'}: ${status.ai.connected ? 'Connected' : 'Offline'}`}>
+        <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 bg-[#FBF9F5] shrink-0 border-l sm:border-l-0 border-black">
+          <div className="flex items-center gap-1" title={`${status.ai.label || 'AI'}: ${status.ai.connected ? 'Connected' : 'Offline'}`}>
             <span
-              className={`w-2.5 h-2.5 border border-black ${
+              className={`w-2 sm:w-2.5 h-2 sm:h-2.5 border border-black ${
                 status.ai.connected ? 'bg-[#4ADE80]' : 'bg-[#FF4B4B]'
               }`}
             />
-            <span className="text-[10px] font-black uppercase text-black">{status.ai.label || 'AI'}</span>
+            <span className="hidden sm:inline text-[10px] font-black uppercase text-black">{status.ai.label || 'AI'}</span>
           </div>
 
-          <div className="flex items-center gap-1.5" title={`${status.tts.label || 'TTS'}: ${status.tts.ready ? 'Ready' : 'Standby'}`}>
+          <div className="flex items-center gap-1" title={`${status.tts.label || 'TTS'}: ${status.tts.ready ? 'Ready' : 'Standby'}`}>
             <span
-              className={`w-2.5 h-2.5 border border-black ${
+              className={`w-2 sm:w-2.5 h-2 sm:h-2.5 border border-black ${
                 status.tts.ready ? 'bg-[#4ADE80]' : 'bg-[#FFD93D]'
               }`}
             />
-            <span className="text-[10px] font-black uppercase text-black">{status.tts.label || 'TTS'}</span>
+            <span className="hidden sm:inline text-[10px] font-black uppercase text-black">{status.tts.label || 'TTS'}</span>
           </div>
 
-          <div className="flex items-center gap-1.5" title={`AnkiConnect: ${status.anki.connected ? 'Connected' : 'Offline'}`}>
+          <div className="flex items-center gap-1" title={`AnkiConnect: ${status.anki.connected ? 'Connected' : 'Offline'}`}>
             <span
-              className={`w-2.5 h-2.5 border border-black ${
+              className={`w-2 sm:w-2.5 h-2 sm:h-2.5 border border-black ${
                 status.anki.connected ? 'bg-[#4ADE80]' : 'bg-[#FF4B4B]'
               }`}
             />
-            <span className="text-[10px] font-black uppercase text-black">Anki</span>
+            <span className="hidden sm:inline text-[10px] font-black uppercase text-black">Anki</span>
           </div>
 
           <button
             type="button"
             onClick={onRefreshStatus}
             title="Refresh Connections"
-            className="p-1 bg-[#FFD93D] hover:bg-[#ffe066] text-black border border-black shadow-[1px_1px_0px_#000000] cursor-pointer active:translate-y-0.5 ml-1"
+            className="p-1 bg-[#FFD93D] hover:bg-[#ffe066] text-black border border-black shadow-[1px_1px_0px_#000000] cursor-pointer active:translate-y-0.5 ml-0.5 sm:ml-1"
           >
             <RefreshCw className="w-3 h-3" />
           </button>

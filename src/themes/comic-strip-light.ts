@@ -3,21 +3,27 @@ import { storyStripFrontNormalHtml, storyStripBackHtml } from './templates';
 
 const css = `/* THEME 2: STORY STRIP LIGHT */
 .card {
-  background-color: #F8FAFC;
-  color: #0F172A;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  margin: 0;
-  padding: 16px 12px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  box-sizing: border-box;
+  background-color: #FFFDF5 !important;
+  color: #000000 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  margin: 0 !important;
+  padding: 16px 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  align-items: stretch !important;
+  min-height: 100vh !important;
+  box-sizing: border-box !important;
+}
+
+.nightMode .card, .nightMode.card {
+  background-color: #FFFDF5 !important;
+  color: #000000 !important;
 }
 
 .comic-card-wrapper.theme-strip {
   width: 100%;
-  max-width: 480px;
+  max-width: 900px !important; flex: 1 !important; display: flex !important; flex-direction: column !important;
   margin: 0 auto;
   box-sizing: border-box;
 }
@@ -242,15 +248,16 @@ const css = `/* THEME 2: STORY STRIP LIGHT */
 }
 
 .spelling-input {
-  flex: 1;
-  padding: 8px 10px;
-  font-size: 15px;
-  font-weight: 900;
-  font-family: inherit;
-  border: 2px solid #000000;
-  background-color: #FFFFFF;
-  color: #000000;
-  outline: none;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 10px 14px !important;
+  font-family: inherit !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  border: 3px solid #000000 !important;
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  outline: none !important;
 }
 
 .spelling-input.is-valid {

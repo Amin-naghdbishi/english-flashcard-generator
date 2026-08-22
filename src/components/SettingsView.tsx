@@ -390,7 +390,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           { id: 'dictionary', label: 'Dictionary Sources', icon: BookOpen },
           { id: 'smartImages', label: 'Smart Images', icon: ImageIcon },
           { id: 'defaultCard', label: 'Default Card Settings', icon: CheckSquare },
-          { id: 'appearance', label: '10 Themes & Live Preview', icon: Palette },
+          { id: 'appearance', label: '12 Themes & Live Preview', icon: Palette },
           { id: 'anki', label: 'AnkiConnect', icon: Bookmark },
           { id: 'diagnostics', label: 'Diagnostics', icon: Activity },
           { id: 'guide', label: 'User Guide', icon: HelpCircle },
@@ -1345,32 +1345,73 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
         </div>
       )}
 
-      {/* SUBTAB 6: APPEARANCE & 10 THEMES */}
+      {/* SUBTAB 6: APPEARANCE & THEMES */}
       {activeSubTab === 'appearance' && (
         <div className="space-y-6">
           <div className="bg-white p-5 border-4 border-black shadow-[6px_6px_0px_#000000]">
-            <h3 className="font-black text-sm uppercase mb-3">Select One of 10 Distinct Card Themes</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              {Object.keys(THEMES).map((themeKey) => {
-                const th = THEMES[themeKey as ThemeId];
-                if (!th) return null;
-                const isSelected = form.theme === themeKey;
-                return (
-                  <button
-                    key={themeKey}
-                    type="button"
-                    onClick={() => setForm({ ...form, theme: themeKey as ThemeId })}
-                    className={`p-3 border-3 border-black text-left cursor-pointer transition-transform ${
-                      isSelected
-                        ? 'bg-black text-[#FFD93D] shadow-[3px_3px_0px_#FFD93D] -translate-y-0.5'
-                        : 'bg-zinc-50 hover:bg-zinc-100 text-black'
-                    }`}
-                  >
-                    <div className="text-xs font-black truncate">{th.name}</div>
-                    <div className="text-[10px] opacity-80 mt-1">{themeKey.includes('dark') ? '🌙 Dark' : '☀️ Light'}</div>
-                  </button>
-                );
-              })}
+            <h3 className="font-black text-sm uppercase mb-4 flex items-center gap-2">
+              <Palette className="w-5 h-5 text-[#FF6B6B]" />
+              <span>Card Appearance & Themes ({THEME_GROUPS.light.length + THEME_GROUPS.dark.length} Visual Styles)</span>
+            </h3>
+
+            {/* Light Themes */}
+            <div className="mb-5">
+              <div className="text-xs font-black uppercase text-amber-800 bg-[#FEF9C3] px-3 py-1 border-2 border-black inline-block mb-3">
+                ☀️ Light Themes (Comic & Minimal)
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {THEME_GROUPS.light.map((th) => {
+                  const isSelected = form.theme === th.id;
+                  return (
+                    <button
+                      key={th.id}
+                      type="button"
+                      onClick={() => setForm({ ...form, theme: th.id as ThemeId })}
+                      className={`p-3 border-3 border-black text-left cursor-pointer transition-all ${
+                        isSelected
+                          ? 'bg-[#FFD93D] text-black shadow-[4px_4px_0px_#000000] -translate-y-0.5'
+                          : 'bg-white hover:bg-zinc-50 text-black shadow-[2px_2px_0px_#000000]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs font-black">{th.name}</div>
+                        {isSelected && <span className="text-[10px] font-black bg-black text-[#FFD93D] px-1.5 py-0.5">ACTIVE</span>}
+                      </div>
+                      <div className="text-[11px] text-zinc-600 font-bold mt-1 line-clamp-2">{th.desc}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Dark Themes */}
+            <div>
+              <div className="text-xs font-black uppercase text-cyan-400 bg-black px-3 py-1 border-2 border-black inline-block mb-3">
+                🌙 Dark Themes (Comic & Minimal)
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {THEME_GROUPS.dark.map((th) => {
+                  const isSelected = form.theme === th.id;
+                  return (
+                    <button
+                      key={th.id}
+                      type="button"
+                      onClick={() => setForm({ ...form, theme: th.id as ThemeId })}
+                      className={`p-3 border-3 border-black text-left cursor-pointer transition-all ${
+                        isSelected
+                          ? 'bg-black text-[#38BDF8] shadow-[4px_4px_0px_#38BDF8] -translate-y-0.5'
+                          : 'bg-zinc-900 hover:bg-zinc-800 text-white shadow-[2px_2px_0px_#000000]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs font-black">{th.name}</div>
+                        {isSelected && <span className="text-[10px] font-black bg-[#38BDF8] text-black px-1.5 py-0.5">ACTIVE</span>}
+                      </div>
+                      <div className="text-[11px] text-zinc-400 font-bold mt-1 line-clamp-2">{th.desc}</div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 

@@ -81,6 +81,8 @@ export type ThemeId =
   | 'comic-notebook-dark'
   | 'comic-arcade-light'
   | 'comic-arcade-dark'
+  | 'minimal-light'
+  | 'minimal-dark'
   // Legacy aliases
   | 'comic-manga-light'
   | 'comic-manga-dark'

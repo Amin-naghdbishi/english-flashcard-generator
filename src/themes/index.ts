@@ -9,34 +9,39 @@ import { comicNotebookLightTheme } from './comic-notebook-light';
 import { comicNotebookDarkTheme } from './comic-notebook-dark';
 import { comicArcadeLightTheme } from './comic-arcade-light';
 import { comicArcadeDarkTheme } from './comic-arcade-dark';
+import { minimalLightTheme } from './minimal-light';
+import { minimalDarkTheme } from './minimal-dark';
 import {
   heroPopFrontSpellingHtml,
   storyStripFrontSpellingHtml,
   duoQuestFrontSpellingHtml,
   indexNotebookFrontSpellingHtml,
   arcadeRetroFrontSpellingHtml,
+  minimalFrontSpellingHtml,
 } from './templates';
 
 export const THEMES: Record<string, ThemeDefinition> = {
-  // 5 Light Themes
+  // Light Themes
   'comic-pop-light': comicPopLightTheme,
   'comic-strip-light': comicStripLightTheme,
   'comic-quest-light': comicQuestLightTheme,
   'comic-notebook-light': comicNotebookLightTheme,
   'comic-arcade-light': comicArcadeLightTheme,
+  'minimal-light': minimalLightTheme,
 
-  // 5 Dark Themes
+  // Dark Themes
   'comic-pop-dark': comicPopDarkTheme,
   'comic-strip-dark': comicStripDarkTheme,
   'comic-quest-dark': comicQuestDarkTheme,
   'comic-notebook-dark': comicNotebookDarkTheme,
   'comic-arcade-dark': comicArcadeDarkTheme,
+  'minimal-dark': minimalDarkTheme,
 
   // Legacy Aliases
   'comic-manga-light': comicQuestLightTheme,
   'comic-manga-dark': comicQuestDarkTheme,
-  'comic-minimal-light': comicNotebookLightTheme,
-  'comic-minimal-dark': comicNotebookDarkTheme,
+  'comic-minimal-light': minimalLightTheme,
+  'comic-minimal-dark': minimalDarkTheme,
   'comic-light': comicPopLightTheme,
   'comic-dark': comicPopDarkTheme,
 };
@@ -48,6 +53,7 @@ export const THEME_GROUPS = {
     { id: 'comic-quest-light', name: 'Duo Quest (Light)', desc: 'Playful Duolingo-inspired learning UX with chunky 3D buttons.' },
     { id: 'comic-notebook-light', name: 'Index Notebook (Light)', desc: 'Ruled paper notebook with sticky index tabs and washi tape.' },
     { id: 'comic-arcade-light', name: 'Arcade Retro (Light)', desc: '90s pixel arcade cabinet style with HUD bars and coin buttons.' },
+    { id: 'minimal-light', name: 'Minimal (Light)', desc: 'Clean, distraction-free classic Anki design with subtle borders.' },
   ],
   dark: [
     { id: 'comic-pop-dark', name: 'Hero Pop (Dark)', desc: 'Midnight comic hero panels with bright amber and cyan action badges.' },
@@ -55,6 +61,7 @@ export const THEME_GROUPS = {
     { id: 'comic-quest-dark', name: 'Duo Quest (Dark)', desc: 'Midnight gamified educational card with glowing XP accents.' },
     { id: 'comic-notebook-dark', name: 'Index Notebook (Dark)', desc: 'Chalkboard study notebook with neon highlighters and sticky notes.' },
     { id: 'comic-arcade-dark', name: 'Arcade Retro (Dark)', desc: 'Vibrant neon 90s arcade cyberpunk interface with glowing terminals.' },
+    { id: 'minimal-dark', name: 'Minimal (Dark)', desc: 'Distraction-free dark Anki card with restrained colors and subtle borders.' },
   ],
 };
 
@@ -75,12 +82,15 @@ export function getSpellingFrontHtml(themeId: ThemeId): string {
       return duoQuestFrontSpellingHtml;
     case 'comic-notebook-light':
     case 'comic-notebook-dark':
-    case 'comic-minimal-light':
-    case 'comic-minimal-dark':
       return indexNotebookFrontSpellingHtml;
     case 'comic-arcade-light':
     case 'comic-arcade-dark':
       return arcadeRetroFrontSpellingHtml;
+    case 'minimal-light':
+    case 'minimal-dark':
+    case 'comic-minimal-light':
+    case 'comic-minimal-dark':
+      return minimalFrontSpellingHtml;
     default:
       return heroPopFrontSpellingHtml;
   }

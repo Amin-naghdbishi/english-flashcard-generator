@@ -3,34 +3,46 @@ import { duoQuestFrontNormalHtml, duoQuestBackHtml } from './templates';
 
 const css = `/* THEME 3: DUO QUEST LIGHT */
 .card {
-  background-color: #F0FDF4;
-  color: #1E293B;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  margin: 0;
-  padding: 16px 12px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  box-sizing: border-box;
+  background-color: #F0FDF4 !important;
+  color: #1E293B !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  margin: 0 !important;
+  padding: 16px 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  align-items: stretch !important;
+  min-height: 100vh !important;
+  box-sizing: border-box !important;
+}
+
+.nightMode .card, .nightMode.card {
+  background-color: #F0FDF4 !important;
+  color: #1E293B !important;
 }
 
 .comic-card-wrapper.theme-quest {
-  width: 100%;
-  max-width: 480px;
-  margin: 0 auto;
-  box-sizing: border-box;
+  width: 100% !important;
+  max-width: 900px !important;
+  margin: 0 auto !important;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box !important;
 }
 
 .quest-card {
-  width: 100%;
-  background-color: #FFFFFF;
-  border: 4px solid #000000;
-  border-radius: 16px;
-  box-shadow: 0 6px 0px #000000;
-  padding: 20px;
-  box-sizing: border-box;
-  text-align: left;
+  width: 100% !important;
+  background-color: #FFFFFF !important;
+  border: 4px solid #000000 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 6px 0px #000000 !important;
+  padding: 20px !important;
+  box-sizing: border-box !important;
+  text-align: left !important;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 .quest-top-bar {
@@ -282,49 +294,58 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   box-shadow: 0 2px 0 #3b8701 !important;
 }
 
-.spelling-interactive-area {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.spelling-input, .quest-input {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 12px 14px !important;
+  font-family: inherit !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  border: 3px solid #000000 !important;
+  border-radius: 12px !important;
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  outline: none !important;
 }
 
-.spelling-input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 10px 12px;
-  font-family: inherit;
-  border: 3px solid #000000;
-  background-color: #FFFFFF;
-  outline: none;
+.spelling-input::placeholder, .quest-input::placeholder {
+  color: #64748B !important;
+  opacity: 1 !important;
+  font-weight: 600 !important;
 }
 
-.spelling-input.is-valid { background-color: #DCFCE7; border-color: #16A34A; }
-.spelling-input.has-error { background-color: #FEE2E2; border-color: #DC2626; }
+.spelling-input.is-valid { background-color: #DCFCE7 !important; border-color: #16A34A !important; color: #0F172A !important; }
+.spelling-input.has-error { background-color: #FEE2E2 !important; border-color: #DC2626 !important; color: #0F172A !important; }
 
 .spelling-result {
-  margin-top: 8px;
-  border-radius: 12px;
-  transition: all 0.2s;
+  margin-top: 10px !important;
+  border-radius: 12px !important;
+  transition: all 0.2s !important;
 }
 
 .spelling-result.is-correct {
-  background-color: #DCFCE7;
-  border: 3px solid #000000;
-  padding: 12px;
+  background-color: #DCFCE7 !important;
+  border: 3px solid #000000 !important;
+  padding: 12px !important;
+  color: #0F172A !important;
 }
 
 .spelling-result.is-incorrect {
-  background-color: #FEE2E2;
-  border: 3px solid #000000;
-  padding: 12px;
+  background-color: #FEE2E2 !important;
+  border: 3px solid #000000 !important;
+  padding: 12px !important;
+  color: #0F172A !important;
 }
 
-.spelling-success-badge { font-size: 13px; font-weight: 900; color: #15803D; }
-.spelling-word-reveal { font-size: 20px; font-weight: 900; text-transform: uppercase; }
-.spelling-error-badge { font-size: 13px; font-weight: 900; color: #DC2626; margin-bottom: 4px; }
-.spelling-compare-box { font-size: 13px; font-weight: 800; }
-.spelling-mistake { color: #DC2626; text-decoration: line-through; }
-.spelling-exact { color: #15803D; font-size: 16px; text-transform: uppercase; }
+.spelling-success-badge { font-size: 13px !important; font-weight: 900 !important; color: #15803D !important; }
+.spelling-word-reveal { font-size: 20px !important; font-weight: 900 !important; text-transform: uppercase !important; color: #0F172A !important; margin-top: 4px !important; }
+.spelling-error-badge { font-size: 13px !important; font-weight: 900 !important; color: #DC2626 !important; margin-bottom: 4px !important; }
+.spelling-compare-box { font-size: 13px !important; font-weight: 800 !important; color: #0F172A !important; }
+.spelling-user-typed { color: #0F172A !important; margin-bottom: 2px !important; }
+.spelling-label { color: #475569 !important; font-weight: 700 !important; }
+.spelling-mistake { color: #DC2626 !important; text-decoration: line-through !important; font-weight: 900 !important; }
+.spelling-correct-ans { color: #0F172A !important; margin-top: 4px !important; }
+.spelling-exact { color: #15803D !important; font-size: 16px !important; font-weight: 900 !important; text-transform: uppercase !important; }
 
 /* AUDIO BUTTONS */
 .replay-button, .play-button, a.replay-button, .comic-audio-btn {
