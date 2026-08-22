@@ -294,6 +294,11 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   box-shadow: 0 2px 0 #3b8701 !important;
 }
 
+.spelling-interactive-area {
+  touch-action: auto !important;
+  pointer-events: auto !important;
+}
+
 .spelling-input, .quest-input {
   width: 100% !important;
   box-sizing: border-box !important;
@@ -306,6 +311,13 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   background-color: #FFFFFF !important;
   color: #0F172A !important;
   outline: none !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+  cursor: text !important;
 }
 
 .spelling-input::placeholder, .quest-input::placeholder {

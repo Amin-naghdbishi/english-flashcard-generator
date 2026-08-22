@@ -345,6 +345,8 @@ const css = `/* THEME 1: HERO POP DARK */
   flex-direction: column;
   gap: 8px;
   margin-bottom: 12px;
+  touch-action: auto !important;
+  pointer-events: auto !important;
 }
 
 .spelling-input {
@@ -358,6 +360,13 @@ const css = `/* THEME 1: HERO POP DARK */
   background-color: #0F172A !important;
   color: #F8FAFC !important;
   outline: none !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+  cursor: text !important;
 }
 
 .spelling-input.is-valid {

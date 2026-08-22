@@ -245,6 +245,8 @@ const css = `/* THEME: MINIMAL DARK - Clean, Distraction-Free Practical Dark The
   display: flex !important;
   flex-direction: column !important;
   gap: 10px !important;
+  touch-action: auto !important;
+  pointer-events: auto !important;
 }
 
 .spelling-input, .minimal-input {
@@ -252,12 +254,19 @@ const css = `/* THEME: MINIMAL DARK - Clean, Distraction-Free Practical Dark The
   box-sizing: border-box !important;
   padding: 10px 14px !important;
   font-family: inherit !important;
-  font-size: 15px !important;
+  font-size: 16px !important;
   border: 1px solid #52525B !important;
   border-radius: 6px !important;
   background-color: #18181B !important;
   color: #F4F4F5 !important;
   outline: none !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+  cursor: text !important;
 }
 
 .spelling-input::placeholder, .minimal-input::placeholder {
