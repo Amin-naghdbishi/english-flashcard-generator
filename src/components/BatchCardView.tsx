@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AppSettings, BatchItem, CardData, BatchFieldConfig, ManualOverrides } from '../types';
+import { AppSettings, BatchItem, CardData, BatchFieldConfig, ManualOverrides, AppTheme } from '../types';
 import {
   runFullPipeline,
   getAnkiDecks,
@@ -28,6 +28,7 @@ import {
 
 interface BatchCardViewProps {
   settings: AppSettings;
+  appTheme?: AppTheme;
 }
 
 export type BatchFormatType = 'formatA_simple' | 'formatB_structured';
@@ -36,47 +37,46 @@ export interface BatchParsedResult {
   format: BatchFormatType;
   formatLabel: string;
   formatDescription: string;
-  items: Array<{ word: string; deck: string; parsedFields: Partial<CardData> }>;
+  items: Array<{ word: string; deck: string; parsedFields: Partial<CardData> & { needsPhoto?: boolean } }>;
 }
 
 const DEFAULT_SAMPLE_FORMAT_A = `apple
 bank
 photo
 abandon
-accurate
-ancient`;
+wander
+wonder`;
 
 const DEFAULT_SAMPLE_FORMAT_B = `--
-Word=apple
+Word=eraser
 Deck=English::B1
-Phonetic=/ˈæpəl/
+Phonetic=/ɪˈreɪzər/
 Part of Speech=noun
-Persian Meaning=سیب
-Example Sentence=I ate a sweet apple for breakfast.
-ExampleTranslation=من برای صبحانه یک سیب شیرین خوردم.
-Memory Aid=Think of a crisp red apple.
+Persian Meaning=پاک‌کن
+Example Sentence=I need an eraser to fix this mistake.
+ExampleTranslation=من به یک پاک‌کن برای تصحیح این اشتباه نیاز دارم.
+Memory Aid=ERASE-ER: It erases mistakes on paper.
+Photo=true
 --
-
+Word=abandon
+Deck=English::B1
+Phonetic=/əˈbændən/
+Part of Speech=verb
+Persian Meaning=رها کردن، ترک کردن
+Example Sentence=He abandoned his car on the highway.
+ExampleTranslation=او ماشین خود را در بزرگراه رها کرد.
+Memory Aid=A-BAND-ON: Imagine a band left behind on the stage.
+Photo=false
 --
 Word=bank
 Deck=English::B1
-Phonetic=/bæŋk/
-Part of Speech=noun
-Persian Meaning=بانک
-Example Sentence=She went to the bank to deposit some cash.
-ExampleTranslation=او برای واریز مقداری پول نقد به بانک رفت.
-Memory Aid=Imagine the building where money is kept safely.
---
-
+Persian Meaning=بانک (موسسه مالی)
+Photo=true
 --
 Word=bank
 Deck=English::B1
-Phonetic=/bæŋk/
-Part of Speech=noun
 Persian Meaning=ساحل رودخانه
-Example Sentence=We walked along the river bank.
-ExampleTranslation=ما در امتداد ساحل رودخانه قدم زدیم.
-Memory Aid=Bank of a river.
+Photo=true
 --`;
 
 /**
@@ -99,9 +99,9 @@ export function autoDetectAndParseBatchInput(
   }
 
   // 1. Detection heuristic for Format B:
-  // Check for '--' block separators or structured key-value patterns (e.g. Word=, Persian Meaning=, etc.)
+  // Check for '--' block separators or structured key-value patterns (e.g. Word=, Persian Meaning=, Photo=, etc.)
   const hasSeparator = /(?:^|\r?\n)\s*--\s*(?:\r?\n|$)/m.test(trimmed);
-  const hasKeyValuePairs = /(?:^|\r?\n)\s*(?:word|deck|phonetic|ipa|part\s*of\s*speech|pos|persian\s*meaning|meaning|example\s*sentence|example|memory\s*aid|mnemonic)\s*[:=]/i.test(trimmed);
+  const hasKeyValuePairs = /(?:^|\r?\n)\s*(?:word|deck|phonetic|ipa|part\s*of\s*speech|pos|persian\s*meaning|meaning|example\s*sentence|example|memory\s*aid|mnemonic|photo|image|picture)\s*[:=]/i.test(trimmed);
 
   if (hasSeparator || hasKeyValuePairs) {
     // FORMAT B: Structured Entries
@@ -110,7 +110,7 @@ export function autoDetectAndParseBatchInput(
       : trimmed.split(/\r?\n\s*\r?\n/); // fallback split on blank lines
 
     const blocks = rawBlocks.map((b) => b.trim()).filter(Boolean);
-    const results: Array<{ word: string; deck: string; parsedFields: Partial<CardData> }> = [];
+    const results: Array<{ word: string; deck: string; parsedFields: Partial<CardData> & { needsPhoto?: boolean } }> = [];
 
     for (const block of blocks) {
       const lines = block.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -130,8 +130,19 @@ export function autoDetectAndParseBatchInput(
       const word = fields['word'] || fields['english'] || fields['term'] || '';
       if (!word) continue;
 
+      let needsPhoto: boolean | undefined = undefined;
+      const photoRaw = fields['photo'] || fields['image'] || fields['picture'] || fields['needsphoto'] || fields['needsimage'];
+      if (photoRaw !== undefined) {
+        const pLow = photoRaw.trim().toLowerCase();
+        if (pLow === 'true' || pLow === 'yes' || pLow === '1' || pLow === 'y' || pLow === 'on') {
+          needsPhoto = true;
+        } else if (pLow === 'false' || pLow === 'no' || pLow === '0' || pLow === 'n' || pLow === 'off') {
+          needsPhoto = false;
+        }
+      }
+
       const deck = fields['deck'] || fields['deckname'] || fields['targetdeck'] || defaultDeck;
-      const parsedFields: Partial<CardData> = {
+      const parsedFields: Partial<CardData> & { needsPhoto?: boolean } = {
         word,
         phonetic: fields['phonetic'] || fields['ipa'] || fields['pronunciation'] || undefined,
         partOfSpeech: fields['partofspeech'] || fields['pos'] || fields['type'] || undefined,
@@ -139,6 +150,7 @@ export function autoDetectAndParseBatchInput(
         example: fields['examplesentence'] || fields['example'] || fields['sentence'] || fields['sample'] || undefined,
         translationFa: fields['exampletranslation'] || fields['translation'] || fields['translationfa'] || fields['sentencefa'] || undefined,
         mnemonic: fields['memoryaid'] || fields['mnemonic'] || fields['aid'] || fields['code'] || undefined,
+        needsPhoto,
       };
 
       results.push({ word, deck, parsedFields });
@@ -170,7 +182,7 @@ export function autoDetectAndParseBatchInput(
   };
 }
 
-export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
+export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings, appTheme = settings.appTheme || 'comic' }) => {
   const [inputText, setInputText] = useState<string>(DEFAULT_SAMPLE_FORMAT_A);
   const [fileName, setFileName] = useState<string>('sample_words.txt');
   const [deck, setDeck] = useState<string>(settings.anki.defaultDeck || 'English::B1');
@@ -190,6 +202,10 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
   const [previewCard, setPreviewCard] = useState<CardData | null>(null);
   const [preflightError, setPreflightError] = useState<string | null>(null);
   const [showFieldConfig, setShowFieldConfig] = useState<boolean>(false);
+
+  const isMinimalLight = appTheme === 'minimal-light';
+  const isMinimalDark = appTheme === 'minimal-dark';
+  const isMinimal = isMinimalLight || isMinimalDark;
 
   // User-Controlled Fields Config
   const [fieldConfig, setFieldConfig] = useState<BatchFieldConfig>({
@@ -217,41 +233,43 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
     }).catch(() => {});
   }, [settings.anki.url]);
 
-  // Automatically detect format and update parsed items whenever input text or deck changes
+  // Sync Input and Auto-Parse Items Whenever Input or Deck changes
   useEffect(() => {
-    const parseResult = autoDetectAndParseBatchInput(inputText, deck);
+    const parsed = autoDetectAndParseBatchInput(inputText, deck);
     setDetectedFormatInfo({
-      format: parseResult.format,
-      formatLabel: parseResult.formatLabel,
-      formatDescription: parseResult.formatDescription,
+      format: parsed.format,
+      formatLabel: parsed.formatLabel,
+      formatDescription: parsed.formatDescription,
     });
 
     setItems(
-      parseResult.items.map((p, idx) => ({
-        id: `${p.word}_${idx}_${Date.now()}`,
-        word: p.word,
-        deck: p.deck || deck,
+      parsed.items.map((it, idx) => ({
+        id: `batch-${idx}-${it.word}`,
+        word: it.word,
+        deck: it.deck,
         status: 'idle',
-        parsedFields: p.parsedFields,
+        parsedFields: it.parsedFields,
       }))
     );
   }, [inputText, deck]);
 
-  // Handle TXT File Upload
+  // File Upload Handler
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setFileName(file.name);
     const reader = new FileReader();
-    reader.onload = (evt) => {
-      const text = (evt.target?.result as string) || '';
-      setInputText(text);
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content) {
+        setInputText(content);
+      }
     };
     reader.readAsText(file);
   };
 
-  // Run Preflight Check for selected AI, TTS, and Anki
+  // Preflight Health Checks
   const runPreflightCheck = async (): Promise<boolean> => {
     setPreflightError(null);
 
@@ -308,6 +326,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
       if (fieldConfig.example && item.parsedFields.example) overrides.example = item.parsedFields.example;
       if (fieldConfig.translationFa && item.parsedFields.translationFa) overrides.translationFa = item.parsedFields.translationFa;
       if (fieldConfig.mnemonic && item.parsedFields.mnemonic) overrides.mnemonic = item.parsedFields.mnemonic;
+      if (item.parsedFields.needsPhoto !== undefined) overrides.needsPhoto = item.parsedFields.needsPhoto;
     }
 
     // Run Pipeline with allowDuplicate: true so duplicate words with distinct meanings create separate cards
@@ -344,32 +363,20 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
 
     setIsProcessing(true);
 
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].status === 'success') continue;
+    const updatedItems = [...items];
 
-      setItems((prev) =>
-        prev.map((it, idx) =>
-          idx === i ? { ...it, status: 'generating_ai', error: undefined } : it
-        )
-      );
+    for (let i = 0; i < updatedItems.length; i++) {
+      if (updatedItems[i].status === 'success') continue;
 
-      try {
-        const resultItem = await processItem(items[i]);
-        setItems((prev) =>
-          prev.map((it, idx) => (idx === i ? resultItem : it))
-        );
+      updatedItems[i] = { ...updatedItems[i], status: 'generating_ai' };
+      setItems([...updatedItems]);
 
-        if (resultItem.cardData) {
-          setPreviewCard(resultItem.cardData);
-        }
-      } catch (err: any) {
-        setItems((prev) =>
-          prev.map((it, idx) =>
-            idx === i
-              ? { ...it, status: 'error', error: err.message || 'Error' }
-              : it
-          )
-        );
+      const processed = await processItem(updatedItems[i]);
+      updatedItems[i] = processed;
+      setItems([...updatedItems]);
+
+      if (processed.cardData) {
+        setPreviewCard(processed.cardData);
       }
     }
 
@@ -378,63 +385,23 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
 
   // Retry single item
   const handleRetrySingle = async (index: number) => {
-    const item = items[index];
-    if (!item || isProcessing) return;
+    if (isProcessing) return;
+    const targetItem = items[index];
+    if (!targetItem) return;
 
-    setItems((prev) =>
-      prev.map((it, idx) =>
-        idx === index ? { ...it, status: 'generating_ai', error: undefined } : it
-      )
-    );
+    const preflightPassed = await runPreflightCheck();
+    if (!preflightPassed) return;
 
-    try {
-      const targetDeck = item.deck || deck;
-      const overrides: ManualOverrides = {};
-      if (item.parsedFields) {
-        if (fieldConfig.phonetic && item.parsedFields.phonetic) overrides.phonetic = item.parsedFields.phonetic;
-        if (fieldConfig.partOfSpeech && item.parsedFields.partOfSpeech) overrides.partOfSpeech = item.parsedFields.partOfSpeech;
-        if (fieldConfig.meaningFa && item.parsedFields.meaningFa) overrides.meaningFa = item.parsedFields.meaningFa;
-        if (fieldConfig.example && item.parsedFields.example) overrides.example = item.parsedFields.example;
-        if (fieldConfig.translationFa && item.parsedFields.translationFa) overrides.translationFa = item.parsedFields.translationFa;
-        if (fieldConfig.mnemonic && item.parsedFields.mnemonic) overrides.mnemonic = item.parsedFields.mnemonic;
-      }
+    const updated = [...items];
+    updated[index] = { ...targetItem, status: 'generating_ai', error: undefined };
+    setItems(updated);
 
-      const res = await runFullPipeline({
-        word: item.word,
-        deck: targetDeck,
-        manualOverrides: overrides,
-        cardType: settings.defaultCard?.cardType || 'normal',
-        createInAnki: true,
-      });
+    const processed = await processItem(targetItem);
+    updated[index] = processed;
+    setItems([...updated]);
 
-      if (res.success && res.cardData) {
-        setItems((prev) =>
-          prev.map((it, idx) =>
-            idx === index
-              ? {
-                  ...it,
-                  status: 'success',
-                  cardData: res.cardData,
-                  noteId: res.noteId,
-                  error: undefined,
-                }
-              : it
-          )
-        );
-        setPreviewCard(res.cardData);
-      } else {
-        setItems((prev) =>
-          prev.map((it, idx) =>
-            idx === index ? { ...it, status: 'error', error: res.error } : it
-          )
-        );
-      }
-    } catch (err: any) {
-      setItems((prev) =>
-        prev.map((it, idx) =>
-          idx === index ? { ...it, status: 'error', error: err.message } : it
-        )
-      );
+    if (processed.cardData) {
+      setPreviewCard(processed.cardData);
     }
   };
 
@@ -445,13 +412,21 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
   }, 0);
 
   return (
-    <div className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 p-4 sm:p-6">
+    <div className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 p-4 sm:p-6 min-w-0">
       {/* LEFT COLUMN: TXT Batch Input & Queue */}
-      <section className="w-full lg:w-[480px] flex flex-col gap-6 shrink-0">
-        {/* Batch File Box (#4ADE80) */}
-        <div className="bg-[#4ADE80] p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-black">
-          <div className="flex items-center justify-between border-b-4 border-black pb-3 mb-4">
-            <h2 className="text-xl sm:text-2xl font-black uppercase italic tracking-tight flex items-center gap-2">
+      <section className="w-full lg:w-[480px] flex flex-col gap-6 shrink-0 min-w-0">
+        {/* Batch File Box */}
+        <div
+          className={
+            isMinimalLight
+              ? 'bg-white p-5 sm:p-6 border border-slate-200 rounded-lg shadow-sm text-slate-800'
+              : isMinimalDark
+              ? 'bg-[#27272A] p-5 sm:p-6 border border-zinc-700 rounded-lg shadow-sm text-zinc-100'
+              : 'bg-[#4ADE80] p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-black'
+          }
+        >
+          <div className={isMinimal ? 'flex items-center justify-between border-b pb-3 mb-4 border-slate-200 dark:border-zinc-700' : 'flex items-center justify-between border-b-4 border-black pb-3 mb-4'}>
+            <h2 className={isMinimal ? 'text-lg font-bold tracking-tight' : 'text-xl sm:text-2xl font-black uppercase italic tracking-tight flex items-center gap-2'}>
               Batch Import (TXT)
             </h2>
             <div className="flex items-center gap-2">
@@ -465,7 +440,11 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-3 py-1.5 bg-[#FFD93D] hover:bg-[#ffe066] text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000000] flex items-center gap-1.5 cursor-pointer uppercase active:translate-y-0.5"
+                className={
+                  isMinimal
+                    ? 'px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-sm flex items-center gap-1.5 cursor-pointer'
+                    : 'px-3 py-1.5 bg-[#FFD93D] hover:bg-[#ffe066] text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000000] flex items-center gap-1.5 cursor-pointer uppercase active:translate-y-0.5'
+                }
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>Upload TXT</span>
@@ -474,50 +453,86 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
           </div>
 
           {/* AUTO-DETECTED FORMAT BANNER */}
-          <div className="bg-black text-white p-3 border-4 border-black shadow-[3px_3px_0px_#000000] mb-3">
+          <div
+            className={
+              isMinimalLight
+                ? 'bg-slate-50 text-slate-800 p-3 border border-slate-200 rounded-md shadow-sm mb-3'
+                : isMinimalDark
+                ? 'bg-zinc-900 text-zinc-200 p-3 border border-zinc-700 rounded-md shadow-sm mb-3'
+                : 'bg-black text-white p-3 border-4 border-black shadow-[3px_3px_0px_#000000] mb-3'
+            }
+          >
             <div className="flex items-center justify-between gap-2 mb-1">
               <div className="flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-[#FFD93D]" />
-                <span className="text-xs font-black uppercase text-[#FFD93D] tracking-wider">
+                <span className={isMinimal ? 'text-xs font-semibold' : 'text-xs font-black uppercase text-[#FFD93D] tracking-wider'}>
                   Auto-Detected Format:
                 </span>
               </div>
               <span
-                className={`px-2 py-0.5 text-[10px] font-black uppercase border border-white ${
+                className={`px-2 py-0.5 text-[10px] font-bold uppercase border ${
                   detectedFormatInfo.format === 'formatB_structured'
-                    ? 'bg-[#C084FC] text-black'
-                    : 'bg-[#38BDF8] text-black'
-                }`}
+                    ? 'bg-purple-600 text-white border-purple-700'
+                    : 'bg-blue-600 text-white border-blue-700'
+                } ${isMinimal ? 'rounded' : ''}`}
               >
                 {detectedFormatInfo.format === 'formatB_structured' ? 'Format B (Structured)' : 'Format A (Simple List)'}
               </span>
             </div>
-            <p className="text-[11px] text-zinc-300 font-bold">
+            <p className={isMinimal ? 'text-xs text-slate-500 dark:text-zinc-400' : 'text-[11px] text-zinc-300 font-bold'}>
               {detectedFormatInfo.formatDescription}
             </p>
           </div>
 
           {/* TXT File Status & Default Deck */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-            <div className="bg-white p-2.5 border-4 border-black flex items-center justify-between">
+            <div
+              className={
+                isMinimalLight
+                  ? 'bg-white p-2.5 border border-slate-200 rounded-md flex items-center justify-between'
+                  : isMinimalDark
+                  ? 'bg-zinc-900 p-2.5 border border-zinc-700 rounded-md flex items-center justify-between'
+                  : 'bg-white p-2.5 border-4 border-black flex items-center justify-between'
+              }
+            >
               <div className="flex items-center gap-2 min-w-0">
-                <FileText className="w-4 h-4 text-black shrink-0" />
-                <span className="text-xs font-black text-black truncate max-w-[120px]">
+                <FileText className="w-4 h-4 text-black dark:text-zinc-300 shrink-0" />
+                <span className="text-xs font-bold truncate max-w-[120px]">
                   {fileName}
                 </span>
               </div>
-              <span className="text-xs font-black bg-black text-[#4ADE80] px-2 py-0.5 border border-black">
+              <span
+                className={
+                  isMinimal
+                    ? 'text-xs font-semibold bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 px-2 py-0.5 rounded'
+                    : 'text-xs font-black bg-black text-[#4ADE80] px-2 py-0.5 border border-black'
+                }
+              >
                 {items.length} cards
               </span>
             </div>
 
-            <div className="bg-white p-2.5 border-4 border-black flex items-center justify-between gap-1">
-              <label className="text-xs font-black text-black uppercase">Deck:</label>
+            <div
+              className={
+                isMinimalLight
+                  ? 'bg-white p-2.5 border border-slate-200 rounded-md flex items-center justify-between gap-1'
+                  : isMinimalDark
+                  ? 'bg-zinc-900 p-2.5 border border-zinc-700 rounded-md flex items-center justify-between gap-1'
+                  : 'bg-white p-2.5 border-4 border-black flex items-center justify-between gap-1'
+              }
+            >
+              <label className="text-xs font-bold uppercase">Deck:</label>
               <select
                 value={deck}
                 onChange={(e) => setDeck(e.target.value)}
                 disabled={isProcessing}
-                className="flex-1 bg-white text-black text-xs font-bold px-1 py-0.5 focus:outline-none cursor-pointer"
+                className={
+                  isMinimalLight
+                    ? 'flex-1 bg-white text-slate-900 text-xs font-medium px-1 py-0.5 focus:outline-none cursor-pointer'
+                    : isMinimalDark
+                    ? 'flex-1 bg-zinc-900 text-zinc-100 text-xs font-medium px-1 py-0.5 focus:outline-none cursor-pointer'
+                    : 'flex-1 bg-white text-black text-xs font-bold px-1 py-0.5 focus:outline-none cursor-pointer'
+                }
               >
                 {availableDecks.map((d) => (
                   <option key={d} value={d}>
@@ -536,9 +551,13 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                 setFileName('sample_simple_list.txt');
                 setInputText(DEFAULT_SAMPLE_FORMAT_A);
               }}
-              className="flex-1 py-1.5 px-2 bg-white hover:bg-zinc-100 text-black text-[11px] font-black uppercase border-2 border-black cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center justify-center gap-1"
+              className={
+                isMinimal
+                  ? 'flex-1 py-1.5 px-2 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 text-xs font-medium rounded border border-slate-200 dark:border-zinc-700 cursor-pointer flex items-center justify-center gap-1 transition-colors'
+                  : 'flex-1 py-1.5 px-2 bg-white hover:bg-zinc-100 text-black text-[11px] font-black uppercase border-2 border-black cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center justify-center gap-1'
+              }
             >
-              <List className="w-3.5 h-3.5 text-[#2563EB]" />
+              <List className="w-3.5 h-3.5 text-blue-600" />
               <span>Load Format A Example</span>
             </button>
             <button
@@ -547,9 +566,13 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                 setFileName('sample_structured_blocks.txt');
                 setInputText(DEFAULT_SAMPLE_FORMAT_B);
               }}
-              className="flex-1 py-1.5 px-2 bg-white hover:bg-zinc-100 text-black text-[11px] font-black uppercase border-2 border-black cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center justify-center gap-1"
+              className={
+                isMinimal
+                  ? 'flex-1 py-1.5 px-2 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 text-xs font-medium rounded border border-slate-200 dark:border-zinc-700 cursor-pointer flex items-center justify-center gap-1 transition-colors'
+                  : 'flex-1 py-1.5 px-2 bg-white hover:bg-zinc-100 text-black text-[11px] font-black uppercase border-2 border-black cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center justify-center gap-1'
+              }
             >
-              <Layers className="w-3.5 h-3.5 text-[#7C3AED]" />
+              <Layers className="w-3.5 h-3.5 text-purple-600" />
               <span>Load Format B Example</span>
             </button>
           </div>
@@ -561,17 +584,31 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               disabled={isProcessing}
-              className="w-full bg-white text-black text-xs font-bold font-mono p-3 border-4 border-black focus:outline-none"
+              className={
+                isMinimalLight
+                  ? 'w-full bg-white text-slate-900 text-xs font-medium font-mono p-3 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                  : isMinimalDark
+                  ? 'w-full bg-zinc-950 text-zinc-100 text-xs font-medium font-mono p-3 border border-zinc-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                  : 'w-full bg-white text-black text-xs font-bold font-mono p-3 border-4 border-black focus:outline-none'
+              }
               placeholder="Paste words or upload TXT file. Format is auto-detected automatically!"
             />
           </div>
 
           {/* Field Settings Collapsible */}
-          <div className="bg-white border-4 border-black p-3 mb-4">
+          <div
+            className={
+              isMinimalLight
+                ? 'bg-white border border-slate-200 rounded-md p-3 mb-4 shadow-sm'
+                : isMinimalDark
+                ? 'bg-zinc-900 border border-zinc-700 rounded-md p-3 mb-4 shadow-sm'
+                : 'bg-white border-4 border-black p-3 mb-4'
+            }
+          >
             <button
               type="button"
               onClick={() => setShowFieldConfig(!showFieldConfig)}
-              className="w-full flex items-center justify-between text-xs font-black uppercase tracking-wider text-black cursor-pointer hover:opacity-80"
+              className="w-full flex items-center justify-between text-xs font-bold uppercase tracking-wider cursor-pointer hover:opacity-80"
             >
               <span className="flex items-center gap-1.5">
                 <Sliders className="w-3.5 h-3.5" />
@@ -581,8 +618,8 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             </button>
 
             {showFieldConfig && (
-              <div className="mt-3 pt-3 border-t-2 border-black text-xs space-y-2">
-                <p className="text-[10px] text-zinc-600 font-bold mb-2">
+              <div className="mt-3 pt-3 border-t border-slate-200 dark:border-zinc-700 text-xs space-y-2">
+                <p className={isMinimal ? 'text-[11px] text-slate-500 dark:text-zinc-400 mb-2' : 'text-[10px] text-zinc-600 font-bold mb-2'}>
                   * If present in TXT, the file's data is preserved with top priority. Missing fields are generated by AI / dictionary.
                 </p>
                 <div className="grid grid-cols-2 gap-2">
@@ -591,72 +628,72 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                       type="checkbox"
                       checked={fieldConfig.word}
                       disabled
-                      className="w-3.5 h-3.5 accent-black"
+                      className="w-3.5 h-3.5 accent-blue-600"
                     />
-                    <span className="text-[11px] font-bold">Word (Always)</span>
+                    <span className="text-[11px] font-medium">Word (Always)</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={fieldConfig.deck}
                       onChange={(e) => setFieldConfig({ ...fieldConfig, deck: e.target.checked })}
-                      className="w-3.5 h-3.5 accent-black"
+                      className="w-3.5 h-3.5 accent-blue-600"
                     />
-                    <span className="text-[11px] font-bold">Deck</span>
+                    <span className="text-[11px] font-medium">Deck</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={fieldConfig.phonetic}
                       onChange={(e) => setFieldConfig({ ...fieldConfig, phonetic: e.target.checked })}
-                      className="w-3.5 h-3.5 accent-black"
+                      className="w-3.5 h-3.5 accent-blue-600"
                     />
-                    <span className="text-[11px] font-bold">Phonetic</span>
+                    <span className="text-[11px] font-medium">Phonetic</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={fieldConfig.partOfSpeech}
                       onChange={(e) => setFieldConfig({ ...fieldConfig, partOfSpeech: e.target.checked })}
-                      className="w-3.5 h-3.5 accent-black"
+                      className="w-3.5 h-3.5 accent-blue-600"
                     />
-                    <span className="text-[11px] font-bold">Part of Speech</span>
+                    <span className="text-[11px] font-medium">Part of Speech</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={fieldConfig.meaningFa}
                       onChange={(e) => setFieldConfig({ ...fieldConfig, meaningFa: e.target.checked })}
-                      className="w-3.5 h-3.5 accent-black"
+                      className="w-3.5 h-3.5 accent-blue-600"
                     />
-                    <span className="text-[11px] font-bold">Persian Meaning</span>
+                    <span className="text-[11px] font-medium">Persian Meaning</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={fieldConfig.example}
                       onChange={(e) => setFieldConfig({ ...fieldConfig, example: e.target.checked })}
-                      className="w-3.5 h-3.5 accent-black"
+                      className="w-3.5 h-3.5 accent-blue-600"
                     />
-                    <span className="text-[11px] font-bold">Example Sentence</span>
+                    <span className="text-[11px] font-medium">Example Sentence</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={fieldConfig.translationFa}
                       onChange={(e) => setFieldConfig({ ...fieldConfig, translationFa: e.target.checked })}
-                      className="w-3.5 h-3.5 accent-black"
+                      className="w-3.5 h-3.5 accent-blue-600"
                     />
-                    <span className="text-[11px] font-bold">Example Translation</span>
+                    <span className="text-[11px] font-medium">Example Translation</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={fieldConfig.mnemonic}
                       onChange={(e) => setFieldConfig({ ...fieldConfig, mnemonic: e.target.checked })}
-                      className="w-3.5 h-3.5 accent-black"
+                      className="w-3.5 h-3.5 accent-blue-600"
                     />
-                    <span className="text-[11px] font-bold">Memory Aid</span>
+                    <span className="text-[11px] font-medium">Memory Aid</span>
                   </label>
                 </div>
               </div>
@@ -665,20 +702,30 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
 
           {/* Preflight Error Banner */}
           {preflightError && (
-            <div className="mb-3 p-3 bg-red-600 border-4 border-black text-white text-xs flex items-center gap-2 font-bold shadow-[2px_2px_0px_#000000]">
+            <div className="mb-3 p-3 bg-red-600 text-white text-xs flex items-center gap-2 font-bold shadow-sm rounded-md">
               <AlertTriangle className="w-4 h-4 text-white shrink-0" />
               <span>{preflightError}</span>
             </div>
           )}
 
-          {/* Build All Button (#FF4B4B) */}
+          {/* Build All Button */}
           <button
             type="button"
             onClick={handleBuildAll}
             disabled={isProcessing || items.length === 0}
-            className={`w-full bg-[#FF4B4B] text-white font-black py-4 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-xl uppercase tracking-wider hover:translate-y-0.5 active:translate-y-1 transition-transform flex items-center justify-center gap-2 select-none ${
-              isProcessing ? 'opacity-80 cursor-wait' : 'cursor-pointer'
-            }`}
+            className={
+              isMinimal
+                ? `w-full py-3 px-4 font-semibold text-sm rounded-md shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+                    isProcessing
+                      ? 'bg-blue-400 text-white cursor-wait'
+                      : isMinimalDark
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`
+                : `w-full bg-[#FF4B4B] text-white font-black py-4 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-xl uppercase tracking-wider hover:translate-y-0.5 active:translate-y-1 transition-transform flex items-center justify-center gap-2 select-none ${
+                    isProcessing ? 'opacity-80 cursor-wait' : 'cursor-pointer'
+                  }`
+            }
           >
             {isProcessing ? (
               <>
@@ -695,14 +742,22 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
         </div>
 
         {/* Batch Queue List */}
-        <div className="bg-white border-4 border-black p-4 sm:p-5 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col text-black">
-          <div className="flex items-center justify-between border-b-2 border-black pb-2 mb-3">
-            <span className="text-xs font-black text-black uppercase tracking-wider">
+        <div
+          className={
+            isMinimalLight
+              ? 'bg-white border border-slate-200 rounded-lg p-4 sm:p-5 shadow-sm flex flex-col text-slate-800'
+              : isMinimalDark
+              ? 'bg-[#27272A] border border-zinc-700 rounded-lg p-4 sm:p-5 shadow-sm flex flex-col text-zinc-100'
+              : 'bg-white border-4 border-black p-4 sm:p-5 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col text-black'
+          }
+        >
+          <div className="flex items-center justify-between border-b pb-2 mb-3 border-slate-200 dark:border-zinc-700">
+            <span className="text-xs font-bold uppercase tracking-wider">
               Batch Queue ({completedCount} / {items.length})
             </span>
-            <div className="flex items-center gap-2 text-[11px] font-black">
-              {completedCount > 0 && <span className="text-emerald-700">{completedCount} ✓</span>}
-              {errorCount > 0 && <span className="text-red-600">{errorCount} ✕</span>}
+            <div className="flex items-center gap-2 text-xs font-semibold">
+              {completedCount > 0 && <span className="text-emerald-600">{completedCount} ✓</span>}
+              {errorCount > 0 && <span className="text-red-500">{errorCount} ✕</span>}
             </div>
           </div>
 
@@ -717,15 +772,27 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                 <div
                   key={item.id}
                   onClick={() => item.cardData && setPreviewCard(item.cardData)}
-                  className={`p-2.5 border-2 border-black flex items-center justify-between gap-3 text-xs transition-colors cursor-pointer ${
-                    isSuccess
-                      ? 'bg-emerald-50 text-black'
-                      : isFailed
-                      ? 'bg-red-50 text-black'
-                      : isRunning
-                      ? 'bg-sky-50 text-black animate-pulse'
-                      : 'bg-white text-black'
-                  }`}
+                  className={
+                    isMinimal
+                      ? `p-2.5 border rounded-md flex items-center justify-between gap-3 text-xs transition-colors cursor-pointer ${
+                          isSuccess
+                            ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200'
+                            : isFailed
+                            ? 'bg-red-50 dark:bg-red-950/40 border-red-300 dark:border-red-800 text-red-950 dark:text-red-200'
+                            : isRunning
+                            ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-300 dark:border-sky-800 text-sky-950 dark:text-sky-200 animate-pulse'
+                            : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-zinc-200'
+                        }`
+                      : `p-2.5 border-2 border-black flex items-center justify-between gap-3 text-xs transition-colors cursor-pointer ${
+                          isSuccess
+                            ? 'bg-emerald-50 text-black'
+                            : isFailed
+                            ? 'bg-red-50 text-black'
+                            : isRunning
+                            ? 'bg-sky-50 text-black animate-pulse'
+                            : 'bg-white text-black'
+                        }`
+                  }
                 >
                   {/* Left: Word & Info */}
                   <div className="flex items-center gap-2 min-w-0">
@@ -734,15 +801,15 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                     </span>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-black text-black text-sm truncate">{item.word}</span>
+                        <span className="font-bold text-sm truncate">{item.word}</span>
                         {item.noteId && (
-                          <span className="text-[10px] bg-black text-[#4ADE80] font-black px-1.5 py-0.2 border border-black">
+                          <span className="text-[10px] bg-slate-800 text-emerald-400 font-bold px-1.5 py-0.2 rounded">
                             #{item.noteId}
                           </span>
                         )}
                       </div>
                       {customMeaning && (
-                        <span className="text-[10px] text-zinc-600 font-bold block truncate max-w-[200px]" dir="rtl">
+                        <span className="text-[10px] text-zinc-500 font-medium block truncate max-w-[200px]" dir="rtl">
                           {customMeaning}
                         </span>
                       )}
@@ -752,10 +819,10 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                   {/* Right: Actions */}
                   <div className="flex items-center gap-2 shrink-0">
                     {isSuccess && (
-                      <span className="text-emerald-700 font-black text-sm">✓</span>
+                      <span className="text-emerald-600 font-bold text-sm">✓</span>
                     )}
                     {isRunning && (
-                      <span className="text-blue-700 font-black text-xs">generating...</span>
+                      <span className="text-blue-600 font-bold text-xs">generating...</span>
                     )}
                     {isFailed && (
                       <button
@@ -765,14 +832,14 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                           handleRetrySingle(idx);
                         }}
                         disabled={isProcessing}
-                        className="px-2 py-0.5 bg-red-600 text-white font-black text-[10px] border border-black flex items-center gap-1 cursor-pointer"
+                        className="px-2 py-0.5 bg-red-600 text-white font-medium text-[10px] rounded flex items-center gap-1 cursor-pointer"
                       >
                         <RotateCcw className="w-2.5 h-2.5" />
                         <span>Retry</span>
                       </button>
                     )}
                     {item.status === 'idle' && (
-                      <span className="text-zinc-400 font-bold text-xs">ready</span>
+                      <span className="text-zinc-400 font-medium text-xs">ready</span>
                     )}
                     {item.cardData && (
                       <button
@@ -781,7 +848,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                           e.stopPropagation();
                           setPreviewCard(item.cardData!);
                         }}
-                        className="p-1 text-black hover:opacity-70 cursor-pointer"
+                        className="p-1 hover:opacity-70 cursor-pointer"
                         title="Inspect Card"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -796,13 +863,22 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
       </section>
 
       {/* RIGHT COLUMN: Live Card Preview Frame */}
-      <section className="flex-1 flex flex-col min-h-[560px]">
-        <div className="flex-1 bg-[#F5F2EB] border-4 border-black p-4 sm:p-8 relative overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col">
-          <div className="relative z-10 w-full flex-1 flex flex-col justify-center">
+      <section className="flex-1 flex flex-col min-h-[560px] min-w-0">
+        <div
+          className={
+            isMinimalLight
+              ? 'flex-1 bg-slate-50 border border-slate-200 rounded-lg p-4 sm:p-6 relative overflow-hidden shadow-sm flex flex-col'
+              : isMinimalDark
+              ? 'flex-1 bg-[#1F1F23] border border-zinc-700 rounded-lg p-4 sm:p-6 relative overflow-hidden shadow-sm flex flex-col'
+              : 'flex-1 bg-[#F5F2EB] border-4 border-black p-4 sm:p-8 relative overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col'
+          }
+        >
+          <div className="relative z-10 w-full flex-1 flex flex-col justify-center min-w-0">
             <CardPreview
               cardData={previewCard}
               themeId={settings.theme}
               emptyWordPlaceholder={items[0]?.word || 'batch card'}
+              appTheme={appTheme}
             />
           </div>
         </div>

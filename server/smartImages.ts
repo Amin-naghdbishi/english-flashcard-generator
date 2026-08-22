@@ -297,7 +297,8 @@ export async function getSmartImage(
   partOfSpeech: string = '',
   meaningFa: string = '',
   smartImagesConfig?: SmartImagesConfig,
-  appSettings?: AppSettings
+  appSettings?: AppSettings,
+  forceFetch: boolean = false
 ): Promise<SmartImageResult> {
   const cleanWord = (word || '').trim().toLowerCase();
   if (!cleanWord) {
@@ -306,20 +307,28 @@ export async function getSmartImage(
 
   // 1. Evaluate image decision
   let decision: SmartImageDecision;
-  const decisionProvider = smartImagesConfig?.decisionProvider || 'heuristic';
-
-  if (decisionProvider === 'heuristic' || !appSettings) {
-    decision = evaluateWordNeedsImageHeuristic(cleanWord, partOfSpeech, meaningFa);
-  } else {
-    decision = await evaluateWordNeedsImageAI(cleanWord, partOfSpeech, meaningFa, decisionProvider, appSettings);
-  }
-
-  if (!decision.needsImage) {
-    return {
-      success: true,
-      needsImage: false,
-      reason: decision.reason || 'Word is an abstract concept that does not require an image.',
+  if (forceFetch) {
+    decision = {
+      needsImage: true,
+      reason: 'Photo explicitly requested by user (Photo: Yes)',
+      searchTerm: cleanWord,
     };
+  } else {
+    const decisionProvider = smartImagesConfig?.decisionProvider || 'heuristic';
+
+    if (decisionProvider === 'heuristic' || !appSettings) {
+      decision = evaluateWordNeedsImageHeuristic(cleanWord, partOfSpeech, meaningFa);
+    } else {
+      decision = await evaluateWordNeedsImageAI(cleanWord, partOfSpeech, meaningFa, decisionProvider, appSettings);
+    }
+
+    if (!decision.needsImage) {
+      return {
+        success: true,
+        needsImage: false,
+        reason: decision.reason || 'Word is an abstract concept that does not require an image.',
+      };
+    }
   }
 
   const searchTerm = decision.searchTerm || cleanWord;

@@ -51,6 +51,10 @@ export interface CardData {
   wordAudioFileName?: string;
   exampleAudioFileName?: string;
 
+  needsPhoto?: boolean;
+  needsImage?: boolean;
+  imageReason?: string;
+
   // Array of all generated audio clips
   audioFiles?: CardAudioFile[];
 }
@@ -65,7 +69,10 @@ export interface ManualOverrides {
   cardType?: CardType;
   imageBase64?: string;
   imageFileName?: string;
+  needsPhoto?: boolean;
 }
+
+export type AppTheme = 'comic' | 'minimal-light' | 'minimal-dark';
 
 export type AIProvider = 'ollama' | 'gemini' | 'custom' | string;
 export type TTSProvider = 'piper' | 'online' | 'custom' | string;
@@ -215,6 +222,7 @@ export interface AppSettings {
   defaultCard: DefaultCardConfig;
   anki: AnkiConfig;
   theme: ThemeId;
+  appTheme?: AppTheme;
 }
 
 export interface BatchFieldConfig {

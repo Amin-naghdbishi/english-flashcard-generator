@@ -218,10 +218,15 @@ function normalizeSettings(raw: any): AppSettings {
     allowDuplicateWords: defCard.allowDuplicateWords !== false,
   };
 
-  // Normalize Theme
+  // Normalize Card Theme
   if (merged.theme === 'comic-dark') merged.theme = 'comic-pop-dark';
   if (merged.theme === 'comic-light') merged.theme = 'comic-pop-light';
   if (!THEMES[merged.theme]) merged.theme = 'comic-pop-dark';
+
+  // Normalize Application UI Theme (Comic vs Minimal Light vs Minimal Dark)
+  if (merged.appTheme !== 'minimal-light' && merged.appTheme !== 'minimal-dark' && merged.appTheme !== 'comic') {
+    merged.appTheme = 'comic';
+  }
 
   return merged;
 }
@@ -821,15 +826,27 @@ async function startServer() {
       });
     }
 
-    // [5] Smart Images (Automatic image evaluation & download)
-    if (appSettings.smartImages.enabled) {
+    // [5] Smart Images (Automatic image evaluation & download, or explicit Photo Choice)
+    const explicitPhotoChoice = (manualOverrides && typeof manualOverrides.needsPhoto === 'boolean')
+      ? manualOverrides.needsPhoto
+      : (req.body.photoChoice === 'yes' || req.body.photoChoice === true
+          ? true
+          : (req.body.photoChoice === 'no' || req.body.photoChoice === false
+              ? false
+              : undefined));
+
+    if (explicitPhotoChoice === false) {
+      pushLog(5, 'Smart Image Option', 'skipped', `Photo disabled by user (Photo: No). No image searched.`);
+    } else if (explicitPhotoChoice === true || appSettings.smartImages.enabled) {
       try {
+        const forceFetch = explicitPhotoChoice === true;
         const imgRes = await getSmartImage(
           cardData.word,
           cardData.partOfSpeech,
           cardData.meaningFa,
           appSettings.smartImages,
-          appSettings
+          appSettings,
+          forceFetch
         );
         if (imgRes.success && imgRes.needsImage && imgRes.imageBase64 && imgRes.imageFileName) {
           cardData.imageBase64 = imgRes.imageBase64;
@@ -838,7 +855,7 @@ async function startServer() {
           cardData.imageReason = imgRes.reason;
           pushLog(5, 'Smart Image Attached', 'success', `Attached image for "${cardData.word}" (${imgRes.imageFileName})`, imgRes.reason);
         } else {
-          pushLog(5, 'Smart Image Evaluated', 'skipped', `No image needed: ${imgRes.reason || 'Abstract word'}`);
+          pushLog(5, 'Smart Image Evaluated', 'skipped', `No image attached: ${imgRes.reason || 'Not needed or not found'}`);
         }
       } catch (err: any) {
         pushLog(5, 'Smart Image Evaluated', 'skipped', `Image search skipped: ${err?.message}`);

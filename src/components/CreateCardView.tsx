@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CardData, ManualOverrides, AppSettings, StepLog, AnkiCardVerificationDetails, CardType } from '../types';
+import { CardData, ManualOverrides, AppSettings, StepLog, AnkiCardVerificationDetails, CardType, AppTheme } from '../types';
 import { CardPreview } from './CardPreview';
 import { AudioPlayer } from './AudioPlayer';
 import {
@@ -24,11 +24,13 @@ import {
   ExternalLink,
   Search,
   CheckSquare,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 interface CreateCardViewProps {
   settings: AppSettings;
   onCardCreated?: (cardData: CardData, noteId?: number) => void;
+  appTheme?: AppTheme;
 }
 
 const DEFAULT_STEPS: Array<{ step: number; name: string }> = [
@@ -36,24 +38,30 @@ const DEFAULT_STEPS: Array<{ step: number; name: string }> = [
   { step: 2, name: 'Deck validated' },
   { step: 3, name: 'AI Provider Connected' },
   { step: 4, name: 'AI data generated' },
-  { step: 5, name: 'TTS Service Reachable' },
-  { step: 6, name: 'Audio Generated' },
-  { step: 7, name: 'AnkiConnect Connected' },
-  { step: 8, name: 'Deck Ensured' },
-  { step: 9, name: 'Note Type Configured' },
-  { step: 10, name: 'Fields Prepared' },
-  { step: 11, name: 'Media Uploaded' },
-  { step: 12, name: 'Note Created' },
-  { step: 13, name: 'Card Verified' },
+  { step: 5, name: 'Smart Image Attached' },
+  { step: 6, name: 'TTS Service Reachable' },
+  { step: 7, name: 'Audio Generated' },
+  { step: 8, name: 'AnkiConnect Connected' },
+  { step: 9, name: 'Deck Ensured' },
+  { step: 10, name: 'Note Type Configured' },
+  { step: 11, name: 'Fields Prepared' },
+  { step: 12, name: 'Media Uploaded' },
+  { step: 13, name: 'Note Created' },
+  { step: 14, name: 'Card Verified' },
 ];
 
-export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCardCreated }) => {
+export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCardCreated, appTheme = settings.appTheme || 'comic' }) => {
   const [word, setWord] = useState('abandon');
   const [deck, setDeck] = useState(settings.anki.defaultDeck || 'English::B1');
   const [cardType, setCardType] = useState<CardType>(settings.defaultCard?.cardType || 'normal');
+  const [photoChoice, setPhotoChoice] = useState<'yes' | 'no'>('no');
   const [availableDecks, setAvailableDecks] = useState<string[]>(['English::B1', 'English::B2', 'IELTS']);
   const [isCustomDeck, setIsCustomDeck] = useState(false);
   const [loadingDecks, setLoadingDecks] = useState(false);
+
+  const isMinimalLight = appTheme === 'minimal-light';
+  const isMinimalDark = appTheme === 'minimal-dark';
+  const isMinimal = isMinimalLight || isMinimalDark;
 
   // Advanced Overrides (strictly prioritized over AI)
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -153,7 +161,10 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
       const pipelineRes = await runFullPipeline({
         word: trimmedWord,
         deck: deck.trim(),
-        manualOverrides: overrides,
+        manualOverrides: {
+          ...overrides,
+          needsPhoto: photoChoice === 'yes',
+        },
         cardType,
         createInAnki: true,
       });
@@ -266,16 +277,32 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 p-4 sm:p-6">
-      {/* LEFT COLUMN: Bento Creation Box & Pipeline Box */}
-      <section className="w-full lg:w-[420px] flex flex-col gap-6 shrink-0">
-        {/* Bento Box 1: Build Flashcard Form (#FFD93D) */}
-        <div className="bg-[#FFD93D] p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-black">
+    <div className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 p-4 sm:p-6 min-w-0">
+      {/* LEFT COLUMN: Creation Box & Pipeline Box */}
+      <section className="w-full lg:w-[420px] flex flex-col gap-6 shrink-0 min-w-0">
+        {/* Box 1: Build Flashcard Form */}
+        <div
+          className={
+            isMinimalLight
+              ? 'bg-white p-5 sm:p-6 border border-slate-200 rounded-lg shadow-sm text-slate-800'
+              : isMinimalDark
+              ? 'bg-[#27272A] p-5 sm:p-6 border border-zinc-700 rounded-lg shadow-sm text-zinc-100'
+              : 'bg-[#FFD93D] p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-black'
+          }
+        >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-black uppercase italic tracking-tight">
+            <h2 className={isMinimal ? 'text-lg font-bold tracking-tight' : 'text-2xl font-black uppercase italic tracking-tight'}>
               Build Flashcard
             </h2>
-            <span className="text-[10px] font-black uppercase bg-black text-[#FFD93D] px-2 py-0.5 border border-black">
+            <span
+              className={
+                isMinimalLight
+                  ? 'text-[11px] font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200'
+                  : isMinimalDark
+                  ? 'text-[11px] font-semibold bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded border border-zinc-700'
+                  : 'text-[10px] font-black uppercase bg-black text-[#FFD93D] px-2 py-0.5 border border-black'
+              }
+            >
               Single Mode
             </span>
           </div>
@@ -289,7 +316,15 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
           >
             {/* Word Input */}
             <div>
-              <label className="block text-xs font-black uppercase mb-1 tracking-wider text-black">
+              <label
+                className={
+                  isMinimalLight
+                    ? 'block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1'
+                    : isMinimalDark
+                    ? 'block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1'
+                    : 'block text-xs font-black uppercase mb-1 tracking-wider text-black'
+                }
+              >
                 Word (واژه انگلیسی)
               </label>
               <input
@@ -298,14 +333,28 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                 onChange={(e) => setWord(e.target.value)}
                 placeholder="e.g. abandon, accurate..."
                 disabled={isGenerating || testingAnkiOnly}
-                className="w-full border-4 border-black p-3 bg-white text-black text-lg sm:text-xl font-bold rounded-none focus:outline-none placeholder:text-zinc-400"
+                className={
+                  isMinimalLight
+                    ? 'w-full border border-slate-300 p-2.5 bg-white text-slate-900 text-base font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-slate-400'
+                    : isMinimalDark
+                    ? 'w-full border border-zinc-700 p-2.5 bg-zinc-950 text-zinc-100 text-base font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-zinc-500'
+                    : 'w-full border-4 border-black p-3 bg-white text-black text-lg sm:text-xl font-bold rounded-none focus:outline-none placeholder:text-zinc-400'
+                }
                 required
               />
             </div>
 
             {/* Card Type Selector [ Normal | Spelling ] */}
             <div>
-              <label className="block text-xs font-black uppercase mb-1 tracking-wider text-black">
+              <label
+                className={
+                  isMinimalLight
+                    ? 'block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1'
+                    : isMinimalDark
+                    ? 'block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1'
+                    : 'block text-xs font-black uppercase mb-1 tracking-wider text-black'
+                }
+              >
                 Card Type (نوع کارت)
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -313,11 +362,21 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                   type="button"
                   onClick={() => setCardType('normal')}
                   disabled={isGenerating || testingAnkiOnly}
-                  className={`py-2 px-3 border-2 border-black font-black text-xs uppercase flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] ${
-                    cardType === 'normal'
-                      ? 'bg-[#4ADE80] text-black ring-2 ring-black'
-                      : 'bg-white text-black hover:bg-zinc-100'
-                  }`}
+                  className={
+                    isMinimal
+                      ? `py-2 px-3 text-xs font-medium rounded-md border flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                          cardType === 'normal'
+                            ? 'bg-blue-600 border-blue-600 text-white font-semibold shadow-sm'
+                            : isMinimalDark
+                            ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-750'
+                            : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                        }`
+                      : `py-2 px-3 border-2 border-black font-black text-xs uppercase flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] ${
+                          cardType === 'normal'
+                            ? 'bg-[#4ADE80] text-black ring-2 ring-black'
+                            : 'bg-white text-black hover:bg-zinc-100'
+                        }`
+                  }
                 >
                   <span>Normal Vocab</span>
                 </button>
@@ -325,13 +384,88 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                   type="button"
                   onClick={() => setCardType('spelling')}
                   disabled={isGenerating || testingAnkiOnly}
-                  className={`py-2 px-3 border-2 border-black font-black text-xs uppercase flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] ${
-                    cardType === 'spelling'
-                      ? 'bg-[#C084FC] text-black ring-2 ring-black'
-                      : 'bg-white text-black hover:bg-zinc-100'
-                  }`}
+                  className={
+                    isMinimal
+                      ? `py-2 px-3 text-xs font-medium rounded-md border flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                          cardType === 'spelling'
+                            ? 'bg-purple-600 border-purple-600 text-white font-semibold shadow-sm'
+                            : isMinimalDark
+                            ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-750'
+                            : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                        }`
+                      : `py-2 px-3 border-2 border-black font-black text-xs uppercase flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] ${
+                          cardType === 'spelling'
+                            ? 'bg-[#C084FC] text-black ring-2 ring-black'
+                            : 'bg-white text-black hover:bg-zinc-100'
+                        }`
+                  }
                 >
                   <span>Spelling Exercise</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Photo Option: [ Yes ] [ No ] */}
+            <div>
+              <label
+                className={
+                  isMinimalLight
+                    ? 'block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1 flex items-center justify-between'
+                    : isMinimalDark
+                    ? 'block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1 flex items-center justify-between'
+                    : 'block text-xs font-black uppercase mb-1 tracking-wider text-black flex items-center justify-between'
+                }
+              >
+                <span>Photo (تصویر کارت)</span>
+                <span className="text-[10px] opacity-75">{photoChoice === 'yes' ? 'Include Image' : 'No Image'}</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPhotoChoice('yes')}
+                  disabled={isGenerating || testingAnkiOnly}
+                  className={
+                    isMinimal
+                      ? `py-2 px-3 text-xs font-medium rounded-md border flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                          photoChoice === 'yes'
+                            ? 'bg-blue-600 border-blue-600 text-white font-semibold shadow-sm'
+                            : isMinimalDark
+                            ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-750'
+                            : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                        }`
+                      : `py-2 px-3 border-2 border-black font-black text-xs uppercase flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] transition-all ${
+                          photoChoice === 'yes'
+                            ? 'bg-[#38BDF8] text-black ring-2 ring-black font-black'
+                            : 'bg-white text-black hover:bg-zinc-100'
+                        }`
+                  }
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  <span>Yes</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPhotoChoice('no')}
+                  disabled={isGenerating || testingAnkiOnly}
+                  className={
+                    isMinimal
+                      ? `py-2 px-3 text-xs font-medium rounded-md border flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                          photoChoice === 'no'
+                            ? isMinimalDark
+                              ? 'bg-zinc-700 border-zinc-600 text-white font-semibold shadow-sm'
+                              : 'bg-slate-700 border-slate-700 text-white font-semibold shadow-sm'
+                            : isMinimalDark
+                            ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-750'
+                            : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                        }`
+                      : `py-2 px-3 border-2 border-black font-black text-xs uppercase flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] transition-all ${
+                          photoChoice === 'no'
+                            ? 'bg-[#FF6B6B] text-white ring-2 ring-black font-black'
+                            : 'bg-white text-black hover:bg-zinc-100'
+                        }`
+                  }
+                >
+                  <span>No</span>
                 </button>
               </div>
             </div>
@@ -339,7 +473,15 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
             {/* Deck Selector */}
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-black uppercase tracking-wider text-black flex items-center gap-1">
+                <label
+                  className={
+                    isMinimalLight
+                      ? 'block text-xs font-semibold uppercase tracking-wider text-slate-700 flex items-center gap-1'
+                      : isMinimalDark
+                      ? 'block text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-1'
+                      : 'block text-xs font-black uppercase tracking-wider text-black flex items-center gap-1'
+                  }
+                >
                   <span>Deck (دسته در انکی)</span>
                   {loadingDecks && <Loader2 className="w-3 h-3 animate-spin inline" />}
                 </label>
@@ -348,14 +490,14 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                     type="button"
                     onClick={loadDecks}
                     title="Refresh Decks from Anki"
-                    className="text-[11px] text-black hover:opacity-70 font-bold flex items-center gap-0.5"
+                    className="text-[11px] hover:opacity-70 font-semibold flex items-center gap-0.5"
                   >
                     <RefreshCw className="w-3 h-3" />
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsCustomDeck(!isCustomDeck)}
-                    className="text-[11px] text-black hover:underline font-bold"
+                    className="text-[11px] hover:underline font-semibold"
                   >
                     {isCustomDeck ? 'List Decks' : '+ Custom Deck'}
                   </button>
@@ -369,7 +511,13 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                   onChange={(e) => setDeck(e.target.value)}
                   placeholder="e.g. English::Vocabulary"
                   disabled={isGenerating || testingAnkiOnly}
-                  className="w-full border-4 border-black p-3 bg-white text-black text-base font-bold rounded-none focus:outline-none"
+                  className={
+                    isMinimalLight
+                      ? 'w-full border border-slate-300 p-2.5 bg-white text-slate-900 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                      : isMinimalDark
+                      ? 'w-full border border-zinc-700 p-2.5 bg-zinc-950 text-zinc-100 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                      : 'w-full border-4 border-black p-3 bg-white text-black text-base font-bold rounded-none focus:outline-none'
+                  }
                 />
               ) : (
                 <div className="relative flex gap-1">
@@ -377,7 +525,13 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                     value={deck}
                     onChange={(e) => setDeck(e.target.value)}
                     disabled={isGenerating || testingAnkiOnly}
-                    className="w-full border-4 border-black p-3 bg-white text-black text-base font-bold rounded-none appearance-none focus:outline-none cursor-pointer pr-10"
+                    className={
+                      isMinimalLight
+                        ? 'w-full border border-slate-300 p-2.5 bg-white text-slate-900 text-sm font-medium rounded-md appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer pr-10'
+                        : isMinimalDark
+                        ? 'w-full border border-zinc-700 p-2.5 bg-zinc-950 text-zinc-100 text-sm font-medium rounded-md appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer pr-10'
+                        : 'w-full border-4 border-black p-3 bg-white text-black text-base font-bold rounded-none appearance-none focus:outline-none cursor-pointer pr-10'
+                    }
                   >
                     {availableDecks.map((d) => (
                       <option key={d} value={d}>
@@ -518,13 +672,23 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
               </div>
             )}
 
-            {/* Action Submit Button (#FF4B4B) */}
+            {/* Action Submit Button */}
             <button
               type="submit"
               disabled={isGenerating || testingAnkiOnly || !word.trim()}
-              className={`w-full bg-[#FF4B4B] text-white font-black py-4 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-xl uppercase tracking-wider hover:translate-y-0.5 active:translate-y-1 transition-transform flex items-center justify-center gap-2 select-none ${
-                isGenerating ? 'opacity-80 cursor-wait' : 'cursor-pointer'
-              }`}
+              className={
+                isMinimal
+                  ? `w-full py-3 px-4 font-semibold text-sm rounded-md shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+                      isGenerating
+                        ? 'bg-blue-400 text-white cursor-wait'
+                        : isMinimalDark
+                        ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`
+                  : `w-full bg-[#FF4B4B] text-white font-black py-4 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-xl uppercase tracking-wider hover:translate-y-0.5 active:translate-y-1 transition-transform flex items-center justify-center gap-2 select-none ${
+                      isGenerating ? 'opacity-80 cursor-wait' : 'cursor-pointer'
+                    }`
+              }
             >
               {isGenerating ? (
                 <>
@@ -544,7 +708,15 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
               type="button"
               onClick={handleRunAnkiTest}
               disabled={isGenerating || testingAnkiOnly}
-              className="w-full bg-white hover:bg-zinc-100 text-black font-black py-2 px-3 border-2 border-black text-xs uppercase flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#000000] cursor-pointer"
+              className={
+                isMinimal
+                  ? `w-full py-2 px-3 text-xs font-medium rounded-md border flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                      isMinimalDark
+                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                        : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'
+                    }`
+                  : 'w-full bg-white hover:bg-zinc-100 text-black font-black py-2 px-3 border-2 border-black text-xs uppercase flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#000000] cursor-pointer'
+              }
             >
               {testingAnkiOnly ? (
                 <>
@@ -553,22 +725,36 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                 </>
               ) : (
                 <>
-                  <Zap className="w-3.5 h-3.5 text-[#FF4B4B]" />
-                  <span>Test Anki Card Creation (No AI/TTS)</span>
+                  <Zap className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Test Anki Card Creation (Direct Connect)</span>
                 </>
               )}
             </button>
           </form>
         </div>
 
-        {/* Bento Box 2: 13-Stage Detailed Execution Logs (bg-white text-black) */}
-        <div className="flex-1 bg-white border-4 border-black p-4 sm:p-5 text-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] overflow-hidden">
-          <div className="flex items-center justify-between mb-3 border-b-2 border-black pb-2">
-            <h3 className="text-sm font-black uppercase flex items-center gap-1.5">
+        {/* Box 2: Execution Logs */}
+        <div
+          className={
+            isMinimalLight
+              ? 'flex-1 bg-white border border-slate-200 rounded-lg p-4 sm:p-5 text-slate-800 shadow-sm overflow-hidden'
+              : isMinimalDark
+              ? 'flex-1 bg-[#27272A] border border-zinc-700 rounded-lg p-4 sm:p-5 text-zinc-100 shadow-sm overflow-hidden'
+              : 'flex-1 bg-white border-4 border-black p-4 sm:p-5 text-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] overflow-hidden'
+          }
+        >
+          <div className="flex items-center justify-between mb-3 border-b pb-2 border-slate-200">
+            <h3 className={isMinimal ? 'text-xs font-bold uppercase tracking-wider text-slate-600' : 'text-sm font-black uppercase flex items-center gap-1.5'}>
               <span>Execution Pipeline</span>
             </h3>
             {createdNoteId && (
-              <span className="text-[10px] bg-[#4ADE80] text-black font-black px-2 py-0.5 border border-black uppercase flex items-center gap-1">
+              <span
+                className={
+                  isMinimal
+                    ? 'text-[11px] bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1'
+                    : 'text-[10px] bg-[#4ADE80] text-black font-black px-2 py-0.5 border border-black uppercase flex items-center gap-1'
+                }
+              >
                 <CheckCircle2 className="w-3 h-3" /> Note #{createdNoteId}
               </span>
             )}
@@ -839,14 +1025,22 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
       </section>
 
       {/* RIGHT COLUMN: Live Card Preview Frame */}
-      <section className="flex-1 flex flex-col min-h-[560px]">
-        {/* Bento Stage Container (Warm Ivory #F5F2EB) */}
-        <div className="flex-1 bg-[#F5F2EB] border-4 border-black p-4 sm:p-8 relative overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col">
-          <div className="relative z-10 w-full flex-1 flex flex-col justify-center">
+      <section className="flex-1 flex flex-col min-h-[560px] min-w-0">
+        <div
+          className={
+            isMinimalLight
+              ? 'flex-1 bg-slate-50 border border-slate-200 rounded-lg p-4 sm:p-6 relative overflow-hidden shadow-sm flex flex-col'
+              : isMinimalDark
+              ? 'flex-1 bg-[#1F1F23] border border-zinc-700 rounded-lg p-4 sm:p-6 relative overflow-hidden shadow-sm flex flex-col'
+              : 'flex-1 bg-[#F5F2EB] border-4 border-black p-4 sm:p-8 relative overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col'
+          }
+        >
+          <div className="relative z-10 w-full flex-1 flex flex-col justify-center min-w-0">
             <CardPreview
               cardData={generatedCard}
               themeId={settings.theme}
               emptyWordPlaceholder={word || 'abandon'}
+              appTheme={appTheme}
             />
           </div>
         </div>

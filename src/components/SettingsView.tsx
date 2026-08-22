@@ -10,6 +10,7 @@ import {
   CardData,
   CustomAIProviderConfig,
   CustomTTSProviderConfig,
+  AppTheme,
 } from '../types';
 import {
   saveConfig,
@@ -83,14 +84,19 @@ import {
 interface SettingsViewProps {
   settings: AppSettings;
   onUpdateSettings: (newSettings: AppSettings) => void;
+  appTheme?: AppTheme;
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSettings }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSettings, appTheme = settings.appTheme || 'comic' }) => {
   const [form, setForm] = useState<AppSettings>(settings);
   const [activeSubTab, setActiveSubTab] = useState<
     'ai' | 'tts' | 'dictionary' | 'smartImages' | 'defaultCard' | 'appearance' | 'anki' | 'diagnostics' | 'guide'
   >('ai');
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  const isMinimalLight = (form.appTheme || appTheme) === 'minimal-light';
+  const isMinimalDark = (form.appTheme || appTheme) === 'minimal-dark';
+  const isMinimal = isMinimalLight || isMinimalDark;
 
   // Ollama states
   const [ollamaStatus, setOllamaStatus] = useState<{ connected: boolean; version?: string; error?: string } | null>(null);
@@ -352,29 +358,41 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     };
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+    <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-6 min-w-0">
       {/* Header with Save Button */}
-      <div className="bg-[#FFD93D] p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div
+        className={
+          isMinimalLight
+            ? 'bg-white p-5 sm:p-6 border border-slate-200 rounded-lg shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-slate-800'
+            : isMinimalDark
+            ? 'bg-[#27272A] p-5 sm:p-6 border border-zinc-700 rounded-lg shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-zinc-100'
+            : 'bg-[#FFD93D] p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-black'
+        }
+      >
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black uppercase italic tracking-tight text-black flex items-center gap-2">
-            <Sliders className="w-8 h-8" />
-            <span>Settings & Providers</span>
+          <h1 className={isMinimal ? 'text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2' : 'text-2xl sm:text-3xl font-black uppercase italic tracking-tight text-black flex items-center gap-2'}>
+            <Sliders className="w-7 h-7" />
+            <span>Settings & Configuration</span>
           </h1>
-          <p className="text-xs sm:text-sm font-bold text-zinc-800 mt-1">
-            Configure flexible AI providers (Ollama / Gemini / 9Router-style Custom APIs), TTS voices & speed, dictionaries, smart images, and card themes.
+          <p className={isMinimal ? 'text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-1' : 'text-xs sm:text-sm font-bold text-zinc-800 mt-1'}>
+            Configure AI providers (Ollama / Gemini / Custom), TTS voices & speed, dictionaries, smart images, and card themes.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           {saveStatus && (
-            <span className="text-xs font-black px-3 py-1.5 bg-black text-[#4ADE80] border-2 border-black">
+            <span className={isMinimal ? 'text-xs font-semibold px-3 py-1.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 rounded border border-emerald-300 dark:border-emerald-800' : 'text-xs font-black px-3 py-1.5 bg-black text-[#4ADE80] border-2 border-black'}>
               {saveStatus}
             </span>
           )}
           <button
             type="button"
             onClick={handleSave}
-            className="px-5 py-2.5 bg-[#FF4B4B] hover:bg-[#ff6161] text-white font-black text-sm uppercase border-4 border-black shadow-[4px_4px_0px_#000000] flex items-center gap-2 cursor-pointer active:translate-y-0.5"
+            className={
+              isMinimal
+                ? 'px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-md shadow-sm flex items-center gap-2 cursor-pointer transition-colors'
+                : 'px-5 py-2.5 bg-[#FF4B4B] hover:bg-[#ff6161] text-white font-black text-sm uppercase border-4 border-black shadow-[4px_4px_0px_#000000] flex items-center gap-2 cursor-pointer active:translate-y-0.5'
+            }
           >
             <Save className="w-4 h-4" />
             <span>Save Settings</span>
@@ -383,7 +401,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       </div>
 
       {/* Navigation Sub-Tabs */}
-      <div className="flex flex-wrap gap-2 border-b-4 border-black pb-2">
+      <div className={isMinimal ? 'flex flex-wrap gap-1.5 border-b border-slate-200 dark:border-zinc-700 pb-2' : 'flex flex-wrap gap-2 border-b-4 border-black pb-2'}>
         {[
           { id: 'ai', label: 'AI Provider', icon: Cpu },
           { id: 'tts', label: 'TTS & Speed', icon: Volume2 },
@@ -402,11 +420,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               key={tab.id}
               type="button"
               onClick={() => setActiveSubTab(tab.id as any)}
-              className={`px-3.5 py-2 font-black text-xs uppercase border-4 border-black flex items-center gap-1.5 transition-transform cursor-pointer ${
-                isActive
-                  ? 'bg-black text-[#FFD93D] shadow-[4px_4px_0px_0px_rgba(255,217,61,1)] -translate-y-0.5'
-                  : 'bg-white hover:bg-zinc-100 text-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-              }`}
+              className={
+                isMinimal
+                  ? `px-3 py-1.5 font-medium text-xs rounded-md flex items-center gap-1.5 transition-colors cursor-pointer ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-sm font-semibold'
+                        : isMinimalDark
+                        ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-750'
+                        : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                    }`
+                  : `px-3.5 py-2 font-black text-xs uppercase border-4 border-black flex items-center gap-1.5 transition-transform cursor-pointer ${
+                      isActive
+                        ? 'bg-black text-[#FFD93D] shadow-[4px_4px_0px_0px_rgba(255,217,61,1)] -translate-y-0.5'
+                        : 'bg-white hover:bg-zinc-100 text-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
+                    }`
+              }
             >
               <Icon className="w-4 h-4" />
               <span>{tab.label}</span>
@@ -1348,15 +1376,103 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       {/* SUBTAB 6: APPEARANCE & THEMES */}
       {activeSubTab === 'appearance' && (
         <div className="space-y-6">
-          <div className="bg-white p-5 border-4 border-black shadow-[6px_6px_0px_#000000]">
-            <h3 className="font-black text-sm uppercase mb-4 flex items-center gap-2">
-              <Palette className="w-5 h-5 text-[#FF6B6B]" />
-              <span>Card Appearance & Themes ({THEME_GROUPS.light.length + THEME_GROUPS.dark.length} Visual Styles)</span>
+          {/* 1. APPLICATION UI THEME SELECTOR */}
+          <div
+            className={
+              isMinimalLight
+                ? 'bg-white p-5 border border-slate-200 rounded-lg shadow-sm text-slate-800'
+                : isMinimalDark
+                ? 'bg-[#27272A] p-5 border border-zinc-700 rounded-lg shadow-sm text-zinc-100'
+                : 'bg-white p-5 border-4 border-black shadow-[6px_6px_0px_#000000] text-black'
+            }
+          >
+            <h3 className={isMinimal ? 'font-bold text-sm uppercase mb-1 flex items-center gap-2' : 'font-black text-sm uppercase mb-1 flex items-center gap-2'}>
+              <Sliders className="w-5 h-5 text-blue-500" />
+              <span>1. Application UI Theme (ظاهر کل نرم‌افزار)</span>
             </h3>
+            <p className={isMinimal ? 'text-xs text-slate-500 dark:text-zinc-400 mb-4' : 'text-xs font-bold text-zinc-700 mb-4'}>
+              Choose the appearance of the English Flashcard Generator application itself. Flashcard note themes are selected separately below.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Option 1: Comic */}
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, appTheme: 'comic' })}
+                className={`p-3.5 border-2 text-left cursor-pointer transition-all ${
+                  (form.appTheme || 'comic') === 'comic'
+                    ? 'bg-[#FFD93D] text-black border-black font-black shadow-[3px_3px_0px_#000000]'
+                    : 'bg-white text-black border-zinc-300 hover:bg-zinc-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black">Comic / Cheerful</span>
+                  {(form.appTheme || 'comic') === 'comic' && <span className="text-[10px] font-black bg-black text-[#FFD93D] px-1.5 py-0.5">ACTIVE</span>}
+                </div>
+                <div className="text-[11px] opacity-80 mt-1">Bold comic borders, colorful bento cards, lively energetic UI.</div>
+              </button>
+
+              {/* Option 2: Minimal Light */}
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, appTheme: 'minimal-light' })}
+                className={`p-3.5 border text-left cursor-pointer transition-all rounded-md ${
+                  form.appTheme === 'minimal-light'
+                    ? 'bg-blue-50 text-blue-950 border-blue-600 font-semibold shadow-sm'
+                    : isMinimalDark
+                    ? 'bg-zinc-850 text-zinc-300 border-zinc-700 hover:bg-zinc-800'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold">Application Minimal Light</span>
+                  {form.appTheme === 'minimal-light' && <span className="text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded">ACTIVE</span>}
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1">Clean light background, subtle borders, classic Anki-style simplicity.</div>
+              </button>
+
+              {/* Option 3: Minimal Dark */}
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, appTheme: 'minimal-dark' })}
+                className={`p-3.5 border text-left cursor-pointer transition-all rounded-md ${
+                  form.appTheme === 'minimal-dark'
+                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-sm'
+                    : isMinimalDark
+                    ? 'bg-zinc-900 text-zinc-300 border-zinc-700 hover:bg-zinc-800'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold">Application Minimal Dark</span>
+                  {form.appTheme === 'minimal-dark' && <span className="text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded">ACTIVE</span>}
+                </div>
+                <div className="text-[11px] text-zinc-400 mt-1">Clean dark background, restrained dark colors, dark Anki-style UI.</div>
+              </button>
+            </div>
+          </div>
+
+          {/* 2. FLASHCARD NOTE THEMES */}
+          <div
+            className={
+              isMinimalLight
+                ? 'bg-white p-5 border border-slate-200 rounded-lg shadow-sm text-slate-800'
+                : isMinimalDark
+                ? 'bg-[#27272A] p-5 border border-zinc-700 rounded-lg shadow-sm text-zinc-100'
+                : 'bg-white p-5 border-4 border-black shadow-[6px_6px_0px_#000000] text-black'
+            }
+          >
+            <h3 className={isMinimal ? 'font-bold text-sm uppercase mb-1 flex items-center gap-2' : 'font-black text-sm uppercase mb-1 flex items-center gap-2'}>
+              <Palette className="w-5 h-5 text-[#FF6B6B]" />
+              <span>2. Anki Flashcard Note Theme ({THEME_GROUPS.light.length + THEME_GROUPS.dark.length} Visual Styles)</span>
+            </h3>
+            <p className={isMinimal ? 'text-xs text-slate-500 dark:text-zinc-400 mb-4' : 'text-xs font-bold text-zinc-700 mb-4'}>
+              Select the HTML/CSS template that is written directly into your Anki cards.
+            </p>
 
             {/* Light Themes */}
             <div className="mb-5">
-              <div className="text-xs font-black uppercase text-amber-800 bg-[#FEF9C3] px-3 py-1 border-2 border-black inline-block mb-3">
+              <div className={isMinimal ? 'text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-2' : 'text-xs font-black uppercase text-amber-800 bg-[#FEF9C3] px-3 py-1 border-2 border-black inline-block mb-3'}>
                 ☀️ Light Themes (Comic & Minimal)
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -1367,17 +1483,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       key={th.id}
                       type="button"
                       onClick={() => setForm({ ...form, theme: th.id as ThemeId })}
-                      className={`p-3 border-3 border-black text-left cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-[#FFD93D] text-black shadow-[4px_4px_0px_#000000] -translate-y-0.5'
-                          : 'bg-white hover:bg-zinc-50 text-black shadow-[2px_2px_0px_#000000]'
-                      }`}
+                      className={
+                        isMinimal
+                          ? `p-3 border rounded-md text-left cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-blue-50 text-blue-950 border-blue-600 font-semibold shadow-sm dark:bg-blue-950/40 dark:border-blue-500 dark:text-blue-200'
+                                : isMinimalDark
+                                ? 'bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border-zinc-700'
+                                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'
+                            }`
+                          : `p-3 border-3 border-black text-left cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-[#FFD93D] text-black shadow-[4px_4px_0px_#000000] -translate-y-0.5'
+                                : 'bg-white hover:bg-zinc-50 text-black shadow-[2px_2px_0px_#000000]'
+                            }`
+                      }
                     >
                       <div className="flex items-center justify-between">
                         <div className="text-xs font-black">{th.name}</div>
-                        {isSelected && <span className="text-[10px] font-black bg-black text-[#FFD93D] px-1.5 py-0.5">ACTIVE</span>}
+                        {isSelected && <span className={isMinimal ? 'text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded' : 'text-[10px] font-black bg-black text-[#FFD93D] px-1.5 py-0.5'}>ACTIVE</span>}
                       </div>
-                      <div className="text-[11px] text-zinc-600 font-bold mt-1 line-clamp-2">{th.desc}</div>
+                      <div className={isMinimal ? 'text-[11px] text-slate-500 dark:text-zinc-400 mt-1 line-clamp-2' : 'text-[11px] text-zinc-600 font-bold mt-1 line-clamp-2'}>{th.desc}</div>
                     </button>
                   );
                 })}
@@ -1386,7 +1512,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
             {/* Dark Themes */}
             <div>
-              <div className="text-xs font-black uppercase text-cyan-400 bg-black px-3 py-1 border-2 border-black inline-block mb-3">
+              <div className={isMinimal ? 'text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-2' : 'text-xs font-black uppercase text-cyan-400 bg-black px-3 py-1 border-2 border-black inline-block mb-3'}>
                 🌙 Dark Themes (Comic & Minimal)
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -1397,17 +1523,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       key={th.id}
                       type="button"
                       onClick={() => setForm({ ...form, theme: th.id as ThemeId })}
-                      className={`p-3 border-3 border-black text-left cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-black text-[#38BDF8] shadow-[4px_4px_0px_#38BDF8] -translate-y-0.5'
-                          : 'bg-zinc-900 hover:bg-zinc-800 text-white shadow-[2px_2px_0px_#000000]'
-                      }`}
+                      className={
+                        isMinimal
+                          ? `p-3 border rounded-md text-left cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-blue-50 text-blue-950 border-blue-600 font-semibold shadow-sm dark:bg-blue-950/40 dark:border-blue-500 dark:text-blue-200'
+                                : isMinimalDark
+                                ? 'bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border-zinc-700'
+                                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'
+                            }`
+                          : `p-3 border-3 border-black text-left cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-black text-[#38BDF8] shadow-[4px_4px_0px_#38BDF8] -translate-y-0.5'
+                                : 'bg-zinc-900 hover:bg-zinc-800 text-white shadow-[2px_2px_0px_#000000]'
+                            }`
+                      }
                     >
                       <div className="flex items-center justify-between">
                         <div className="text-xs font-black">{th.name}</div>
-                        {isSelected && <span className="text-[10px] font-black bg-[#38BDF8] text-black px-1.5 py-0.5">ACTIVE</span>}
+                        {isSelected && <span className={isMinimal ? 'text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded' : 'text-[10px] font-black bg-[#38BDF8] text-black px-1.5 py-0.5'}>ACTIVE</span>}
                       </div>
-                      <div className="text-[11px] text-zinc-400 font-bold mt-1 line-clamp-2">{th.desc}</div>
+                      <div className={isMinimal ? 'text-[11px] text-slate-400 dark:text-zinc-400 mt-1 line-clamp-2' : 'text-[11px] text-zinc-400 font-bold mt-1 line-clamp-2'}>{th.desc}</div>
                     </button>
                   );
                 })}
@@ -1416,7 +1552,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           </div>
 
           {/* Live Card Preview */}
-          <div className="bg-[#F5F2EB] p-4 sm:p-6 border-4 border-black shadow-[6px_6px_0px_#000000]">
+          <div
+            className={
+              isMinimalLight
+                ? 'bg-slate-50 p-4 sm:p-6 border border-slate-200 rounded-lg shadow-sm'
+                : isMinimalDark
+                ? 'bg-[#1F1F23] p-4 sm:p-6 border border-zinc-700 rounded-lg shadow-sm'
+                : 'bg-[#F5F2EB] p-4 sm:p-6 border-4 border-black shadow-[6px_6px_0px_#000000]'
+            }
+          >
             <CardPreview
               cardData={{
                 word: 'abandon',
@@ -1430,6 +1574,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 spellingSentence: 'He had to ______ his car in the heavy snowstorm.',
               }}
               themeId={form.theme}
+              appTheme={form.appTheme || appTheme}
             />
           </div>
         </div>
