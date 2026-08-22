@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional, List
 
@@ -37,13 +38,25 @@ from app.config import (
 from app.ai_service import AIService
 from app.tts_service import TTSService
 from app.txt_manager import list_txt_files, TXTFormat
+from app.capture_service import (
+    DiagnosticRecord,
+    capture_selected_text_detailed,
+    get_last_diagnostic,
+    set_last_diagnostic,
+)
+from app.niri_helper import (
+    is_niri_environment,
+    check_niri_status,
+    apply_niri_config,
+    generate_niri_config_snippet,
+)
 from app.theme import get_theme_qss
 
 class DashboardWindow(QWidget):
     """
     Settings & Management Dashboard for Vocabulary Capture.
     Follows the minimal Anki-style design language with organized tabs:
-    - General
+    - General (with Global Shortcut Diagnostics & Niri setup)
     - AI Providers
     - AI Prompts
     - TTS (Piper)
@@ -61,8 +74,8 @@ class DashboardWindow(QWidget):
         self.tts_service = tts_service or TTSService(self.config.tts)
 
         self.setWindowTitle("Vocabulary Capture — Settings & Dashboard")
-        self.resize(560, 620)
-        self.setMinimumSize(500, 550)
+        self.resize(580, 640)
+        self.setMinimumSize(520, 560)
 
         self._init_ui()
         self.apply_theme()
@@ -119,7 +132,7 @@ class DashboardWindow(QWidget):
         main_layout.addLayout(footer_layout)
 
     # -------------------------------------------------------------
-    # 1. GENERAL TAB
+    # 1. GENERAL TAB (With Global Shortcut Diagnostics & Niri Helper)
     # -------------------------------------------------------------
     def _create_general_tab(self) -> QWidget:
         widget = QWidget()
@@ -127,14 +140,37 @@ class DashboardWindow(QWidget):
         layout.setSpacing(10)
 
         # Shortcut Group
-        sc_group = QGroupBox("Global Keyboard Shortcut")
+        sc_group = QGroupBox("Global Keyboard Shortcut & Niri Setup")
         sc_layout = QVBoxLayout(sc_group)
+        sc_layout.setSpacing(6)
+
+        sc_row = QHBoxLayout()
+        sc_lbl = QLabel("Shortcut:")
+        sc_lbl.setFixedWidth(65)
         self.inp_shortcut = QLineEdit()
         self.inp_shortcut.setPlaceholderText("<ctrl>+<alt>+v")
-        sc_hint = QLabel("Format: <ctrl>+<alt>+v. On Niri / Wayland, configure your keybind to run 'run.sh --capture'.")
-        sc_hint.setProperty("class", "muted")
-        sc_layout.addWidget(self.inp_shortcut)
-        sc_layout.addWidget(sc_hint)
+        sc_row.addWidget(sc_lbl)
+        sc_row.addWidget(self.inp_shortcut, 1)
+        sc_layout.addLayout(sc_row)
+
+        # Diagnostic & Test Buttons Row
+        diag_btn_row = QHBoxLayout()
+        self.btn_test_shortcut = QPushButton("🔍 Test Global Shortcut")
+        self.btn_test_shortcut.clicked.connect(self._run_shortcut_diagnostic)
+        self.btn_apply_niri = QPushButton("⚙ Setup Niri config.kdl")
+        self.btn_apply_niri.clicked.connect(self._apply_niri_keybind)
+        diag_btn_row.addWidget(self.btn_test_shortcut)
+        diag_btn_row.addWidget(self.btn_apply_niri)
+        diag_btn_row.addStretch(1)
+        sc_layout.addLayout(diag_btn_row)
+
+        # Diagnostic Output Box
+        self.txt_diag_output = QTextEdit()
+        self.txt_diag_output.setReadOnly(True)
+        self.txt_diag_output.setFixedHeight(85)
+        self.txt_diag_output.setPlaceholderText("Click 'Test Global Shortcut' or press your shortcut in Firefox to see real-time diagnostics...")
+        sc_layout.addWidget(self.txt_diag_output)
+
         layout.addWidget(sc_group)
 
         # Storage Directory Group
@@ -182,6 +218,60 @@ class DashboardWindow(QWidget):
         layout.addWidget(win_group)
         layout.addStretch(1)
         return widget
+
+    def update_diagnostic_display(self, record: DiagnosticRecord):
+        """Updates the diagnostic text area when a shortcut/capture event occurs."""
+        self.txt_diag_output.setPlainText(record.to_formatted_report())
+
+    def _run_shortcut_diagnostic(self):
+        """Executes a diagnostic test of selection capture and window open."""
+        shortcut = self.inp_shortcut.text().strip() or self.config.global_shortcut
+        text, method = capture_selected_text_detailed()
+        t_now = datetime.now().strftime("%H:%M:%S")
+
+        lines = [
+            f"[{t_now}] Diagnostic Test Executed",
+            f"Shortcut detected: {shortcut}",
+        ]
+
+        if text:
+            lines.append(f"Selected text: \"{text}\" (captured via {method})")
+            # Trigger floating window open
+            self.open_floating_requested.emit()
+            lines.append("✓ Text capture succeeded & floating window opened.")
+        else:
+            lines.append("⚠ Shortcut detected, but no selected text was captured.")
+            lines.append("  → Highlight a word in Firefox or Chrome and click 'Test Global Shortcut' again.")
+            lines.append("  → On Wayland, verify 'wl-clipboard' is installed (wl-paste).")
+
+        niri_info = check_niri_status(shortcut)
+        if niri_info["is_niri"]:
+            lines.append(f"\n[Niri Status] Config: {niri_info['config_path']}")
+            lines.append(f"  • Window Rule: {'✓ Found' if niri_info['has_window_rule'] else '⚠ Missing (Click Setup Niri)'}")
+            lines.append(f"  • Keybind: {'✓ ' + niri_info['current_keybind'] if niri_info['has_keybind'] else '⚠ Missing (Click Setup Niri)'}")
+
+        report = "\n".join(lines)
+        self.txt_diag_output.setPlainText(report)
+
+        rec = DiagnosticRecord(
+            timestamp=t_now,
+            shortcut=shortcut,
+            source="Manual Test Button",
+            text=text,
+            method=method,
+            window_opened=bool(text),
+            status_message=report
+        )
+        set_last_diagnostic(rec)
+
+    def _apply_niri_keybind(self):
+        shortcut = self.inp_shortcut.text().strip() or self.config.global_shortcut
+        success, msg = apply_niri_config(shortcut)
+        if success:
+            QMessageBox.information(self, "Niri Configuration", f"{msg}\n\nNiri will now execute 'run.sh --capture' whenever {shortcut} is pressed.")
+            self._run_shortcut_diagnostic()
+        else:
+            QMessageBox.warning(self, "Niri Configuration Error", msg)
 
     # -------------------------------------------------------------
     # 2. AI PROVIDERS TAB
@@ -469,6 +559,11 @@ class DashboardWindow(QWidget):
         self._update_file_stats()
         self._test_piper_connection(silent_if_fail=True)
 
+        # Load last diagnostic if available
+        last_rec = get_last_diagnostic()
+        if last_rec:
+            self.txt_diag_output.setPlainText(last_rec.to_formatted_report())
+
     def _populate_providers_combo(self):
         self.combo_active_provider.blockSignals(True)
         self.combo_active_provider.clear()
@@ -521,7 +616,6 @@ class DashboardWindow(QWidget):
 
     def _refresh_provider_models(self):
         prov = self.config.get_active_provider()
-        # Sync current form inputs into provider object
         prov.name = self.inp_pname.text().strip()
         prov.type = self.combo_ptype.currentText()
         prov.base_url = self.inp_purl.text().strip()

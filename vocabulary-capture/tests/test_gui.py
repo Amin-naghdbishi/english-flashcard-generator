@@ -11,7 +11,7 @@ from app.config import AppConfig, ConfigManager, AIProviderConfig, AIPromptsConf
 from app.ai_service import AIService
 from app.tts_service import TTSService
 from app.txt_manager import create_new_txt_file, TXTFormat
-from app.capture_service import CaptureService
+from app.capture_service import CaptureService, DiagnosticRecord
 from app.ui.floating_window import FloatingWindow
 from app.ui.dashboard_window import DashboardWindow
 from app.ui.tray_icon import SystemTrayManager
@@ -130,6 +130,24 @@ def test_dashboard_window_multi_tab_settings(qapp):
         dash.show()
         assert dash.isVisible()
         assert dash.tabs.count() == 5
+
+        # Test Diagnostic button
+        dash._run_shortcut_diagnostic()
+        assert len(dash.txt_diag_output.toPlainText()) > 0
+        assert "Shortcut detected" in dash.txt_diag_output.toPlainText()
+
+        # Test update diagnostic display
+        rec = DiagnosticRecord(
+            timestamp="12:00:00",
+            shortcut="<ctrl>+<alt>+v",
+            source="Manual Test",
+            text="abandon",
+            method="wl-paste",
+            window_opened=True,
+            status_message="OK"
+        )
+        dash.update_diagnostic_display(rec)
+        assert "abandon" in dash.txt_diag_output.toPlainText()
 
         # Modify general settings
         dash.inp_shortcut.setText("<ctrl>+<alt>+y")

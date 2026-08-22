@@ -1,6 +1,7 @@
 import sys
 import os
 import signal
+from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QObject, Signal
@@ -9,14 +10,21 @@ from PySide6.QtWidgets import QApplication
 from app.config import ConfigManager, AppConfig
 from app.ai_service import AIService
 from app.tts_service import TTSService
-from app.capture_service import CaptureService, capture_selected_text_fast
+from app.capture_service import (
+    CaptureService,
+    capture_selected_text_detailed,
+    capture_selected_text_fast,
+    DiagnosticRecord,
+    set_last_diagnostic,
+    get_last_diagnostic,
+)
 from app.ipc import IPCServer, send_ipc_message
 from app.ui.floating_window import FloatingWindow
 from app.ui.dashboard_window import DashboardWindow
 from app.ui.tray_icon import SystemTrayManager
 
 class BridgeSignaler(QObject):
-    text_captured = Signal(str)
+    text_captured = Signal(str, str)  # (text, source)
 
 class VocabularyCaptureApp:
     def __init__(self):
@@ -42,7 +50,7 @@ class VocabularyCaptureApp:
 
         # 4. IPC Server for Wayland/Niri instant triggers
         self.ipc_server = IPCServer()
-        self.ipc_server.capture_requested.connect(self._on_captured_in_main_thread)
+        self.ipc_server.capture_requested.connect(lambda t: self._on_captured_in_main_thread(t, "Niri / IPC Socket"))
         self.ipc_server.show_floating_requested.connect(self.show_floating)
         self.ipc_server.show_dashboard_requested.connect(self.show_dashboard)
 
@@ -53,7 +61,7 @@ class VocabularyCaptureApp:
         # 6. Initialize Background Global Hotkey Listener
         self.capture_service = CaptureService(
             shortcut=self.config.global_shortcut,
-            on_captured_callback=self._on_hotkey_triggered
+            on_captured_callback=lambda t: self.bridge.text_captured.emit(t, "Global Hotkey")
         )
 
         # 7. Wire Signals
@@ -69,10 +77,21 @@ class VocabularyCaptureApp:
         self.dashboard_window.open_floating_requested.connect(self.show_floating)
         self.dashboard_window.settings_saved.connect(self._on_settings_saved)
 
-    def _on_hotkey_triggered(self, text: str):
-        self.bridge.text_captured.emit(text)
+    def _on_captured_in_main_thread(self, text: str, source: str = "Shortcut"):
+        # Record diagnostic event
+        rec = DiagnosticRecord(
+            timestamp=datetime.now().strftime("%H:%M:%S"),
+            shortcut=self.config.global_shortcut,
+            source=source,
+            text=text,
+            method="Auto-captured",
+            window_opened=True,
+            status_message="Captured & Window Opened"
+        )
+        set_last_diagnostic(rec)
+        self.dashboard_window.update_diagnostic_display(rec)
 
-    def _on_captured_in_main_thread(self, text: str):
+        # Set text and show floating window
         self.floating_window.set_captured_text(text)
 
     def _on_settings_saved(self, new_config: AppConfig):
@@ -121,8 +140,8 @@ class VocabularyCaptureApp:
             pass  # Start silently in system tray
         elif "--capture" in args or "--trigger" in args:
             # Capture selection immediately
-            text = capture_selected_text_fast()
-            self._on_captured_in_main_thread(text)
+            text, method = capture_selected_text_detailed()
+            self._on_captured_in_main_thread(text, f"CLI Trigger ({method})")
         elif "--floating" in args:
             self.show_floating()
         else:
