@@ -116,11 +116,10 @@ function parseBatchInput(
     if (results.length > 0) return results;
   }
 
-  // Format A: Simple word list (one word per line)
+  // Format A: Simple word list (one word per line, duplicates fully allowed)
   const lines = trimmed.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const uniqueWords = Array.from(new Set(lines));
 
-  return uniqueWords.map((w) => ({
+  return lines.map((w) => ({
     word: w,
     deck: defaultDeck,
     parsedFields: { word: w },
@@ -240,21 +239,6 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
   const processItem = async (item: BatchItem): Promise<BatchItem> => {
     const targetDeck = item.deck || deck;
 
-    // 1. Duplicate Check
-    try {
-      const dup = await checkDuplicate(targetDeck, item.word, settings.anki.url);
-      if (dup.isDuplicate) {
-        return {
-          ...item,
-          status: 'duplicate',
-          isDuplicate: true,
-          error: 'Word already exists in target deck',
-        };
-      }
-    } catch {
-      // Proceed if duplicate check network error
-    }
-
     // Build manual overrides from parsedFields based on user field config
     const overrides: ManualOverrides = {};
     if (item.parsedFields) {
@@ -266,11 +250,12 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
       if (fieldConfig.mnemonic && item.parsedFields.mnemonic) overrides.mnemonic = item.parsedFields.mnemonic;
     }
 
-    // 2. Run Pipeline
+    // Run Pipeline
     const res = await runFullPipeline({
       word: item.word,
       deck: targetDeck,
       manualOverrides: overrides,
+      cardType: settings.defaultCard?.cardType || 'normal',
       createInAnki: true,
     });
 

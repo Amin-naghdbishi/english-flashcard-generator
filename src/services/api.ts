@@ -1,4 +1,4 @@
-import { AppSettings, CardData, DiagnosticsReport, ManualOverrides, AnkiCardVerificationDetails, ThemeId } from '../types';
+import { AppSettings, CardData, DiagnosticsReport, ManualOverrides, AnkiCardVerificationDetails, ThemeId, CardType } from '../types';
 import { OllamaModelTag } from '../../server/ollama';
 import { PiperVoice, PiperDiagnosticResult } from '../../server/piper';
 import { OnlineTTSDiagnosticResult } from '../../server/onlineTts';
@@ -98,6 +98,25 @@ export async function runOnlineTTSDiagnostics(): Promise<OnlineTTSDiagnosticResu
   return res.json();
 }
 
+export async function testSmartImage(word: string, partOfSpeech?: string, meaningFa?: string) {
+  const res = await fetch('/api/smart-images/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ word, partOfSpeech, meaningFa }),
+  });
+  return res.json();
+}
+
+export async function lookupAbadisDict(word: string) {
+  const res = await fetch(`/api/dictionary/abadis?word=${encodeURIComponent(word)}`);
+  return res.json();
+}
+
+export async function lookupFreeDict(word: string) {
+  const res = await fetch(`/api/dictionary/freedict?word=${encodeURIComponent(word)}`);
+  return res.json();
+}
+
 export async function synthesizeAudio(text: string, voice?: string, speed?: number, endpoint?: string) {
   const res = await fetch('/api/tts/synthesize', {
     method: 'POST',
@@ -143,11 +162,11 @@ export async function checkDuplicate(deck: string, word: string, url?: string): 
   return res.json();
 }
 
-export async function setupAnkiModel(themeId?: ThemeId, url?: string) {
+export async function setupAnkiModel(themeId?: ThemeId, cardType?: CardType, url?: string) {
   const res = await fetch('/api/anki/setup-model', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ themeId, url }),
+    body: JSON.stringify({ themeId, cardType, url }),
   });
   return res.json();
 }
@@ -198,6 +217,7 @@ export async function createDirectAnkiNote(params: {
   deck: string;
   cardData: CardData;
   themeId?: ThemeId;
+  cardType?: CardType;
   url?: string;
 }): Promise<{
   success: boolean;
@@ -218,6 +238,7 @@ export async function runFullPipeline(params: {
   word: string;
   deck: string;
   manualOverrides?: ManualOverrides;
+  cardType?: CardType;
   createInAnki?: boolean;
 }): Promise<{
   success: boolean;

@@ -1,3 +1,5 @@
+export type CardType = 'normal' | 'spelling';
+
 export interface CardAudioFile {
   fileName: string;
   fieldSoundTag: string;
@@ -16,6 +18,17 @@ export interface CardData {
   example: string;
   translationFa: string;
   mnemonic: string;
+
+  // Card type & Spelling specific
+  cardType?: CardType;
+  spellingSentence?: string; // Sentence with ______ for the target word
+
+  // Smart Images
+  imageBase64?: string;
+  imageFileName?: string;
+  imageAlt?: string;
+  needsImage?: boolean;
+  imageReason?: string;
 
   // Multi-audio files
   wordAudioUsNormalBase64?: string;
@@ -49,6 +62,9 @@ export interface ManualOverrides {
   example?: string;
   translationFa?: string;
   mnemonic?: string;
+  cardType?: CardType;
+  imageBase64?: string;
+  imageFileName?: string;
 }
 
 export type AIProvider = 'ollama' | 'gemini';
@@ -59,12 +75,17 @@ export type ThemeId =
   | 'comic-pop-dark'
   | 'comic-strip-light'
   | 'comic-strip-dark'
+  | 'comic-quest-light'
+  | 'comic-quest-dark'
+  | 'comic-notebook-light'
+  | 'comic-notebook-dark'
+  | 'comic-arcade-light'
+  | 'comic-arcade-dark'
+  // Legacy aliases
   | 'comic-manga-light'
   | 'comic-manga-dark'
   | 'comic-minimal-light'
   | 'comic-minimal-dark'
-  | 'comic-arcade-light'
-  | 'comic-arcade-dark'
   | 'comic-dark'
   | 'comic-light';
 
@@ -85,7 +106,6 @@ export interface AIConfig {
   provider: AIProvider;
   ollama: OllamaConfig;
   gemini: GeminiConfig;
-  // Legacy / fallback flat properties
   url?: string;
   model?: string;
   temperature?: number;
@@ -98,12 +118,37 @@ export interface TTSConfig {
   endpoint: string; // http://127.0.0.1:5000 (for Piper)
   americanVoice: string; // en_US-lessac-high
   britishVoice: string; // en_GB-cori-high
-  normalSpeed: number;
-  slowSpeed: number;
-  generateSlow: boolean;
-  generateBritish: boolean;
-  generateAmerican: boolean;
+  normalSpeed: number; // 1.0
+  slowSpeed: number; // 1.25 (higher = slower for Piper length scale)
+  generateAmericanNormal: boolean;
+  generateAmericanSlow: boolean;
+  generateBritishNormal: boolean;
+  generateBritishSlow: boolean;
+  generateExampleUs: boolean;
+  generateExampleUk: boolean;
+  // Legacy flat fields
+  generateSlow?: boolean;
+  generateBritish?: boolean;
+  generateAmerican?: boolean;
   generateSlowExample?: boolean;
+}
+
+export interface DictionaryConfig {
+  meaningFaSource: 'ai' | 'abadis' | 'freedict';
+  definitionEnSource: 'ai' | 'freedict' | 'wiktionary';
+  exampleSource: 'ai' | 'freedict';
+  translationSource: 'ai';
+  mnemonicSource: 'ai';
+}
+
+export interface SmartImagesConfig {
+  enabled: boolean;
+  provider: 'auto' | 'wikimedia' | 'unsplash';
+}
+
+export interface DefaultCardConfig {
+  cardType: CardType;
+  allowDuplicateWords: boolean;
 }
 
 export interface AnkiConfig {
@@ -120,6 +165,9 @@ export interface AnkiConfig {
 export interface AppSettings {
   ai: AIConfig;
   tts: TTSConfig;
+  dictionary: DictionaryConfig;
+  smartImages: SmartImagesConfig;
+  defaultCard: DefaultCardConfig;
   anki: AnkiConfig;
   theme: ThemeId;
 }
@@ -195,6 +243,7 @@ export interface DiagnosticsReport {
   system: DiagnosticsItem[];
   ai: DiagnosticsItem[];
   tts: DiagnosticsItem[];
+  dictionary: DiagnosticsItem[];
   anki: DiagnosticsItem[];
   templates: DiagnosticsItem[];
   allPassed: boolean;

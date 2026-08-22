@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CardData, ManualOverrides, AppSettings, StepLog, AnkiCardVerificationDetails } from '../types';
+import { CardData, ManualOverrides, AppSettings, StepLog, AnkiCardVerificationDetails, CardType } from '../types';
 import { CardPreview } from './CardPreview';
 import { AudioPlayer } from './AudioPlayer';
 import {
@@ -50,6 +50,7 @@ const DEFAULT_STEPS: Array<{ step: number; name: string }> = [
 export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCardCreated }) => {
   const [word, setWord] = useState('abandon');
   const [deck, setDeck] = useState(settings.anki.defaultDeck || 'English::B1');
+  const [cardType, setCardType] = useState<CardType>(settings.defaultCard?.cardType || 'normal');
   const [availableDecks, setAvailableDecks] = useState<string[]>(['English::B1', 'English::B2', 'IELTS']);
   const [isCustomDeck, setIsCustomDeck] = useState(false);
   const [loadingDecks, setLoadingDecks] = useState(false);
@@ -153,6 +154,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
         word: trimmedWord,
         deck: deck.trim(),
         manualOverrides: overrides,
+        cardType,
         createInAnki: true,
       });
 
@@ -294,6 +296,39 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                 className="w-full border-4 border-black p-3 bg-white text-black text-lg sm:text-xl font-bold rounded-none focus:outline-none placeholder:text-zinc-400"
                 required
               />
+            </div>
+
+            {/* Card Type Selector [ Normal | Spelling ] */}
+            <div>
+              <label className="block text-xs font-black uppercase mb-1 tracking-wider text-black">
+                Card Type (نوع کارت)
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCardType('normal')}
+                  disabled={isGenerating || testingAnkiOnly}
+                  className={`py-2 px-3 border-2 border-black font-black text-xs uppercase flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] ${
+                    cardType === 'normal'
+                      ? 'bg-[#4ADE80] text-black ring-2 ring-black'
+                      : 'bg-white text-black hover:bg-zinc-100'
+                  }`}
+                >
+                  <span>Normal Vocab</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCardType('spelling')}
+                  disabled={isGenerating || testingAnkiOnly}
+                  className={`py-2 px-3 border-2 border-black font-black text-xs uppercase flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] ${
+                    cardType === 'spelling'
+                      ? 'bg-[#C084FC] text-black ring-2 ring-black'
+                      : 'bg-white text-black hover:bg-zinc-100'
+                  }`}
+                >
+                  <span>Spelling Exercise</span>
+                </button>
+              </div>
             </div>
 
             {/* Deck Selector */}

@@ -269,6 +269,13 @@ export async function generateAllCardAudios(params: {
   britishVoice?: string;
   normalSpeed?: number;
   slowSpeed?: number;
+  generateAmericanNormal?: boolean;
+  generateAmericanSlow?: boolean;
+  generateBritishNormal?: boolean;
+  generateBritishSlow?: boolean;
+  generateExampleUs?: boolean;
+  generateExampleUk?: boolean;
+  // Legacy
   generateSlow?: boolean;
   generateBritish?: boolean;
   generateAmerican?: boolean;
@@ -282,10 +289,12 @@ export async function generateAllCardAudios(params: {
     britishVoice = 'en_GB-cori-high',
     normalSpeed = 1.0,
     slowSpeed = 1.25,
-    generateSlow = true,
-    generateBritish = true,
-    generateAmerican = true,
-    generateSlowExample = false,
+    generateAmericanNormal = true,
+    generateAmericanSlow = true,
+    generateBritishNormal = true,
+    generateBritishSlow = true,
+    generateExampleUs = true,
+    generateExampleUk = false,
   } = params;
 
   const safeWord = word.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
@@ -314,52 +323,36 @@ export async function generateAllCardAudios(params: {
   }
 
   // --- AMERICAN PRONUNCIATIONS ---
-  if (generateAmerican) {
-    // 1. American Normal Word
+  if (generateAmericanNormal) {
     const usNormalFile = `${safeWord}_us_normal.wav`;
     const usNormalRes = await synthesizePiperAudio(word, americanVoice, normalSpeed, endpoint);
-    if (!usNormalRes.success || !usNormalRes.wavBuffer || !usNormalRes.wavBase64) {
-      return {
-        success: false,
-        error: `Failed to generate American normal audio: ${usNormalRes.error || 'Piper failed'}`,
-        files: [],
-        wordAudioField: '',
-        exampleAudioField: '',
-      };
+    if (usNormalRes.success && usNormalRes.wavBuffer && usNormalRes.wavBase64) {
+      resultFiles.push({
+        fileName: usNormalFile,
+        fieldSoundTag: `[sound:${usNormalFile}]`,
+        base64: usNormalRes.wavBase64,
+        buffer: usNormalRes.wavBuffer,
+        label: 'American Normal (1.0x)',
+        voice: americanVoice,
+        speed: normalSpeed,
+        validation: usNormalRes.validation!,
+      });
+      wordSoundTags.push(`[sound:${usNormalFile}]`);
+      returnData.wordAudioUsNormalBase64 = usNormalRes.wavBase64;
+      returnData.wordAudioUsNormalFileName = usNormalFile;
     }
-    resultFiles.push({
-      fileName: usNormalFile,
-      fieldSoundTag: `[sound:${usNormalFile}]`,
-      base64: usNormalRes.wavBase64,
-      buffer: usNormalRes.wavBuffer,
-      label: 'American Normal (1.0x)',
-      voice: americanVoice,
-      speed: normalSpeed,
-      validation: usNormalRes.validation!,
-    });
-    wordSoundTags.push(`[sound:${usNormalFile}]`);
-    returnData.wordAudioUsNormalBase64 = usNormalRes.wavBase64;
-    returnData.wordAudioUsNormalFileName = usNormalFile;
+  }
 
-    // 2. American Slow Word
-    if (generateSlow) {
-      const usSlowFile = `${safeWord}_us_slow.wav`;
-      const usSlowRes = await synthesizePiperAudio(word, americanVoice, slowSpeed, endpoint);
-      if (!usSlowRes.success || !usSlowRes.wavBuffer || !usSlowRes.wavBase64) {
-        return {
-          success: false,
-          error: `Failed to generate American slow audio: ${usSlowRes.error || 'Piper failed'}`,
-          files: [],
-          wordAudioField: '',
-          exampleAudioField: '',
-        };
-      }
+  if (generateAmericanSlow) {
+    const usSlowFile = `${safeWord}_us_slow.wav`;
+    const usSlowRes = await synthesizePiperAudio(word, americanVoice, slowSpeed, endpoint);
+    if (usSlowRes.success && usSlowRes.wavBuffer && usSlowRes.wavBase64) {
       resultFiles.push({
         fileName: usSlowFile,
         fieldSoundTag: `[sound:${usSlowFile}]`,
         base64: usSlowRes.wavBase64,
         buffer: usSlowRes.wavBuffer,
-        label: 'American Slow (1.25x)',
+        label: `American Slow (${slowSpeed}x)`,
         voice: americanVoice,
         speed: slowSpeed,
         validation: usSlowRes.validation!,
@@ -368,20 +361,12 @@ export async function generateAllCardAudios(params: {
       returnData.wordAudioUsSlowBase64 = usSlowRes.wavBase64;
       returnData.wordAudioUsSlowFileName = usSlowFile;
     }
+  }
 
-    // 3. American Example Normal
-    if (example && example.trim()) {
-      const exampleUsFile = `${safeWord}_example_us_normal.wav`;
-      const exampleUsRes = await synthesizePiperAudio(example, americanVoice, normalSpeed, endpoint);
-      if (!exampleUsRes.success || !exampleUsRes.wavBuffer || !exampleUsRes.wavBase64) {
-        return {
-          success: false,
-          error: `Failed to generate American example audio: ${exampleUsRes.error || 'Piper failed'}`,
-          files: [],
-          wordAudioField: '',
-          exampleAudioField: '',
-        };
-      }
+  if (generateExampleUs && example && example.trim()) {
+    const exampleUsFile = `${safeWord}_example_us_normal.wav`;
+    const exampleUsRes = await synthesizePiperAudio(example, americanVoice, normalSpeed, endpoint);
+    if (exampleUsRes.success && exampleUsRes.wavBuffer && exampleUsRes.wavBase64) {
       resultFiles.push({
         fileName: exampleUsFile,
         fieldSoundTag: `[sound:${exampleUsFile}]`,
@@ -399,52 +384,36 @@ export async function generateAllCardAudios(params: {
   }
 
   // --- BRITISH PRONUNCIATIONS ---
-  if (generateBritish) {
-    // 4. British Normal Word
+  if (generateBritishNormal) {
     const ukNormalFile = `${safeWord}_uk_normal.wav`;
     const ukNormalRes = await synthesizePiperAudio(word, britishVoice, normalSpeed, endpoint);
-    if (!ukNormalRes.success || !ukNormalRes.wavBuffer || !ukNormalRes.wavBase64) {
-      return {
-        success: false,
-        error: `Failed to generate British normal audio: ${ukNormalRes.error || 'Piper failed'}`,
-        files: [],
-        wordAudioField: '',
-        exampleAudioField: '',
-      };
+    if (ukNormalRes.success && ukNormalRes.wavBuffer && ukNormalRes.wavBase64) {
+      resultFiles.push({
+        fileName: ukNormalFile,
+        fieldSoundTag: `[sound:${ukNormalFile}]`,
+        base64: ukNormalRes.wavBase64,
+        buffer: ukNormalRes.wavBuffer,
+        label: 'British Normal (1.0x)',
+        voice: britishVoice,
+        speed: normalSpeed,
+        validation: ukNormalRes.validation!,
+      });
+      wordSoundTags.push(`[sound:${ukNormalFile}]`);
+      returnData.wordAudioUkNormalBase64 = ukNormalRes.wavBase64;
+      returnData.wordAudioUkNormalFileName = ukNormalFile;
     }
-    resultFiles.push({
-      fileName: ukNormalFile,
-      fieldSoundTag: `[sound:${ukNormalFile}]`,
-      base64: ukNormalRes.wavBase64,
-      buffer: ukNormalRes.wavBuffer,
-      label: 'British Normal (1.0x)',
-      voice: britishVoice,
-      speed: normalSpeed,
-      validation: ukNormalRes.validation!,
-    });
-    wordSoundTags.push(`[sound:${ukNormalFile}]`);
-    returnData.wordAudioUkNormalBase64 = ukNormalRes.wavBase64;
-    returnData.wordAudioUkNormalFileName = ukNormalFile;
+  }
 
-    // 5. British Slow Word
-    if (generateSlow) {
-      const ukSlowFile = `${safeWord}_uk_slow.wav`;
-      const ukSlowRes = await synthesizePiperAudio(word, britishVoice, slowSpeed, endpoint);
-      if (!ukSlowRes.success || !ukSlowRes.wavBuffer || !ukSlowRes.wavBase64) {
-        return {
-          success: false,
-          error: `Failed to generate British slow audio: ${ukSlowRes.error || 'Piper failed'}`,
-          files: [],
-          wordAudioField: '',
-          exampleAudioField: '',
-        };
-      }
+  if (generateBritishSlow) {
+    const ukSlowFile = `${safeWord}_uk_slow.wav`;
+    const ukSlowRes = await synthesizePiperAudio(word, britishVoice, slowSpeed, endpoint);
+    if (ukSlowRes.success && ukSlowRes.wavBuffer && ukSlowRes.wavBase64) {
       resultFiles.push({
         fileName: ukSlowFile,
         fieldSoundTag: `[sound:${ukSlowFile}]`,
         base64: ukSlowRes.wavBase64,
         buffer: ukSlowRes.wavBuffer,
-        label: 'British Slow (1.25x)',
+        label: `British Slow (${slowSpeed}x)`,
         voice: britishVoice,
         speed: slowSpeed,
         validation: ukSlowRes.validation!,
@@ -453,20 +422,12 @@ export async function generateAllCardAudios(params: {
       returnData.wordAudioUkSlowBase64 = ukSlowRes.wavBase64;
       returnData.wordAudioUkSlowFileName = ukSlowFile;
     }
+  }
 
-    // 6. British Example Normal
-    if (example && example.trim()) {
-      const exampleUkFile = `${safeWord}_example_uk_normal.wav`;
-      const exampleUkRes = await synthesizePiperAudio(example, britishVoice, normalSpeed, endpoint);
-      if (!exampleUkRes.success || !exampleUkRes.wavBuffer || !exampleUkRes.wavBase64) {
-        return {
-          success: false,
-          error: `Failed to generate British example audio: ${exampleUkRes.error || 'Piper failed'}`,
-          files: [],
-          wordAudioField: '',
-          exampleAudioField: '',
-        };
-      }
+  if (generateExampleUk && example && example.trim()) {
+    const exampleUkFile = `${safeWord}_example_uk_normal.wav`;
+    const exampleUkRes = await synthesizePiperAudio(example, britishVoice, normalSpeed, endpoint);
+    if (exampleUkRes.success && exampleUkRes.wavBuffer && exampleUkRes.wavBase64) {
       resultFiles.push({
         fileName: exampleUkFile,
         fieldSoundTag: `[sound:${exampleUkFile}]`,

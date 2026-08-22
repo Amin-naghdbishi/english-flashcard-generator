@@ -1,11 +1,11 @@
 import { ThemeDefinition } from '../types';
-import { sharedFrontHtml, sharedBackHtml } from './templates';
+import { heroPopFrontNormalHtml, heroPopBackHtml } from './templates';
 
-const css = `/* THEME 1: POP COMIC LIGHT */
+const css = `/* THEME 1: HERO POP LIGHT */
 .card {
-  background-color: #FAF8F5;
+  background-color: #FEF9C3;
   color: #000000;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: "Bungee", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   margin: 0;
   padding: 16px 12px;
   display: flex;
@@ -25,21 +25,54 @@ const css = `/* THEME 1: POP COMIC LIGHT */
 .comic-card {
   width: 100%;
   background-color: #FFFFFF;
-  border: 5px solid #000000;
+  border: 4px solid #000000;
   box-shadow: 6px 6px 0px #000000;
   padding: 20px;
   box-sizing: border-box;
   text-align: left;
-  border-radius: 0;
+  border-radius: 4px;
+}
+
+.card-hero-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.hero-badge {
+  font-size: 11px;
+  font-weight: 900;
+  background-color: #FF4B4B;
+  color: #FFFFFF;
+  padding: 3px 8px;
+  border: 2px solid #000000;
+  box-shadow: 2px 2px 0px #000000;
+  letter-spacing: 0.5px;
+}
+
+.hero-badge.badge-spelling {
+  background-color: #8B5CF6;
+}
+
+.card-illustration {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  border: 3px solid #000000;
+  box-shadow: 3px 3px 0px #000000;
+  margin-bottom: 14px;
+  display: block;
+  background-color: #F8FAFC;
 }
 
 .comic-word-section {
   width: 100%;
-  background-color: #FFFDF0;
-  border: 4px solid #000000;
+  background-color: #FFD93D;
+  border: 3px solid #000000;
+  box-shadow: 3px 3px 0px #000000;
   padding: 14px 16px;
   margin-bottom: 14px;
-  box-shadow: 4px 4px 0px #000000;
   box-sizing: border-box;
 }
 
@@ -77,17 +110,16 @@ const css = `/* THEME 1: POP COMIC LIGHT */
   letter-spacing: 0.5px;
   padding: 3px 8px;
   border: 2px solid #000000;
-  box-shadow: 2px 2px 0px #000000;
   line-height: 1.2;
 }
 
 .badge-pos {
-  background-color: #FFD93D;
+  background-color: #4ADE80;
   color: #000000;
 }
 
 .badge-ipa {
-  background-color: #38BDF8;
+  background-color: #FFFFFF;
   color: #000000;
   font-family: "Lucida Sans Unicode", "DejaVu Sans", sans-serif;
   font-style: italic;
@@ -96,7 +128,7 @@ const css = `/* THEME 1: POP COMIC LIGHT */
 .comic-pronunciation-box {
   width: 100%;
   box-sizing: border-box;
-  background-color: #FAF8F5;
+  background-color: #F8FAFC;
   border: 3px solid #000000;
   box-shadow: 3px 3px 0px #000000;
   padding: 10px 12px;
@@ -148,13 +180,13 @@ const css = `/* THEME 1: POP COMIC LIGHT */
 .speed-label {
   font-size: 11px;
   font-weight: 800;
-  color: #000000;
+  color: #475569;
 }
 
 .comic-hint-box {
-  background-color: #FAF8F5;
-  border: 3px solid #000000;
-  border-left: 8px solid #FFD93D;
+  background-color: #FFFBEB;
+  border: 2px solid #000000;
+  border-left: 6px solid #F59E0B;
   padding: 12px 14px;
   box-sizing: border-box;
 }
@@ -163,7 +195,7 @@ const css = `/* THEME 1: POP COMIC LIGHT */
   display: block;
   font-size: 10px;
   font-weight: 900;
-  color: #64748b;
+  color: #B45309;
   margin-bottom: 4px;
   letter-spacing: 0.5px;
 }
@@ -184,12 +216,11 @@ const css = `/* THEME 1: POP COMIC LIGHT */
 }
 
 .comic-meaning-box {
-  background-color: #F0FDF4;
-  border: 3px solid #000000;
-  border-left: 8px solid #4ADE80;
+  background-color: #DCFCE7;
+  border: 2px solid #000000;
+  border-left: 6px solid #16A34A;
   padding: 12px 14px;
   margin-bottom: 14px;
-  box-shadow: 3px 3px 0px #000000;
   box-sizing: border-box;
 }
 
@@ -204,7 +235,7 @@ const css = `/* THEME 1: POP COMIC LIGHT */
 
 .label-meaning { color: #15803D; }
 .label-example { color: #C2410C; }
-.label-memory { color: #6B21A8; }
+.label-memory { color: #6D28D9; }
 
 .meaning-text {
   margin: 0;
@@ -215,12 +246,11 @@ const css = `/* THEME 1: POP COMIC LIGHT */
 }
 
 .comic-example-box {
-  background-color: #FFF7ED;
-  border: 3px solid #000000;
-  border-left: 8px solid #FB923C;
+  background-color: #FFEDD5;
+  border: 2px solid #000000;
+  border-left: 6px solid #EA580C;
   padding: 12px 14px;
   margin-bottom: 14px;
-  box-shadow: 3px 3px 0px #000000;
   box-sizing: border-box;
 }
 
@@ -265,10 +295,9 @@ const css = `/* THEME 1: POP COMIC LIGHT */
 
 .comic-mnemonic-box {
   background-color: #F3E8FF;
-  border: 3px solid #000000;
-  border-left: 8px solid #A855F7;
+  border: 2px solid #000000;
+  border-left: 6px solid #9333EA;
   padding: 12px 14px;
-  box-shadow: 3px 3px 0px #000000;
   box-sizing: border-box;
 }
 
@@ -280,6 +309,142 @@ const css = `/* THEME 1: POP COMIC LIGHT */
   font-weight: 700;
 }
 
+/* SPELLING STYLES */
+.spelling-prompt-box {
+  background-color: #F3E8FF;
+  border: 3px solid #000000;
+  box-shadow: 3px 3px 0px #000000;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.spelling-prompt-title {
+  font-size: 10px;
+  font-weight: 900;
+  color: #6D28D9;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.spelling-sentence {
+  font-size: 16px;
+  font-weight: 800;
+  color: #000000;
+  line-height: 1.4;
+}
+
+.spelling-interactive-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.spelling-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  font-size: 16px;
+  font-weight: 900;
+  font-family: inherit;
+  border: 3px solid #000000;
+  box-shadow: 3px 3px 0px #000000;
+  background-color: #FFFFFF;
+  color: #000000;
+  outline: none;
+}
+
+.spelling-input.is-valid {
+  border-color: #16A34A;
+  background-color: #DCFCE7;
+}
+
+.spelling-input.has-error {
+  border-color: #DC2626;
+  background-color: #FEE2E2;
+}
+
+.spelling-check-btn {
+  background-color: #FFD93D !important;
+  color: #000000 !important;
+  font-weight: 900 !important;
+  font-size: 13px !important;
+  padding: 10px 16px !important;
+  border: 3px solid #000000 !important;
+  box-shadow: 3px 3px 0px #000000 !important;
+  cursor: pointer !important;
+  text-transform: uppercase !important;
+  transition: transform 0.1s;
+}
+
+.spelling-check-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0px #000000 !important;
+}
+
+.spelling-result {
+  margin-top: 8px;
+  border: 3px solid transparent;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+
+.spelling-result.is-correct {
+  background-color: #DCFCE7;
+  border: 3px solid #000000;
+  box-shadow: 3px 3px 0px #000000;
+  padding: 12px;
+}
+
+.spelling-result.is-incorrect {
+  background-color: #FEE2E2;
+  border: 3px solid #000000;
+  box-shadow: 3px 3px 0px #000000;
+  padding: 12px;
+}
+
+.spelling-success-badge {
+  font-size: 13px;
+  font-weight: 900;
+  color: #15803D;
+}
+
+.spelling-word-reveal {
+  font-size: 20px;
+  font-weight: 900;
+  color: #000000;
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+
+.spelling-error-badge {
+  font-size: 13px;
+  font-weight: 900;
+  color: #DC2626;
+  margin-bottom: 6px;
+}
+
+.spelling-compare-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.spelling-mistake {
+  color: #DC2626;
+  text-decoration: line-through;
+  font-size: 16px;
+}
+
+.spelling-exact {
+  color: #15803D;
+  font-size: 18px;
+  text-transform: uppercase;
+}
+
+/* AUDIO BUTTONS */
 .replay-button, .play-button, a.replay-button, .comic-audio-btn {
   background-color: #FFD93D !important;
   border: 2px solid #000000 !important;
@@ -311,9 +476,9 @@ const css = `/* THEME 1: POP COMIC LIGHT */
 
 export const comicPopLightTheme: ThemeDefinition = {
   id: 'comic-pop-light',
-  name: 'Pop Comic Light',
-  description: 'Bright pop-art comic panels with punchy yellow, blue, and emerald highlights.',
-  frontHtml: sharedFrontHtml,
-  backHtml: sharedBackHtml,
+  name: 'Hero Pop (Light)',
+  description: 'Punchy comic hero cards with bold yellow title panels and vivid halftone badges.',
+  frontHtml: heroPopFrontNormalHtml,
+  backHtml: heroPopBackHtml,
   css,
 };

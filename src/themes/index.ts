@@ -3,60 +3,127 @@ import { comicPopLightTheme } from './comic-pop-light';
 import { comicPopDarkTheme } from './comic-pop-dark';
 import { comicStripLightTheme } from './comic-strip-light';
 import { comicStripDarkTheme } from './comic-strip-dark';
-import { comicMangaLightTheme } from './comic-manga-light';
-import { comicMangaDarkTheme } from './comic-manga-dark';
-import { comicMinimalLightTheme } from './comic-minimal-light';
-import { comicMinimalDarkTheme } from './comic-minimal-dark';
+import { comicQuestLightTheme } from './comic-quest-light';
+import { comicQuestDarkTheme } from './comic-quest-dark';
+import { comicNotebookLightTheme } from './comic-notebook-light';
+import { comicNotebookDarkTheme } from './comic-notebook-dark';
 import { comicArcadeLightTheme } from './comic-arcade-light';
 import { comicArcadeDarkTheme } from './comic-arcade-dark';
+import {
+  heroPopFrontSpellingHtml,
+  storyStripFrontSpellingHtml,
+  duoQuestFrontSpellingHtml,
+  indexNotebookFrontSpellingHtml,
+  arcadeRetroFrontSpellingHtml,
+} from './templates';
 
 export const THEMES: Record<string, ThemeDefinition> = {
   // 5 Light Themes
   'comic-pop-light': comicPopLightTheme,
   'comic-strip-light': comicStripLightTheme,
-  'comic-manga-light': comicMangaLightTheme,
-  'comic-minimal-light': comicMinimalLightTheme,
+  'comic-quest-light': comicQuestLightTheme,
+  'comic-notebook-light': comicNotebookLightTheme,
   'comic-arcade-light': comicArcadeLightTheme,
 
   // 5 Dark Themes
   'comic-pop-dark': comicPopDarkTheme,
   'comic-strip-dark': comicStripDarkTheme,
-  'comic-manga-dark': comicMangaDarkTheme,
-  'comic-minimal-dark': comicMinimalDarkTheme,
+  'comic-quest-dark': comicQuestDarkTheme,
+  'comic-notebook-dark': comicNotebookDarkTheme,
   'comic-arcade-dark': comicArcadeDarkTheme,
 
   // Legacy Aliases
+  'comic-manga-light': comicQuestLightTheme,
+  'comic-manga-dark': comicQuestDarkTheme,
+  'comic-minimal-light': comicNotebookLightTheme,
+  'comic-minimal-dark': comicNotebookDarkTheme,
   'comic-light': comicPopLightTheme,
   'comic-dark': comicPopDarkTheme,
 };
 
 export const THEME_GROUPS = {
   light: [
-    { id: 'comic-pop-light', name: 'Pop Comic (Light)', desc: 'Vibrant pop-art comic panels with bold colors' },
-    { id: 'comic-strip-light', name: 'Comic Strip (Light)', desc: 'Classic Sunday newspaper comic strip style' },
-    { id: 'comic-manga-light', name: 'Graphic Novel (Light)', desc: 'High-contrast graphic novel and manga ink style' },
-    { id: 'comic-minimal-light', name: 'Minimal Line (Light)', desc: 'Clean line-art comic panels with pastel badges' },
-    { id: 'comic-arcade-light', name: 'Arcade Cartoon (Light)', desc: 'Playful retro arcade game & cartoon aesthetic' },
+    { id: 'comic-pop-light', name: 'Hero Pop (Light)', desc: 'Bold comic hero cards with halftone badges and speech balloons.' },
+    { id: 'comic-strip-light', name: 'Story Strip (Light)', desc: '3-panel Sunday newspaper comic layout with dialogue panels.' },
+    { id: 'comic-quest-light', name: 'Duo Quest (Light)', desc: 'Playful Duolingo-inspired learning UX with chunky 3D buttons.' },
+    { id: 'comic-notebook-light', name: 'Index Notebook (Light)', desc: 'Ruled paper notebook with sticky index tabs and washi tape.' },
+    { id: 'comic-arcade-light', name: 'Arcade Retro (Light)', desc: '90s pixel arcade cabinet style with HUD bars and coin buttons.' },
   ],
   dark: [
-    { id: 'comic-pop-dark', name: 'Pop Comic (Dark)', desc: 'Midnight ink canvas with vibrant neon comic accents' },
-    { id: 'comic-strip-dark', name: 'Comic Strip (Dark)', desc: 'Deep navy charcoal comic strip panels' },
-    { id: 'comic-manga-dark', name: 'Graphic Novel (Dark)', desc: 'Pitch black graphic novel aesthetic with cyan ink' },
-    { id: 'comic-minimal-dark', name: 'Minimal Line (Dark)', desc: 'Matte dark slate comic panels with delicate outlines' },
-    { id: 'comic-arcade-dark', name: 'Arcade Cartoon (Dark)', desc: 'Neon 90s arcade cartoon card with magenta accents' },
+    { id: 'comic-pop-dark', name: 'Hero Pop (Dark)', desc: 'Midnight comic hero panels with bright amber and cyan action badges.' },
+    { id: 'comic-strip-dark', name: 'Story Strip (Dark)', desc: 'Deep navy comic strip panels with speech bubbles and dialogue frames.' },
+    { id: 'comic-quest-dark', name: 'Duo Quest (Dark)', desc: 'Midnight gamified educational card with glowing XP accents.' },
+    { id: 'comic-notebook-dark', name: 'Index Notebook (Dark)', desc: 'Chalkboard study notebook with neon highlighters and sticky notes.' },
+    { id: 'comic-arcade-dark', name: 'Arcade Retro (Dark)', desc: 'Vibrant neon 90s arcade cyberpunk interface with glowing terminals.' },
   ],
 };
+
+export function getSpellingFrontHtml(themeId: ThemeId): string {
+  switch (themeId) {
+    case 'comic-pop-light':
+    case 'comic-pop-dark':
+    case 'comic-light':
+    case 'comic-dark':
+      return heroPopFrontSpellingHtml;
+    case 'comic-strip-light':
+    case 'comic-strip-dark':
+      return storyStripFrontSpellingHtml;
+    case 'comic-quest-light':
+    case 'comic-quest-dark':
+    case 'comic-manga-light':
+    case 'comic-manga-dark':
+      return duoQuestFrontSpellingHtml;
+    case 'comic-notebook-light':
+    case 'comic-notebook-dark':
+    case 'comic-minimal-light':
+    case 'comic-minimal-dark':
+      return indexNotebookFrontSpellingHtml;
+    case 'comic-arcade-light':
+    case 'comic-arcade-dark':
+      return arcadeRetroFrontSpellingHtml;
+    default:
+      return heroPopFrontSpellingHtml;
+  }
+}
+
+/**
+ * Creates blanked sentence for spelling exercises by replacing the word (and inflections) with ______
+ */
+export function makeSpellingSentence(sentence: string, targetWord: string): string {
+  if (!sentence) return '______';
+  if (!targetWord) return sentence;
+
+  const cleanWord = targetWord.trim();
+  // Match word boundary variations (e.g. abandon, abandons, abandoned, abandoning)
+  const regex = new RegExp(`\\b${cleanWord}(?:ed|ing|s|es|d)?\\b`, 'gi');
+  if (regex.test(sentence)) {
+    return sentence.replace(regex, '______');
+  }
+
+  // Fallback: simple case-insensitive replacement
+  const directIdx = sentence.toLowerCase().indexOf(cleanWord.toLowerCase());
+  if (directIdx !== -1) {
+    return (
+      sentence.slice(0, directIdx) +
+      '______' +
+      sentence.slice(directIdx + cleanWord.length)
+    );
+  }
+
+  return `${sentence} [ ______ ]`;
+}
 
 export function renderThemeHtml(
   templateHtml: string,
   data: CardData,
   options?: {
     isPreview?: boolean;
-    audioPlayerHtml?: { word?: string; example?: string };
+    cardType?: 'normal' | 'spelling';
   }
 ): string {
   let html = templateHtml;
 
+  // 1. Audio formatting
   let wordAudio = '';
   let exampleAudio = '';
   let wordAudioUsNormal = '';
@@ -71,17 +138,16 @@ export function renderThemeHtml(
       if (b64) {
         return `<button type="button" class="comic-audio-btn preview-play-btn" data-audio-target="${target}" title="Play ${label}">▶ ${label}</button>`;
       }
-      return `<button type="button" class="comic-audio-btn preview-play-btn" style="opacity: 0.35; cursor: not-allowed;" title="${label} (No audio)">▶ ${label}</button>`;
+      return `<button type="button" class="comic-audio-btn preview-play-btn" style="opacity: 0.35; cursor: not-allowed;" title="${label} (Disabled in settings)">▶ ${label}</button>`;
     };
 
     wordAudioUsNormal = makePreviewBtn('word_us_normal', 'Play', data.wordAudioUsNormalBase64 || data.wordAudioBase64);
-    wordAudioUsSlow = makePreviewBtn('word_us_slow', 'Play', data.wordAudioUsSlowBase64);
+    wordAudioUsSlow = makePreviewBtn('word_us_slow', 'Slow', data.wordAudioUsSlowBase64);
     wordAudioUkNormal = makePreviewBtn('word_uk_normal', 'Play', data.wordAudioUkNormalBase64);
-    wordAudioUkSlow = makePreviewBtn('word_uk_slow', 'Play', data.wordAudioUkSlowBase64);
+    wordAudioUkSlow = makePreviewBtn('word_uk_slow', 'Slow', data.wordAudioUkSlowBase64);
     exampleAudioUsNormal = makePreviewBtn('example_us_normal', 'Play', data.exampleAudioUsNormalBase64 || data.exampleAudioBase64);
     exampleAudioUkNormal = makePreviewBtn('example_uk_normal', 'Play', data.exampleAudioUkNormalBase64);
 
-    // Grouped fallback buttons
     const wordGroup = [
       data.wordAudioUsNormalBase64 || data.wordAudioBase64 ? makePreviewBtn('word_us_normal', '🇺🇸 Normal', data.wordAudioUsNormalBase64 || data.wordAudioBase64) : '',
       data.wordAudioUsSlowBase64 ? makePreviewBtn('word_us_slow', '🇺🇸 Slow', data.wordAudioUsSlowBase64) : '',
@@ -113,6 +179,19 @@ export function renderThemeHtml(
     exampleAudio = allExampleSounds || (data.exampleAudioFileName ? `[sound:${data.exampleAudioFileName}]` : '');
   }
 
+  // 2. Image formatting
+  let cardImageHtml = '';
+  if (options?.isPreview && data.imageBase64) {
+    const isPng = data.imageBase64.startsWith('iVBORw0KGgo');
+    const mime = isPng ? 'image/png' : 'image/jpeg';
+    cardImageHtml = `<img src="data:${mime};base64,${data.imageBase64}" class="card-illustration" alt="${escapeHtml(data.word)}" />`;
+  } else if (data.imageFileName) {
+    cardImageHtml = `<img src="${data.imageFileName}" class="card-illustration" alt="${escapeHtml(data.word)}" />`;
+  }
+
+  // 3. Spelling sentence
+  const spellingSentence = data.spellingSentence || makeSpellingSentence(data.example || '', data.word || '');
+
   const replacements: Record<string, string> = {
     '{{Word}}': escapeHtml(data.word || ''),
     '{{Phonetic}}': escapeHtml(data.phonetic || '/.../'),
@@ -121,6 +200,8 @@ export function renderThemeHtml(
     '{{Example}}': escapeHtml(data.example || ''),
     '{{Translation}}': escapeHtml(data.translationFa || ''),
     '{{Mnemonic}}': escapeHtml(data.mnemonic || ''),
+    '{{CardImage}}': cardImageHtml,
+    '{{SpellingSentence}}': escapeHtml(spellingSentence),
     '{{WordAudio}}': wordAudio,
     '{{ExampleAudio}}': exampleAudio,
     '{{WordAudioUsNormal}}': wordAudioUsNormal,

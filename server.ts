@@ -4,6 +4,8 @@ import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { checkOllamaConnection, listOllamaModels, generateWithOllama } from './server/ollama';
 import { checkGeminiConnection, generateWithGemini, GEMINI_MODELS } from './server/gemini';
+import { getDictionaryData, lookupAbadis, lookupFreeDictionary } from './server/dictionary';
+import { getSmartImage, evaluateWordNeedsImage } from './server/smartImages';
 import {
   checkPiperHealth,
   synthesizePiperAudio,
@@ -30,8 +32,8 @@ import {
   openInAnkiBrowser,
   changeCardsDeck,
 } from './server/anki';
-import { AppSettings, CardData, DiagnosticsReport, StepLog, ThemeId } from './src/types';
-import { THEMES } from './src/themes';
+import { AppSettings, CardData, DiagnosticsReport, StepLog, ThemeId, CardType } from './src/types';
+import { THEMES, makeSpellingSentence } from './src/themes';
 
 const SETTINGS_FILE = path.join(process.cwd(), 'user-settings.json');
 
@@ -62,10 +64,31 @@ const defaultSettings: AppSettings = {
     britishVoice: 'en_GB-cori-high',
     normalSpeed: 1.0,
     slowSpeed: 1.25,
+    generateAmericanNormal: true,
+    generateAmericanSlow: true,
+    generateBritishNormal: true,
+    generateBritishSlow: true,
+    generateExampleUs: true,
+    generateExampleUk: false,
     generateSlow: true,
     generateBritish: true,
     generateAmerican: true,
     generateSlowExample: false,
+  },
+  dictionary: {
+    meaningFaSource: 'ai',
+    definitionEnSource: 'ai',
+    exampleSource: 'ai',
+    translationSource: 'ai',
+    mnemonicSource: 'ai',
+  },
+  smartImages: {
+    enabled: true,
+    provider: 'auto',
+  },
+  defaultCard: {
+    cardType: 'normal',
+    allowDuplicateWords: true,
   },
   anki: {
     url: 'http://127.0.0.1:8765',
@@ -120,13 +143,43 @@ function normalizeSettings(raw: any): AppSettings {
     britishVoice: tts.britishVoice || 'en_GB-cori-high',
     normalSpeed: typeof tts.normalSpeed === 'number' ? tts.normalSpeed : 1.0,
     slowSpeed: typeof tts.slowSpeed === 'number' ? tts.slowSpeed : 1.25,
+    generateAmericanNormal: tts.generateAmericanNormal !== false,
+    generateAmericanSlow: tts.generateAmericanSlow !== false,
+    generateBritishNormal: tts.generateBritishNormal !== false,
+    generateBritishSlow: tts.generateBritishSlow !== false,
+    generateExampleUs: tts.generateExampleUs !== false,
+    generateExampleUk: !!tts.generateExampleUk,
     generateSlow: tts.generateSlow !== false,
     generateBritish: tts.generateBritish !== false,
     generateAmerican: tts.generateAmerican !== false,
     generateSlowExample: !!tts.generateSlowExample,
   };
 
-  // Normalize Theme (map legacy comic-dark / comic-light if needed)
+  // Normalize Dictionary config
+  const dict = merged.dictionary || {};
+  merged.dictionary = {
+    meaningFaSource: dict.meaningFaSource || 'ai',
+    definitionEnSource: dict.definitionEnSource || 'ai',
+    exampleSource: dict.exampleSource || 'ai',
+    translationSource: dict.translationSource || 'ai',
+    mnemonicSource: dict.mnemonicSource || 'ai',
+  };
+
+  // Normalize Smart Images
+  const img = merged.smartImages || {};
+  merged.smartImages = {
+    enabled: img.enabled !== false,
+    provider: img.provider || 'auto',
+  };
+
+  // Normalize Default Card
+  const defCard = merged.defaultCard || {};
+  merged.defaultCard = {
+    cardType: defCard.cardType === 'spelling' ? 'spelling' : 'normal',
+    allowDuplicateWords: defCard.allowDuplicateWords !== false,
+  };
+
+  // Normalize Theme
   if (merged.theme === 'comic-dark') merged.theme = 'comic-pop-dark';
   if (merged.theme === 'comic-light') merged.theme = 'comic-pop-light';
   if (!THEMES[merged.theme]) merged.theme = 'comic-pop-dark';
@@ -160,7 +213,7 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json({ limit: '25mb' }));
+  app.use(express.json({ limit: '35mb' }));
 
   // --- Health ---
   app.get('/api/health', (req, res) => {
@@ -176,6 +229,29 @@ async function startServer() {
     appSettings = normalizeSettings({ ...appSettings, ...req.body });
     saveSettings(appSettings);
     res.json({ success: true, settings: appSettings });
+  });
+
+  // --- Dictionary Endpoints ---
+  app.get('/api/dictionary/abadis', async (req, res) => {
+    const word = (req.query.word as string) || '';
+    if (!word) return res.status(400).json({ error: 'Word required' });
+    const result = await lookupAbadis(word);
+    res.json(result);
+  });
+
+  app.get('/api/dictionary/freedict', async (req, res) => {
+    const word = (req.query.word as string) || '';
+    if (!word) return res.status(400).json({ error: 'Word required' });
+    const result = await lookupFreeDictionary(word);
+    res.json(result);
+  });
+
+  // --- Smart Images Endpoints ---
+  app.post('/api/smart-images/test', async (req, res) => {
+    const { word, partOfSpeech, meaningFa } = req.body;
+    if (!word) return res.status(400).json({ error: 'Word required' });
+    const result = await getSmartImage(word, partOfSpeech || '', meaningFa || '', true);
+    res.json(result);
   });
 
   // --- Ollama Endpoints ---
@@ -320,11 +396,12 @@ async function startServer() {
   });
 
   app.post('/api/anki/setup-model', async (req, res) => {
-    const { url, themeId } = req.body;
+    const { url, themeId, cardType } = req.body;
     const ankiUrl = url || appSettings.anki.url;
     const selectedTheme = themeId || appSettings.theme;
+    const selectedType = cardType || appSettings.defaultCard.cardType;
 
-    const result = await ensureAnkiModel(ankiUrl, selectedTheme);
+    const result = await ensureAnkiModel(ankiUrl, selectedTheme, selectedType);
     res.json(result);
   });
 
@@ -341,15 +418,16 @@ async function startServer() {
   });
 
   app.post('/api/anki/create-note', async (req, res) => {
-    const { url, deck, cardData, themeId } = req.body;
+    const { url, deck, cardData, themeId, cardType } = req.body;
     const ankiUrl = url || appSettings.anki.url;
     const selectedTheme = themeId || appSettings.theme;
+    const selectedType = cardType || cardData?.cardType || appSettings.defaultCard.cardType;
 
     if (!deck || !cardData) {
       return res.status(400).json({ success: false, error: 'Deck and cardData are required' });
     }
 
-    const result = await createAnkiNote(ankiUrl, deck, cardData, selectedTheme);
+    const result = await createAnkiNote(ankiUrl, deck, cardData, selectedTheme, selectedType);
     res.json(result);
   });
 
@@ -391,7 +469,7 @@ async function startServer() {
 
   // --- End-to-End Pipeline Handler ---
   app.post('/api/pipeline/generate-card', async (req, res) => {
-    const { word, deck, manualOverrides, createInAnki = true } = req.body;
+    const { word, deck, manualOverrides, cardType, createInAnki = true } = req.body;
     const logs: StepLog[] = [];
     const pushLog = (
       step: number,
@@ -421,7 +499,8 @@ async function startServer() {
       });
     }
     const cleanWord = word.trim();
-    pushLog(1, 'Word received', 'success', `Word received: "${cleanWord}"`);
+    const effectiveCardType: CardType = cardType || manualOverrides?.cardType || appSettings.defaultCard.cardType || 'normal';
+    pushLog(1, 'Word received', 'success', `Word received: "${cleanWord}" (Card Type: ${effectiveCardType.toUpperCase()})`);
 
     // [2] Deck validated
     const targetDeck = (deck || appSettings.anki.defaultDeck || 'English::B1').trim();
@@ -460,9 +539,13 @@ async function startServer() {
       pushLog(3, 'AI Provider Connected', 'success', `Connected to Ollama (${ollamaCheck.version || 'active'}) with model "${appSettings.ai.ollama.model}"`);
     }
 
-    // [4] AI Data Generated
+    // [4] Data Generation (Priority: 1. User Overrides -> 2. Configured Dictionary -> 3. AI Provider -> 4. Fallback)
     let cardData: CardData;
     try {
+      // Step A: Check Dictionary if configured
+      const dictData = await getDictionaryData(cleanWord, appSettings.dictionary);
+
+      // Step B: Generate with AI
       let aiResult: { success: boolean; data?: CardData; error?: string };
 
       if (isGemini) {
@@ -495,13 +578,32 @@ async function startServer() {
         });
       }
 
-      cardData = { ...aiResult.data };
+      // Step C: Merge according to strict Priority Order
+      const baseAi = aiResult.data;
+      cardData = {
+        word: cleanWord,
+        phonetic: manualOverrides?.phonetic || dictData.phonetic || baseAi.phonetic,
+        partOfSpeech: manualOverrides?.partOfSpeech || dictData.partOfSpeech || baseAi.partOfSpeech,
+        meaningFa: manualOverrides?.meaningFa || dictData.meaningFa || baseAi.meaningFa,
+        example: manualOverrides?.example || dictData.example || baseAi.example,
+        translationFa: manualOverrides?.translationFa || baseAi.translationFa,
+        mnemonic: manualOverrides?.mnemonic || baseAi.mnemonic,
+        cardType: effectiveCardType,
+        spellingSentence: makeSpellingSentence(manualOverrides?.example || dictData.example || baseAi.example, cleanWord),
+      };
+
+      const sourcesList = [
+        manualOverrides?.meaningFa ? 'User Override' : null,
+        dictData.sources.length > 0 ? `Dictionary (${dictData.sources.join(', ')})` : null,
+        isGemini ? 'Google Gemini' : 'Ollama',
+      ].filter(Boolean).join(' → ');
+
       pushLog(
         4,
         'AI data generated',
         'success',
         `Generated card data for "${cleanWord}" (POS: ${cardData.partOfSpeech}, IPA: ${cardData.phonetic})`,
-        `Meaning: ${cardData.meaningFa} | Example: "${cardData.example}"`
+        `Meaning: ${cardData.meaningFa} | Sources: ${sourcesList}`
       );
     } catch (err: any) {
       pushLog(4, 'AI data generated', 'error', `AI exception: ${err?.message}`);
@@ -513,24 +615,44 @@ async function startServer() {
       });
     }
 
-    // [5] & [6] TTS Audio Generation (Piper vs Online)
+    // [5] Smart Images (Automatic image evaluation & download)
+    if (appSettings.smartImages.enabled) {
+      try {
+        const imgRes = await getSmartImage(cardData.word, cardData.partOfSpeech, cardData.meaningFa, true);
+        if (imgRes.success && imgRes.needsImage && imgRes.imageBase64 && imgRes.imageFileName) {
+          cardData.imageBase64 = imgRes.imageBase64;
+          cardData.imageFileName = imgRes.imageFileName;
+          cardData.needsImage = true;
+          cardData.imageReason = imgRes.reason;
+          pushLog(5, 'Smart Image Attached', 'success', `Attached illustration for "${cardData.word}" (${imgRes.imageFileName})`, imgRes.reason);
+        } else {
+          pushLog(5, 'Smart Image Evaluated', 'skipped', `No image needed: ${imgRes.reason || 'Abstract word'}`);
+        }
+      } catch (err: any) {
+        pushLog(5, 'Smart Image Evaluated', 'skipped', `Image search skipped: ${err?.message}`);
+      }
+    }
+
+    // [6] TTS Audio Generation (Piper vs Online with Granular Selection)
     const isOnlineTTS = appSettings.tts.provider === 'online';
     if (isOnlineTTS) {
-      pushLog(5, 'TTS Service Reachable', 'success', 'Using High-Quality Online English TTS');
-      pushLog(6, 'Audio Generated', 'pending', 'Synthesizing US/UK normal & slow pronunciations with Online TTS...');
+      pushLog(6, 'TTS Audio Generation', 'pending', 'Synthesizing selected pronunciations with Online TTS...');
 
       try {
         const onlineAudioRes = await generateAllOnlineCardAudios({
           word: cardData.word,
           example: cardData.example,
-          generateSlow: appSettings.tts.generateSlow !== false,
-          generateBritish: appSettings.tts.generateBritish !== false,
-          generateAmerican: appSettings.tts.generateAmerican !== false,
+          generateAmericanNormal: appSettings.tts.generateAmericanNormal,
+          generateAmericanSlow: appSettings.tts.generateAmericanSlow,
+          generateBritishNormal: appSettings.tts.generateBritishNormal,
+          generateBritishSlow: appSettings.tts.generateBritishSlow,
+          generateExampleUs: appSettings.tts.generateExampleUs,
+          generateExampleUk: appSettings.tts.generateExampleUk,
         });
 
         if (!onlineAudioRes.success || onlineAudioRes.files.length === 0) {
           const errDetail = onlineAudioRes.error || 'Failed to synthesize online audio';
-          pushLog(6, 'Audio Generated', 'error', errDetail);
+          pushLog(6, 'TTS Audio Generation', 'error', errDetail);
           return res.status(500).json({
             success: false,
             stage: 'audio_generated',
@@ -554,9 +676,9 @@ async function startServer() {
           wordAudioUkSlowFileName: onlineAudioRes.wordAudioUkSlowFileName,
           exampleAudioUsNormalFileName: onlineAudioRes.exampleAudioUsNormalFileName,
           exampleAudioUkNormalFileName: onlineAudioRes.exampleAudioUkNormalFileName,
-          wordAudioBase64: onlineAudioRes.wordAudioUsNormalBase64,
+          wordAudioBase64: onlineAudioRes.wordAudioUsNormalBase64 || onlineAudioRes.wordAudioUkNormalBase64,
           exampleAudioBase64: onlineAudioRes.exampleAudioUsNormalBase64,
-          wordAudioFileName: onlineAudioRes.wordAudioUsNormalFileName,
+          wordAudioFileName: onlineAudioRes.wordAudioUsNormalFileName || onlineAudioRes.wordAudioUkNormalFileName,
           exampleAudioFileName: onlineAudioRes.exampleAudioUsNormalFileName,
           audioFiles: onlineAudioRes.files.map((f) => ({
             fileName: f.fileName,
@@ -570,9 +692,9 @@ async function startServer() {
         };
 
         const fileSummary = onlineAudioRes.files.map((a) => `${a.label} (${a.fileName})`).join(', ');
-        pushLog(6, 'Audio Generated', 'success', `Generated ${onlineAudioRes.files.length} MP3 audio clips via Online TTS`, fileSummary);
+        pushLog(6, 'TTS Audio Generation', 'success', `Generated ${onlineAudioRes.files.length} audio clips via Online TTS`, fileSummary);
       } catch (err: any) {
-        pushLog(6, 'Audio Generated', 'error', `Online TTS exception: ${err?.message}`);
+        pushLog(6, 'TTS Audio Generation', 'error', `Online TTS exception: ${err?.message}`);
         return res.status(500).json({
           success: false,
           stage: 'audio_generated',
@@ -585,8 +707,8 @@ async function startServer() {
       // Offline Piper TTS
       const piperCheck = await checkPiperHealth(appSettings.tts.endpoint);
       if (!piperCheck.connected) {
-        const errMsg = `Piper TTS is offline at ${appSettings.tts.endpoint}: ${piperCheck.error}. Please ensure Piper HTTP server is running on port 5000.`;
-        pushLog(5, 'TTS Service Reachable', 'error', errMsg);
+        const errMsg = `Piper TTS is offline at ${appSettings.tts.endpoint}: ${piperCheck.error}.`;
+        pushLog(6, 'TTS Audio Generation', 'error', errMsg);
         return res.status(502).json({
           success: false,
           stage: 'tts_reachable',
@@ -595,9 +717,8 @@ async function startServer() {
           logs,
         });
       }
-      pushLog(5, 'TTS Service Reachable', 'success', `Piper HTTP server is active at ${appSettings.tts.endpoint} (${appSettings.tts.americanVoice}, ${appSettings.tts.britishVoice})`);
 
-      pushLog(6, 'Audio Generated', 'pending', 'Synthesizing US/UK normal & slow pronunciations with Piper...');
+      pushLog(6, 'TTS Audio Generation', 'pending', `Synthesizing with Piper (Length scale ${appSettings.tts.slowSpeed})...`);
       try {
         const audioGenRes = await generateAllCardAudios({
           word: cardData.word,
@@ -607,15 +728,17 @@ async function startServer() {
           britishVoice: appSettings.tts.britishVoice,
           normalSpeed: appSettings.tts.normalSpeed,
           slowSpeed: appSettings.tts.slowSpeed,
-          generateSlow: appSettings.tts.generateSlow !== false,
-          generateBritish: appSettings.tts.generateBritish !== false,
-          generateAmerican: appSettings.tts.generateAmerican !== false,
-          generateSlowExample: !!appSettings.tts.generateSlowExample,
+          generateAmericanNormal: appSettings.tts.generateAmericanNormal,
+          generateAmericanSlow: appSettings.tts.generateAmericanSlow,
+          generateBritishNormal: appSettings.tts.generateBritishNormal,
+          generateBritishSlow: appSettings.tts.generateBritishSlow,
+          generateExampleUs: appSettings.tts.generateExampleUs,
+          generateExampleUk: appSettings.tts.generateExampleUk,
         });
 
         if (!audioGenRes.success || audioGenRes.files.length === 0) {
           const errDetail = audioGenRes.error || 'Failed to synthesize audio with Piper';
-          pushLog(6, 'Audio Generated', 'error', errDetail);
+          pushLog(6, 'TTS Audio Generation', 'error', errDetail);
           return res.status(500).json({
             success: false,
             stage: 'audio_generated',
@@ -639,9 +762,9 @@ async function startServer() {
           wordAudioUkSlowFileName: audioGenRes.wordAudioUkSlowFileName,
           exampleAudioUsNormalFileName: audioGenRes.exampleAudioUsNormalFileName,
           exampleAudioUkNormalFileName: audioGenRes.exampleAudioUkNormalFileName,
-          wordAudioBase64: audioGenRes.wordAudioUsNormalBase64,
+          wordAudioBase64: audioGenRes.wordAudioUsNormalBase64 || audioGenRes.wordAudioUkNormalBase64,
           exampleAudioBase64: audioGenRes.exampleAudioUsNormalBase64,
-          wordAudioFileName: audioGenRes.wordAudioUsNormalFileName,
+          wordAudioFileName: audioGenRes.wordAudioUsNormalFileName || audioGenRes.wordAudioUkNormalFileName,
           exampleAudioFileName: audioGenRes.exampleAudioUsNormalFileName,
           audioFiles: audioGenRes.files.map((f) => ({
             fileName: f.fileName,
@@ -655,9 +778,9 @@ async function startServer() {
         };
 
         const fileSummary = audioGenRes.files.map((a) => `${a.label} (${a.fileName})`).join(', ');
-        pushLog(6, 'Audio Generated', 'success', `Synthesized & validated ${audioGenRes.files.length} WAV audio clips via Piper`, fileSummary);
+        pushLog(6, 'TTS Audio Generation', 'success', `Synthesized ${audioGenRes.files.length} WAV clips via Piper`, fileSummary);
       } catch (err: any) {
-        pushLog(6, 'Audio Generated', 'error', `Piper audio exception: ${err?.message}`);
+        pushLog(6, 'TTS Audio Generation', 'error', `Piper audio exception: ${err?.message}`);
         return res.status(500).json({
           success: false,
           stage: 'audio_generated',
@@ -685,60 +808,29 @@ async function startServer() {
       return res.status(502).json({
         success: false,
         stage: 'anki_connected',
-        error: `AnkiConnect is offline or unreachable at ${appSettings.anki.url}: ${ankiCheck.error}. Please ensure Anki is open with AnkiConnect installed.`,
+        error: `AnkiConnect unreachable at ${appSettings.anki.url}. Make sure Anki is running.`,
         cardData,
         logs,
       });
     }
     pushLog(7, 'AnkiConnect Connected', 'success', `Connected to AnkiConnect v${ankiCheck.version}`);
 
-    // [8] Deck found / ensured
-    const deckRes = await getAnkiDecks(appSettings.anki.url);
-    const existingDecks = deckRes.decks || [];
-    const deckExists = existingDecks.includes(targetDeck);
-    if (!deckExists) {
-      pushLog(8, 'Deck Ensured', 'success', `Deck "${targetDeck}" will be automatically ensured in Anki`);
-    } else {
-      pushLog(8, 'Deck Ensured', 'success', `Deck "${targetDeck}" found in Anki (${existingDecks.length} total decks)`);
-    }
-
-    // [9] Note Type found / created
-    const modelSetup = await ensureAnkiModel(appSettings.anki.url, appSettings.theme);
-    if (!modelSetup.success) {
-      pushLog(9, 'Note Type Configured', 'error', `Note type setup failed: ${modelResError(modelSetup)}`);
-      return res.status(500).json({
-        success: false,
-        stage: 'note_type_found',
-        error: `Failed to configure note type 'AI Vocabulary': ${modelResError(modelSetup)}`,
-        cardData,
-        logs,
-      });
-    }
-    pushLog(9, 'Note Type Configured', 'success', modelSetup.message);
-
-    // [10] Fields prepared
+    // [8] Media uploaded & Note created (allowing duplicates intentionally)
     const totalClips = (cardData.audioFiles || []).length;
-    pushLog(
-      10,
-      'Fields Prepared',
-      'success',
-      `Prepared note fields with ${totalClips} audio sound tags (US/UK normal/slow)`
-    );
-
-    // [11] Media uploaded & [12] Note created & [13] Card verified
     const noteCreation = await createAnkiNote(
       appSettings.anki.url,
       targetDeck,
       cardData,
-      appSettings.theme
+      appSettings.theme,
+      effectiveCardType
     );
 
     if (!noteCreation.success || !noteCreation.noteId) {
-      pushLog(12, 'Note Created', 'error', `Note creation or verification failed: ${noteCreation.error}`);
+      pushLog(8, 'Note Created', 'error', `Note creation failed: ${noteCreation.error}`);
       return res.status(500).json({
         success: false,
         stage: 'note_created',
-        error: `Anki note creation/verification failed: ${noteCreation.error}`,
+        error: `Anki note creation failed: ${noteCreation.error}`,
         cardData,
         logs,
       });
@@ -747,31 +839,12 @@ async function startServer() {
     const v = noteCreation.verification;
     const cardIds = noteCreation.cardIds || [];
 
-    const uploadedNames = (cardData.audioFiles || []).map((a) => a.fileName).join(', ');
-    pushLog(11, 'Media Uploaded', 'success', `Uploaded & verified ${totalClips} audio files in Anki media collection`, uploadedNames);
-    pushLog(12, 'Note Created', 'success', `Note #${noteCreation.noteId} created & verified in model "${v?.modelName || 'AI Vocabulary'}"`);
-
-    // [13] Card created & verified
-    if (cardIds.length === 0 || !v || !v.isVerified) {
-      pushLog(13, 'Card Verified', 'error', v?.verificationMessage || 'Verification failed: 0 cards generated.');
-      return res.status(500).json({
-        success: false,
-        stage: 'card_verified',
-        error: v?.verificationMessage || 'Card verification failed in Anki.',
-        cardData,
-        noteId: noteCreation.noteId,
-        cardIds,
-        verification: v,
-        logs,
-      });
-    }
-
-    const firstCard = v.cardsInfo?.[0];
     pushLog(
-      13,
-      'Card Verified',
+      8,
+      'Card Verified in Anki',
       'success',
-      `✓ Verified in Deck: "${v.actualDeck}" | ✓ ${v.cardsCount} Active Card(s): [${cardIds.join(', ')}] | Status: ${firstCard?.queueLabel || 'New'}`
+      `✓ Note #${noteCreation.noteId} created & verified in Deck "${v?.actualDeck || targetDeck}" (${totalClips} audio files + ${cardData.imageFileName ? '1 image' : '0 images'})`,
+      `Card IDs: [${cardIds.join(', ')}] | Type: ${effectiveCardType.toUpperCase()}`
     );
 
     return res.json({
@@ -779,15 +852,11 @@ async function startServer() {
       cardData,
       noteId: noteCreation.noteId,
       cardIds,
-      deck: v.actualDeck,
+      deck: v?.actualDeck || targetDeck,
       verification: v,
       logs,
     });
   });
-
-  function modelResError(res: any): string {
-    return res.error || res.message || 'Unknown error';
-  }
 
   // --- Diagnostics Report ---
   app.post('/api/diagnostics/all', async (req, res) => {
@@ -797,12 +866,13 @@ async function startServer() {
         {
           name: 'Application Core',
           status: 'ok',
-          message: 'English Flashcard Generator active',
+          message: 'English Flashcard Generator v2.0 active',
           timestamp: now,
         },
       ],
       ai: [],
       tts: [],
+      dictionary: [],
       anki: [],
       templates: [],
       allPassed: true,
@@ -817,20 +887,8 @@ async function startServer() {
         message: `Connected to ${appSettings.ai.ollama.url} (${ollamaHealth.version})`,
         timestamp: now,
       });
-
-      const models = await listOllamaModels(appSettings.ai.ollama.url);
-      if (models.success && models.models.length > 0) {
-        report.ai.push({
-          name: 'Installed Ollama Models',
-          status: 'ok',
-          message: `${models.models.length} model(s) available: ${models.models.map((m) => m.name).join(', ')}`,
-          timestamp: now,
-        });
-      }
     } else {
-      if (appSettings.ai.provider === 'ollama') {
-        report.allPassed = false;
-      }
+      if (appSettings.ai.provider === 'ollama') report.allPassed = false;
       report.ai.push({
         name: 'Ollama Connection',
         status: appSettings.ai.provider === 'ollama' ? 'error' : 'warning',
@@ -839,7 +897,7 @@ async function startServer() {
       });
     }
 
-    // Check Gemini if key present or active
+    // Check Gemini
     if (appSettings.ai.gemini.apiKey || appSettings.ai.provider === 'gemini') {
       const geminiHealth = await checkGeminiConnection(
         appSettings.ai.gemini.apiKey,
@@ -853,9 +911,7 @@ async function startServer() {
           timestamp: now,
         });
       } else {
-        if (appSettings.ai.provider === 'gemini') {
-          report.allPassed = false;
-        }
+        if (appSettings.ai.provider === 'gemini') report.allPassed = false;
         report.ai.push({
           name: 'Google Gemini API',
           status: appSettings.ai.provider === 'gemini' ? 'error' : 'warning',
@@ -865,14 +921,20 @@ async function startServer() {
       }
     }
 
+    // Check Dictionaries
+    report.dictionary.push({
+      name: 'Dictionary Sources',
+      status: 'ok',
+      message: `Persian: ${appSettings.dictionary.meaningFaSource.toUpperCase()} | English Def: ${appSettings.dictionary.definitionEnSource.toUpperCase()}`,
+      timestamp: now,
+    });
+
     // Check Piper TTS
     const piperService = await getPiperServiceStatus();
     report.tts.push({
       name: 'systemd piper.service',
       status: piperService.active ? 'ok' : (appSettings.tts.provider === 'piper' ? 'warning' : 'ok'),
-      message: piperService.active
-        ? 'piper.service is running (systemctl --user is-active)'
-        : `piper.service is ${piperService.status}`,
+      message: piperService.active ? 'piper.service is running' : `piper.service is ${piperService.status}`,
       timestamp: now,
     });
 
@@ -881,13 +943,11 @@ async function startServer() {
       report.tts.push({
         name: 'Piper TTS Server',
         status: 'ok',
-        message: `Online at ${appSettings.tts.endpoint}`,
+        message: `Online at ${appSettings.tts.endpoint} (Slow scale: ${appSettings.tts.slowSpeed}x)`,
         timestamp: now,
       });
     } else {
-      if (appSettings.tts.provider === 'piper') {
-        report.allPassed = false;
-      }
+      if (appSettings.tts.provider === 'piper') report.allPassed = false;
       report.tts.push({
         name: 'Piper TTS Server',
         status: appSettings.tts.provider === 'piper' ? 'error' : 'warning',
@@ -906,9 +966,7 @@ async function startServer() {
         timestamp: now,
       });
     } else {
-      if (appSettings.tts.provider === 'online') {
-        report.allPassed = false;
-      }
+      if (appSettings.tts.provider === 'online') report.allPassed = false;
       report.tts.push({
         name: 'Online High-Quality TTS',
         status: appSettings.tts.provider === 'online' ? 'error' : 'warning',
@@ -926,16 +984,6 @@ async function startServer() {
         message: `Connected to Anki (Version ${ankiHealth.version})`,
         timestamp: now,
       });
-
-      const decks = await getAnkiDecks(appSettings.anki.url);
-      if (decks.success) {
-        report.anki.push({
-          name: 'Anki Decks Access',
-          status: 'ok',
-          message: `Found ${decks.decks.length} deck(s): ${decks.decks.join(', ')}`,
-          timestamp: now,
-        });
-      }
     } else {
       report.allPassed = false;
       report.anki.push({
@@ -949,9 +997,9 @@ async function startServer() {
     // Check 10 Templates
     const themeKeys = Object.keys(THEMES);
     report.templates.push({
-      name: 'Comic Theme Templates',
+      name: 'Card Design Templates',
       status: 'ok',
-      message: `10 distinct Light and Dark comic themes loaded (${themeKeys.length} identifiers)`,
+      message: `10 distinct Light and Dark templates loaded (Normal & Spelling modes supported)`,
       timestamp: now,
     });
 

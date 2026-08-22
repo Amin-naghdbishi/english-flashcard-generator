@@ -1,7 +1,7 @@
 import { ThemeDefinition } from '../types';
-import { sharedFrontHtml, sharedBackHtml } from './templates';
+import { storyStripFrontNormalHtml, storyStripBackHtml } from './templates';
 
-const css = `/* THEME 2: SUNDAY COMIC STRIP DARK */
+const css = `/* THEME 2: STORY STRIP DARK */
 .card {
   background-color: #0F172A;
   color: #F8FAFC;
@@ -15,266 +15,297 @@ const css = `/* THEME 2: SUNDAY COMIC STRIP DARK */
   box-sizing: border-box;
 }
 
-.comic-card-wrapper {
+.comic-card-wrapper.theme-strip {
   width: 100%;
   max-width: 480px;
   margin: 0 auto;
   box-sizing: border-box;
 }
 
-.comic-card {
+.strip-container {
   width: 100%;
   background-color: #1E293B;
   border: 4px solid #000000;
-  box-shadow: 4px 4px 0px #000000;
-  padding: 20px;
+  box-shadow: 5px 5px 0px #000000;
+  padding: 0;
   box-sizing: border-box;
-  text-align: left;
-  border-radius: 0;
 }
 
-.comic-word-section {
-  width: 100%;
-  background-color: #334155;
-  border: 3px solid #000000;
+.strip-panel {
   padding: 14px 16px;
-  margin-bottom: 14px;
-  box-sizing: border-box;
+  border-bottom: 3px solid #000000;
+  position: relative;
 }
 
-.comic-title-row {
-  width: 100%;
+.strip-panel:last-child {
+  border-bottom: none;
+}
+
+.panel-tag {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  background-color: #38BDF8;
+  color: #000000;
+  padding: 2px 6px;
   margin-bottom: 8px;
+  text-transform: uppercase;
 }
 
-.comic-title {
+.panel-tag.tag-spelling {
+  background-color: #C084FC;
+}
+
+.card-illustration {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border: 2px solid #000000;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.strip-word-header {
+  margin-bottom: 6px;
+}
+
+.strip-title {
   margin: 0;
-  font-size: clamp(22px, 6vw, 32px);
+  font-size: clamp(24px, 6.5vw, 34px);
   font-weight: 900;
   color: #F8FAFC;
-  letter-spacing: -0.5px;
   text-transform: uppercase;
   line-height: 1.15;
   white-space: normal;
   word-break: normal;
   overflow-wrap: break-word;
-  max-width: 100%;
   display: block;
+  width: 100%;
 }
 
-.comic-badges-row {
+.strip-meta {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
   gap: 8px;
+  align-items: center;
+  margin-top: 4px;
 }
 
-.comic-badge {
+.strip-pos {
   font-size: 11px;
   font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 3px 8px;
-  border: 2px solid #000000;
-  line-height: 1.2;
-}
-
-.badge-pos {
   background-color: #F59E0B;
   color: #000000;
+  border: 1.5px solid #000000;
+  padding: 2px 6px;
+  text-transform: uppercase;
 }
 
-.badge-ipa {
-  background-color: #38BDF8;
-  color: #000000;
-  font-family: "Lucida Sans Unicode", "DejaVu Sans", sans-serif;
+.strip-ipa {
+  font-size: 13px;
+  font-weight: 700;
+  color: #38BDF8;
+  font-family: "Lucida Sans Unicode", sans-serif;
   font-style: italic;
 }
 
-.comic-pronunciation-box {
-  width: 100%;
-  box-sizing: border-box;
-  background-color: #0F172A;
-  border: 3px solid #000000;
-  padding: 10px 12px;
-  margin-bottom: 14px;
-  display: flex;
-  flex-direction: column;
+.strip-audio-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 
-.audio-region {
-  box-sizing: border-box;
-  padding: 6px 8px;
-  border: 2px solid #000000;
-  background-color: #1E293B;
-}
-
-.region-us {
-  border-left: 6px solid #EF4444;
-}
-
-.region-uk {
-  border-left: 6px solid #38BDF8;
-}
-
-.audio-region-title {
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-  color: #F8FAFC;
-  margin-bottom: 6px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.audio-buttons-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.audio-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.speed-label {
-  font-size: 11px;
-  font-weight: 800;
-  color: #94A3B8;
-}
-
-.comic-hint-box {
+.strip-audio-box {
   background-color: #0F172A;
   border: 2px solid #000000;
-  border-left: 6px solid #F59E0B;
-  padding: 12px 14px;
-  box-sizing: border-box;
+  padding: 6px 8px;
 }
 
-.hint-label {
+.strip-audio-box.us-box {
+  border-left: 5px solid #EF4444;
+}
+
+.strip-audio-box.uk-box {
+  border-left: 5px solid #38BDF8;
+}
+
+.flag-label {
   display: block;
   font-size: 10px;
   font-weight: 900;
-  color: #94A3B8;
+  color: #CBD5E1;
   margin-bottom: 4px;
-  letter-spacing: 0.5px;
-}
-
-.comic-example-en {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.45;
-  color: #F1F5F9;
-  font-weight: 700;
-  font-style: italic;
-}
-
-.comic-divider {
-  height: 3px;
-  background-color: #000000;
-  margin: 14px 0 16px 0;
-}
-
-.comic-meaning-box {
-  background-color: #064E3B;
-  border: 2px solid #000000;
-  border-left: 6px solid #10B981;
-  padding: 12px 14px;
-  margin-bottom: 14px;
-  box-sizing: border-box;
-}
-
-.box-label {
-  display: block;
-  font-size: 11px;
-  font-weight: 900;
-  margin-bottom: 4px;
-  letter-spacing: 0.5px;
   text-transform: uppercase;
 }
 
-.label-meaning { color: #34D399; }
-.label-example { color: #FB923C; }
-.label-memory { color: #C084FC; }
+.btn-cluster {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
 
-.meaning-text {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 900;
+.speech-bubble {
+  background-color: #334155;
+  border: 3px solid #000000;
+  padding: 12px 14px;
+  position: relative;
+  box-shadow: 3px 3px 0px #000000;
+  margin-top: 4px;
+}
+
+.bubble-tail {
+  position: absolute;
+  top: -12px;
+  left: 24px;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 12px solid #000000;
+}
+
+.bubble-en {
+  margin: 0 0 6px 0;
+  font-size: 15px;
+  font-weight: 800;
   color: #F8FAFC;
   line-height: 1.4;
+  font-style: italic;
 }
 
-.comic-example-box {
-  background-color: #7C2D12;
-  border: 2px solid #000000;
-  border-left: 6px solid #F97316;
-  padding: 12px 14px;
-  margin-bottom: 14px;
-  box-sizing: border-box;
+.bubble-fa {
+  margin: 0;
+  font-size: 13px;
+  color: #94A3B8;
+  line-height: 1.4;
+  font-weight: 700;
 }
 
-.example-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.example-audio-group {
+.dialogue-audio-bar {
+  margin-top: 8px;
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.example-audio-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   font-size: 11px;
   font-weight: 800;
-  color: #FED7AA;
-}
-
-.example-en {
-  margin: 0 0 4px 0;
-  font-size: 14px;
-  line-height: 1.45;
-  color: #F1F5F9;
-  font-weight: 700;
-}
-
-.example-fa {
-  margin: 0;
-  font-size: 13px;
   color: #CBD5E1;
-  line-height: 1.4;
-  font-weight: 600;
 }
 
-.comic-mnemonic-box {
-  background-color: #581C87;
+.strip-meaning-callout {
+  background-color: #064E3B;
   border: 2px solid #000000;
-  border-left: 6px solid #A855F7;
-  padding: 12px 14px;
-  box-sizing: border-box;
-}
-
-.mnemonic-text {
-  margin: 0;
-  font-size: 13px;
+  border-left: 6px solid #10B981;
+  padding: 10px 12px;
+  font-size: 20px;
+  font-weight: 900;
   color: #F8FAFC;
   line-height: 1.4;
-  font-weight: 700;
+  margin-bottom: 8px;
 }
 
+.strip-mnemonic-footer {
+  background-color: #581C87;
+  border: 1.5px solid #000000;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #F8FAFC;
+  line-height: 1.35;
+}
+
+.mnem-star {
+  color: #C084FC;
+  font-weight: 900;
+}
+
+/* SPELLING STRIP */
+.spelling-prompt-banner {
+  background-color: #3B0764;
+  border: 2px solid #000000;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #F8FAFC;
+}
+
+.strip-audio-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #CBD5E1;
+}
+
+.spelling-interactive-area {
+  display: flex;
+  gap: 6px;
+}
+
+.spelling-input {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 15px;
+  font-weight: 900;
+  font-family: inherit;
+  border: 2px solid #000000;
+  background-color: #0F172A;
+  color: #F8FAFC;
+  outline: none;
+}
+
+.spelling-input.is-valid {
+  background-color: #064E3B;
+  border-color: #10B981;
+}
+
+.spelling-input.has-error {
+  background-color: #7F1D1D;
+  border-color: #EF4444;
+}
+
+.spelling-check-btn {
+  background-color: #F59E0B !important;
+  color: #000000 !important;
+  font-weight: 900 !important;
+  padding: 8px 14px !important;
+  border: 2px solid #000000 !important;
+  box-shadow: 2px 2px 0px #000000 !important;
+  cursor: pointer !important;
+  text-transform: uppercase !important;
+  font-size: 12px !important;
+}
+
+.spelling-result {
+  margin-top: 8px;
+  padding: 0;
+  transition: all 0.2s;
+}
+
+.spelling-result.is-correct {
+  background-color: #064E3B;
+  border: 2px solid #000000;
+  padding: 8px 10px;
+}
+
+.spelling-result.is-incorrect {
+  background-color: #7F1D1D;
+  border: 2px solid #000000;
+  padding: 8px 10px;
+}
+
+.spelling-success-badge { font-size: 12px; font-weight: 900; color: #34D399; }
+.spelling-word-reveal { font-size: 18px; font-weight: 900; color: #F8FAFC; text-transform: uppercase; }
+.spelling-error-badge { font-size: 12px; font-weight: 900; color: #FCA5A5; margin-bottom: 4px; }
+.spelling-compare-box { font-size: 13px; font-weight: 800; }
+.spelling-mistake { color: #FCA5A5; text-decoration: line-through; }
+.spelling-exact { color: #34D399; text-transform: uppercase; font-size: 15px; }
+
+/* AUDIO BUTTONS */
 .replay-button, .play-button, a.replay-button, .comic-audio-btn {
   background-color: #F59E0B !important;
   border: 2px solid #000000 !important;
@@ -296,19 +327,13 @@ const css = `/* THEME 2: SUNDAY COMIC STRIP DARK */
   background-color: #fbbf24 !important;
   transform: translate(-1px, -1px);
 }
-
-.replay-button svg, a.replay-button svg {
-  width: 12px !important;
-  height: 12px !important;
-  fill: #000000 !important;
-}
 `;
 
 export const comicStripDarkTheme: ThemeDefinition = {
   id: 'comic-strip-dark',
-  name: 'Comic Strip Dark',
-  description: 'Deep navy charcoal comic strip panels with rich amber and emerald ink framing.',
-  frontHtml: sharedFrontHtml,
-  backHtml: sharedBackHtml,
+  name: 'Story Strip (Dark)',
+  description: 'Deep navy charcoal comic strip panels with speech bubbles and dialogue frames.',
+  frontHtml: storyStripFrontNormalHtml,
+  backHtml: storyStripBackHtml,
   css,
 };

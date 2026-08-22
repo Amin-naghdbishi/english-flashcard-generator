@@ -1,38 +1,50 @@
-import React, { useState } from 'react';
-import { CardData, ThemeDefinition, ThemeId } from '../types';
-import { THEMES, renderThemeHtml } from '../themes';
-import { Eye, Sparkles, Volume2, Smartphone, Monitor } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { CardData, ThemeDefinition, ThemeId, CardType } from '../types';
+import { THEMES, renderThemeHtml, getSpellingFrontHtml } from '../themes';
+import { Eye, Sparkles, Volume2, Smartphone, Monitor, CheckCircle, HelpCircle } from 'lucide-react';
 
 interface CardPreviewProps {
   cardData: CardData | null;
   themeId?: ThemeId;
+  cardType?: CardType;
   emptyWordPlaceholder?: string;
 }
 
 export const CardPreview: React.FC<CardPreviewProps> = ({
   cardData,
   themeId = 'comic-pop-dark',
-  emptyWordPlaceholder = 'abandon',
+  cardType = 'normal',
+  emptyWordPlaceholder = 'eraser',
 }) => {
   const [activeSide, setActiveSide] = useState<'front' | 'back' | 'both'>('back');
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
+  const [previewCardType, setPreviewCardType] = useState<CardType>(cardType);
+
+  useEffect(() => {
+    if (cardData?.cardType) {
+      setPreviewCardType(cardData.cardType);
+    } else if (cardType) {
+      setPreviewCardType(cardType);
+    }
+  }, [cardData?.cardType, cardType]);
 
   const theme: ThemeDefinition = THEMES[themeId] || THEMES['comic-pop-dark'] || THEMES['comic-dark'];
 
-  // Default display data if empty
+  // Default rich display data if empty
   const displayData: CardData = cardData || {
     word: emptyWordPlaceholder,
-    phonetic: '/əˈbændən/',
-    partOfSpeech: 'verb',
-    meaningFa: 'رها کردن، ترک کردن، دست کشیدن از',
-    example: 'He had to abandon his car in the heavy snowstorm.',
-    translationFa: 'او مجبور شد در طوفان شدید برف ماشینش را رها کند.',
-    mnemonic: 'A-BANDON: A band on the run abandons their instruments.',
-    wordAudioBase64: undefined,
-    exampleAudioBase64: undefined,
+    phonetic: '/ɪˈreɪzər/',
+    partOfSpeech: 'noun',
+    meaningFa: 'پاک‌کن، ابزار پاک کردن',
+    example: 'I made a pencil mistake and need an eraser.',
+    translationFa: 'من با مداد اشتباه نوشتم و به یک پاک‌کن نیاز دارم.',
+    mnemonic: 'ERASE-ER: It erases errors easily on paper.',
+    cardType: previewCardType,
+    spellingSentence: 'I made a pencil mistake and need an ______.',
+    imageBase64: undefined,
   };
 
-  // Play audio when clicking audio buttons rendered in theme HTML
+  // Play audio when clicking preview audio buttons
   const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = (e.target as HTMLElement).closest('[data-audio-target]');
     if (!target) return;
@@ -61,10 +73,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
     try {
       let audioUrl = base64Data;
       if (!audioUrl.startsWith('data:')) {
-        // Detect if MP3 or WAV
-        const isMp3 = displayData.wordAudioUsNormalFileName?.endsWith('.mp3') ||
-                      displayData.exampleAudioUsNormalFileName?.endsWith('.mp3') ||
-                      !base64Data.startsWith('UklGR'); // 'RIFF' in base64 is UklGR
+        const isMp3 = !base64Data.startsWith('UklGR');
         const mime = isMp3 ? 'audio/mpeg' : 'audio/wav';
         audioUrl = `data:${mime};base64,${base64Data}`;
       }
@@ -75,23 +84,13 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
     }
   };
 
-  const frontRendered = renderThemeHtml(theme.frontHtml, displayData, { isPreview: true });
-  const backRendered = renderThemeHtml(theme.backHtml, displayData, { isPreview: true });
-
-  const hasAnyAudio = !!(
-    displayData.wordAudioUsNormalBase64 ||
-    displayData.wordAudioUsSlowBase64 ||
-    displayData.wordAudioUkNormalBase64 ||
-    displayData.wordAudioUkSlowBase64 ||
-    displayData.exampleAudioUsNormalBase64 ||
-    displayData.exampleAudioUkNormalBase64 ||
-    displayData.wordAudioBase64 ||
-    displayData.exampleAudioBase64
-  );
+  const frontTemplate = previewCardType === 'spelling' ? getSpellingFrontHtml(theme.id) : theme.frontHtml;
+  const frontRendered = renderThemeHtml(frontTemplate, { ...displayData, cardType: previewCardType }, { isPreview: true, cardType: previewCardType });
+  const backRendered = renderThemeHtml(theme.backHtml, { ...displayData, cardType: previewCardType }, { isPreview: true, cardType: previewCardType });
 
   return (
-    <div className="w-full flex flex-col h-full">
-      {/* Inject Theme CSS into page */}
+    <div className="w-full flex flex-col h-full text-black">
+      {/* Inject Selected Theme CSS */}
       <style>{theme.css}</style>
 
       {/* Preview Header & Controls */}
@@ -99,12 +98,38 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
         <div className="flex items-center gap-2">
           <Eye className="w-4 h-4 text-[#FF4B4B]" />
           <span className="text-xs font-black uppercase tracking-wider text-black">
-            Card Preview ({theme.name})
+            {theme.name} • {previewCardType === 'spelling' ? 'Spelling Mode' : 'Normal Mode'}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Mobile / Desktop Width Mode Toggle */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Card Type Toggle [ Normal | Spelling ] */}
+          <div className="inline-flex border-2 border-black bg-white p-0.5 shadow-[2px_2px_0px_#000000]">
+            <button
+              type="button"
+              onClick={() => setPreviewCardType('normal')}
+              className={`px-2 py-0.5 text-[11px] font-black uppercase transition-all cursor-pointer ${
+                previewCardType === 'normal'
+                  ? 'bg-[#4ADE80] text-black shadow-inner'
+                  : 'bg-zinc-100 text-black hover:bg-zinc-200'
+              }`}
+            >
+              Normal
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewCardType('spelling')}
+              className={`px-2 py-0.5 text-[11px] font-black uppercase transition-all cursor-pointer ${
+                previewCardType === 'spelling'
+                  ? 'bg-[#C084FC] text-black shadow-inner'
+                  : 'bg-zinc-100 text-black hover:bg-zinc-200'
+              }`}
+            >
+              Spelling
+            </button>
+          </div>
+
+          {/* Desktop / Mobile Width Mode Toggle */}
           <div className="inline-flex border-2 border-black bg-white p-0.5 shadow-[2px_2px_0px_#000000]">
             <button
               type="button"
@@ -178,7 +203,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
           <div className="w-full flex flex-col items-center">
             {activeSide === 'both' && (
               <div className="mb-2 text-[10px] font-black uppercase tracking-wider text-black bg-[#38BDF8] px-2.5 py-0.5 border-2 border-black shadow-[2px_2px_0px_#000000]">
-                — FRONT CARD —
+                — FRONT CARD ({previewCardType.toUpperCase()}) —
               </div>
             )}
             <div
