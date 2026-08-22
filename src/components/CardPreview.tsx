@@ -268,13 +268,21 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
         {(activeSide === 'front' || activeSide === 'both') && (
           <div className="w-full flex flex-col items-center">
             {activeSide === 'both' && (
-              <div className="mb-2 text-[10px] font-black uppercase tracking-wider text-black bg-[#38BDF8] px-2.5 py-0.5 border-2 border-black shadow-[2px_2px_0px_#000000]">
+              <div
+                className={
+                  isMinimal
+                    ? 'mb-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-300 dark:border-zinc-700 shadow-xs'
+                    : 'mb-2 text-[10px] font-black uppercase tracking-wider text-black bg-[#38BDF8] px-2.5 py-0.5 border-2 border-black shadow-[2px_2px_0px_#000000]'
+                }
+              >
                 — FRONT CARD ({previewCardType.toUpperCase()}) —
               </div>
             )}
             <div
               className={`w-full transition-all duration-200 ${
-                viewMode === 'mobile' ? 'max-w-[340px] border-x-2 border-dashed border-zinc-400 p-1' : 'max-w-md'
+                viewMode === 'mobile'
+                  ? `max-w-[340px] border-x-2 border-dashed ${isMinimal ? 'border-slate-300 dark:border-zinc-700' : 'border-zinc-400'} p-1`
+                  : 'max-w-md'
               }`}
               dangerouslySetInnerHTML={{ __html: frontRendered }}
             />
@@ -284,13 +292,21 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
         {(activeSide === 'back' || activeSide === 'both') && (
           <div className="w-full flex flex-col items-center">
             {activeSide === 'both' && (
-              <div className="mb-2 text-[10px] font-black uppercase tracking-wider text-black bg-[#4ADE80] px-2.5 py-0.5 border-2 border-black shadow-[2px_2px_0px_#000000]">
+              <div
+                className={
+                  isMinimal
+                    ? 'mb-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-300 dark:border-zinc-700 shadow-xs'
+                    : 'mb-2 text-[10px] font-black uppercase tracking-wider text-black bg-[#4ADE80] px-2.5 py-0.5 border-2 border-black shadow-[2px_2px_0px_#000000]'
+                }
+              >
                 — BACK CARD —
               </div>
             )}
             <div
               className={`w-full transition-all duration-200 ${
-                viewMode === 'mobile' ? 'max-w-[340px] border-x-2 border-dashed border-zinc-400 p-1' : 'max-w-md'
+                viewMode === 'mobile'
+                  ? `max-w-[340px] border-x-2 border-dashed ${isMinimal ? 'border-slate-300 dark:border-zinc-700' : 'border-zinc-400'} p-1`
+                  : 'max-w-md'
               }`}
               dangerouslySetInnerHTML={{ __html: backRendered }}
             />

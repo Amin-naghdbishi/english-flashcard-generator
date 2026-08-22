@@ -547,11 +547,21 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
             </div>
 
             {/* Advanced Overrides Collapsible (Strict User Priority) */}
-            <div className="border-4 border-black bg-white p-3 text-black">
+            <div
+              className={
+                isMinimalLight
+                  ? 'border border-slate-200 bg-slate-50/50 rounded-lg p-3 text-slate-800'
+                  : isMinimalDark
+                  ? 'border border-zinc-700 bg-zinc-900/50 rounded-lg p-3 text-zinc-100'
+                  : 'border-4 border-black bg-white p-3 text-black'
+              }
+            >
               <button
                 type="button"
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="w-full flex items-center justify-between text-xs font-black text-black hover:opacity-80 uppercase tracking-wider cursor-pointer"
+                className={`w-full flex items-center justify-between text-xs cursor-pointer ${
+                  isMinimal ? 'font-semibold text-slate-700 dark:text-zinc-300' : 'font-black text-black hover:opacity-80 uppercase tracking-wider'
+                }`}
               >
                 <span className="flex items-center gap-1.5">
                   <span>⚙</span> Advanced Overrides (اختیاری)
@@ -560,76 +570,112 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
               </button>
 
               {showAdvanced && (
-                <div className="mt-3 pt-3 border-t-2 border-black grid grid-cols-1 gap-2 text-xs">
-                  <p className="text-[10px] text-zinc-600 font-bold mb-1">
+                <div className={`mt-3 pt-3 grid grid-cols-1 gap-2 text-xs ${isMinimal ? 'border-t border-slate-200 dark:border-zinc-700' : 'border-t-2 border-black'}`}>
+                  <p className={`text-[10px] mb-1 ${isMinimal ? 'text-slate-500 dark:text-zinc-400' : 'text-zinc-600 font-bold'}`}>
                     * Any manual entry here overrides AI and is permanently preserved.
                   </p>
 
                   <div>
-                    <label className="text-[10px] font-black uppercase block mb-0.5">IPA Phonetic</label>
+                    <label className={`text-[10px] block mb-0.5 ${isMinimal ? 'font-semibold text-slate-700 dark:text-zinc-300' : 'font-black uppercase'}`}>IPA Phonetic</label>
                     <input
                       type="text"
                       placeholder="e.g. /əˈbændən/"
                       value={overrides.phonetic}
                       onChange={(e) => setOverrides({ ...overrides, phonetic: e.target.value })}
-                      className="w-full bg-[#f8fafc] text-black p-2 border-2 border-black text-xs font-bold focus:outline-none"
+                      className={
+                        isMinimalLight
+                          ? 'w-full bg-white text-slate-900 p-2 border border-slate-300 rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500'
+                          : isMinimalDark
+                          ? 'w-full bg-zinc-800 text-zinc-100 p-2 border border-zinc-700 rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500'
+                          : 'w-full bg-[#f8fafc] text-black p-2 border-2 border-black text-xs font-bold focus:outline-none'
+                      }
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black uppercase block mb-0.5">Part of Speech</label>
+                    <label className={`text-[10px] block mb-0.5 ${isMinimal ? 'font-semibold text-slate-700 dark:text-zinc-300' : 'font-black uppercase'}`}>Part of Speech</label>
                     <input
                       type="text"
                       placeholder="e.g. verb, noun"
                       value={overrides.partOfSpeech}
                       onChange={(e) => setOverrides({ ...overrides, partOfSpeech: e.target.value })}
-                      className="w-full bg-[#f8fafc] text-black p-2 border-2 border-black text-xs font-bold focus:outline-none"
+                      className={
+                        isMinimalLight
+                          ? 'w-full bg-white text-slate-900 p-2 border border-slate-300 rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500'
+                          : isMinimalDark
+                          ? 'w-full bg-zinc-800 text-zinc-100 p-2 border border-zinc-700 rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500'
+                          : 'w-full bg-[#f8fafc] text-black p-2 border-2 border-black text-xs font-bold focus:outline-none'
+                      }
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black uppercase block mb-0.5">Persian Meaning (معنی فارسی)</label>
+                    <label className={`text-[10px] block mb-0.5 ${isMinimal ? 'font-semibold text-slate-700 dark:text-zinc-300' : 'font-black uppercase'}`}>Persian Meaning (معنی فارسی)</label>
                     <input
                       type="text"
                       dir="rtl"
                       placeholder="رها کردن، ترک کردن"
                       value={overrides.meaningFa}
                       onChange={(e) => setOverrides({ ...overrides, meaningFa: e.target.value })}
-                      className="w-full bg-[#f8fafc] text-black p-2 border-2 border-black text-xs font-bold focus:outline-none"
+                      className={
+                        isMinimalLight
+                          ? 'w-full bg-white text-slate-900 p-2 border border-slate-300 rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500'
+                          : isMinimalDark
+                          ? 'w-full bg-zinc-800 text-zinc-100 p-2 border border-zinc-700 rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500'
+                          : 'w-full bg-[#f8fafc] text-black p-2 border-2 border-black text-xs font-bold focus:outline-none'
+                      }
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black uppercase block mb-0.5">Example Sentence (جمله نمونه)</label>
+                    <label className={`text-[10px] block mb-0.5 ${isMinimal ? 'font-semibold text-slate-700 dark:text-zinc-300' : 'font-black uppercase'}`}>Example Sentence (جمله نمونه)</label>
                     <input
                       type="text"
                       placeholder="He abandoned his car on the road."
                       value={overrides.example}
                       onChange={(e) => setOverrides({ ...overrides, example: e.target.value })}
-                      className="w-full bg-[#f8fafc] text-black p-2 border-2 border-black text-xs font-bold focus:outline-none"
+                      className={
+                        isMinimalLight
+                          ? 'w-full bg-white text-slate-900 p-2 border border-slate-300 rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500'
+                          : isMinimalDark
+                          ? 'w-full bg-zinc-800 text-zinc-100 p-2 border border-zinc-700 rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500'
+                          : 'w-full bg-[#f8fafc] text-black p-2 border-2 border-black text-xs font-bold focus:outline-none'
+                      }
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black uppercase block mb-0.5">Example Translation (ترجمه مثال)</label>
+                    <label className={`text-[10px] block mb-0.5 ${isMinimal ? 'font-semibold text-slate-700 dark:text-zinc-300' : 'font-black uppercase'}`}>Example Translation (ترجمه مثال)</label>
                     <input
                       type="text"
                       dir="rtl"
                       placeholder="او ماشین خود را در جاده رها کرد."
                       value={overrides.translationFa}
                       onChange={(e) => setOverrides({ ...overrides, translationFa: e.target.value })}
-                      className="w-full bg-[#f8fafc] text-black p-2 border-2 border-black text-xs font-bold focus:outline-none"
+                      className={
+                        isMinimalLight
+                          ? 'w-full bg-white text-slate-900 p-2 border border-slate-300 rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500'
+                          : isMinimalDark
+                          ? 'w-full bg-zinc-800 text-zinc-100 p-2 border border-zinc-700 rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500'
+                          : 'w-full bg-[#f8fafc] text-black p-2 border-2 border-black text-xs font-bold focus:outline-none'
+                      }
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black uppercase block mb-0.5">Memory Aid (کدگذاری و یادافزا)</label>
+                    <label className={`text-[10px] block mb-0.5 ${isMinimal ? 'font-semibold text-slate-700 dark:text-zinc-300' : 'font-black uppercase'}`}>Memory Aid (کدگذاری و یادافزا)</label>
                     <input
                       type="text"
                       placeholder="A-BAND-ON: Imagine a band left on the stage."
                       value={overrides.mnemonic}
                       onChange={(e) => setOverrides({ ...overrides, mnemonic: e.target.value })}
-                      className="w-full bg-[#f8fafc] text-black p-2 border-2 border-black text-xs font-bold focus:outline-none"
+                      className={
+                        isMinimalLight
+                          ? 'w-full bg-white text-slate-900 p-2 border border-slate-300 rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500'
+                          : isMinimalDark
+                          ? 'w-full bg-zinc-800 text-zinc-100 p-2 border border-zinc-700 rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500'
+                          : 'w-full bg-[#f8fafc] text-black p-2 border-2 border-black text-xs font-bold focus:outline-none'
+                      }
                     />
                   </div>
                 </div>
@@ -638,23 +684,39 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
 
             {/* Duplicate Notice */}
             {duplicateWarning && duplicateWarning.isDup && (
-              <div className="p-3 bg-black text-[#FFD93D] border-4 border-black text-xs flex flex-col gap-2 shadow-[2px_2px_0px_#000000]">
-                <div className="flex items-center gap-1.5 font-black">
-                  <AlertTriangle className="w-4 h-4 text-[#FFD93D] shrink-0" />
+              <div
+                className={
+                  isMinimalLight
+                    ? 'p-3 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs flex flex-col gap-2 shadow-xs'
+                    : isMinimalDark
+                    ? 'p-3 bg-amber-950/40 text-amber-200 border border-amber-800 rounded-lg text-xs flex flex-col gap-2 shadow-xs'
+                    : 'p-3 bg-black text-[#FFD93D] border-4 border-black text-xs flex flex-col gap-2 shadow-[2px_2px_0px_#000000]'
+                }
+              >
+                <div className="flex items-center gap-1.5 font-bold">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
                   <span>Word already exists in "{deck}"!</span>
                 </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setDuplicateWarning(null)}
-                    className="flex-1 px-3 py-1 bg-white text-black font-bold border-2 border-black hover:bg-zinc-200 text-xs"
+                    className={
+                      isMinimal
+                        ? 'flex-1 px-3 py-1.5 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-medium border border-slate-300 dark:border-zinc-700 rounded-md text-xs hover:bg-slate-50 dark:hover:bg-zinc-750 cursor-pointer'
+                        : 'flex-1 px-3 py-1 bg-white text-black font-bold border-2 border-black hover:bg-zinc-200 text-xs cursor-pointer'
+                    }
                   >
                     Skip
                   </button>
                   <button
                     type="button"
                     onClick={() => handleCreate(true)}
-                    className="flex-1 px-3 py-1 bg-[#4ADE80] text-black font-black border-2 border-black hover:bg-[#3ecb73] text-xs uppercase"
+                    className={
+                      isMinimal
+                        ? 'flex-1 px-3 py-1.5 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 text-xs cursor-pointer shadow-xs'
+                        : 'flex-1 px-3 py-1 bg-[#4ADE80] text-black font-black border-2 border-black hover:bg-[#3ecb73] text-xs uppercase cursor-pointer'
+                    }
                   >
                     Add Anyway
                   </button>
@@ -664,11 +726,19 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
 
             {/* Error Notice */}
             {errorMessage && (
-              <div className="p-3 bg-red-600 text-white border-4 border-black text-xs flex flex-col gap-1 shadow-[2px_2px_0px_#000000]">
-                <span className="font-black uppercase tracking-wider flex items-center gap-1">
+              <div
+                className={
+                  isMinimalLight
+                    ? 'p-3 bg-rose-50 text-rose-800 border border-rose-200 rounded-lg text-xs flex flex-col gap-1 shadow-xs'
+                    : isMinimalDark
+                    ? 'p-3 bg-rose-950/40 text-rose-200 border border-rose-800 rounded-lg text-xs flex flex-col gap-1 shadow-xs'
+                    : 'p-3 bg-red-600 text-white border-4 border-black text-xs flex flex-col gap-1 shadow-[2px_2px_0px_#000000]'
+                }
+              >
+                <span className="font-semibold uppercase tracking-wider flex items-center gap-1">
                   <XCircle className="w-4 h-4 shrink-0" /> Error in Stage: {failedStage || 'Execution'}
                 </span>
-                <p className="font-bold">{errorMessage}</p>
+                <p className={isMinimal ? 'text-xs' : 'font-bold'}>{errorMessage}</p>
               </div>
             )}
 
@@ -737,21 +807,21 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
         <div
           className={
             isMinimalLight
-              ? 'flex-1 bg-white border border-slate-200 rounded-lg p-4 sm:p-5 text-slate-800 shadow-sm overflow-hidden'
+              ? 'flex-1 bg-white border border-slate-200 rounded-lg p-4 sm:p-5 text-slate-800 shadow-sm overflow-hidden min-w-0'
               : isMinimalDark
-              ? 'flex-1 bg-[#27272A] border border-zinc-700 rounded-lg p-4 sm:p-5 text-zinc-100 shadow-sm overflow-hidden'
-              : 'flex-1 bg-white border-4 border-black p-4 sm:p-5 text-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] overflow-hidden'
+              ? 'flex-1 bg-[#27272A] border border-zinc-700 rounded-lg p-4 sm:p-5 text-zinc-100 shadow-sm overflow-hidden min-w-0'
+              : 'flex-1 bg-white border-4 border-black p-4 sm:p-5 text-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] overflow-hidden min-w-0'
           }
         >
-          <div className="flex items-center justify-between mb-3 border-b pb-2 border-slate-200">
-            <h3 className={isMinimal ? 'text-xs font-bold uppercase tracking-wider text-slate-600' : 'text-sm font-black uppercase flex items-center gap-1.5'}>
+          <div className={`flex items-center justify-between mb-3 pb-2 ${isMinimal ? 'border-b border-slate-200 dark:border-zinc-700' : 'border-b-2 border-black'}`}>
+            <h3 className={isMinimal ? 'text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400' : 'text-sm font-black uppercase flex items-center gap-1.5'}>
               <span>Execution Pipeline</span>
             </h3>
             {createdNoteId && (
               <span
                 className={
                   isMinimal
-                    ? 'text-[11px] bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1'
+                    ? 'text-[11px] bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 font-semibold px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 flex items-center gap-1'
                     : 'text-[10px] bg-[#4ADE80] text-black font-black px-2 py-0.5 border border-black uppercase flex items-center gap-1'
                 }
               >
@@ -762,17 +832,27 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
 
           {/* Test Anki Result Banner */}
           {testAnkiResult && (
-            <div className={`p-2.5 mb-3 border-2 border-black text-xs font-bold ${
-              testAnkiResult.success ? 'bg-[#bbf7d0] text-black' : 'bg-[#fecaca] text-black'
-            }`}>
-              <div className="font-black uppercase mb-1">
+            <div
+              className={
+                isMinimal
+                  ? `p-2.5 mb-3 border rounded-lg text-xs font-medium ${
+                      testAnkiResult.success
+                        ? 'bg-emerald-50 text-emerald-900 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800'
+                        : 'bg-rose-50 text-rose-900 border-rose-200 dark:bg-rose-950/40 dark:text-rose-200 dark:border-rose-800'
+                    }`
+                  : `p-2.5 mb-3 border-2 border-black text-xs font-bold ${
+                      testAnkiResult.success ? 'bg-[#bbf7d0] text-black' : 'bg-[#fecaca] text-black'
+                    }`
+              }
+            >
+              <div className="font-bold uppercase mb-1">
                 {testAnkiResult.success ? '✓ Anki Direct Test Passed!' : '✕ Anki Direct Test Failed'}
               </div>
               <div className="space-y-1">
                 {testAnkiResult.steps.map((st, i) => (
                   <div key={i} className="flex items-center justify-between text-[11px]">
                     <span>{st.step}</span>
-                    <span className={st.status === 'ok' ? 'text-green-800' : 'text-red-800'}>
+                    <span className={st.status === 'ok' ? 'text-emerald-700 dark:text-emerald-400 font-semibold' : 'text-rose-700 dark:text-rose-400 font-semibold'}>
                       {st.message}
                     </span>
                   </div>
@@ -789,38 +869,52 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
               const isSkipped = matchedLog && matchedLog.status === 'skipped';
               const isRunning = isGenerating && activeStepNumber === step;
 
-              let badgeBg = 'bg-zinc-200 text-zinc-600';
+              let badgeBg = isMinimal ? 'bg-slate-200 text-slate-600 dark:bg-zinc-700 dark:text-zinc-300' : 'bg-zinc-200 text-zinc-600';
               let symbol = step.toString();
-              let textStyle = 'text-zinc-500';
+              let textStyle = isMinimal ? 'text-slate-500 dark:text-zinc-400' : 'text-zinc-500';
 
               if (isPassed) {
-                badgeBg = 'bg-[#4ADE80] text-black font-black';
+                badgeBg = isMinimal ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-semibold' : 'bg-[#4ADE80] text-black font-black';
                 symbol = '✓';
-                textStyle = 'text-black font-bold';
+                textStyle = isMinimal ? 'text-slate-800 dark:text-zinc-100 font-semibold' : 'text-black font-bold';
               } else if (isFailed) {
-                badgeBg = 'bg-[#FF4B4B] text-white font-black';
+                badgeBg = isMinimal ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 font-semibold' : 'bg-[#FF4B4B] text-white font-black';
                 symbol = '✕';
-                textStyle = 'text-red-700 font-bold';
+                textStyle = isMinimal ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-red-700 font-bold';
               } else if (isSkipped) {
-                badgeBg = 'bg-zinc-300 text-zinc-700';
+                badgeBg = isMinimal ? 'bg-slate-100 text-slate-400 dark:bg-zinc-800 dark:text-zinc-500' : 'bg-zinc-300 text-zinc-700';
                 symbol = '-';
-                textStyle = 'text-zinc-400 line-through';
+                textStyle = isMinimal ? 'text-slate-400 dark:text-zinc-500 line-through' : 'text-zinc-400 line-through';
               } else if (isRunning) {
-                badgeBg = 'bg-[#38bdf8] text-black font-black animate-pulse';
+                badgeBg = isMinimal ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 font-semibold animate-pulse' : 'bg-[#38bdf8] text-black font-black animate-pulse';
                 symbol = '⟳';
-                textStyle = 'text-blue-700 font-bold animate-pulse';
+                textStyle = isMinimal ? 'text-blue-600 dark:text-blue-400 font-semibold animate-pulse' : 'text-blue-700 font-bold animate-pulse';
               }
 
               return (
                 <div
                   key={step}
-                  className={`p-2 border border-black flex flex-col gap-0.5 ${
-                    isFailed ? 'bg-red-50' : isPassed ? 'bg-emerald-50/50' : isRunning ? 'bg-sky-50' : 'bg-white'
-                  }`}
+                  className={
+                    isMinimal
+                      ? `p-2 rounded-md border flex flex-col gap-0.5 ${
+                          isFailed
+                            ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900'
+                            : isPassed
+                            ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-900'
+                            : isRunning
+                            ? 'bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900'
+                            : isMinimalDark
+                            ? 'bg-zinc-900/60 border-zinc-800'
+                            : 'bg-white border-slate-200'
+                        }`
+                      : `p-2 border border-black flex flex-col gap-0.5 ${
+                          isFailed ? 'bg-red-50' : isPassed ? 'bg-emerald-50/50' : isRunning ? 'bg-sky-50' : 'bg-white'
+                        }`
+                  }
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className={`w-5 h-5 flex items-center justify-center text-[10px] border border-black ${badgeBg}`}>
+                      <span className={`w-5 h-5 flex items-center justify-center text-[10px] ${isMinimal ? 'rounded' : 'border border-black'} ${badgeBg}`}>
                         {symbol}
                       </span>
                       <span className={`text-xs ${textStyle}`}>
@@ -828,18 +922,18 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                       </span>
                     </div>
                     {matchedLog?.status && (
-                      <span className="text-[10px] uppercase font-black px-1 border border-black bg-white">
+                      <span className={`text-[10px] uppercase px-1.5 py-0.2 ${isMinimal ? 'font-semibold rounded border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300' : 'font-black border border-black bg-white'}`}>
                         {matchedLog.status}
                       </span>
                     )}
                   </div>
                   {matchedLog?.message && (
-                    <p className="text-[10px] text-zinc-600 font-sans pl-7 font-normal break-words">
+                    <p className={`text-[10px] font-sans pl-7 font-normal break-words ${isMinimal ? 'text-slate-600 dark:text-zinc-400' : 'text-zinc-600'}`}>
                       {matchedLog.message}
                     </p>
                   )}
                   {matchedLog?.details && (
-                    <p className="text-[9px] text-zinc-500 font-mono pl-7 break-words">
+                    <p className={`text-[9px] font-mono pl-7 break-words ${isMinimal ? 'text-slate-400 dark:text-zinc-500' : 'text-zinc-500'}`}>
                       {matchedLog.details}
                     </p>
                   )}
@@ -850,37 +944,45 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
 
           {/* Real Card & Note ID confirmation & Verification Panel */}
           {createdNoteId && (
-            <div className="mt-3 pt-2 border-t-2 border-black space-y-2">
+            <div className={`mt-3 pt-2 ${isMinimal ? 'border-t border-slate-200 dark:border-zinc-700 space-y-2' : 'border-t-2 border-black space-y-2'}`}>
               {/* Verification Checklist */}
-              <div className="bg-[#4ADE80]/20 p-3 border-2 border-black space-y-1.5 text-xs text-black">
-                <div className="flex items-center justify-between font-black uppercase text-xs border-b border-black pb-1">
+              <div
+                className={
+                  isMinimalLight
+                    ? 'bg-emerald-50/70 p-3 border border-emerald-200 rounded-lg space-y-1.5 text-xs text-slate-800'
+                    : isMinimalDark
+                    ? 'bg-emerald-950/30 p-3 border border-emerald-800/60 rounded-lg space-y-1.5 text-xs text-zinc-100'
+                    : 'bg-[#4ADE80]/20 p-3 border-2 border-black space-y-1.5 text-xs text-black'
+                }
+              >
+                <div className={`flex items-center justify-between font-bold uppercase text-xs pb-1 ${isMinimal ? 'border-b border-emerald-200 dark:border-emerald-800' : 'border-b border-black font-black'}`}>
                   <span className="flex items-center gap-1">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                     <span>Anki Verified Status</span>
                   </span>
-                  <span className="bg-[#4ADE80] px-1.5 py-0.5 border border-black text-[10px] font-black">
+                  <span className={isMinimal ? 'bg-emerald-200 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-100 px-1.5 py-0.5 rounded text-[10px] font-semibold' : 'bg-[#4ADE80] px-1.5 py-0.5 border border-black text-[10px] font-black'}>
                     VERIFIED IN ANKI
                   </span>
                 </div>
 
-                <div className="space-y-1 text-[11px] font-bold">
-                  <div className="flex items-center gap-1.5 text-emerald-900">
+                <div className="space-y-1 text-[11px]">
+                  <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
                     <span>✓</span>
                     <span>Note created in Anki (ID: #{createdNoteId})</span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-emerald-900">
+                  <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
                     <span>✓</span>
-                    <span>Note verified in model: <code className="font-mono bg-white px-1 border border-black/30">{verificationDetails?.modelName || 'AI Vocabulary'}</code></span>
+                    <span>Note verified in model: <code className={`font-mono px-1 rounded ${isMinimal ? 'bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700' : 'bg-white border border-black/30'}`}>{verificationDetails?.modelName || 'AI Vocabulary'}</code></span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-emerald-900">
+                  <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
                     <span>✓</span>
-                    <span>Deck verified: <code className="font-mono bg-white px-1 border border-black/30">{verificationDetails?.actualDeck || deck}</code></span>
+                    <span>Deck verified: <code className={`font-mono px-1 rounded ${isMinimal ? 'bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700' : 'bg-white border border-black/30'}`}>{verificationDetails?.actualDeck || deck}</code></span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-emerald-900">
+                  <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
                     <span>✓</span>
-                    <span>Card(s) verified in Anki: <code className="font-mono bg-white px-1 border border-black/30">{createdCardIds.map((id) => `#${id}`).join(', ') || `#${createdNoteId}`}</code></span>
+                    <span>Card(s) verified in Anki: <code className={`font-mono px-1 rounded ${isMinimal ? 'bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700' : 'bg-white border border-black/30'}`}>{createdCardIds.map((id) => `#${id}`).join(', ') || `#${createdNoteId}`}</code></span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-emerald-900">
+                  <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
                     <span>✓</span>
                     <span>Card exists and active in Anki (Queue: {verificationDetails?.cardsInfo?.[0]?.queueLabel || 'New (0)'})</span>
                   </div>
@@ -892,12 +994,16 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                     type="button"
                     onClick={handleOpenInAnki}
                     disabled={isOpeningInAnki}
-                    className="flex-1 py-1.5 px-2 bg-black hover:bg-zinc-800 text-white font-black text-[11px] uppercase border-2 border-black flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#000000] cursor-pointer"
+                    className={
+                      isMinimal
+                        ? 'flex-1 py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-colors'
+                        : 'flex-1 py-1.5 px-2 bg-black hover:bg-zinc-800 text-white font-black text-[11px] uppercase border-2 border-black flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#000000] cursor-pointer'
+                    }
                   >
                     {isOpeningInAnki ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#4ADE80]" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
-                      <ExternalLink className="w-3.5 h-3.5 text-[#FFD93D]" />
+                      <ExternalLink className="w-3.5 h-3.5" />
                     )}
                     <span>Open in Anki</span>
                   </button>
@@ -906,7 +1012,11 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                     type="button"
                     onClick={handleReverifyInAnki}
                     disabled={isReverifying}
-                    className="py-1.5 px-2 bg-white hover:bg-zinc-100 text-black font-black text-[11px] uppercase border-2 border-black flex items-center justify-center gap-1 shadow-[2px_2px_0px_#000000] cursor-pointer"
+                    className={
+                      isMinimal
+                        ? 'py-1.5 px-2.5 bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-750 text-slate-700 dark:text-zinc-200 font-medium text-xs border border-slate-300 dark:border-zinc-700 rounded-md flex items-center justify-center gap-1 shadow-xs cursor-pointer transition-colors'
+                        : 'py-1.5 px-2 bg-white hover:bg-zinc-100 text-black font-black text-[11px] uppercase border-2 border-black flex items-center justify-center gap-1 shadow-[2px_2px_0px_#000000] cursor-pointer'
+                    }
                     title="Query AnkiConnect again to re-verify"
                   >
                     {isReverifying ? (
@@ -920,7 +1030,11 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                   <button
                     type="button"
                     onClick={() => setShowDiagnosticsDetail(!showDiagnosticsDetail)}
-                    className="py-1.5 px-2 bg-white hover:bg-zinc-100 text-black font-black text-[11px] uppercase border-2 border-black flex items-center justify-center gap-1 shadow-[2px_2px_0px_#000000] cursor-pointer"
+                    className={
+                      isMinimal
+                        ? 'py-1.5 px-2.5 bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-750 text-slate-700 dark:text-zinc-200 font-medium text-xs border border-slate-300 dark:border-zinc-700 rounded-md flex items-center justify-center gap-1 shadow-xs cursor-pointer transition-colors'
+                        : 'py-1.5 px-2 bg-white hover:bg-zinc-100 text-black font-black text-[11px] uppercase border-2 border-black flex items-center justify-center gap-1 shadow-[2px_2px_0px_#000000] cursor-pointer'
+                    }
                     title="View Raw Anki Diagnostics"
                   >
                     <Info className="w-3.5 h-3.5" />
@@ -930,7 +1044,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
 
                 {/* Anki Action feedback */}
                 {ankiActionMessage && (
-                  <div className="p-1.5 bg-white border border-black text-[10px] font-mono text-black">
+                  <div className={`p-1.5 rounded text-[10px] font-mono ${isMinimal ? 'bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-zinc-200' : 'bg-white border border-black text-black'}`}>
                     {ankiActionMessage}
                   </div>
                 )}
@@ -938,10 +1052,10 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
 
               {/* Collapsible Card Diagnostics Report */}
               {showDiagnosticsDetail && verificationDetails && (
-                <div className="p-3 bg-zinc-50 border-2 border-black text-xs font-mono space-y-2">
-                  <div className="font-black uppercase text-[11px] text-black border-b border-black pb-1 flex justify-between">
+                <div className={`p-3 text-xs font-mono space-y-2 ${isMinimal ? 'bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg' : 'bg-zinc-50 border-2 border-black'}`}>
+                  <div className={`font-bold uppercase text-[11px] pb-1 flex justify-between ${isMinimal ? 'border-b border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-zinc-200' : 'border-b border-black text-black font-black'}`}>
                     <span>Card Diagnostics Data</span>
-                    <span className="text-[10px] text-zinc-600">nid:{verificationDetails.noteId}</span>
+                    <span className="text-[10px] opacity-75">nid:{verificationDetails.noteId}</span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-1.5 text-[11px]">
