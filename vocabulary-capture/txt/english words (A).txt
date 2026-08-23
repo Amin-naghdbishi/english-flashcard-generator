@@ -1,4 +1,8 @@
-apple
-bank
-photo
-abandon
+Word=apple
+Deck=English::B1
+Word=bank
+Deck=English::B1
+Word=photo
+Deck=English::B1
+Word=abandon
+Deck=English::B1

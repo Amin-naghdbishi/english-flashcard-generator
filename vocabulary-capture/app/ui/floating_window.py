@@ -62,7 +62,7 @@ class NewFileDialog(QDialog):
         fmt_lbl = QLabel("Format:")
         fmt_lbl.setStyleSheet("font-size: 11px;")
         self.fmt_combo = QComboBox()
-        self.fmt_combo.addItems(["Format A (Simple List)", "Format B (Structured Blocks)"])
+        self.fmt_combo.addItems(["Format A (Word + Deck)", "Format B (Structured Blocks)"])
         if default_format == TXTFormat.B:
             self.fmt_combo.setCurrentIndex(1)
         fmt_layout.addWidget(fmt_lbl)
@@ -92,7 +92,7 @@ class FloatingWindow(QWidget):
     - Top contains ONLY small tabs & close button (NO 'Vocabulary Capture' title).
     - Never auto-closes on actions (user closes explicitly with ×).
     - Tab 1: AI Assistant with TRUE streaming response & Piper TTS audio button.
-    - Tab 2: Add to TXT (Format A & B).
+    - Tab 2: Add to TXT (Format A & B editors).
     - Keyboard navigation: 1 / 2, Left / Right arrows.
     """
     closed = Signal()
@@ -103,6 +103,7 @@ class FloatingWindow(QWidget):
         self.ai_service = ai_service
         self.tts_service = tts_service or TTSService(config.tts)
         self.captured_text = ""
+        self.selected_a_file: Optional[Path] = None
         self.selected_b_file: Optional[Path] = None
         self.current_format_filter = TXTFormat.A
         self.active_stream_worker: Optional[AIStreamWorker] = None
@@ -288,7 +289,7 @@ class FloatingWindow(QWidget):
         return page
 
     # -------------------------------------------------------------
-    # TAB 2: ADD TO TXT (Format A & B)
+    # TAB 2: ADD TO TXT (Format A & B Editors)
     # -------------------------------------------------------------
     def _create_txt_tab(self) -> QWidget:
         page = QWidget()
@@ -296,7 +297,7 @@ class FloatingWindow(QWidget):
         layout.setContentsMargins(0, 2, 0, 0)
         layout.setSpacing(6)
 
-        # Stack inside TXT tab: (0: File List View, 1: Format B Editor)
+        # Stack inside TXT tab: (0: File List View, 1: Format A Editor, 2: Format B Editor)
         self.txt_stack = QStackedWidget()
 
         # --- View 0: File Selection List ---
@@ -351,12 +352,55 @@ class FloatingWindow(QWidget):
 
         self.txt_stack.addWidget(self.file_list_view)
 
-        # --- View 1: Format B Editor ---
+        # --- View 1: Format A Editor ---
+        self.a_editor_view = self._create_a_editor()
+        self.txt_stack.addWidget(self.a_editor_view)
+
+        # --- View 2: Format B Editor ---
         self.b_editor_view = self._create_b_editor()
         self.txt_stack.addWidget(self.b_editor_view)
 
         layout.addWidget(self.txt_stack, 1)
         return page
+
+    def _create_a_editor(self) -> QWidget:
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
+        # Top nav: Back button + Target file label
+        a_header = QHBoxLayout()
+        a_header.setSpacing(6)
+        self.btn_a_back = QPushButton("← Back")
+        self.btn_a_back.setStyleSheet("font-size: 11px; padding: 2px 6px;")
+        self.btn_a_back.clicked.connect(lambda: self.txt_stack.setCurrentIndex(0))
+        a_header.addWidget(self.btn_a_back)
+
+        self.a_target_lbl = QLabel("Target: (A).txt")
+        self.a_target_lbl.setStyleSheet("font-weight: 600; font-size: 11px;")
+        a_header.addWidget(self.a_target_lbl, 1)
+        layout.addLayout(a_header)
+
+        # Form container for Format A fields (Word and Deck)
+        form_container = QWidget()
+        f_layout = QVBoxLayout(form_container)
+        f_layout.setContentsMargins(4, 4, 4, 4)
+        f_layout.setSpacing(8)
+
+        self.a_inp_word = self._make_field(f_layout, "Word (required)")
+        self.a_inp_deck = self._make_field(f_layout, "Deck (required)", default_val=self.config.default_deck)
+
+        layout.addWidget(form_container)
+        layout.addStretch(1)
+
+        # Save Button
+        self.btn_a_save = QPushButton("Add to TXT File")
+        self.btn_a_save.setProperty("class", "primary-btn")
+        self.btn_a_save.clicked.connect(self._save_format_a_entry)
+        layout.addWidget(self.btn_a_save)
+
+        return widget
 
     def _create_b_editor(self) -> QWidget:
         widget = QWidget()
@@ -433,6 +477,7 @@ class FloatingWindow(QWidget):
         """Called when text is captured via global shortcut or IPC."""
         self.captured_text = text.strip()
         self.ai_selection_lbl.setText(self.captured_text if self.captured_text else "No text captured.")
+        self.a_inp_word.setText(self.captured_text)
         self.b_inp_word.setText(self.captured_text)
 
         # Auto-trigger AI analysis if configured
@@ -464,6 +509,8 @@ class FloatingWindow(QWidget):
         else:
             self.btn_fmt_a.setProperty("class", "tab-btn")
             self.btn_fmt_b.setProperty("class", "tab-btn active")
+        self.btn_fmt_a.style().polish(self.btn_fmt_a)
+        self.btn_fmt_b.style().polish(self.btn_fmt_b)
         self.txt_stack.setCurrentIndex(0)
         self.refresh_file_list()
 
@@ -498,21 +545,44 @@ class FloatingWindow(QWidget):
         fmt = detect_format_from_filename(file_path)
 
         if fmt == TXTFormat.A:
-            word = self.captured_text or self.b_inp_word.text().strip()
-            if not word:
-                self._show_status("⚠ No word/text captured to add.", is_error=True)
-                return
-
-            success = append_to_format_a(file_path, word)
-            if success:
-                self._show_status(f"✓ Added '{word}' to {file_path.name}")
-            else:
-                self._show_status("Failed to append to file.", is_error=True)
+            self.selected_a_file = file_path
+            self.a_target_lbl.setText(f"Target: {file_path.name}")
+            word = self.captured_text or self.b_inp_word.text().strip() or self.a_inp_word.text().strip()
+            self.a_inp_word.setText(word)
+            if not self.a_inp_deck.text().strip():
+                self.a_inp_deck.setText(self.config.default_deck)
+            self.txt_stack.setCurrentIndex(1)
 
         elif fmt == TXTFormat.B:
             self.selected_b_file = file_path
             self.b_target_lbl.setText(f"Target: {file_path.name}")
-            self.txt_stack.setCurrentIndex(1)
+            word = self.captured_text or self.a_inp_word.text().strip() or self.b_inp_word.text().strip()
+            self.b_inp_word.setText(word)
+            if not self.b_inp_deck.text().strip():
+                self.b_inp_deck.setText(self.config.default_deck)
+            self.txt_stack.setCurrentIndex(2)
+
+    def _save_format_a_entry(self):
+        if not self.selected_a_file:
+            return
+
+        word = self.a_inp_word.text().strip()
+        deck = self.a_inp_deck.text().strip() or self.config.default_deck
+
+        if not word:
+            self._show_status("Word field is required.", is_error=True)
+            return
+
+        if not deck:
+            self._show_status("Deck field is required.", is_error=True)
+            return
+
+        success = append_to_format_a(self.selected_a_file, word, deck)
+        if success:
+            self.txt_stack.setCurrentIndex(0)
+            self._show_status(f"✓ Saved '{word}' to {self.selected_a_file.name}")
+        else:
+            self._show_status("Failed to save entry.", is_error=True)
 
     def _save_format_b_entry(self):
         if not self.selected_b_file:
@@ -555,6 +625,22 @@ class FloatingWindow(QWidget):
                 if success:
                     self.set_txt_format(fmt)
                     self._show_status(f"✓ Created {path.name}")
+                    if fmt == TXTFormat.A:
+                        self.selected_a_file = path
+                        self.a_target_lbl.setText(f"Target: {path.name}")
+                        word = self.captured_text or self.b_inp_word.text().strip() or self.a_inp_word.text().strip()
+                        self.a_inp_word.setText(word)
+                        if not self.a_inp_deck.text().strip():
+                            self.a_inp_deck.setText(self.config.default_deck)
+                        self.txt_stack.setCurrentIndex(1)
+                    elif fmt == TXTFormat.B:
+                        self.selected_b_file = path
+                        self.b_target_lbl.setText(f"Target: {path.name}")
+                        word = self.captured_text or self.a_inp_word.text().strip() or self.b_inp_word.text().strip()
+                        self.b_inp_word.setText(word)
+                        if not self.b_inp_deck.text().strip():
+                            self.b_inp_deck.setText(self.config.default_deck)
+                        self.txt_stack.setCurrentIndex(2)
                 else:
                     self._show_status(msg, is_error=True)
 
@@ -602,7 +688,7 @@ class FloatingWindow(QWidget):
         self.active_stream_worker.start()
 
     def _ai_auto_analyze(self):
-        text = self.captured_text or self.b_inp_word.text().strip()
+        text = self.captured_text or self.a_inp_word.text().strip() or self.b_inp_word.text().strip()
         if not text:
             return
         is_single_word = len(text.split()) <= 2 and len(text) < 30
@@ -612,7 +698,7 @@ class FloatingWindow(QWidget):
             self._ai_translate()
 
     def _ai_get_meaning(self):
-        text = self.captured_text or self.b_inp_word.text().strip()
+        text = self.captured_text or self.a_inp_word.text().strip() or self.b_inp_word.text().strip()
         if not text:
             return
         prompt = self.ai_service.build_vocab_prompt(text, self.config.prompts.vocab_prompt)
@@ -622,7 +708,7 @@ class FloatingWindow(QWidget):
         self._start_streaming_ai(prompt=prompt, system_prompt=sys_prompt)
 
     def _ai_translate(self):
-        text = self.captured_text or self.b_inp_word.text().strip()
+        text = self.captured_text or self.a_inp_word.text().strip() or self.b_inp_word.text().strip()
         if not text:
             return
         prompt = self.ai_service.build_sentence_prompt(text, self.config.prompts.sentence_prompt)
@@ -646,7 +732,7 @@ class FloatingWindow(QWidget):
     # PIPER TTS AUDIO ACTIONS
     # -------------------------------------------------------------
     def _play_selection_tts(self):
-        text = self.captured_text or self.b_inp_word.text().strip()
+        text = self.captured_text or self.a_inp_word.text().strip() or self.b_inp_word.text().strip()
         if not text:
             return
         self.tts_service.config = self.config.tts

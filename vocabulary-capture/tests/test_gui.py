@@ -25,9 +25,9 @@ def qapp():
         app = QApplication([])
     return app
 
-def test_floating_window_lifecycle_and_streaming(qapp):
+def test_floating_window_lifecycle_and_format_a_and_b(qapp):
     with tempfile.TemporaryDirectory() as tmpdir:
-        cfg = AppConfig(txt_directory=tmpdir, theme="anki-dark", auto_trigger_meaning=False)
+        cfg = AppConfig(txt_directory=tmpdir, theme="anki-dark", auto_trigger_meaning=False, default_deck="English::B1")
         ai = AIService(base_url="http://127.0.0.1:59999")
         tts = TTSService(cfg.tts)
 
@@ -45,6 +45,7 @@ def test_floating_window_lifecycle_and_streaming(qapp):
         # Set captured text
         win.set_captured_text("abandon")
         assert win.captured_text == "abandon"
+        assert win.a_inp_word.text() == "abandon"
         assert win.b_inp_word.text() == "abandon"
         assert win.isVisible()
 
@@ -75,20 +76,53 @@ def test_floating_window_lifecycle_and_streaming(qapp):
         win.keyPressEvent(event_right)
         assert win.stack.currentIndex() == 1
 
-        # Format A selection and appending
+        # =========================================================
+        # FORMAT A ENTRY WORKFLOW TEST
+        # =========================================================
         win.set_txt_format(TXTFormat.A)
         assert win.current_format_filter == TXTFormat.A
         assert win.files_list_widget.count() == 1
         assert "daily words" in win.files_list_widget.item(0).text()
 
-        # Click Format A file -> appends word
+        # Click Format A file -> opens Format A editor (Word and Deck fields appear)
         item_a = win.files_list_widget.item(0)
         win._on_file_item_clicked(item_a)
+        assert win.txt_stack.currentIndex() == 1  # Format A editor
+        assert win.selected_a_file.name == "daily words (A).txt"
+        assert win.a_inp_word.text() == "abandon"
+        assert win.a_inp_deck.text() == "English::B1"
+        assert win.isVisible()
+
+        # Edit Deck to custom value and click Save
+        win.a_inp_deck.setText("English::CustomDeck")
+        win._save_format_a_entry()
+
+        # Verify returned to file list in same window
+        assert win.txt_stack.currentIndex() == 0
         assert win.isVisible()
         a_content = (Path(tmpdir) / "daily words (A).txt").read_text(encoding="utf-8")
-        assert "abandon" in a_content
+        assert "Word=abandon\nDeck=English::CustomDeck" in a_content
 
-        # Format B selection and editing
+        # Create a new A-format file and repeat test
+        succ, new_a_path, _ = create_new_txt_file(Path(tmpdir), "extra vocab", "A")
+        assert succ
+        win.refresh_file_list()
+        # Find extra vocab item
+        items = [win.files_list_widget.item(i) for i in range(win.files_list_widget.count())]
+        extra_item = next(it for it in items if "extra vocab" in it.text())
+        win._on_file_item_clicked(extra_item)
+        assert win.txt_stack.currentIndex() == 1
+        assert win.selected_a_file.name == "extra vocab (A).txt"
+        win.a_inp_word.setText("serendipity")
+        win.a_inp_deck.setText("English::C1")
+        win._save_format_a_entry()
+
+        extra_content = (Path(tmpdir) / "extra vocab (A).txt").read_text(encoding="utf-8")
+        assert "Word=serendipity\nDeck=English::C1" in extra_content
+
+        # =========================================================
+        # FORMAT B ENTRY WORKFLOW TEST
+        # =========================================================
         win.set_txt_format(TXTFormat.B)
         assert win.current_format_filter == TXTFormat.B
         assert win.files_list_widget.count() == 1
@@ -97,7 +131,7 @@ def test_floating_window_lifecycle_and_streaming(qapp):
         # Click Format B file -> opens B field editor in same window
         item_b = win.files_list_widget.item(0)
         win._on_file_item_clicked(item_b)
-        assert win.txt_stack.currentIndex() == 1
+        assert win.txt_stack.currentIndex() == 2  # Format B editor
         assert win.selected_b_file.name == "english B1 (B).txt"
         assert win.isVisible()
 

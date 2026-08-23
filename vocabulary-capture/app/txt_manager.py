@@ -80,14 +80,29 @@ def list_txt_files(directory: Path, format_filter: Optional[str] = None, search_
         
     return results
 
-def append_to_format_a(file_path: Path, word_or_text: str) -> bool:
+def build_format_a_block(word: str, deck: str) -> str:
     """
-    Appends word/text directly to a Format A TXT file as a new line.
+    Builds a Format A entry containing Word and Deck.
+    
+    Example:
+    Word=abandon
+    Deck=English::B1
     """
-    text = word_or_text.strip()
-    if not text:
+    w = word.strip()
+    d = deck.strip()
+    return f"Word={w}\nDeck={d}"
+
+def append_to_format_a(file_path: Path, word: str, deck: str) -> bool:
+    """
+    Appends a Format A entry (Word and Deck) to a Format A TXT file.
+    Format A always requires both Word and Deck.
+    """
+    w = word.strip()
+    d = deck.strip()
+    if not w or not d:
         return False
         
+    block = build_format_a_block(w, d)
     try:
         file_path.parent.mkdir(parents=True, exist_ok=True)
         
@@ -103,7 +118,7 @@ def append_to_format_a(file_path: Path, word_or_text: str) -> bool:
         with open(file_path, "a", encoding="utf-8") as f:
             if needs_leading_newline:
                 f.write("\n")
-            f.write(f"{text}\n")
+            f.write(f"{block}\n")
             
         return True
     except Exception as e:

@@ -27,7 +27,7 @@ It runs continuously in the background with a system tray icon, integrates seaml
   - No bloated title bars or application titles — only a small close (`×`) button.
   - **Never auto-closes**: stays alive during tab switches, file creation, and word entry until explicitly closed.
 - **TXT Vocabulary Capture**:
-  - **Format A**: Simple word list (`english words (A).txt`).
+  - **Format A**: Word and Deck entries (`english words (A).txt`, e.g. `Word=abandon`, `Deck=English::B1`).
   - **Format B**: Structured flashcard records (`english B1 (B).txt`) strictly omitting unused/empty fields.
   - Format determined exclusively from filename tag (`(A)` or `(B)`).
 

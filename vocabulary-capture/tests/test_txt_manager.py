@@ -5,6 +5,7 @@ from app.txt_manager import (
     detect_format_from_filename,
     format_clean_filename,
     list_txt_files,
+    build_format_a_block,
     append_to_format_a,
     build_format_b_block,
     append_to_format_b,
@@ -12,19 +13,16 @@ from app.txt_manager import (
 )
 
 def test_filename_format_detection():
-    # Point 15: Format A correctly identified from filename
     assert detect_format_from_filename("english words (A).txt") == TXTFormat.A
     assert detect_format_from_filename("daily vocabulary (A).txt") == TXTFormat.A
     assert detect_format_from_filename("my words [A].txt") == TXTFormat.A
     assert detect_format_from_filename("/path/to/vocab (a).txt") == TXTFormat.A
 
-    # Point 16: Format B correctly identified from filename
     assert detect_format_from_filename("english B1 (B).txt") == TXTFormat.B
     assert detect_format_from_filename("books (B).txt") == TXTFormat.B
     assert detect_format_from_filename("ielts [b].txt") == TXTFormat.B
     assert detect_format_from_filename("/some/dir/flashcards (B).txt") == TXTFormat.B
 
-    # Unknown
     assert detect_format_from_filename("random.txt") == TXTFormat.UNKNOWN
     assert detect_format_from_filename("notes.md") == TXTFormat.UNKNOWN
 
@@ -37,23 +35,22 @@ def test_format_clean_filename():
     assert format_clean_filename("test (A)", "A") == "test (A).txt"
     assert format_clean_filename("test (A)", "B") == "test (B).txt"
 
+def test_build_format_a_block():
+    block = build_format_a_block("abandon", "English::B1")
+    assert block == "Word=abandon\nDeck=English::B1"
+
 def test_append_format_a():
-    # Point 17: A entries appended correctly
     with tempfile.TemporaryDirectory() as tmpdir:
         file_path = Path(tmpdir) / "daily (A).txt"
 
-        append_to_format_a(file_path, "apple")
-        append_to_format_a(file_path, "bank")
-        append_to_format_a(file_path, "photo")
-        append_to_format_a(file_path, "abandon")
+        append_to_format_a(file_path, "apple", "English::A1")
+        append_to_format_a(file_path, "abandon", "English::B1")
 
         content = file_path.read_text(encoding="utf-8")
-        lines = [l.strip() for l in content.splitlines() if l.strip()]
-        assert lines == ["apple", "bank", "photo", "abandon"]
+        assert "Word=apple\nDeck=English::A1" in content
+        assert "Word=abandon\nDeck=English::B1" in content
 
 def test_format_b_block_omits_empty_fields():
-    # Point 19: Empty B fields are omitted completely
-    # Only Word and Deck filled
     fields1 = {
         "Word": "abandon",
         "Deck": "English::B1",
@@ -69,7 +66,6 @@ def test_format_b_block_omits_empty_fields():
     assert "Persian Meaning=" not in block1
     assert "Part of Speech=" not in block1
 
-    # Word, Deck, Persian Meaning, and Spelling filled
     fields2 = {
         "Word": "abandon",
         "Deck": "English::B1",
@@ -85,18 +81,15 @@ def test_format_b_block_omits_empty_fields():
     assert "Photo=" not in block2
 
 def test_append_format_b():
-    # Point 18: B records are written correctly
     with tempfile.TemporaryDirectory() as tmpdir:
         file_path = Path(tmpdir) / "english B1 (B).txt"
 
-        # Entry 1
         append_to_format_b(file_path, {
             "Word": "abandon",
             "Deck": "English::B1",
             "Persian Meaning": "رها کردن",
         })
 
-        # Entry 2
         append_to_format_b(file_path, {
             "Word": "remarkable",
             "Deck": "English::B2",
@@ -109,7 +102,6 @@ def test_append_format_b():
         assert "Phonetic=" not in content
 
 def test_list_and_create_files():
-    # Point 20: Search works, Point 21: New A file, Point 22: New B file
     with tempfile.TemporaryDirectory() as tmpdir:
         p = Path(tmpdir)
 
