@@ -736,14 +736,22 @@ class FloatingWindow(QWidget):
         if not text:
             return
         self.tts_service.config = self.config.tts
-        self.tts_service.speak_text_async(text)
+        def _on_error(err_msg: str):
+            self.ai_chat_output.append(f"\n[TTS Error: {err_msg}]")
+        self.tts_service.speak_text_async(text, on_error=_on_error)
 
     def _play_response_tts(self):
         text = self.ai_chat_output.toPlainText().strip()
         if not text:
             return
+        cleaned_lines = [l for l in text.splitlines() if not l.startswith(("[Error:", "[Ollama Error", "[Provider Error", "[Gemini Error", "[TTS Error:"))]
+        speak_text = "\n".join(cleaned_lines).strip()
+        if not speak_text:
+            return
         self.tts_service.config = self.config.tts
-        self.tts_service.speak_text_async(text)
+        def _on_error(err_msg: str):
+            self.ai_chat_output.append(f"\n[TTS Error: {err_msg}]")
+        self.tts_service.speak_text_async(speak_text, on_error=_on_error)
 
     # -------------------------------------------------------------
     # WINDOW MOVEMENT & KEYBOARD SHORTCUTS

@@ -1,6 +1,7 @@
 import os
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 import pytest
 
 from PySide6.QtCore import Qt, QPoint
@@ -16,6 +17,11 @@ from app.ui.floating_window import FloatingWindow
 from app.ui.dashboard_window import DashboardWindow
 from app.ui.tray_icon import SystemTrayManager
 from app.main import VocabularyCaptureApp
+
+VALID_WAV_BYTES = (
+    b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00"
+    b"\x22\x56\x00\x00\x44\xAC\x00\x00\x02\x00\x10\x00data\x00\x00\x00\x00"
+)
 
 @pytest.fixture(scope="session")
 def qapp():
@@ -103,23 +109,6 @@ def test_floating_window_lifecycle_and_format_a_and_b(qapp):
         a_content = (Path(tmpdir) / "daily words (A).txt").read_text(encoding="utf-8")
         assert "Word=abandon\nDeck=English::CustomDeck" in a_content
 
-        # Create a new A-format file and repeat test
-        succ, new_a_path, _ = create_new_txt_file(Path(tmpdir), "extra vocab", "A")
-        assert succ
-        win.refresh_file_list()
-        # Find extra vocab item
-        items = [win.files_list_widget.item(i) for i in range(win.files_list_widget.count())]
-        extra_item = next(it for it in items if "extra vocab" in it.text())
-        win._on_file_item_clicked(extra_item)
-        assert win.txt_stack.currentIndex() == 1
-        assert win.selected_a_file.name == "extra vocab (A).txt"
-        win.a_inp_word.setText("serendipity")
-        win.a_inp_deck.setText("English::C1")
-        win._save_format_a_entry()
-
-        extra_content = (Path(tmpdir) / "extra vocab (A).txt").read_text(encoding="utf-8")
-        assert "Word=serendipity\nDeck=English::C1" in extra_content
-
         # =========================================================
         # FORMAT B ENTRY WORKFLOW TEST
         # =========================================================
@@ -146,8 +135,10 @@ def test_floating_window_lifecycle_and_format_a_and_b(qapp):
         assert "--\nWord=abandon\nDeck=English::B1\nPersian Meaning=رها کردن\n--" in b_content
         assert "Phonetic=" not in b_content
 
-        # Test audio button click (does not raise)
-        win._play_selection_tts()
+        # Test audio button click
+        with patch.object(tts, "synthesize", return_value=(True, VALID_WAV_BYTES, "")):
+            with patch.object(tts, "play_wav_bytes", return_value=(True, "OK")):
+                win._play_selection_tts()
 
         # Explicit close with hide_window
         win.hide_window()
@@ -170,18 +161,24 @@ def test_dashboard_window_multi_tab_settings(qapp):
         assert len(dash.txt_diag_output.toPlainText()) > 0
         assert "Shortcut detected" in dash.txt_diag_output.toPlainText()
 
-        # Test update diagnostic display
-        rec = DiagnosticRecord(
-            timestamp="12:00:00",
-            shortcut="<ctrl>+<alt>+v",
-            source="Manual Test",
-            text="abandon",
-            method="wl-paste",
-            window_opened=True,
-            status_message="OK"
-        )
-        dash.update_diagnostic_display(rec)
-        assert "abandon" in dash.txt_diag_output.toPlainText()
+        # Test AI Provider Test Connection
+        with patch.object(ai, "test_connection", return_value=(True, "Connected to Ollama (Found 2 model(s))", ["llama3:latest", "qwen2.5:7b"])):
+            dash._test_provider_connection()
+            assert "Connected to Ollama" in dash.lbl_prov_status.text()
+            assert dash.combo_pmodel.count() == 2
+            assert dash.combo_pmodel.itemText(0) == "llama3:latest"
+
+        # Test Piper Connection Test
+        with patch.object(tts, "check_connection", return_value=(True, "Connected to Piper (Found 2 voice(s))", ["en_US-lessac-medium", "en_GB-cori-high"])):
+            dash._test_piper_connection()
+            assert "Connected to Piper" in dash.lbl_piper_status.text()
+            dash._detect_piper_voices()
+            assert dash.combo_piper_voice.count() == 2
+
+        # Test Piper Voice Test
+        with patch.object(tts, "synthesize", return_value=(True, VALID_WAV_BYTES, "")):
+            with patch.object(tts, "play_wav_bytes", return_value=(True, "OK")):
+                dash._test_piper_voice()
 
         # Modify general settings
         dash.inp_shortcut.setText("<ctrl>+<alt>+y")

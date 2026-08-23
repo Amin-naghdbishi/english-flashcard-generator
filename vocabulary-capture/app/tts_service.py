@@ -2,7 +2,6 @@ import os
 import io
 import time
 import tempfile
-import urllib.parse
 import threading
 import subprocess
 import requests
@@ -20,41 +19,65 @@ class TTSService:
 
     @property
     def base_url(self) -> str:
-        return self.config.piper_url.rstrip("/")
+        return self.config.piper_url.strip().rstrip("/")
 
     def check_connection(self) -> Tuple[bool, str, List[str]]:
         """
         Tests connection to Piper HTTP server and fetches installed voices if available.
+        Returns: (is_connected, status_message, list_of_voices)
         """
         url = self.base_url
         if not url:
-            return False, "Piper URL is not configured.", []
+            return False, "Piper server URL is empty.", []
 
         # 1. Try GET /voices
         try:
-            resp = requests.get(f"{url}/voices", timeout=2.5)
+            resp = requests.get(f"{url}/voices", timeout=3.0)
             if resp.status_code == 200:
                 data = resp.json()
                 voices = []
                 if isinstance(data, list):
-                    voices = [v if isinstance(v, str) else v.get("key", v.get("name", "")) for v in data]
+                    for v in data:
+                        if isinstance(v, str) and v.strip():
+                            voices.append(v.strip())
+                        elif isinstance(v, dict):
+                            v_name = v.get("key") or v.get("name") or v.get("id")
+                            if v_name:
+                                voices.append(str(v_name).strip())
                 elif isinstance(data, dict):
-                    voices = list(data.keys())
-                return True, f"Connected (found {len(voices)} voice(s))", [v for v in voices if v]
+                    # Piper dictionary format: {"en_US-lessac-medium": {...}, ...}
+                    if "voices" in data and isinstance(data["voices"], (list, dict)):
+                        v_sub = data["voices"]
+                        if isinstance(v_sub, list):
+                            voices = [v if isinstance(v, str) else v.get("key", v.get("name", "")) for v in v_sub]
+                        else:
+                            voices = list(v_sub.keys())
+                    else:
+                        voices = list(data.keys())
+
+                clean_voices = [str(v).strip() for v in voices if str(v).strip()]
+                if clean_voices:
+                    return True, f"Connected to Piper (Found {len(clean_voices)} voice(s))", clean_voices
+                return True, "Connected to Piper server (Default voice active)", []
+        except requests.exceptions.ConnectionError:
+            return False, f"Connection refused at {url}. Ensure Piper HTTP server is running.", []
+        except requests.exceptions.Timeout:
+            return False, f"Connection timed out at {url} (after 3.0s).", []
         except Exception:
             pass
 
-        # 2. Try GET / or GET /api/voices
-        try:
-            resp = requests.get(url, timeout=2.0)
-            if resp.status_code == 200:
-                return True, "Connected to Piper server", []
-        except requests.exceptions.ConnectionError:
-            return False, f"Cannot connect to Piper at {url}. Ensure Piper HTTP server is running.", []
-        except requests.exceptions.Timeout:
-            return False, "Connection to Piper timed out.", []
-        except Exception as e:
-            return False, f"Connection error: {e}", []
+        # 2. Fallback: Try GET / or GET /api/voices
+        for endpoint in ("/", "/api/voices"):
+            try:
+                resp = requests.get(f"{url}{endpoint}", timeout=2.5)
+                if resp.status_code == 200:
+                    return True, "Connected to Piper server", []
+            except requests.exceptions.ConnectionError:
+                return False, f"Connection refused at {url}. Ensure Piper HTTP server is running.", []
+            except requests.exceptions.Timeout:
+                return False, f"Connection timed out at {url}.", []
+            except Exception as e:
+                return False, f"Piper connection error: {e}", []
 
         return False, f"Piper server at {url} returned HTTP {resp.status_code}", []
 
@@ -62,13 +85,17 @@ class TTSService:
         """
         Synthesizes text to WAV bytes using Piper HTTP server.
         Uses Piper length_scale: 1.0=normal, 1.25=slower, 0.8=faster.
+        Validates the WAV header of the response.
         """
         clean_text = text.strip()
         if not clean_text:
-            return False, b"", "Empty text."
+            return False, b"", "Empty text cannot be synthesized."
 
         url = self.base_url
-        v = voice or self.config.voice
+        if not url:
+            return False, b"", "Piper URL is empty."
+
+        v = voice.strip() or self.config.voice.strip()
         ls = length_scale if length_scale is not None else self.config.length_scale
 
         params = {}
@@ -77,31 +104,45 @@ class TTSService:
         if ls:
             params["length_scale"] = str(ls)
 
-        # 1. Try POST to / with raw text or params
+        def _is_valid_wav(data: bytes) -> bool:
+            return len(data) >= 44 and data.startswith(b"RIFF") and b"WAVE" in data[:16]
+
+        last_error = ""
+
+        # Method 1: POST to / with raw text in body and params
         try:
             resp = requests.post(
                 f"{url}/",
                 data=clean_text.encode("utf-8"),
                 params=params,
                 headers={"Content-Type": "text/plain; charset=utf-8"},
-                timeout=10.0
+                timeout=12.0
             )
-            if resp.status_code == 200 and len(resp.content) > 100:
-                return True, resp.content, ""
-        except Exception:
-            pass
+            if resp.status_code == 200:
+                if _is_valid_wav(resp.content):
+                    return True, resp.content, ""
+                else:
+                    last_error = f"Piper returned 200 but content is not a valid WAV file (received {len(resp.content)} bytes)."
+            else:
+                last_error = f"Piper returned HTTP {resp.status_code}: {resp.text[:120]}"
+        except requests.exceptions.ConnectionError:
+            return False, b"", f"Connection refused at {url}. Is Piper HTTP server running?"
+        except requests.exceptions.Timeout:
+            return False, b"", f"Piper synthesis timed out at {url} (after 12s)."
+        except Exception as e:
+            last_error = str(e)
 
-        # 2. Try GET with query params
+        # Method 2: GET / with query params
         try:
             get_params = dict(params)
             get_params["text"] = clean_text
-            resp = requests.get(f"{url}/", params=get_params, timeout=10.0)
-            if resp.status_code == 200 and len(resp.content) > 100:
+            resp = requests.get(f"{url}/", params=get_params, timeout=12.0)
+            if resp.status_code == 200 and _is_valid_wav(resp.content):
                 return True, resp.content, ""
-        except Exception:
-            pass
+        except Exception as e:
+            last_error = str(e)
 
-        # 3. Try POST JSON to /api/tts or /tts
+        # Method 3: POST /api/tts JSON
         for endpoint in ("/api/tts", "/tts"):
             try:
                 payload = {"text": clean_text}
@@ -109,21 +150,21 @@ class TTSService:
                     payload["voice"] = v
                 if ls:
                     payload["length_scale"] = ls
-                resp = requests.post(f"{url}{endpoint}", json=payload, timeout=10.0)
-                if resp.status_code == 200 and len(resp.content) > 100:
+                resp = requests.post(f"{url}{endpoint}", json=payload, timeout=12.0)
+                if resp.status_code == 200 and _is_valid_wav(resp.content):
                     return True, resp.content, ""
-            except Exception:
-                pass
+            except Exception as e:
+                last_error = str(e)
 
-        return False, b"", f"Failed to synthesize audio from Piper at {url}"
+        return False, b"", f"Piper synthesis failed at {url}: {last_error or 'Unknown error'}"
 
     def play_wav_bytes(self, wav_bytes: bytes) -> Tuple[bool, str]:
         """
         Plays WAV audio using standard Linux audio players.
         Tries: paplay -> pw-play -> aplay -> mpv -> ffplay -> play
         """
-        if not wav_bytes:
-            return False, "No audio data."
+        if not wav_bytes or len(wav_bytes) < 44 or not wav_bytes.startswith(b"RIFF"):
+            return False, "Invalid or empty WAV audio data."
 
         try:
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
@@ -154,9 +195,8 @@ class TTSService:
                 except Exception:
                     pass
 
-            # Play in background thread so caller does not block
             threading.Thread(target=_play_and_cleanup, args=(tmp_path,), daemon=True).start()
-            return True, "Playing audio."
+            return True, "Audio playback started."
         except Exception as e:
             return False, f"Audio playback error: {e}"
 
@@ -170,13 +210,18 @@ class TTSService:
     ):
         """
         Asynchronously fetches and plays Piper audio in a background thread.
+        Notifies caller of success or actual error reason.
         """
         def _worker():
             success, wav_bytes, err = self.synthesize(text, voice=voice, length_scale=length_scale)
             if success:
-                self.play_wav_bytes(wav_bytes)
-                if on_success:
-                    on_success()
+                play_ok, play_err = self.play_wav_bytes(wav_bytes)
+                if play_ok:
+                    if on_success:
+                        on_success()
+                else:
+                    if on_error:
+                        on_error(play_err)
             else:
                 if on_error:
                     on_error(err)

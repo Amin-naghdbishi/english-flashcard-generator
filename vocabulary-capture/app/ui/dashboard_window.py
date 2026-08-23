@@ -57,9 +57,9 @@ class DashboardWindow(QWidget):
     Settings & Management Dashboard for Vocabulary Capture.
     Follows the minimal Anki-style design language with organized tabs:
     - General (with Global Shortcut Diagnostics & Niri setup)
-    - AI Providers
+    - AI Providers (Real connection test & model discovery)
     - AI Prompts
-    - TTS (Piper)
+    - TTS (Piper) (Real connection test, voice discovery, and voice synthesis)
     - Themes
     Closing this window keeps the application running in the background/system tray.
     """
@@ -274,7 +274,7 @@ class DashboardWindow(QWidget):
             QMessageBox.warning(self, "Niri Configuration Error", msg)
 
     # -------------------------------------------------------------
-    # 2. AI PROVIDERS TAB
+    # 2. AI PROVIDERS TAB (Real Connection Test & Discovery)
     # -------------------------------------------------------------
     def _create_providers_tab(self) -> QWidget:
         widget = QWidget()
@@ -337,20 +337,25 @@ class DashboardWindow(QWidget):
         row3.addWidget(self.inp_pkey, 1)
         form_layout.addLayout(row3)
 
-        # Model & Refresh
+        # Model & Discovery Buttons
         row4 = QHBoxLayout()
         lbl_pmodel = QLabel("Model:")
         lbl_pmodel.setFixedWidth(70)
         self.combo_pmodel = QComboBox()
         self.combo_pmodel.setEditable(True)
+        self.btn_test_provider = QPushButton("Test Connection")
+        self.btn_test_provider.clicked.connect(self._test_provider_connection)
         self.btn_refresh_models = QPushButton("Refresh Models")
         self.btn_refresh_models.clicked.connect(self._refresh_provider_models)
         row4.addWidget(lbl_pmodel)
         row4.addWidget(self.combo_pmodel, 1)
+        row4.addWidget(self.btn_test_provider)
         row4.addWidget(self.btn_refresh_models)
         form_layout.addLayout(row4)
 
+        # Live Status Feedback
         self.lbl_prov_status = QLabel("")
+        self.lbl_prov_status.setWordWrap(True)
         self.lbl_prov_status.setProperty("class", "muted")
         form_layout.addWidget(self.lbl_prov_status)
 
@@ -412,7 +417,7 @@ class DashboardWindow(QWidget):
         return widget
 
     # -------------------------------------------------------------
-    # 4. TTS (PIPER) TAB
+    # 4. TTS (PIPER) TAB (Real Connection Test & Synthesis)
     # -------------------------------------------------------------
     def _create_tts_tab(self) -> QWidget:
         widget = QWidget()
@@ -439,7 +444,7 @@ class DashboardWindow(QWidget):
         voice_lbl.setFixedWidth(90)
         self.combo_piper_voice = QComboBox()
         self.combo_piper_voice.setEditable(True)
-        self.btn_detect_voices = QPushButton("Detect Voices")
+        self.btn_detect_voices = QPushButton("Refresh Voices")
         self.btn_detect_voices.clicked.connect(self._detect_piper_voices)
         voice_row.addWidget(voice_lbl)
         voice_row.addWidget(self.combo_piper_voice, 1)
@@ -469,13 +474,14 @@ class DashboardWindow(QWidget):
         stat_title.setFixedWidth(90)
         self.lbl_piper_status = QLabel("Piper ● Disconnected")
         self.lbl_piper_status.setProperty("class", "disconnected")
+        self.lbl_piper_status.setWordWrap(True)
         status_row.addWidget(stat_title)
         status_row.addWidget(self.lbl_piper_status, 1)
         t_layout.addLayout(status_row)
 
         # Test Buttons
         test_row = QHBoxLayout()
-        self.btn_test_piper_conn = QPushButton("Test Connection")
+        self.btn_test_piper_conn = QPushButton("Test Piper Connection")
         self.btn_test_piper_conn.clicked.connect(self._test_piper_connection)
         self.btn_test_piper_voice = QPushButton("🔊 Test Voice")
         self.btn_test_piper_voice.clicked.connect(self._test_piper_voice)
@@ -614,28 +620,45 @@ class DashboardWindow(QWidget):
         self.config.active_provider_id = self.config.providers[0].id
         self._populate_providers_combo()
 
-    def _refresh_provider_models(self):
+    def _get_form_provider_config(self) -> AIProviderConfig:
         prov = self.config.get_active_provider()
-        prov.name = self.inp_pname.text().strip()
-        prov.type = self.combo_ptype.currentText()
-        prov.base_url = self.inp_purl.text().strip()
-        prov.api_key = self.inp_pkey.text().strip()
+        return AIProviderConfig(
+            id=prov.id,
+            name=self.inp_pname.text().strip() or prov.name,
+            type=self.combo_ptype.currentText(),
+            base_url=self.inp_purl.text().strip(),
+            api_key=self.inp_pkey.text().strip(),
+            model=self.combo_pmodel.currentText().strip(),
+            custom_headers=dict(prov.custom_headers),
+            streaming=prov.streaming
+        )
 
-        models = self.ai_service.get_models(prov)
-        self.combo_pmodel.clear()
-        if models:
-            self.combo_pmodel.addItems(models)
-            if prov.model in models:
-                self.combo_pmodel.setCurrentText(prov.model)
-            else:
-                self.combo_pmodel.setCurrentIndex(0)
-            self.lbl_prov_status.setText(f"✓ Found {len(models)} model(s).")
+    def _test_provider_connection(self):
+        prov = self._get_form_provider_config()
+        self.lbl_prov_status.setText("Testing connection...")
+        self.lbl_prov_status.setProperty("class", "muted")
+        self.lbl_prov_status.style().polish(self.lbl_prov_status)
+        QApplication.processEvents()
+
+        success, msg, models = self.ai_service.test_connection(prov)
+        if success:
+            self.lbl_prov_status.setText(f"✓ {msg}")
             self.lbl_prov_status.setProperty("class", "success")
+            if models:
+                cur_model = self.combo_pmodel.currentText().strip()
+                self.combo_pmodel.clear()
+                self.combo_pmodel.addItems(models)
+                if cur_model in models:
+                    self.combo_pmodel.setCurrentText(cur_model)
+                else:
+                    self.combo_pmodel.setCurrentIndex(0)
         else:
-            if prov.model:
-                self.combo_pmodel.addItem(prov.model)
-            self.lbl_prov_status.setText(f"Could not connect to provider at {prov.base_url}")
+            self.lbl_prov_status.setText(f"✗ Connection failed: {msg}")
             self.lbl_prov_status.setProperty("class", "error")
+        self.lbl_prov_status.style().polish(self.lbl_prov_status)
+
+    def _refresh_provider_models(self):
+        self._test_provider_connection()
 
     def _reset_prompts_to_defaults(self):
         self.txt_sys_prompt.setPlainText(DEFAULT_SYSTEM_PROMPT)
@@ -646,31 +669,46 @@ class DashboardWindow(QWidget):
     def _detect_piper_voices(self):
         url = self.inp_piper_url.text().strip() or "http://127.0.0.1:5000"
         self.tts_service.config.piper_url = url
+        self.lbl_piper_status.setText("Connecting to Piper...")
+        self.lbl_piper_status.setProperty("class", "muted")
+        self.lbl_piper_status.style().polish(self.lbl_piper_status)
+        QApplication.processEvents()
+
         success, msg, voices = self.tts_service.check_connection()
         if success:
-            self.lbl_piper_status.setText("Piper ● Connected")
+            self.lbl_piper_status.setText("✓ " + msg)
             self.lbl_piper_status.setProperty("class", "connected")
-            self.lbl_piper_status.style().polish(self.lbl_piper_status)
             if voices:
+                cur_voice = self.combo_piper_voice.currentText().strip()
                 self.combo_piper_voice.clear()
                 self.combo_piper_voice.addItems(voices)
+                if cur_voice in voices:
+                    self.combo_piper_voice.setCurrentText(cur_voice)
+                else:
+                    self.combo_piper_voice.setCurrentIndex(0)
         else:
-            self.lbl_piper_status.setText("Piper ● Disconnected")
+            self.lbl_piper_status.setText(f"✗ Piper connection failed: {msg}")
             self.lbl_piper_status.setProperty("class", "disconnected")
-            self.lbl_piper_status.style().polish(self.lbl_piper_status)
+        self.lbl_piper_status.style().polish(self.lbl_piper_status)
 
     def _test_piper_connection(self, silent_if_fail: bool = False):
         url = self.inp_piper_url.text().strip() or "http://127.0.0.1:5000"
         self.tts_service.config.piper_url = url
         success, msg, voices = self.tts_service.check_connection()
         if success:
-            self.lbl_piper_status.setText("Piper ● Connected")
+            self.lbl_piper_status.setText("✓ " + msg)
             self.lbl_piper_status.setProperty("class", "connected")
             if voices:
+                cur_voice = self.combo_piper_voice.currentText().strip()
                 self.combo_piper_voice.clear()
                 self.combo_piper_voice.addItems(voices)
+                if cur_voice in voices:
+                    self.combo_piper_voice.setCurrentText(cur_voice)
         else:
-            self.lbl_piper_status.setText("Piper ● Disconnected")
+            if not silent_if_fail:
+                self.lbl_piper_status.setText(f"✗ Piper connection failed: {msg}")
+            else:
+                self.lbl_piper_status.setText("Piper ● Disconnected")
             self.lbl_piper_status.setProperty("class", "disconnected")
         self.lbl_piper_status.style().polish(self.lbl_piper_status)
 
@@ -683,11 +721,28 @@ class DashboardWindow(QWidget):
         self.tts_service.config.piper_url = url
         self.tts_service.config.voice = voice
         self.tts_service.config.length_scale = ls
+
+        self.lbl_piper_status.setText("Synthesizing test voice...")
+        self.lbl_piper_status.setProperty("class", "muted")
+        self.lbl_piper_status.style().polish(self.lbl_piper_status)
+        QApplication.processEvents()
+
+        def _on_success():
+            self.lbl_piper_status.setText("✓ Audio synthesized & played successfully.")
+            self.lbl_piper_status.setProperty("class", "connected")
+            self.lbl_piper_status.style().polish(self.lbl_piper_status)
+
+        def _on_error(err):
+            self.lbl_piper_status.setText(f"✗ Voice test failed: {err}")
+            self.lbl_piper_status.setProperty("class", "disconnected")
+            self.lbl_piper_status.style().polish(self.lbl_piper_status)
+
         self.tts_service.speak_text_async(
             text=text,
             voice=voice,
             length_scale=ls,
-            on_error=lambda err: print(f"[TTS Test Error] {err}")
+            on_success=_on_success,
+            on_error=_on_error
         )
 
     def _browse_directory(self):
