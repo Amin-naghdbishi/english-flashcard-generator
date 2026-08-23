@@ -57,6 +57,9 @@ class AppConfig:
     global_shortcut: str = "<ctrl>+<alt>+v"
     txt_directory: str = str(DEFAULT_TXT_DIR)
     default_deck: str = "English::B1"
+    default_capture_type: str = "A"  # "A" or "B"
+    default_txt_file_a: str = ""      # e.g. "english words (A).txt"
+    default_txt_file_b: str = ""      # e.g. "english B1 (B).txt"
     show_tabs: bool = True
     theme: str = "anki-dark"  # "anki-dark" or "anki-light"
     stay_on_top: bool = True

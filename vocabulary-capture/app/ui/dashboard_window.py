@@ -20,8 +20,13 @@ from PySide6.QtWidgets import (
     QFrame,
     QGroupBox,
     QTabWidget,
+    QListWidget,
+    QListWidgetItem,
+    QSplitter,
     QApplication,
     QMessageBox,
+    QRadioButton,
+    QButtonGroup,
 )
 
 from app.config import (
@@ -37,7 +42,12 @@ from app.config import (
 )
 from app.ai_service import AIService
 from app.tts_service import TTSService
-from app.txt_manager import list_txt_files, TXTFormat
+from app.txt_manager import (
+    list_txt_files,
+    detect_format_from_filename,
+    create_new_txt_file,
+    TXTFormat,
+)
 from app.capture_service import (
     DiagnosticRecord,
     capture_selected_text_detailed,
@@ -48,20 +58,27 @@ from app.niri_helper import (
     is_niri_environment,
     check_niri_status,
     apply_niri_config,
-    generate_niri_config_snippet,
+)
+from app.gnome_helper import (
+    is_gnome_environment,
+    get_display_session_type,
+    get_desktop_environment_name,
+    check_gnome_status,
+    apply_gnome_shortcut,
 )
 from app.theme import get_theme_qss
+from app.ui.floating_window import NewFileDialog
 
 class DashboardWindow(QWidget):
     """
     Settings & Management Dashboard for Vocabulary Capture.
-    Follows the minimal Anki-style design language with organized tabs:
-    - General (with Global Shortcut Diagnostics & Niri setup)
-    - AI Providers (Real connection test & model discovery)
-    - AI Prompts
-    - TTS (Piper) (Real connection test, voice discovery, and voice synthesis)
-    - Themes
-    Closing this window keeps the application running in the background/system tray.
+    Follows minimal Anki-style design with 6 organized tabs:
+    1. General & Shortcuts (with GNOME / Niri diagnostics)
+    2. TXT Files (File viewer, format detection, default capture selection)
+    3. AI Providers (Live connection test & model discovery)
+    4. AI Prompts
+    5. TTS (Piper) (Live connection test & voice synthesis)
+    6. Themes
     """
     settings_saved = Signal(AppConfig)
     open_floating_requested = Signal()
@@ -72,10 +89,11 @@ class DashboardWindow(QWidget):
         self.config = config_manager.config
         self.ai_service = ai_service
         self.tts_service = tts_service or TTSService(self.config.tts)
+        self.selected_txt_path: Optional[Path] = None
 
         self.setWindowTitle("Vocabulary Capture — Settings & Dashboard")
-        self.resize(580, 640)
-        self.setMinimumSize(520, 560)
+        self.resize(620, 680)
+        self.setMinimumSize(560, 600)
 
         self._init_ui()
         self.apply_theme()
@@ -110,7 +128,8 @@ class DashboardWindow(QWidget):
 
         # Tab Widget for organized settings
         self.tabs = QTabWidget()
-        self.tabs.addTab(self._create_general_tab(), "General")
+        self.tabs.addTab(self._create_general_tab(), "General & Shortcuts")
+        self.tabs.addTab(self._create_txt_files_tab(), "TXT Files")
         self.tabs.addTab(self._create_providers_tab(), "AI Providers")
         self.tabs.addTab(self._create_prompts_tab(), "AI Prompts")
         self.tabs.addTab(self._create_tts_tab(), "TTS (Piper)")
@@ -132,15 +151,15 @@ class DashboardWindow(QWidget):
         main_layout.addLayout(footer_layout)
 
     # -------------------------------------------------------------
-    # 1. GENERAL TAB (With Global Shortcut Diagnostics & Niri Helper)
+    # 1. GENERAL & SHORTCUTS TAB (GNOME & Niri Compatible)
     # -------------------------------------------------------------
     def _create_general_tab(self) -> QWidget:
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setSpacing(10)
 
-        # Shortcut Group
-        sc_group = QGroupBox("Global Keyboard Shortcut & Niri Setup")
+        # Shortcut & Desktop Setup Group
+        sc_group = QGroupBox("Global Keyboard Shortcut & Desktop Integration")
         sc_layout = QVBoxLayout(sc_group)
         sc_layout.setSpacing(6)
 
@@ -153,48 +172,44 @@ class DashboardWindow(QWidget):
         sc_row.addWidget(self.inp_shortcut, 1)
         sc_layout.addLayout(sc_row)
 
-        # Diagnostic & Test Buttons Row
+        # Desktop Environment Detection info
+        env_name = get_desktop_environment_name()
+        session_type = get_display_session_type()
+        self.lbl_env_info = QLabel(f"Desktop: {env_name} | Session: {session_type}")
+        self.lbl_env_info.setProperty("class", "muted")
+        sc_layout.addWidget(self.lbl_env_info)
+
+        # Diagnostic & Desktop Helper Buttons Row
         diag_btn_row = QHBoxLayout()
         self.btn_test_shortcut = QPushButton("🔍 Test Global Shortcut")
         self.btn_test_shortcut.clicked.connect(self._run_shortcut_diagnostic)
-        self.btn_apply_niri = QPushButton("⚙ Setup Niri config.kdl")
+
+        self.btn_apply_niri = QPushButton("⚙ Setup Niri (config.kdl)")
         self.btn_apply_niri.clicked.connect(self._apply_niri_keybind)
+
+        self.btn_apply_gnome = QPushButton("⚙ Setup GNOME Shortcut")
+        self.btn_apply_gnome.clicked.connect(self._apply_gnome_keybind)
+
         diag_btn_row.addWidget(self.btn_test_shortcut)
         diag_btn_row.addWidget(self.btn_apply_niri)
+        diag_btn_row.addWidget(self.btn_apply_gnome)
         diag_btn_row.addStretch(1)
         sc_layout.addLayout(diag_btn_row)
 
         # Diagnostic Output Box
         self.txt_diag_output = QTextEdit()
         self.txt_diag_output.setReadOnly(True)
-        self.txt_diag_output.setFixedHeight(85)
-        self.txt_diag_output.setPlaceholderText("Click 'Test Global Shortcut' or press your shortcut in Firefox to see real-time diagnostics...")
+        self.txt_diag_output.setFixedHeight(95)
+        self.txt_diag_output.setPlaceholderText("Click 'Test Global Shortcut' or press your shortcut to see real-time diagnostics...")
         sc_layout.addWidget(self.txt_diag_output)
 
         layout.addWidget(sc_group)
-
-        # Storage Directory Group
-        dir_group = QGroupBox("TXT Storage Directory")
-        dir_layout = QVBoxLayout(dir_group)
-        dir_row = QHBoxLayout()
-        self.inp_txt_dir = QLineEdit()
-        self.inp_txt_dir.textChanged.connect(self._update_file_stats)
-        self.btn_browse = QPushButton("Browse...")
-        self.btn_browse.clicked.connect(self._browse_directory)
-        dir_row.addWidget(self.inp_txt_dir, 1)
-        dir_row.addWidget(self.btn_browse)
-        dir_layout.addLayout(dir_row)
-
-        self.lbl_dir_stats = QLabel("Checking directory...")
-        self.lbl_dir_stats.setProperty("class", "muted")
-        dir_layout.addWidget(self.lbl_dir_stats)
-        layout.addWidget(dir_group)
 
         # Window Behavior Group
         win_group = QGroupBox("Floating Window Behavior")
         win_layout = QVBoxLayout(win_group)
         self.chk_stay_on_top = QCheckBox("Keep Floating Window Always on Top")
-        self.chk_show_tabs = QCheckBox("Show Tab Buttons (1 AI / 2 TXT) in Floating Window")
+        self.chk_show_tabs = QCheckBox("Show Tab Buttons (1 AI / 2 Quick / 3 Manual) in Floating Window")
         self.chk_auto_meaning = QCheckBox("Automatically Analyze Meaning when Text is Captured")
         win_layout.addWidget(self.chk_stay_on_top)
         win_layout.addWidget(self.chk_show_tabs)
@@ -220,35 +235,36 @@ class DashboardWindow(QWidget):
         return widget
 
     def update_diagnostic_display(self, record: DiagnosticRecord):
-        """Updates the diagnostic text area when a shortcut/capture event occurs."""
         self.txt_diag_output.setPlainText(record.to_formatted_report())
 
     def _run_shortcut_diagnostic(self):
-        """Executes a diagnostic test of selection capture and window open."""
         shortcut = self.inp_shortcut.text().strip() or self.config.global_shortcut
         text, method = capture_selected_text_detailed()
         t_now = datetime.now().strftime("%H:%M:%S")
 
         lines = [
             f"[{t_now}] Diagnostic Test Executed",
-            f"Shortcut detected: {shortcut}",
+            f"Desktop Environment: {get_desktop_environment_name()}",
+            f"Display Session: {get_display_session_type()}",
+            f"Global Shortcut: {shortcut}",
         ]
 
         if text:
             lines.append(f"Selected text: \"{text}\" (captured via {method})")
-            # Trigger floating window open
             self.open_floating_requested.emit()
             lines.append("✓ Text capture succeeded & floating window opened.")
         else:
             lines.append("⚠ Shortcut detected, but no selected text was captured.")
-            lines.append("  → Highlight a word in Firefox or Chrome and click 'Test Global Shortcut' again.")
+            lines.append("  → Highlight a word in Firefox or Chrome and test again.")
             lines.append("  → On Wayland, verify 'wl-clipboard' is installed (wl-paste).")
 
         niri_info = check_niri_status(shortcut)
         if niri_info["is_niri"]:
-            lines.append(f"\n[Niri Status] Config: {niri_info['config_path']}")
-            lines.append(f"  • Window Rule: {'✓ Found' if niri_info['has_window_rule'] else '⚠ Missing (Click Setup Niri)'}")
-            lines.append(f"  • Keybind: {'✓ ' + niri_info['current_keybind'] if niri_info['has_keybind'] else '⚠ Missing (Click Setup Niri)'}")
+            lines.append(f"[Niri] Config: {niri_info['config_path']} | Rule: {'✓' if niri_info['has_window_rule'] else '⚠ Missing'} | Keybind: {'✓ ' + niri_info['current_keybind'] if niri_info['has_keybind'] else '⚠ Missing'}")
+
+        gnome_info = check_gnome_status(shortcut)
+        if gnome_info["is_gnome"]:
+            lines.append(f"[GNOME] gsettings: {'✓ Available' if gnome_info['gsettings_available'] else '✗ Missing'} | Keybind: {'✓ ' + gnome_info['current_keybind'] if gnome_info['has_keybind'] else '⚠ Missing'}")
 
         report = "\n".join(lines)
         self.txt_diag_output.setPlainText(report)
@@ -268,13 +284,218 @@ class DashboardWindow(QWidget):
         shortcut = self.inp_shortcut.text().strip() or self.config.global_shortcut
         success, msg = apply_niri_config(shortcut)
         if success:
-            QMessageBox.information(self, "Niri Configuration", f"{msg}\n\nNiri will now execute 'run.sh --capture' whenever {shortcut} is pressed.")
+            QMessageBox.information(self, "Niri Configuration", f"{msg}\n\nNiri will execute 'run.sh --capture' on {shortcut}.")
             self._run_shortcut_diagnostic()
         else:
             QMessageBox.warning(self, "Niri Configuration Error", msg)
 
+    def _apply_gnome_keybind(self):
+        shortcut = self.inp_shortcut.text().strip() or self.config.global_shortcut
+        success, msg = apply_gnome_shortcut(shortcut)
+        if success:
+            QMessageBox.information(self, "GNOME Shortcut", f"{msg}\n\nGNOME will execute 'run.sh --capture' on {shortcut}.")
+            self._run_shortcut_diagnostic()
+        else:
+            QMessageBox.warning(self, "GNOME Configuration Error", msg)
+
     # -------------------------------------------------------------
-    # 2. AI PROVIDERS TAB (Real Connection Test & Discovery)
+    # 2. TXT FILES MANAGEMENT TAB (In-App Reader & Defaults)
+    # -------------------------------------------------------------
+    def _create_txt_files_tab(self) -> QWidget:
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setSpacing(10)
+
+        # TXT Directory Path
+        dir_group = QGroupBox("TXT Storage Directory")
+        dir_layout = QHBoxLayout(dir_group)
+        self.inp_txt_dir = QLineEdit()
+        self.inp_txt_dir.textChanged.connect(self._refresh_txt_files_management)
+        self.btn_browse_dir = QPushButton("Browse...")
+        self.btn_browse_dir.clicked.connect(self._browse_directory)
+        dir_layout.addWidget(self.inp_txt_dir, 1)
+        dir_layout.addWidget(self.btn_browse_dir)
+        layout.addWidget(dir_group)
+
+        # Default Capture Configuration
+        defaults_group = QGroupBox("Default Quick Capture Settings (for Tab 2)")
+        def_layout = QVBoxLayout(defaults_group)
+        def_layout.setSpacing(8)
+
+        # Default Type (A or B)
+        type_row = QHBoxLayout()
+        type_lbl = QLabel("Default Capture Type:")
+        type_lbl.setFixedWidth(140)
+        self.rad_type_a = QRadioButton("Format A (Word + Deck)")
+        self.rad_type_b = QRadioButton("Format B (Structured Blocks)")
+        self.rad_type_a.setChecked(True)
+        self.rad_type_a.toggled.connect(self._on_default_type_toggled)
+
+        self.type_button_group = QButtonGroup(self)
+        self.type_button_group.addButton(self.rad_type_a)
+        self.type_button_group.addButton(self.rad_type_b)
+
+        type_row.addWidget(type_lbl)
+        type_row.addWidget(self.rad_type_a)
+        type_row.addWidget(self.rad_type_b)
+        type_row.addStretch(1)
+        def_layout.addLayout(type_row)
+
+        # Default Format A File
+        fa_row = QHBoxLayout()
+        fa_lbl = QLabel("Default Format A File:")
+        fa_lbl.setFixedWidth(140)
+        self.combo_default_file_a = QComboBox()
+        fa_row.addWidget(fa_lbl)
+        fa_row.addWidget(self.combo_default_file_a, 1)
+        def_layout.addLayout(fa_row)
+
+        # Default Format B File
+        fb_row = QHBoxLayout()
+        fb_lbl = QLabel("Default Format B File:")
+        fb_lbl.setFixedWidth(140)
+        self.combo_default_file_b = QComboBox()
+        fb_row.addWidget(fb_lbl)
+        fb_row.addWidget(self.combo_default_file_b, 1)
+        def_layout.addLayout(fb_row)
+
+        layout.addWidget(defaults_group)
+
+        # In-App File Explorer & Content Viewer
+        explorer_group = QGroupBox("TXT Files & In-App Content Viewer")
+        exp_layout = QVBoxLayout(explorer_group)
+        exp_layout.setSpacing(6)
+
+        # Toolbar
+        exp_tb = QHBoxLayout()
+        self.btn_new_txt = QPushButton("+ New TXT File")
+        self.btn_new_txt.setProperty("class", "primary-btn")
+        self.btn_new_txt.clicked.connect(self._open_new_txt_dialog)
+        self.btn_refresh_txt = QPushButton("Refresh List")
+        self.btn_refresh_txt.clicked.connect(self._refresh_txt_files_management)
+        exp_tb.addWidget(self.btn_new_txt)
+        exp_tb.addWidget(self.btn_refresh_txt)
+        exp_tb.addStretch(1)
+        exp_layout.addLayout(exp_tb)
+
+        # Splitter: Left List / Right Viewer
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+
+        # Left list
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        self.mgmt_txt_list = QListWidget()
+        self.mgmt_txt_list.itemClicked.connect(self._on_mgmt_file_clicked)
+        left_layout.addWidget(self.mgmt_txt_list)
+        splitter.addWidget(left_widget)
+
+        # Right viewer
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        self.lbl_viewing_file = QLabel("Select a file to view its contents:")
+        self.lbl_viewing_file.setStyleSheet("font-weight: 600; font-size: 11px;")
+        self.txt_content_viewer = QTextEdit()
+        self.txt_content_viewer.setReadOnly(True)
+        self.txt_content_viewer.setPlaceholderText("File contents will be displayed here...")
+        right_layout.addWidget(self.lbl_viewing_file)
+        right_layout.addWidget(self.txt_content_viewer, 1)
+        splitter.addWidget(right_widget)
+
+        splitter.setSizes([220, 320])
+        exp_layout.addWidget(splitter, 1)
+
+        layout.addWidget(explorer_group, 1)
+        return widget
+
+    def _browse_directory(self):
+        cur = self.inp_txt_dir.text().strip() or str(Path.home())
+        chosen = QFileDialog.getExistingDirectory(self, "Select TXT Storage Directory", cur)
+        if chosen:
+            self.inp_txt_dir.setText(chosen)
+            self._refresh_txt_files_management()
+
+    def _on_default_type_toggled(self):
+        pass
+
+    def _refresh_txt_files_management(self):
+        txt_dir = Path(self.inp_txt_dir.text().strip()).expanduser()
+        txt_dir.mkdir(parents=True, exist_ok=True)
+
+        # List all TXT files
+        a_files = list_txt_files(txt_dir, format_filter=TXTFormat.A)
+        b_files = list_txt_files(txt_dir, format_filter=TXTFormat.B)
+        all_files = list_txt_files(txt_dir)
+
+        # Update Default Combos
+        cur_a = self.combo_default_file_a.currentText()
+        self.combo_default_file_a.clear()
+        for f in a_files:
+            self.combo_default_file_a.addItem(f.name, str(f))
+        if cur_a:
+            idx = self.combo_default_file_a.findText(cur_a)
+            if idx >= 0:
+                self.combo_default_file_a.setCurrentIndex(idx)
+
+        cur_b = self.combo_default_file_b.currentText()
+        self.combo_default_file_b.clear()
+        for f in b_files:
+            self.combo_default_file_b.addItem(f.name, str(f))
+        if cur_b:
+            idx = self.combo_default_file_b.findText(cur_b)
+            if idx >= 0:
+                self.combo_default_file_b.setCurrentIndex(idx)
+
+        # Populate File Management List
+        self.mgmt_txt_list.clear()
+        for f in all_files:
+            fmt = detect_format_from_filename(f)
+            size_kb = f.stat().st_size / 1024 if f.exists() else 0
+            display_text = f"[{fmt}] {f.name} ({size_kb:.1f} KB)"
+            item = QListWidgetItem(display_text)
+            item.setData(Qt.ItemDataRole.UserRole, str(f))
+            self.mgmt_txt_list.addItem(item)
+
+        # Re-read currently viewed file if available
+        if self.selected_txt_path and self.selected_txt_path.exists():
+            self._display_file_content(self.selected_txt_path)
+
+    def _on_mgmt_file_clicked(self, item: QListWidgetItem):
+        path_str = item.data(Qt.ItemDataRole.UserRole)
+        if path_str:
+            p = Path(path_str)
+            self.selected_txt_path = p
+            self._display_file_content(p)
+
+    def _display_file_content(self, file_path: Path):
+        self.lbl_viewing_file.setText(f"Viewing: {file_path.name}")
+        try:
+            content = file_path.read_text(encoding="utf-8")
+            if not content:
+                self.txt_content_viewer.setPlainText(f"# {file_path.name}\n(File is currently empty)")
+            else:
+                self.txt_content_viewer.setPlainText(content)
+        except Exception as e:
+            self.txt_content_viewer.setPlainText(f"[Error reading file: {e}]")
+
+    def _open_new_txt_dialog(self):
+        dlg = NewFileDialog(self, default_format=TXTFormat.A)
+        if dlg.exec() == QMessageBox.DialogCode.Accepted:
+            name, fmt = dlg.get_result()
+            if name:
+                txt_dir = Path(self.inp_txt_dir.text().strip()).expanduser()
+                success, path, msg = create_new_txt_file(txt_dir, name, fmt)
+                if success:
+                    self._refresh_txt_files_management()
+                    self.selected_txt_path = path
+                    self._display_file_content(path)
+                    QMessageBox.information(self, "File Created", f"Successfully created {path.name}")
+                else:
+                    QMessageBox.warning(self, "Error", msg)
+
+    # -------------------------------------------------------------
+    # 3. AI PROVIDERS TAB (Real Connection Test & Discovery)
     # -------------------------------------------------------------
     def _create_providers_tab(self) -> QWidget:
         widget = QWidget()
@@ -364,14 +585,13 @@ class DashboardWindow(QWidget):
         return widget
 
     # -------------------------------------------------------------
-    # 3. AI PROMPTS TAB
+    # 4. AI PROMPTS TAB
     # -------------------------------------------------------------
     def _create_prompts_tab(self) -> QWidget:
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setSpacing(8)
 
-        # System Prompt
         sys_lbl = QLabel("Default System Prompt:")
         sys_lbl.setStyleSheet("font-weight: 600;")
         self.txt_sys_prompt = QTextEdit()
@@ -379,7 +599,6 @@ class DashboardWindow(QWidget):
         layout.addWidget(sys_lbl)
         layout.addWidget(self.txt_sys_prompt)
 
-        # Vocabulary Prompt
         vocab_lbl = QLabel("Vocabulary Prompt (single word / term):")
         vocab_lbl.setStyleSheet("font-weight: 600;")
         vocab_hint = QLabel("Use '{text}' as placeholder for the selected word.")
@@ -390,7 +609,6 @@ class DashboardWindow(QWidget):
         layout.addWidget(vocab_hint)
         layout.addWidget(self.txt_vocab_prompt)
 
-        # Sentence Prompt
         sent_lbl = QLabel("Sentence Translation Prompt:")
         sent_lbl.setStyleSheet("font-weight: 600;")
         self.txt_sentence_prompt = QTextEdit()
@@ -398,14 +616,12 @@ class DashboardWindow(QWidget):
         layout.addWidget(sent_lbl)
         layout.addWidget(self.txt_sentence_prompt)
 
-        # Custom Instructions
         inst_lbl = QLabel("Custom Instructions / Output Formatting:")
         inst_lbl.setStyleSheet("font-weight: 600;")
         self.inp_custom_instructions = QLineEdit()
         layout.addWidget(inst_lbl)
         layout.addWidget(self.inp_custom_instructions)
 
-        # Reset button
         reset_row = QHBoxLayout()
         reset_row.addStretch(1)
         self.btn_reset_prompts = QPushButton("Reset to Defaults")
@@ -417,7 +633,7 @@ class DashboardWindow(QWidget):
         return widget
 
     # -------------------------------------------------------------
-    # 4. TTS (PIPER) TAB (Real Connection Test & Synthesis)
+    # 5. TTS (PIPER) TAB
     # -------------------------------------------------------------
     def _create_tts_tab(self) -> QWidget:
         widget = QWidget()
@@ -428,7 +644,6 @@ class DashboardWindow(QWidget):
         t_layout = QVBoxLayout(tts_group)
         t_layout.setSpacing(8)
 
-        # Piper URL
         url_row = QHBoxLayout()
         url_lbl = QLabel("Piper URL:")
         url_lbl.setFixedWidth(90)
@@ -438,7 +653,6 @@ class DashboardWindow(QWidget):
         url_row.addWidget(self.inp_piper_url, 1)
         t_layout.addLayout(url_row)
 
-        # Voice & Detection
         voice_row = QHBoxLayout()
         voice_lbl = QLabel("Voice Name:")
         voice_lbl.setFixedWidth(90)
@@ -451,7 +665,6 @@ class DashboardWindow(QWidget):
         voice_row.addWidget(self.btn_detect_voices)
         t_layout.addLayout(voice_row)
 
-        # Speed / length_scale
         speed_row = QHBoxLayout()
         speed_lbl = QLabel("Speech Speed:")
         speed_lbl.setFixedWidth(90)
@@ -468,7 +681,6 @@ class DashboardWindow(QWidget):
         speed_row.addStretch(1)
         t_layout.addLayout(speed_row)
 
-        # Connection Status
         status_row = QHBoxLayout()
         stat_title = QLabel("Connection:")
         stat_title.setFixedWidth(90)
@@ -479,7 +691,6 @@ class DashboardWindow(QWidget):
         status_row.addWidget(self.lbl_piper_status, 1)
         t_layout.addLayout(status_row)
 
-        # Test Buttons
         test_row = QHBoxLayout()
         self.btn_test_piper_conn = QPushButton("Test Piper Connection")
         self.btn_test_piper_conn.clicked.connect(self._test_piper_connection)
@@ -495,7 +706,7 @@ class DashboardWindow(QWidget):
         return widget
 
     # -------------------------------------------------------------
-    # 5. THEMES TAB
+    # 6. THEMES TAB
     # -------------------------------------------------------------
     def _create_themes_tab(self) -> QWidget:
         widget = QWidget()
@@ -541,6 +752,22 @@ class DashboardWindow(QWidget):
         self.spin_width.setValue(self.config.window_width)
         self.spin_height.setValue(self.config.window_height)
 
+        # TXT Files & Defaults
+        if self.config.default_capture_type == "B":
+            self.rad_type_b.setChecked(True)
+        else:
+            self.rad_type_a.setChecked(True)
+
+        self._refresh_txt_files_management()
+        if self.config.default_txt_file_a:
+            idx_a = self.combo_default_file_a.findText(self.config.default_txt_file_a)
+            if idx_a >= 0:
+                self.combo_default_file_a.setCurrentIndex(idx_a)
+        if self.config.default_txt_file_b:
+            idx_b = self.combo_default_file_b.findText(self.config.default_txt_file_b)
+            if idx_b >= 0:
+                self.combo_default_file_b.setCurrentIndex(idx_b)
+
         # AI Providers
         self._populate_providers_combo()
 
@@ -562,10 +789,8 @@ class DashboardWindow(QWidget):
             self.combo_theme.setCurrentIndex(0)
         self.inp_default_deck.setText(self.config.default_deck)
 
-        self._update_file_stats()
         self._test_piper_connection(silent_if_fail=True)
 
-        # Load last diagnostic if available
         last_rec = get_last_diagnostic()
         if last_rec:
             self.txt_diag_output.setPlainText(last_rec.to_formatted_report())
@@ -745,28 +970,13 @@ class DashboardWindow(QWidget):
             on_error=_on_error
         )
 
-    def _browse_directory(self):
-        cur = self.inp_txt_dir.text().strip() or str(Path.home())
-        chosen = QFileDialog.getExistingDirectory(self, "Select TXT Storage Directory", cur)
-        if chosen:
-            self.inp_txt_dir.setText(chosen)
-
-    def _update_file_stats(self):
-        p = Path(self.inp_txt_dir.text().strip()).expanduser()
-        if p.exists() and p.is_dir():
-            a_files = list_txt_files(p, format_filter=TXTFormat.A)
-            b_files = list_txt_files(p, format_filter=TXTFormat.B)
-            self.lbl_dir_stats.setText(f"Found {len(a_files)} Format A file(s) and {len(b_files)} Format B file(s).")
-        else:
-            self.lbl_dir_stats.setText("Directory does not exist yet (will be created on save).")
-
     def _on_theme_changed(self, idx: int):
         new_theme = "anki-light" if idx == 1 else "anki-dark"
         self.config.theme = new_theme
         self.apply_theme()
 
     def save_settings(self):
-        # General
+        # General & Shortcuts
         self.config.global_shortcut = self.inp_shortcut.text().strip() or "<ctrl>+<alt>+v"
         self.config.txt_directory = self.inp_txt_dir.text().strip()
         self.config.stay_on_top = self.chk_stay_on_top.isChecked()
@@ -774,6 +984,11 @@ class DashboardWindow(QWidget):
         self.config.auto_trigger_meaning = self.chk_auto_meaning.isChecked()
         self.config.window_width = self.spin_width.value()
         self.config.window_height = self.spin_height.value()
+
+        # TXT Defaults
+        self.config.default_capture_type = "B" if self.rad_type_b.isChecked() else "A"
+        self.config.default_txt_file_a = self.combo_default_file_a.currentText().strip()
+        self.config.default_txt_file_b = self.combo_default_file_b.currentText().strip()
 
         # Active Provider
         prov = self.config.get_active_provider()

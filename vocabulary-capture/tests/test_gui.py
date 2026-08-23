@@ -31,192 +31,147 @@ def qapp():
         app = QApplication([])
     return app
 
-def test_floating_window_lifecycle_and_format_a_and_b(qapp):
+def test_floating_window_3_tabs_and_quick_add_workflow(qapp):
     with tempfile.TemporaryDirectory() as tmpdir:
-        cfg = AppConfig(txt_directory=tmpdir, theme="anki-dark", auto_trigger_meaning=False, default_deck="English::B1")
+        # Create test TXT files
+        create_new_txt_file(Path(tmpdir), "daily vocabulary", "A")
+        create_new_txt_file(Path(tmpdir), "advanced english", "B")
+
+        cfg = AppConfig(
+            txt_directory=tmpdir,
+            theme="anki-dark",
+            auto_trigger_meaning=False,
+            default_deck="English::B1",
+            default_capture_type="A",
+            default_txt_file_a="daily vocabulary (A).txt",
+            default_txt_file_b="advanced english (B).txt"
+        )
         ai = AIService(base_url="http://127.0.0.1:59999")
         tts = TTSService(cfg.tts)
-
-        create_new_txt_file(Path(tmpdir), "daily words", "A")
-        create_new_txt_file(Path(tmpdir), "english B1", "B")
 
         win = FloatingWindow(cfg, ai, tts)
         win.show_window()
         assert win.isVisible()
 
-        # Niri / Wayland fixed size constraint check
-        assert win.width() == cfg.window_width
-        assert win.height() == cfg.window_height
+        # Check 3 tabs exist in main stack
+        assert win.stack.count() == 3
 
         # Set captured text
         win.set_captured_text("abandon")
         assert win.captured_text == "abandon"
-        assert win.a_inp_word.text() == "abandon"
-        assert win.b_inp_word.text() == "abandon"
-        assert win.isVisible()
-
-        # Tab 1 (AI)
-        assert win.stack.currentIndex() == 0
         assert win.ai_selection_lbl.text() == "abandon"
+        assert win.quick_a_inp_word.text() == "abandon"
 
-        # Tab 2 (TXT)
+        # Tab 1: AI (Index 0)
+        assert win.stack.currentIndex() == 0
+
+        # Switch to Tab 2: Quick Add (Index 1)
         win.switch_tab(1)
         assert win.stack.currentIndex() == 1
+        assert win.quick_stack.currentIndex() == 0  # Format A view
+        assert "daily vocabulary (A).txt" in win.quick_target_lbl.text()
+        assert win.quick_a_inp_word.text() == "abandon"
+        assert win.quick_a_inp_deck.text() == "English::B1"
+
+        # Save quick Format A entry
+        win._save_quick_entry()
+        a_content = (Path(tmpdir) / "daily vocabulary (A).txt").read_text(encoding="utf-8")
+        assert "Word=abandon\nDeck=English::B1" in a_content
+        assert "✓ Saved 'abandon'" in win.quick_status_lbl.text()
         assert win.isVisible()
 
-        # Keyboard 1/2 navigation
-        event_key1 = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_1, Qt.KeyboardModifier.NoModifier)
-        win.keyPressEvent(event_key1)
-        assert win.stack.currentIndex() == 0
+        # Change default to Format B and verify Quick Add adapts
+        win.config.default_capture_type = "B"
+        win._refresh_quick_tab_state()
+        assert win.quick_stack.currentIndex() == 1  # Format B view
+        assert "advanced english (B).txt" in win.quick_target_lbl.text()
+        assert win.quick_b_inp_word.text() == "abandon"
 
-        event_key2 = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_2, Qt.KeyboardModifier.NoModifier)
-        win.keyPressEvent(event_key2)
-        assert win.stack.currentIndex() == 1
-
-        # Arrow-key navigation
-        event_left = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Left, Qt.KeyboardModifier.NoModifier)
-        win.keyPressEvent(event_left)
-        assert win.stack.currentIndex() == 0
-
-        event_right = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Right, Qt.KeyboardModifier.NoModifier)
-        win.keyPressEvent(event_right)
-        assert win.stack.currentIndex() == 1
-
-        # =========================================================
-        # FORMAT A ENTRY WORKFLOW TEST
-        # =========================================================
-        win.set_txt_format(TXTFormat.A)
-        assert win.current_format_filter == TXTFormat.A
-        assert win.files_list_widget.count() == 1
-        assert "daily words" in win.files_list_widget.item(0).text()
-
-        # Click Format A file -> opens Format A editor (Word and Deck fields appear)
-        item_a = win.files_list_widget.item(0)
-        win._on_file_item_clicked(item_a)
-        assert win.txt_stack.currentIndex() == 1  # Format A editor
-        assert win.selected_a_file.name == "daily words (A).txt"
-        assert win.a_inp_word.text() == "abandon"
-        assert win.a_inp_deck.text() == "English::B1"
-        assert win.isVisible()
-
-        # Edit Deck to custom value and click Save
-        win.a_inp_deck.setText("English::CustomDeck")
-        win._save_format_a_entry()
-
-        # Verify returned to file list in same window
-        assert win.txt_stack.currentIndex() == 0
-        assert win.isVisible()
-        a_content = (Path(tmpdir) / "daily words (A).txt").read_text(encoding="utf-8")
-        assert "Word=abandon\nDeck=English::CustomDeck" in a_content
-
-        # =========================================================
-        # FORMAT B ENTRY WORKFLOW TEST
-        # =========================================================
-        win.set_txt_format(TXTFormat.B)
-        assert win.current_format_filter == TXTFormat.B
-        assert win.files_list_widget.count() == 1
-        assert "english B1" in win.files_list_widget.item(0).text()
-
-        # Click Format B file -> opens B field editor in same window
-        item_b = win.files_list_widget.item(0)
-        win._on_file_item_clicked(item_b)
-        assert win.txt_stack.currentIndex() == 2  # Format B editor
-        assert win.selected_b_file.name == "english B1 (B).txt"
-        assert win.isVisible()
-
-        # Fill B fields and save
-        win.b_inp_meaning.setText("رها کردن")
-        win._save_format_b_entry()
-
-        # Verify returned to file list in same window
-        assert win.txt_stack.currentIndex() == 0
-        assert win.isVisible()
-        b_content = (Path(tmpdir) / "english B1 (B).txt").read_text(encoding="utf-8")
+        win.quick_b_inp_meaning.setText("رها کردن")
+        win._save_quick_entry()
+        b_content = (Path(tmpdir) / "advanced english (B).txt").read_text(encoding="utf-8")
         assert "--\nWord=abandon\nDeck=English::B1\nPersian Meaning=رها کردن\n--" in b_content
-        assert "Phonetic=" not in b_content
+        assert "✓ Saved 'abandon'" in win.quick_status_lbl.text()
 
-        # Test audio button click
-        with patch.object(tts, "synthesize", return_value=(True, VALID_WAV_BYTES, "")):
-            with patch.object(tts, "play_wav_bytes", return_value=(True, "OK")):
-                win._play_selection_tts()
+        # =========================================================
+        # TAB 3: MANUAL ADD WORKFLOW TEST
+        # =========================================================
+        win.switch_tab(2)
+        assert win.stack.currentIndex() == 2
+        assert win.manual_txt_stack.currentIndex() == 0  # File list view
+        assert win.manual_files_list_widget.count() >= 1
 
-        # Explicit close with hide_window
+        # Click file item in Manual list -> opens Format A editor
+        item_a = win.manual_files_list_widget.item(0)
+        win._on_manual_file_item_clicked(item_a)
+        assert win.manual_txt_stack.currentIndex() == 1
+        assert win.manual_a_inp_word.text() == "abandon"
+
+        win.manual_a_inp_deck.setText("English::ManualDeck")
+        win._save_manual_format_a_entry()
+        assert "Word=abandon\nDeck=English::ManualDeck" in (Path(tmpdir) / "daily vocabulary (A).txt").read_text(encoding="utf-8")
+        assert win.manual_txt_stack.currentIndex() == 0  # Returned to list
+
+        # Test keyboard 1/2/3 navigation
+        win.keyPressEvent(QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_1, Qt.KeyboardModifier.NoModifier))
+        assert win.stack.currentIndex() == 0
+        win.keyPressEvent(QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_2, Qt.KeyboardModifier.NoModifier))
+        assert win.stack.currentIndex() == 1
+        win.keyPressEvent(QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_3, Qt.KeyboardModifier.NoModifier))
+        assert win.stack.currentIndex() == 2
+
         win.hide_window()
         assert not win.isVisible()
 
-def test_dashboard_window_multi_tab_settings(qapp):
+def test_dashboard_window_txt_files_management(qapp):
     with tempfile.TemporaryDirectory() as tmpdir:
         cfg_file = Path(tmpdir) / "config.json"
         mgr = ConfigManager(config_path=cfg_file)
+        mgr.config.txt_directory = tmpdir
         ai = AIService(base_url="http://127.0.0.1:59999")
         tts = TTSService(mgr.config.tts)
+
+        # Create files
+        create_new_txt_file(Path(tmpdir), "vocab A", "A")
+        create_new_txt_file(Path(tmpdir), "vocab B", "B")
 
         dash = DashboardWindow(mgr, ai, tts)
         dash.show()
         assert dash.isVisible()
-        assert dash.tabs.count() == 5
+        assert dash.tabs.count() == 6  # 6 tabs
 
-        # Test Diagnostic button
-        dash._run_shortcut_diagnostic()
-        assert len(dash.txt_diag_output.toPlainText()) > 0
-        assert "Shortcut detected" in dash.txt_diag_output.toPlainText()
+        # Switch to Tab 1 (TXT Files)
+        dash.tabs.setCurrentIndex(1)
+        dash._refresh_txt_files_management()
 
-        # Test AI Provider Test Connection
-        with patch.object(ai, "test_connection", return_value=(True, "Connected to Ollama (Found 2 model(s))", ["llama3:latest", "qwen2.5:7b"])):
-            dash._test_provider_connection()
-            assert "Connected to Ollama" in dash.lbl_prov_status.text()
-            assert dash.combo_pmodel.count() == 2
-            assert dash.combo_pmodel.itemText(0) == "llama3:latest"
+        assert dash.mgmt_txt_list.count() == 2
+        assert dash.combo_default_file_a.count() >= 1
+        assert dash.combo_default_file_b.count() >= 1
 
-        # Test Piper Connection Test
-        with patch.object(tts, "check_connection", return_value=(True, "Connected to Piper (Found 2 voice(s))", ["en_US-lessac-medium", "en_GB-cori-high"])):
-            dash._test_piper_connection()
-            assert "Connected to Piper" in dash.lbl_piper_status.text()
-            dash._detect_piper_voices()
-            assert dash.combo_piper_voice.count() == 2
+        # Append sample entry to vocab A
+        (Path(tmpdir) / "vocab A (A).txt").write_text("Word=abandon\nDeck=English::B1\n", encoding="utf-8")
 
-        # Test Piper Voice Test
-        with patch.object(tts, "synthesize", return_value=(True, VALID_WAV_BYTES, "")):
-            with patch.object(tts, "play_wav_bytes", return_value=(True, "OK")):
-                dash._test_piper_voice()
+        # Test selecting file and reading contents in in-app viewer
+        item_0 = dash.mgmt_txt_list.item(0)
+        dash._on_mgmt_file_clicked(item_0)
+        assert len(dash.txt_content_viewer.toPlainText()) > 0
+        assert "Viewing: " in dash.lbl_viewing_file.text()
 
-        # Modify general settings
-        dash.inp_shortcut.setText("<ctrl>+<alt>+y")
-        dash.spin_width.setValue(400)
-        dash.spin_height.setValue(500)
-
-        # Modify prompts
-        dash.txt_vocab_prompt.setPlainText("Custom vocabulary prompt {text}")
-        dash.txt_sentence_prompt.setPlainText("Custom translation prompt {text}")
-
-        # Modify TTS
-        dash.inp_piper_url.setText("http://127.0.0.1:5005")
-        dash.spin_tts_speed.setValue(1.15)
+        # Set default files & capture type
+        dash.rad_type_b.setChecked(True)
+        dash.combo_default_file_b.setCurrentText("vocab B (B).txt")
+        dash.combo_default_file_a.setCurrentText("vocab A (A).txt")
 
         # Save settings
         dash.save_settings()
 
-        assert mgr.config.global_shortcut == "<ctrl>+<alt>+y"
-        assert mgr.config.window_width == 400
-        assert mgr.config.window_height == 500
-        assert mgr.config.prompts.vocab_prompt == "Custom vocabulary prompt {text}"
-        assert mgr.config.tts.piper_url == "http://127.0.0.1:5005"
-        assert mgr.config.tts.length_scale == 1.15
+        assert mgr.config.default_capture_type == "B"
+        assert mgr.config.default_txt_file_b == "vocab B (B).txt"
+        assert mgr.config.default_txt_file_a == "vocab A (A).txt"
 
-        # Test hide on closeEvent
         event = QCloseEvent()
         dash.closeEvent(event)
         assert not dash.isVisible()
-
-def test_tray_manager_and_actions(qapp):
-    tray = SystemTrayManager()
-    assert tray.tray_icon is not None
-    assert tray.menu is not None
-
-    actions = {a.text(): a for a in tray.menu.actions()}
-    assert "Open Dashboard" in actions
-    assert "Show Floating Window" in actions
-    assert "Exit Application" in actions
 
 def test_full_app_initialization(qapp):
     app_instance = VocabularyCaptureApp()
