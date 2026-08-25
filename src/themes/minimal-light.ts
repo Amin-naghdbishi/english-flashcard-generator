@@ -252,7 +252,7 @@ const css = `/* THEME: MINIMAL LIGHT - Clean, Distraction-Free Practical Theme *
   pointer-events: auto !important;
 }
 
-.spelling-input, .minimal-input {
+input#typeans, #typeans, .typeans, .spelling-input, .minimal-input {
   width: 100% !important;
   box-sizing: border-box !important;
   padding: 12px 14px !important;
@@ -274,12 +274,12 @@ const css = `/* THEME: MINIMAL LIGHT - Clean, Distraction-Free Practical Theme *
   z-index: 11 !important;
 }
 
-.spelling-input::placeholder, .minimal-input::placeholder {
+input#typeans::placeholder, #typeans::placeholder, .typeans::placeholder, .spelling-input::placeholder, .minimal-input::placeholder {
   color: #94A3B8 !important;
   opacity: 1 !important;
 }
 
-.spelling-input:focus, .minimal-input:focus {
+input#typeans:focus, #typeans:focus, .typeans:focus, .spelling-input:focus, .minimal-input:focus {
   border-color: #3B82F6 !important;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
 }

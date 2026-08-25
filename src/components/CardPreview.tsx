@@ -83,7 +83,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
   const handleCardKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter') {
       const activeEl = document.activeElement as HTMLInputElement;
-      if (activeEl && activeEl.id === 'spelling-input') {
+      if (activeEl && (activeEl.id === 'typeans' || activeEl.id === 'spelling-input')) {
         e.preventDefault();
         const container = activeEl.closest('.spelling-card, .spelling-strip, .spelling-quest, .spelling-notebook, .spelling-arcade, .spelling-minimal, .comic-card-wrapper');
         if (container) {
@@ -101,7 +101,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
     if (checkBtn) {
       const container = checkBtn.closest('.spelling-card, .spelling-strip, .spelling-quest, .spelling-notebook, .spelling-arcade, .spelling-minimal, .comic-card-wrapper');
       if (container) {
-        const input = container.querySelector('#spelling-input') as HTMLInputElement;
+        const input = container.querySelector('#typeans, #spelling-input') as HTMLInputElement;
         const result = container.querySelector('#spelling-result') as HTMLElement;
         const targetEl = container.querySelector('#spelling-target-word') as HTMLElement;
         const target = (targetEl ? (targetEl.innerText || targetEl.textContent) : displayData.word).trim().toLowerCase();

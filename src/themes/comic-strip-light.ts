@@ -260,7 +260,7 @@ const css = `/* THEME 2: STORY STRIP LIGHT */
   pointer-events: auto !important;
 }
 
-.spelling-input {
+input#typeans, #typeans, .typeans, .spelling-input {
   width: 100% !important;
   box-sizing: border-box !important;
   padding: 12px 14px !important;
@@ -282,14 +282,14 @@ const css = `/* THEME 2: STORY STRIP LIGHT */
   z-index: 11 !important;
 }
 
-.spelling-input.is-valid {
-  background-color: #DCFCE7;
-  border-color: #16A34A;
+input#typeans.is-valid, #typeans.is-valid, .typeans.is-valid, .spelling-input.is-valid {
+  background-color: #DCFCE7 !important;
+  border-color: #16A34A !important;
 }
 
-.spelling-input.has-error {
-  background-color: #FEE2E2;
-  border-color: #DC2626;
+input#typeans.has-error, #typeans.has-error, .typeans.has-error, .spelling-input.has-error {
+  background-color: #FEE2E2 !important;
+  border-color: #DC2626 !important;
 }
 
 .spelling-check-btn {

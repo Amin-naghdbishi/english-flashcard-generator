@@ -6,7 +6,7 @@
 export const spellingScript = `
 <script>
 function checkSpelling() {
-  var input = document.getElementById('spelling-input');
+  var input = document.getElementById('typeans') || document.getElementById('spelling-input');
   var result = document.getElementById('spelling-result');
   var targetEl = document.getElementById('spelling-target-word');
   var target = (targetEl ? (targetEl.innerText || targetEl.textContent) : '').trim().toLowerCase();
@@ -39,7 +39,7 @@ function checkSpelling() {
 
 (function initSpelling() {
   function attachListeners() {
-    var input = document.getElementById('spelling-input');
+    var input = document.getElementById('typeans') || document.getElementById('spelling-input');
     if (!input) return;
     
     // Support enter key on hardware and mobile virtual keyboards
@@ -49,6 +49,21 @@ function checkSpelling() {
         checkSpelling();
       }
     });
+
+    // Ensure focus and virtual keyboard trigger on touch
+    input.addEventListener('click', function(e) {
+      this.focus();
+      if (window.navigator && window.navigator.virtualKeyboard) {
+        try { window.navigator.virtualKeyboard.show(); } catch(err){}
+      }
+    });
+
+    // Auto-focus after card load to request soft keyboard in AnkiDroid / AnkiMobile
+    setTimeout(function() {
+      try {
+        input.focus();
+      } catch (e) {}
+    }, 100);
   }
 
   if (document.readyState === 'loading') {
@@ -138,9 +153,9 @@ export const heroPopFrontSpellingHtml = `
     <div class="spelling-interactive-area">
       <input
         type="text"
-        id="spelling-input"
-        name="spelling_answer"
-        class="spelling-input"
+        id="typeans"
+        name="typeans"
+        class="spelling-input typeans"
         placeholder="Type English spelling here..."
         autocomplete="off"
         autocorrect="off"
@@ -296,9 +311,9 @@ export const storyStripFrontSpellingHtml = `
       <div class="spelling-interactive-area">
         <input
           type="text"
-          id="spelling-input"
-          name="spelling_answer"
-          class="spelling-input"
+          id="typeans"
+          name="typeans"
+          class="spelling-input typeans"
           placeholder="Spell the missing word..."
           autocomplete="off"
           autocorrect="off"
@@ -424,9 +439,9 @@ export const duoQuestFrontSpellingHtml = `
     <div class="spelling-interactive-area">
       <input
         type="text"
-        id="spelling-input"
-        name="spelling_answer"
-        class="spelling-input quest-input"
+        id="typeans"
+        name="typeans"
+        class="spelling-input quest-input typeans"
         placeholder="Type answer here..."
         autocomplete="off"
         autocorrect="off"
@@ -550,9 +565,9 @@ export const indexNotebookFrontSpellingHtml = `
     <div class="spelling-interactive-area">
       <input
         type="text"
-        id="spelling-input"
-        name="spelling_answer"
-        class="spelling-input notebook-input"
+        id="typeans"
+        name="typeans"
+        class="spelling-input notebook-input typeans"
         placeholder="Write correct spelling..."
         autocomplete="off"
         autocorrect="off"
@@ -678,9 +693,9 @@ export const arcadeRetroFrontSpellingHtml = `
     <div class="spelling-interactive-area arcade-interactive">
       <input
         type="text"
-        id="spelling-input"
-        name="spelling_answer"
-        class="spelling-input arcade-input"
+        id="typeans"
+        name="typeans"
+        class="spelling-input arcade-input typeans"
         placeholder="ENTER SPELLING..."
         autocomplete="off"
         autocorrect="off"
@@ -803,9 +818,9 @@ export const minimalFrontSpellingHtml = `
     <div class="spelling-interactive-area">
       <input
         type="text"
-        id="spelling-input"
-        name="spelling_answer"
-        class="spelling-input minimal-input"
+        id="typeans"
+        name="typeans"
+        class="spelling-input minimal-input typeans"
         placeholder="Type spelling here..."
         autocomplete="off"
         autocorrect="off"

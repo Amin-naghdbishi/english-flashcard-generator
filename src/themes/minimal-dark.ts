@@ -252,7 +252,7 @@ const css = `/* THEME: MINIMAL DARK - Clean, Distraction-Free Practical Dark The
   pointer-events: auto !important;
 }
 
-.spelling-input, .minimal-input {
+input#typeans, #typeans, .typeans, .spelling-input, .minimal-input {
   width: 100% !important;
   box-sizing: border-box !important;
   padding: 12px 14px !important;
@@ -274,12 +274,12 @@ const css = `/* THEME: MINIMAL DARK - Clean, Distraction-Free Practical Dark The
   z-index: 11 !important;
 }
 
-.spelling-input::placeholder, .minimal-input::placeholder {
+input#typeans::placeholder, #typeans::placeholder, .typeans::placeholder, .spelling-input::placeholder, .minimal-input::placeholder {
   color: #71717A !important;
   opacity: 1 !important;
 }
 
-.spelling-input:focus, .minimal-input:focus {
+input#typeans:focus, #typeans:focus, .typeans:focus, .spelling-input:focus, .minimal-input:focus {
   border-color: #60A5FA !important;
   box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2) !important;
 }

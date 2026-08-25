@@ -301,7 +301,7 @@ const css = `/* THEME 3: DUO QUEST DARK */
   pointer-events: auto !important;
 }
 
-.spelling-input {
+input#typeans, #typeans, .typeans, .spelling-input {
   width: 100% !important;
   box-sizing: border-box !important;
   padding: 12px 14px !important;
@@ -323,8 +323,8 @@ const css = `/* THEME 3: DUO QUEST DARK */
   z-index: 11 !important;
 }
 
-.spelling-input.is-valid { background-color: #064E3B; border-color: #10B981; }
-.spelling-input.has-error { background-color: #7F1D1D; border-color: #EF4444; }
+input#typeans.is-valid, #typeans.is-valid, .typeans.is-valid, .spelling-input.is-valid { background-color: #064E3B !important; border-color: #10B981 !important; }
+input#typeans.has-error, #typeans.has-error, .typeans.has-error, .spelling-input.has-error { background-color: #7F1D1D !important; border-color: #EF4444 !important; }
 
 .spelling-result {
   margin-top: 8px;

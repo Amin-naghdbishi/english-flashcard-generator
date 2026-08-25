@@ -181,6 +181,16 @@ export interface TTSConfig {
   generateExampleUkNormal: boolean;
   generateExampleUkSlow: boolean;
 
+  // Independent speed (length_scale) for every audio variant
+  speedAmericanNormal?: number; // default 1.00
+  speedAmericanSlow?: number; // default 1.25
+  speedBritishNormal?: number; // default 1.00
+  speedBritishSlow?: number; // default 1.25
+  speedExampleUsNormal?: number; // default 1.00
+  speedExampleUsSlow?: number; // default 1.25
+  speedExampleUkNormal?: number; // default 1.00
+  speedExampleUkSlow?: number; // default 1.25
+
   // Legacy flat fields
   generateExampleUs?: boolean;
   generateExampleUk?: boolean;

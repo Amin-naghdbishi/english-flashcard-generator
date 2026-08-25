@@ -212,7 +212,7 @@ const css = `/* THEME 5: ARCADE RETRO LIGHT */
   pointer-events: auto !important;
 }
 
-.arcade-input, .spelling-input {
+input#typeans, #typeans, .typeans, .arcade-input, .spelling-input {
   flex: 1;
   width: 100% !important;
   box-sizing: border-box !important;
@@ -235,8 +235,8 @@ const css = `/* THEME 5: ARCADE RETRO LIGHT */
   z-index: 11 !important;
 }
 
-.arcade-input.is-valid, .spelling-input.is-valid { background-color: #DCFCE7; border-color: #16A34A; }
-.arcade-input.has-error, .spelling-input.has-error { background-color: #FEE2E2; border-color: #DC2626; }
+input#typeans.is-valid, #typeans.is-valid, .typeans.is-valid, .arcade-input.is-valid, .spelling-input.is-valid { background-color: #DCFCE7 !important; border-color: #16A34A !important; }
+input#typeans.has-error, #typeans.has-error, .typeans.has-error, .arcade-input.has-error, .spelling-input.has-error { background-color: #FEE2E2 !important; border-color: #DC2626 !important; }
 
 .arcade-check {
   background-color: #EF4444 !important;
