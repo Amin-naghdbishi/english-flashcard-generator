@@ -344,17 +344,12 @@ const css = `/* THEME 1: HERO POP LIGHT */
   flex-direction: column;
   gap: 8px;
   margin-bottom: 12px;
-  width: 100% !important;
-  position: relative !important;
-  z-index: 10 !important;
-  touch-action: auto !important;
-  pointer-events: auto !important;
 }
 
-input#spelling-input, #spelling-input, input#typeans, #typeans, .typeans, .spelling-input {
+.spelling-input {
   width: 100% !important;
   box-sizing: border-box !important;
-  padding: 12px 14px !important;
+  padding: 10px 14px !important;
   font-family: inherit !important;
   font-size: 16px !important;
   font-weight: 800 !important;
@@ -362,25 +357,16 @@ input#spelling-input, #spelling-input, input#typeans, #typeans, .typeans, .spell
   background-color: #FFFFFF !important;
   color: #0F172A !important;
   outline: none !important;
-  -webkit-user-select: text !important;
-  -moz-user-select: text !important;
-  user-select: text !important;
-  -webkit-touch-callout: default !important;
-  touch-action: manipulation !important;
-  pointer-events: auto !important;
-  cursor: text !important;
-  position: relative !important;
-  z-index: 11 !important;
 }
 
-input#spelling-input.is-valid, #spelling-input.is-valid, input#typeans.is-valid, #typeans.is-valid, .typeans.is-valid, .spelling-input.is-valid {
-  border-color: #16A34A !important;
-  background-color: #DCFCE7 !important;
+.spelling-input.is-valid {
+  border-color: #16A34A;
+  background-color: #DCFCE7;
 }
 
-input#spelling-input.has-error, #spelling-input.has-error, input#typeans.has-error, #typeans.has-error, .typeans.has-error, .spelling-input.has-error {
-  border-color: #DC2626 !important;
-  background-color: #FEE2E2 !important;
+.spelling-input.has-error {
+  border-color: #DC2626;
+  background-color: #FEE2E2;
 }
 
 .spelling-check-btn {
