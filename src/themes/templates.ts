@@ -6,7 +6,7 @@
 export const spellingScript = `
 <script>
 function checkSpelling() {
-  var input = document.getElementById('typeans') || document.getElementById('spelling-input');
+  var input = document.getElementById('spelling-input') || document.getElementById('typeans');
   var result = document.getElementById('spelling-result');
   var targetEl = document.getElementById('spelling-target-word');
   var target = (targetEl ? (targetEl.innerText || targetEl.textContent) : '').trim().toLowerCase();
@@ -16,7 +16,7 @@ function checkSpelling() {
   var typed = input.value.trim();
   if (!typed) {
     result.className = 'spelling-result is-empty';
-    result.innerHTML = '<span class="spelling-empty-msg">⚠️ Please type your answer first!</span>';
+    result.innerHTML = '<span class="spelling-empty-msg">⚠️ Please type the word first!</span>';
     return;
   }
   
@@ -39,7 +39,7 @@ function checkSpelling() {
 
 (function initSpelling() {
   function attachListeners() {
-    var input = document.getElementById('typeans') || document.getElementById('spelling-input');
+    var input = document.getElementById('spelling-input') || document.getElementById('typeans');
     if (!input) return;
     
     // Support enter key on hardware and mobile virtual keyboards
@@ -50,20 +50,27 @@ function checkSpelling() {
       }
     });
 
-    // Ensure focus and virtual keyboard trigger on touch
-    input.addEventListener('click', function(e) {
+    // Prevent AnkiDroid and mobile gesture detectors from swallowing touch events
+    input.addEventListener('touchstart', function(e) {
+      e.stopPropagation();
+    }, { passive: true });
+
+    input.addEventListener('touchend', function(e) {
+      e.stopPropagation();
       this.focus();
-      if (window.navigator && window.navigator.virtualKeyboard) {
-        try { window.navigator.virtualKeyboard.show(); } catch(err){}
-      }
+    }, { passive: true });
+
+    input.addEventListener('click', function(e) {
+      e.stopPropagation();
+      this.focus();
     });
 
-    // Auto-focus after card load to request soft keyboard in AnkiDroid / AnkiMobile
+    // Auto-focus on load for devices that support it
     setTimeout(function() {
       try {
         input.focus();
       } catch (e) {}
-    }, 100);
+    }, 150);
   }
 
   if (document.readyState === 'loading') {
@@ -153,16 +160,19 @@ export const heroPopFrontSpellingHtml = `
     <div class="spelling-interactive-area">
       <input
         type="text"
-        id="typeans"
-        name="typeans"
-        class="spelling-input typeans"
-        placeholder="Type English spelling here..."
+        id="spelling-input"
+        name="spelling_answer"
+        class="spelling-input"
+        placeholder="Type the English spelling here..."
         autocomplete="off"
         autocorrect="off"
         autocapitalize="none"
         spellcheck="false"
         inputmode="text"
         enterkeyhint="done"
+        onclick="event.stopPropagation(); this.focus();"
+        ontouchstart="event.stopPropagation();"
+        ontouchend="event.stopPropagation(); this.focus();"
       />
       <button type="button" class="spelling-check-btn" onclick="checkSpelling()">
         CHECK SPELLING
@@ -311,9 +321,9 @@ export const storyStripFrontSpellingHtml = `
       <div class="spelling-interactive-area">
         <input
           type="text"
-          id="typeans"
-          name="typeans"
-          class="spelling-input typeans"
+          id="spelling-input"
+          name="spelling_answer"
+          class="spelling-input"
           placeholder="Spell the missing word..."
           autocomplete="off"
           autocorrect="off"
@@ -321,6 +331,9 @@ export const storyStripFrontSpellingHtml = `
           spellcheck="false"
           inputmode="text"
           enterkeyhint="done"
+          onclick="event.stopPropagation(); this.focus();"
+          ontouchstart="event.stopPropagation();"
+          ontouchend="event.stopPropagation(); this.focus();"
         />
         <button type="button" class="spelling-check-btn" onclick="checkSpelling()">SUBMIT</button>
       </div>
@@ -439,9 +452,9 @@ export const duoQuestFrontSpellingHtml = `
     <div class="spelling-interactive-area">
       <input
         type="text"
-        id="typeans"
-        name="typeans"
-        class="spelling-input quest-input typeans"
+        id="spelling-input"
+        name="spelling_answer"
+        class="spelling-input quest-input"
         placeholder="Type answer here..."
         autocomplete="off"
         autocorrect="off"
@@ -449,6 +462,9 @@ export const duoQuestFrontSpellingHtml = `
         spellcheck="false"
         inputmode="text"
         enterkeyhint="done"
+        onclick="event.stopPropagation(); this.focus();"
+        ontouchstart="event.stopPropagation();"
+        ontouchend="event.stopPropagation(); this.focus();"
       />
       <button type="button" class="spelling-check-btn quest-btn" onclick="checkSpelling()">CHECK ANSWER</button>
     </div>
@@ -565,9 +581,9 @@ export const indexNotebookFrontSpellingHtml = `
     <div class="spelling-interactive-area">
       <input
         type="text"
-        id="typeans"
-        name="typeans"
-        class="spelling-input notebook-input typeans"
+        id="spelling-input"
+        name="spelling_answer"
+        class="spelling-input notebook-input"
         placeholder="Write correct spelling..."
         autocomplete="off"
         autocorrect="off"
@@ -575,6 +591,9 @@ export const indexNotebookFrontSpellingHtml = `
         spellcheck="false"
         inputmode="text"
         enterkeyhint="done"
+        onclick="event.stopPropagation(); this.focus();"
+        ontouchstart="event.stopPropagation();"
+        ontouchend="event.stopPropagation(); this.focus();"
       />
       <button type="button" class="spelling-check-btn notebook-check" onclick="checkSpelling()">CHECK</button>
     </div>
@@ -693,9 +712,9 @@ export const arcadeRetroFrontSpellingHtml = `
     <div class="spelling-interactive-area arcade-interactive">
       <input
         type="text"
-        id="typeans"
-        name="typeans"
-        class="spelling-input arcade-input typeans"
+        id="spelling-input"
+        name="spelling_answer"
+        class="spelling-input arcade-input"
         placeholder="ENTER SPELLING..."
         autocomplete="off"
         autocorrect="off"
@@ -703,6 +722,9 @@ export const arcadeRetroFrontSpellingHtml = `
         spellcheck="false"
         inputmode="text"
         enterkeyhint="done"
+        onclick="event.stopPropagation(); this.focus();"
+        ontouchstart="event.stopPropagation();"
+        ontouchend="event.stopPropagation(); this.focus();"
       />
       <button type="button" class="spelling-check-btn arcade-check" onclick="checkSpelling()">EXECUTE</button>
     </div>
@@ -818,16 +840,19 @@ export const minimalFrontSpellingHtml = `
     <div class="spelling-interactive-area">
       <input
         type="text"
-        id="typeans"
-        name="typeans"
-        class="spelling-input minimal-input typeans"
-        placeholder="Type spelling here..."
+        id="spelling-input"
+        name="spelling_answer"
+        class="spelling-input minimal-input"
+        placeholder="Type the spelling here..."
         autocomplete="off"
         autocorrect="off"
         autocapitalize="none"
         spellcheck="false"
         inputmode="text"
         enterkeyhint="done"
+        onclick="event.stopPropagation(); this.focus();"
+        ontouchstart="event.stopPropagation();"
+        ontouchend="event.stopPropagation(); this.focus();"
       />
       <button type="button" class="spelling-check-btn minimal-btn" onclick="checkSpelling()">
         Check Spelling

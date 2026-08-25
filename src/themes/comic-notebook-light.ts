@@ -271,7 +271,7 @@ const css = `/* THEME 4: INDEX NOTEBOOK LIGHT */
   pointer-events: auto !important;
 }
 
-input#typeans, #typeans, .typeans, .spelling-input {
+input#spelling-input, #spelling-input, input#typeans, #typeans, .typeans, .spelling-input {
   width: 100% !important;
   box-sizing: border-box !important;
   padding: 12px 14px !important;
@@ -286,15 +286,15 @@ input#typeans, #typeans, .typeans, .spelling-input {
   -moz-user-select: text !important;
   user-select: text !important;
   -webkit-touch-callout: default !important;
-  touch-action: auto !important;
+  touch-action: manipulation !important;
   pointer-events: auto !important;
   cursor: text !important;
   position: relative !important;
   z-index: 11 !important;
 }
 
-input#typeans.is-valid, #typeans.is-valid, .typeans.is-valid, .spelling-input.is-valid { background-color: #DCFCE7 !important; border-color: #16A34A !important; }
-input#typeans.has-error, #typeans.has-error, .typeans.has-error, .spelling-input.has-error { background-color: #FEE2E2 !important; border-color: #DC2626 !important; }
+input#spelling-input.is-valid, #spelling-input.is-valid, input#typeans.is-valid, #typeans.is-valid, .typeans.is-valid, .spelling-input.is-valid { background-color: #DCFCE7 !important; border-color: #16A34A !important; }
+input#spelling-input.has-error, #spelling-input.has-error, input#typeans.has-error, #typeans.has-error, .typeans.has-error, .spelling-input.has-error { background-color: #FEE2E2 !important; border-color: #DC2626 !important; }
 
 .spelling-result {
   margin-top: 8px;

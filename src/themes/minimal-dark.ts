@@ -252,7 +252,7 @@ const css = `/* THEME: MINIMAL DARK - Clean, Distraction-Free Practical Dark The
   pointer-events: auto !important;
 }
 
-input#typeans, #typeans, .typeans, .spelling-input, .minimal-input {
+input#spelling-input, #spelling-input, input#typeans, #typeans, .typeans, .spelling-input, .minimal-input {
   width: 100% !important;
   box-sizing: border-box !important;
   padding: 12px 14px !important;
@@ -267,19 +267,19 @@ input#typeans, #typeans, .typeans, .spelling-input, .minimal-input {
   -moz-user-select: text !important;
   user-select: text !important;
   -webkit-touch-callout: default !important;
-  touch-action: auto !important;
+  touch-action: manipulation !important;
   pointer-events: auto !important;
   cursor: text !important;
   position: relative !important;
   z-index: 11 !important;
 }
 
-input#typeans::placeholder, #typeans::placeholder, .typeans::placeholder, .spelling-input::placeholder, .minimal-input::placeholder {
+input#spelling-input::placeholder, #spelling-input::placeholder, input#typeans::placeholder, #typeans::placeholder, .typeans::placeholder, .spelling-input::placeholder, .minimal-input::placeholder {
   color: #71717A !important;
   opacity: 1 !important;
 }
 
-input#typeans:focus, #typeans:focus, .typeans:focus, .spelling-input:focus, .minimal-input:focus {
+input#spelling-input:focus, #spelling-input:focus, input#typeans:focus, #typeans:focus, .typeans:focus, .spelling-input:focus, .minimal-input:focus {
   border-color: #60A5FA !important;
   box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2) !important;
 }
