@@ -205,18 +205,29 @@ const css = `/* THEME 5: ARCADE RETRO DARK */
 .arcade-interactive, .spelling-interactive-area {
   display: flex;
   gap: 6px;
+  touch-action: auto !important;
+  pointer-events: auto !important;
 }
 
 .arcade-input, .spelling-input {
   flex: 1;
-  padding: 8px 10px;
-  font-size: 15px;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 10px 14px;
+  font-size: 16px !important;
   font-weight: 900;
   font-family: inherit;
   border: 3px solid #000000;
   background-color: #0F172A;
   color: #FFFFFF;
   outline: none;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+  cursor: text !important;
 }
 
 .arcade-input.is-valid, .spelling-input.is-valid { background-color: #064E3B; border-color: #10B981; }

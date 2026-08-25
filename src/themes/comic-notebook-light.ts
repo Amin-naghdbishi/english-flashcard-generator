@@ -264,6 +264,8 @@ const css = `/* THEME 4: INDEX NOTEBOOK LIGHT */
   display: flex;
   flex-direction: column;
   gap: 6px;
+  touch-action: auto !important;
+  pointer-events: auto !important;
 }
 
 .spelling-input {
@@ -277,6 +279,13 @@ const css = `/* THEME 4: INDEX NOTEBOOK LIGHT */
   background-color: #FFFFFF !important;
   color: #0F172A !important;
   outline: none !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+  cursor: text !important;
 }
 
 .spelling-input.is-valid { background-color: #DCFCE7; border-color: #16A34A; }
