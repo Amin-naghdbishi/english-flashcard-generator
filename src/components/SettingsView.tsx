@@ -1368,6 +1368,180 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               )}
             </div>
           )}
+
+          {/* AUDIO GENERATION VARIANTS & SPEECH SPEED */}
+          <div
+            className={`p-5 border rounded-lg shadow-xs space-y-5 ${
+              isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+            }`}
+          >
+            <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+              <div>
+                <h3 className="font-semibold text-sm uppercase tracking-wide">Audio Generation Variants</h3>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  Choose which audio variants to synthesize. Only enabled variants will be generated, saved, uploaded, and referenced on cards.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Word Pronunciation Group */}
+              <div className={`p-4 border rounded-lg space-y-3 ${isDark ? 'bg-zinc-800/60 border-zinc-700' : 'bg-zinc-50 border-zinc-200'}`}>
+                <div className="flex items-center gap-2">
+                  <Volume2 className="w-4 h-4 text-blue-500" />
+                  <span className="text-xs font-bold uppercase tracking-wider">Word Pronunciation</span>
+                </div>
+                <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  Synthesizes individual word pronunciation in selected accents and speeds.
+                </p>
+
+                <div className="space-y-2 pt-1">
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.tts.generateAmericanNormal ?? true}
+                      onChange={(e) => setForm({ ...form, tts: { ...form.tts, generateAmericanNormal: e.target.checked } })}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
+                    />
+                    <span className="text-xs font-medium">🇺🇸 American Normal (1.0x)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.tts.generateAmericanSlow ?? true}
+                      onChange={(e) => setForm({ ...form, tts: { ...form.tts, generateAmericanSlow: e.target.checked } })}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
+                    />
+                    <span className="text-xs font-medium">🇺🇸 American Slow (1.25x)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.tts.generateBritishNormal ?? false}
+                      onChange={(e) => setForm({ ...form, tts: { ...form.tts, generateBritishNormal: e.target.checked } })}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
+                    />
+                    <span className="text-xs font-medium">🇬🇧 British Normal (1.0x)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.tts.generateBritishSlow ?? false}
+                      onChange={(e) => setForm({ ...form, tts: { ...form.tts, generateBritishSlow: e.target.checked } })}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
+                    />
+                    <span className="text-xs font-medium">🇬🇧 British Slow (1.25x)</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Example Sentence Group */}
+              <div className={`p-4 border rounded-lg space-y-3 ${isDark ? 'bg-zinc-800/60 border-zinc-700' : 'bg-zinc-50 border-zinc-200'}`}>
+                <div className="flex items-center gap-2">
+                  <Volume2 className="w-4 h-4 text-emerald-500" />
+                  <span className="text-xs font-bold uppercase tracking-wider">Example Sentence Audio</span>
+                </div>
+                <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  Synthesizes full contextual example sentences for active listening and dictation.
+                </p>
+
+                <div className="space-y-2 pt-1">
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.tts.generateExampleUsNormal ?? true}
+                      onChange={(e) => setForm({ ...form, tts: { ...form.tts, generateExampleUsNormal: e.target.checked } })}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
+                    />
+                    <span className="text-xs font-medium">🇺🇸 American Normal (1.0x)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.tts.generateExampleUsSlow ?? false}
+                      onChange={(e) => setForm({ ...form, tts: { ...form.tts, generateExampleUsSlow: e.target.checked } })}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
+                    />
+                    <span className="text-xs font-medium">🇺🇸 American Slow (1.25x)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.tts.generateExampleUkNormal ?? false}
+                      onChange={(e) => setForm({ ...form, tts: { ...form.tts, generateExampleUkNormal: e.target.checked } })}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
+                    />
+                    <span className="text-xs font-medium">🇬🇧 British Normal (1.0x)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.tts.generateExampleUkSlow ?? false}
+                      onChange={(e) => setForm({ ...form, tts: { ...form.tts, generateExampleUkSlow: e.target.checked } })}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
+                    />
+                    <span className="text-xs font-medium">🇬🇧 British Slow (1.25x)</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Speech Speed & Length Scale Configuration */}
+            <div className={`p-4 border rounded-lg space-y-4 ${isDark ? 'bg-zinc-800/40 border-zinc-700' : 'bg-zinc-50 border-zinc-200'}`}>
+              <h4 className="text-xs font-bold uppercase tracking-wide">Speech Rate & Length Scales</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className={`text-xs font-semibold uppercase ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                      Normal Speed Rate: {form.tts.normalSpeed || 1.0}x
+                    </label>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.6"
+                    max="1.5"
+                    step="0.05"
+                    value={form.tts.normalSpeed || 1.0}
+                    onChange={(e) => setForm({ ...form, tts: { ...form.tts, normalSpeed: parseFloat(e.target.value) } })}
+                    className="w-full accent-blue-600 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-zinc-500 mt-1">
+                    <span>0.6x (Slower)</span>
+                    <span>1.0x (Standard)</span>
+                    <span>1.5x (Faster)</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className={`text-xs font-semibold uppercase ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                      Slow Speed Length Scale: {form.tts.slowSpeed || 1.25}x
+                    </label>
+                  </div>
+                  <input
+                    type="range"
+                    min="1.1"
+                    max="2.0"
+                    step="0.05"
+                    value={form.tts.slowSpeed || 1.25}
+                    onChange={(e) => setForm({ ...form, tts: { ...form.tts, slowSpeed: parseFloat(e.target.value) } })}
+                    className="w-full accent-blue-600 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-zinc-500 mt-1">
+                    <span>1.1x (Mild slow)</span>
+                    <span>1.25x (Recommended)</span>
+                    <span>2.0x (Very slow)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

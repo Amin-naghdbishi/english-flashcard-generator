@@ -263,7 +263,10 @@ const css = `/* THEME 4: INDEX NOTEBOOK LIGHT */
 .spelling-interactive-area {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  width: 100% !important;
+  position: relative !important;
+  z-index: 10 !important;
   touch-action: auto !important;
   pointer-events: auto !important;
 }
@@ -271,7 +274,7 @@ const css = `/* THEME 4: INDEX NOTEBOOK LIGHT */
 .spelling-input {
   width: 100% !important;
   box-sizing: border-box !important;
-  padding: 10px 14px !important;
+  padding: 12px 14px !important;
   font-family: inherit !important;
   font-size: 16px !important;
   font-weight: 800 !important;
@@ -283,9 +286,11 @@ const css = `/* THEME 4: INDEX NOTEBOOK LIGHT */
   -moz-user-select: text !important;
   user-select: text !important;
   -webkit-touch-callout: default !important;
-  touch-action: manipulation !important;
+  touch-action: auto !important;
   pointer-events: auto !important;
   cursor: text !important;
+  position: relative !important;
+  z-index: 11 !important;
 }
 
 .spelling-input.is-valid { background-color: #DCFCE7; border-color: #16A34A; }
@@ -328,13 +333,20 @@ const css = `/* THEME 4: INDEX NOTEBOOK LIGHT */
   justify-content: center !important;
   font-size: 10px !important;
   text-decoration: none !important;
-  box-shadow: 1.5px 1.5px 0px #000000 !important;
+  box-shadow: 1px 1px 0px #000000 !important;
+  border-radius: 4px !important;
   text-transform: uppercase !important;
-  border-radius: 0 !important;
 }
 
 .replay-button:hover, .play-button:hover, a.replay-button:hover, .comic-audio-btn:hover {
-  background-color: #fde047 !important;
+  background-color: #fef9c3 !important;
+}
+
+/* Suppress unwanted generic/uncontained Anki default audio replay buttons */
+#qa > .replay-button:not(.comic-audio-btn):not([class*="audio"]),
+#qa > a.replay-button:not(.comic-audio-btn):not([class*="audio"]),
+.card > a.replay-button:first-child:not([class*="audio"]) {
+  display: none !important;
 }
 `;
 

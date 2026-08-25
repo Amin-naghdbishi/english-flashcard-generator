@@ -66,12 +66,65 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
       playAudio(displayData.wordAudioUkSlowBase64);
     } else if (audioType === 'example_us_normal' && (displayData.exampleAudioUsNormalBase64 || displayData.exampleAudioBase64)) {
       playAudio(displayData.exampleAudioUsNormalBase64 || displayData.exampleAudioBase64!);
+    } else if (audioType === 'example_us_slow' && displayData.exampleAudioUsSlowBase64) {
+      playAudio(displayData.exampleAudioUsSlowBase64);
     } else if (audioType === 'example_uk_normal' && displayData.exampleAudioUkNormalBase64) {
       playAudio(displayData.exampleAudioUkNormalBase64);
+    } else if (audioType === 'example_uk_slow' && displayData.exampleAudioUkSlowBase64) {
+      playAudio(displayData.exampleAudioUkSlowBase64);
     } else if (audioType === 'word' && displayData.wordAudioBase64) {
       playAudio(displayData.wordAudioBase64);
     } else if (audioType === 'example' && displayData.exampleAudioBase64) {
       playAudio(displayData.exampleAudioBase64);
+    }
+  };
+
+  // Support interactive spelling check directly inside Live Preview
+  const handleCardKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter') {
+      const activeEl = document.activeElement as HTMLInputElement;
+      if (activeEl && activeEl.id === 'spelling-input') {
+        e.preventDefault();
+        const container = activeEl.closest('.spelling-card, .spelling-strip, .spelling-quest, .spelling-notebook, .spelling-arcade, .spelling-minimal, .comic-card-wrapper');
+        if (container) {
+          const btn = container.querySelector('.spelling-check-btn') as HTMLElement;
+          if (btn) btn.click();
+        }
+      }
+    }
+  };
+
+  const handleGlobalCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    handleCardClick(e);
+
+    const checkBtn = (e.target as HTMLElement).closest('.spelling-check-btn');
+    if (checkBtn) {
+      const container = checkBtn.closest('.spelling-card, .spelling-strip, .spelling-quest, .spelling-notebook, .spelling-arcade, .spelling-minimal, .comic-card-wrapper');
+      if (container) {
+        const input = container.querySelector('#spelling-input') as HTMLInputElement;
+        const result = container.querySelector('#spelling-result') as HTMLElement;
+        const targetEl = container.querySelector('#spelling-target-word') as HTMLElement;
+        const target = (targetEl ? (targetEl.innerText || targetEl.textContent) : displayData.word).trim().toLowerCase();
+        if (input && result && target) {
+          const typed = input.value.trim();
+          if (!typed) {
+            result.className = 'spelling-result is-empty';
+            result.innerHTML = '<span class="spelling-empty-msg">⚠️ Please type your answer first!</span>';
+            return;
+          }
+          if (typed.toLowerCase() === target) {
+            result.className = 'spelling-result is-correct';
+            result.innerHTML = `<div class="spelling-success-badge">✓ EXCELLENT! PERFECT SPELLING!</div><div class="spelling-word-reveal">${target}</div>`;
+            input.classList.remove('has-error');
+            input.classList.add('is-valid');
+          } else {
+            result.className = 'spelling-result is-incorrect';
+            result.innerHTML = `<div class="spelling-error-badge">✕ INCORRECT SPELLING</div><div class="spelling-compare-box"><div class="spelling-user-typed"><span class="spelling-label">You typed:</span> <del class="spelling-mistake">${typed}</del></div><div class="spelling-correct-ans"><span class="spelling-label">Correct spelling:</span> <strong class="spelling-exact">${target}</strong></div></div>`;
+            input.classList.add('has-error');
+            input.classList.remove('is-valid');
+          }
+        }
+      }
     }
   };
 
@@ -230,7 +283,8 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
 
       {/* Render Canvas (Exact Anki Template & CSS) */}
       <div
-        onClick={handleCardClick}
+        onClick={handleGlobalCardClick}
+        onKeyDown={handleCardKeyDown}
         className="flex-1 overflow-y-auto flex flex-col items-center justify-center gap-6 py-2"
       >
         {(activeSide === 'front' || activeSide === 'both') && (

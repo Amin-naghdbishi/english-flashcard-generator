@@ -345,6 +345,9 @@ const css = `/* THEME 1: HERO POP DARK */
   flex-direction: column;
   gap: 8px;
   margin-bottom: 12px;
+  width: 100% !important;
+  position: relative !important;
+  z-index: 10 !important;
   touch-action: auto !important;
   pointer-events: auto !important;
 }
@@ -352,7 +355,7 @@ const css = `/* THEME 1: HERO POP DARK */
 .spelling-input {
   width: 100% !important;
   box-sizing: border-box !important;
-  padding: 10px 14px !important;
+  padding: 12px 14px !important;
   font-family: inherit !important;
   font-size: 16px !important;
   font-weight: 800 !important;
@@ -364,9 +367,11 @@ const css = `/* THEME 1: HERO POP DARK */
   -moz-user-select: text !important;
   user-select: text !important;
   -webkit-touch-callout: default !important;
-  touch-action: manipulation !important;
+  touch-action: auto !important;
   pointer-events: auto !important;
   cursor: text !important;
+  position: relative !important;
+  z-index: 11 !important;
 }
 
 .spelling-input.is-valid {
@@ -407,14 +412,12 @@ const css = `/* THEME 1: HERO POP DARK */
 .spelling-result.is-correct {
   background-color: #064E3B;
   border: 3px solid #000000;
-  box-shadow: 3px 3px 0px #000000;
   padding: 12px;
 }
 
 .spelling-result.is-incorrect {
   background-color: #7F1D1D;
   border: 3px solid #000000;
-  box-shadow: 3px 3px 0px #000000;
   padding: 12px;
 }
 
@@ -486,6 +489,13 @@ const css = `/* THEME 1: HERO POP DARK */
   width: 12px !important;
   height: 12px !important;
   fill: #000000 !important;
+}
+
+/* Suppress unwanted generic/uncontained Anki default audio replay buttons */
+#qa > .replay-button:not(.comic-audio-btn):not([class*="audio"]),
+#qa > a.replay-button:not(.comic-audio-btn):not([class*="audio"]),
+.card > a.replay-button:first-child:not([class*="audio"]) {
+  display: none !important;
 }
 `;
 

@@ -20,7 +20,9 @@ export const ANKI_MODEL_FIELDS = [
   'WordAudioUkNormal',
   'WordAudioUkSlow',
   'ExampleAudioUsNormal',
+  'ExampleAudioUsSlow',
   'ExampleAudioUkNormal',
+  'ExampleAudioUkSlow',
 ];
 
 export async function callAnkiConnect(
@@ -410,10 +412,16 @@ export async function createAnkiNote(
     audioUploads.push({ fileName: cardData.wordAudioUkSlowFileName, base64: cardData.wordAudioUkSlowBase64, label: 'UK Slow' });
   }
   if (cardData.exampleAudioUsNormalFileName && cardData.exampleAudioUsNormalBase64) {
-    audioUploads.push({ fileName: cardData.exampleAudioUsNormalFileName, base64: cardData.exampleAudioUsNormalBase64, label: 'Example US' });
+    audioUploads.push({ fileName: cardData.exampleAudioUsNormalFileName, base64: cardData.exampleAudioUsNormalBase64, label: 'Example US Normal' });
+  }
+  if (cardData.exampleAudioUsSlowFileName && cardData.exampleAudioUsSlowBase64) {
+    audioUploads.push({ fileName: cardData.exampleAudioUsSlowFileName, base64: cardData.exampleAudioUsSlowBase64, label: 'Example US Slow' });
   }
   if (cardData.exampleAudioUkNormalFileName && cardData.exampleAudioUkNormalBase64) {
-    audioUploads.push({ fileName: cardData.exampleAudioUkNormalFileName, base64: cardData.exampleAudioUkNormalBase64, label: 'Example UK' });
+    audioUploads.push({ fileName: cardData.exampleAudioUkNormalFileName, base64: cardData.exampleAudioUkNormalBase64, label: 'Example UK Normal' });
+  }
+  if (cardData.exampleAudioUkSlowFileName && cardData.exampleAudioUkSlowBase64) {
+    audioUploads.push({ fileName: cardData.exampleAudioUkSlowFileName, base64: cardData.exampleAudioUkSlowBase64, label: 'Example UK Slow' });
   }
   if (cardData.audioFiles && Array.isArray(cardData.audioFiles)) {
     for (const f of cardData.audioFiles) {
@@ -469,7 +477,9 @@ export async function createAnkiNote(
 
   const exampleAudioTags: string[] = [];
   if (cardData.exampleAudioUsNormalFileName) exampleAudioTags.push(`[sound:${cardData.exampleAudioUsNormalFileName}]`);
+  if (cardData.exampleAudioUsSlowFileName) exampleAudioTags.push(`[sound:${cardData.exampleAudioUsSlowFileName}]`);
   if (cardData.exampleAudioUkNormalFileName) exampleAudioTags.push(`[sound:${cardData.exampleAudioUkNormalFileName}]`);
+  if (cardData.exampleAudioUkSlowFileName) exampleAudioTags.push(`[sound:${cardData.exampleAudioUkSlowFileName}]`);
   if (exampleAudioTags.length === 0 && cardData.exampleAudioFileName) {
     exampleAudioTags.push(`[sound:${cardData.exampleAudioFileName}]`);
   }
@@ -493,7 +503,9 @@ export async function createAnkiNote(
     WordAudioUkNormal: cardData.wordAudioUkNormalFileName ? `[sound:${cardData.wordAudioUkNormalFileName}]` : '',
     WordAudioUkSlow: cardData.wordAudioUkSlowFileName ? `[sound:${cardData.wordAudioUkSlowFileName}]` : '',
     ExampleAudioUsNormal: cardData.exampleAudioUsNormalFileName ? `[sound:${cardData.exampleAudioUsNormalFileName}]` : '',
+    ExampleAudioUsSlow: cardData.exampleAudioUsSlowFileName ? `[sound:${cardData.exampleAudioUsSlowFileName}]` : '',
     ExampleAudioUkNormal: cardData.exampleAudioUkNormalFileName ? `[sound:${cardData.exampleAudioUkNormalFileName}]` : '',
+    ExampleAudioUkSlow: cardData.exampleAudioUkSlowFileName ? `[sound:${cardData.exampleAudioUkSlowFileName}]` : '',
   };
 
   // 6. Add Note (IMPORTANT: allowDuplicate: true so user can create multiple cards for the same word with different meanings)

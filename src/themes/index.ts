@@ -141,51 +141,59 @@ export function renderThemeHtml(
   let wordAudioUkNormal = '';
   let wordAudioUkSlow = '';
   let exampleAudioUsNormal = '';
+  let exampleAudioUsSlow = '';
   let exampleAudioUkNormal = '';
+  let exampleAudioUkSlow = '';
 
   if (options?.isPreview) {
     const makePreviewBtn = (target: string, label: string, b64?: string) => {
       if (b64) {
         return `<button type="button" class="comic-audio-btn preview-play-btn" data-audio-target="${target}" title="Play ${label}">▶ ${label}</button>`;
       }
-      return `<button type="button" class="comic-audio-btn preview-play-btn" style="opacity: 0.35; cursor: not-allowed;" title="${label} (Disabled in settings)">▶ ${label}</button>`;
+      return '';
     };
 
-    wordAudioUsNormal = makePreviewBtn('word_us_normal', 'Play', data.wordAudioUsNormalBase64 || data.wordAudioBase64);
-    wordAudioUsSlow = makePreviewBtn('word_us_slow', 'Slow', data.wordAudioUsSlowBase64);
-    wordAudioUkNormal = makePreviewBtn('word_uk_normal', 'Play', data.wordAudioUkNormalBase64);
-    wordAudioUkSlow = makePreviewBtn('word_uk_slow', 'Slow', data.wordAudioUkSlowBase64);
-    exampleAudioUsNormal = makePreviewBtn('example_us_normal', 'Play', data.exampleAudioUsNormalBase64 || data.exampleAudioBase64);
-    exampleAudioUkNormal = makePreviewBtn('example_uk_normal', 'Play', data.exampleAudioUkNormalBase64);
+    wordAudioUsNormal = makePreviewBtn('word_us_normal', '🇺🇸 Normal', data.wordAudioUsNormalBase64 || data.wordAudioBase64);
+    wordAudioUsSlow = makePreviewBtn('word_us_slow', '🇺🇸 Slow', data.wordAudioUsSlowBase64);
+    wordAudioUkNormal = makePreviewBtn('word_uk_normal', '🇬🇧 Normal', data.wordAudioUkNormalBase64);
+    wordAudioUkSlow = makePreviewBtn('word_uk_slow', '🇬🇧 Slow', data.wordAudioUkSlowBase64);
+    exampleAudioUsNormal = makePreviewBtn('example_us_normal', '🇺🇸 Ex Normal', data.exampleAudioUsNormalBase64 || data.exampleAudioBase64);
+    exampleAudioUsSlow = makePreviewBtn('example_us_slow', '🇺🇸 Ex Slow', data.exampleAudioUsSlowBase64);
+    exampleAudioUkNormal = makePreviewBtn('example_uk_normal', '🇬🇧 Ex Normal', data.exampleAudioUkNormalBase64);
+    exampleAudioUkSlow = makePreviewBtn('example_uk_slow', '🇬🇧 Ex Slow', data.exampleAudioUkSlowBase64);
 
     const wordGroup = [
-      data.wordAudioUsNormalBase64 || data.wordAudioBase64 ? makePreviewBtn('word_us_normal', '🇺🇸 Normal', data.wordAudioUsNormalBase64 || data.wordAudioBase64) : '',
-      data.wordAudioUsSlowBase64 ? makePreviewBtn('word_us_slow', '🇺🇸 Slow', data.wordAudioUsSlowBase64) : '',
-      data.wordAudioUkNormalBase64 ? makePreviewBtn('word_uk_normal', '🇬🇧 Normal', data.wordAudioUkNormalBase64) : '',
-      data.wordAudioUkSlowBase64 ? makePreviewBtn('word_uk_slow', '🇬🇧 Slow', data.wordAudioUkSlowBase64) : '',
+      wordAudioUsNormal,
+      wordAudioUsSlow,
+      wordAudioUkNormal,
+      wordAudioUkSlow,
     ].filter(Boolean).join(' ');
 
-    wordAudio = wordGroup || makePreviewBtn('word_us_normal', 'Audio', data.wordAudioBase64);
+    wordAudio = wordGroup || (data.wordAudioBase64 ? makePreviewBtn('word_us_normal', '🇺🇸 Word', data.wordAudioBase64) : '');
 
     const exampleGroup = [
-      data.exampleAudioUsNormalBase64 || data.exampleAudioBase64 ? makePreviewBtn('example_us_normal', '🇺🇸 Example', data.exampleAudioUsNormalBase64 || data.exampleAudioBase64) : '',
-      data.exampleAudioUkNormalBase64 ? makePreviewBtn('example_uk_normal', '🇬🇧 Example', data.exampleAudioUkNormalBase64) : '',
+      exampleAudioUsNormal,
+      exampleAudioUsSlow,
+      exampleAudioUkNormal,
+      exampleAudioUkSlow,
     ].filter(Boolean).join(' ');
 
-    exampleAudio = exampleGroup || makePreviewBtn('example_us_normal', 'Example', data.exampleAudioBase64);
+    exampleAudio = exampleGroup || (data.exampleAudioBase64 ? makePreviewBtn('example_us_normal', '🇺🇸 Example', data.exampleAudioBase64) : '');
   } else {
-    // In Anki: [sound:filename.ext]
-    wordAudioUsNormal = data.wordAudioUsNormalFileName ? `[sound:${data.wordAudioUsNormalFileName}]` : (data.wordAudioFileName ? `[sound:${data.wordAudioFileName}]` : '');
+    // In Anki: [sound:filename.ext] (only if generated/present)
+    wordAudioUsNormal = data.wordAudioUsNormalFileName ? `[sound:${data.wordAudioUsNormalFileName}]` : '';
     wordAudioUsSlow = data.wordAudioUsSlowFileName ? `[sound:${data.wordAudioUsSlowFileName}]` : '';
     wordAudioUkNormal = data.wordAudioUkNormalFileName ? `[sound:${data.wordAudioUkNormalFileName}]` : '';
     wordAudioUkSlow = data.wordAudioUkSlowFileName ? `[sound:${data.wordAudioUkSlowFileName}]` : '';
-    exampleAudioUsNormal = data.exampleAudioUsNormalFileName ? `[sound:${data.exampleAudioUsNormalFileName}]` : (data.exampleAudioFileName ? `[sound:${data.exampleAudioFileName}]` : '');
+    exampleAudioUsNormal = data.exampleAudioUsNormalFileName ? `[sound:${data.exampleAudioUsNormalFileName}]` : '';
+    exampleAudioUsSlow = data.exampleAudioUsSlowFileName ? `[sound:${data.exampleAudioUsSlowFileName}]` : '';
     exampleAudioUkNormal = data.exampleAudioUkNormalFileName ? `[sound:${data.exampleAudioUkNormalFileName}]` : '';
+    exampleAudioUkSlow = data.exampleAudioUkSlowFileName ? `[sound:${data.exampleAudioUkSlowFileName}]` : '';
 
     const allWordSounds = [wordAudioUsNormal, wordAudioUsSlow, wordAudioUkNormal, wordAudioUkSlow].filter(Boolean).join(' ');
     wordAudio = allWordSounds || (data.wordAudioFileName ? `[sound:${data.wordAudioFileName}]` : '');
 
-    const allExampleSounds = [exampleAudioUsNormal, exampleAudioUkNormal].filter(Boolean).join(' ');
+    const allExampleSounds = [exampleAudioUsNormal, exampleAudioUsSlow, exampleAudioUkNormal, exampleAudioUkSlow].filter(Boolean).join(' ');
     exampleAudio = allExampleSounds || (data.exampleAudioFileName ? `[sound:${data.exampleAudioFileName}]` : '');
   }
 
@@ -219,7 +227,9 @@ export function renderThemeHtml(
     '{{WordAudioUkNormal}}': wordAudioUkNormal,
     '{{WordAudioUkSlow}}': wordAudioUkSlow,
     '{{ExampleAudioUsNormal}}': exampleAudioUsNormal,
+    '{{ExampleAudioUsSlow}}': exampleAudioUsSlow,
     '{{ExampleAudioUkNormal}}': exampleAudioUkNormal,
+    '{{ExampleAudioUkSlow}}': exampleAudioUkSlow,
   };
 
   for (const [key, value] of Object.entries(replacements)) {

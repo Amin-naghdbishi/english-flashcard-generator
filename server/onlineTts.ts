@@ -31,13 +31,17 @@ export interface GeneratedOnlineCardAudios {
   wordAudioUkNormalBase64?: string;
   wordAudioUkSlowBase64?: string;
   exampleAudioUsNormalBase64?: string;
+  exampleAudioUsSlowBase64?: string;
   exampleAudioUkNormalBase64?: string;
+  exampleAudioUkSlowBase64?: string;
   wordAudioUsNormalFileName?: string;
   wordAudioUsSlowFileName?: string;
   wordAudioUkNormalFileName?: string;
   wordAudioUkSlowFileName?: string;
   exampleAudioUsNormalFileName?: string;
+  exampleAudioUsSlowFileName?: string;
   exampleAudioUkNormalFileName?: string;
+  exampleAudioUkSlowFileName?: string;
 }
 
 export interface OnlineTTSDiagnosticStep {
@@ -174,22 +178,29 @@ export async function generateAllOnlineCardAudios(params: {
   generateAmericanSlow?: boolean;
   generateBritishNormal?: boolean;
   generateBritishSlow?: boolean;
+  generateExampleUsNormal?: boolean;
+  generateExampleUsSlow?: boolean;
+  generateExampleUkNormal?: boolean;
+  generateExampleUkSlow?: boolean;
+  // Legacy
   generateExampleUs?: boolean;
   generateExampleUk?: boolean;
-  // Legacy
   generateSlow?: boolean;
   generateBritish?: boolean;
   generateAmerican?: boolean;
+  generateSlowExample?: boolean;
 }): Promise<GeneratedOnlineCardAudios> {
   const {
     word,
     example,
     generateAmericanNormal = true,
     generateAmericanSlow = true,
-    generateBritishNormal = true,
-    generateBritishSlow = true,
-    generateExampleUs = true,
-    generateExampleUk = false,
+    generateBritishNormal = false,
+    generateBritishSlow = false,
+    generateExampleUsNormal = params.generateExampleUs ?? true,
+    generateExampleUsSlow = params.generateSlowExample ?? false,
+    generateExampleUkNormal = params.generateExampleUk ?? false,
+    generateExampleUkSlow = false,
   } = params;
 
   const safeWord = word.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
@@ -215,7 +226,7 @@ export async function generateAllOnlineCardAudios(params: {
         fieldSoundTag: `[sound:${usNormalFile}]`,
         base64: usNormalRes.audioBase64,
         buffer: usNormalRes.audioBuffer,
-        label: '🇺🇸 American Normal (1.0x)',
+        label: '🇺🇸 American Normal',
         voice: 'en-US',
         speed: 1.0,
         durationSeconds: usNormalRes.durationSeconds,
@@ -257,7 +268,7 @@ export async function generateAllOnlineCardAudios(params: {
         fieldSoundTag: `[sound:${ukNormalFile}]`,
         base64: ukNormalRes.audioBase64,
         buffer: ukNormalRes.audioBuffer,
-        label: '🇬🇧 British Normal (1.0x)',
+        label: '🇬🇧 British Normal',
         voice: 'en-GB',
         speed: 1.0,
         durationSeconds: ukNormalRes.durationSeconds,
@@ -289,8 +300,8 @@ export async function generateAllOnlineCardAudios(params: {
     }
   }
 
-  // 5. American Example
-  if (generateExampleUs && example && example.trim()) {
+  // 5. American Example Normal
+  if (generateExampleUsNormal && example && example.trim()) {
     const exampleUsFile = `${safeWord}_example_us_normal.mp3`;
     const exampleUsRes = await synthesizeOnlineAudio(example, 'en-US', false);
     if (exampleUsRes.success && exampleUsRes.audioBuffer && exampleUsRes.audioBase64) {
@@ -310,8 +321,29 @@ export async function generateAllOnlineCardAudios(params: {
     }
   }
 
-  // 6. British Example
-  if (generateExampleUk && example && example.trim()) {
+  // 6. American Example Slow
+  if (generateExampleUsSlow && example && example.trim()) {
+    const exampleUsSlowFile = `${safeWord}_example_us_slow.mp3`;
+    const exampleUsSlowRes = await synthesizeOnlineAudio(example, 'en-US', true);
+    if (exampleUsSlowRes.success && exampleUsSlowRes.audioBuffer && exampleUsSlowRes.audioBase64) {
+      resultFiles.push({
+        fileName: exampleUsSlowFile,
+        fieldSoundTag: `[sound:${exampleUsSlowFile}]`,
+        base64: exampleUsSlowRes.audioBase64,
+        buffer: exampleUsSlowRes.audioBuffer,
+        label: '🇺🇸 Example American Slow',
+        voice: 'en-US',
+        speed: 0.75,
+        durationSeconds: exampleUsSlowRes.durationSeconds,
+      });
+      exampleSoundTags.push(`[sound:${exampleUsSlowFile}]`);
+      returnData.exampleAudioUsSlowBase64 = exampleUsSlowRes.audioBase64;
+      returnData.exampleAudioUsSlowFileName = exampleUsSlowFile;
+    }
+  }
+
+  // 7. British Example Normal
+  if (generateExampleUkNormal && example && example.trim()) {
     const exampleUkFile = `${safeWord}_example_uk_normal.mp3`;
     const exampleUkRes = await synthesizeOnlineAudio(example, 'en-GB', false);
     if (exampleUkRes.success && exampleUkRes.audioBuffer && exampleUkRes.audioBase64) {
@@ -328,6 +360,27 @@ export async function generateAllOnlineCardAudios(params: {
       exampleSoundTags.push(`[sound:${exampleUkFile}]`);
       returnData.exampleAudioUkNormalBase64 = exampleUkRes.audioBase64;
       returnData.exampleAudioUkNormalFileName = exampleUkFile;
+    }
+  }
+
+  // 8. British Example Slow
+  if (generateExampleUkSlow && example && example.trim()) {
+    const exampleUkSlowFile = `${safeWord}_example_uk_slow.mp3`;
+    const exampleUkSlowRes = await synthesizeOnlineAudio(example, 'en-GB', true);
+    if (exampleUkSlowRes.success && exampleUkSlowRes.audioBuffer && exampleUkSlowRes.audioBase64) {
+      resultFiles.push({
+        fileName: exampleUkSlowFile,
+        fieldSoundTag: `[sound:${exampleUkSlowFile}]`,
+        base64: exampleUkSlowRes.audioBase64,
+        buffer: exampleUkSlowRes.audioBuffer,
+        label: '🇬🇧 Example British Slow',
+        voice: 'en-GB',
+        speed: 0.75,
+        durationSeconds: exampleUkSlowRes.durationSeconds,
+      });
+      exampleSoundTags.push(`[sound:${exampleUkSlowFile}]`);
+      returnData.exampleAudioUkSlowBase64 = exampleUkSlowRes.audioBase64;
+      returnData.exampleAudioUkSlowFileName = exampleUkSlowFile;
     }
   }
 

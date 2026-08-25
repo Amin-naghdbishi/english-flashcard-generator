@@ -36,14 +36,18 @@ export interface CardData {
   wordAudioUkNormalBase64?: string;
   wordAudioUkSlowBase64?: string;
   exampleAudioUsNormalBase64?: string;
+  exampleAudioUsSlowBase64?: string;
   exampleAudioUkNormalBase64?: string;
+  exampleAudioUkSlowBase64?: string;
 
   wordAudioUsNormalFileName?: string;
   wordAudioUsSlowFileName?: string;
   wordAudioUkNormalFileName?: string;
   wordAudioUkSlowFileName?: string;
   exampleAudioUsNormalFileName?: string;
+  exampleAudioUsSlowFileName?: string;
   exampleAudioUkNormalFileName?: string;
+  exampleAudioUkSlowFileName?: string;
 
   // Primary / fallback audio
   wordAudioBase64?: string;
@@ -166,13 +170,20 @@ export interface TTSConfig {
   slowSpeed: number; // 1.25 (higher = slower for Piper length scale)
   customProviders?: CustomTTSProviderConfig[];
   activeCustomProviderId?: string;
+
+  // Independent audio generation flags
   generateAmericanNormal: boolean;
   generateAmericanSlow: boolean;
   generateBritishNormal: boolean;
   generateBritishSlow: boolean;
-  generateExampleUs: boolean;
-  generateExampleUk: boolean;
+  generateExampleUsNormal: boolean;
+  generateExampleUsSlow: boolean;
+  generateExampleUkNormal: boolean;
+  generateExampleUkSlow: boolean;
+
   // Legacy flat fields
+  generateExampleUs?: boolean;
+  generateExampleUk?: boolean;
   generateSlow?: boolean;
   generateBritish?: boolean;
   generateAmerican?: boolean;

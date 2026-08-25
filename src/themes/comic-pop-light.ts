@@ -344,6 +344,9 @@ const css = `/* THEME 1: HERO POP LIGHT */
   flex-direction: column;
   gap: 8px;
   margin-bottom: 12px;
+  width: 100% !important;
+  position: relative !important;
+  z-index: 10 !important;
   touch-action: auto !important;
   pointer-events: auto !important;
 }
@@ -351,7 +354,7 @@ const css = `/* THEME 1: HERO POP LIGHT */
 .spelling-input {
   width: 100% !important;
   box-sizing: border-box !important;
-  padding: 10px 14px !important;
+  padding: 12px 14px !important;
   font-family: inherit !important;
   font-size: 16px !important;
   font-weight: 800 !important;
@@ -363,9 +366,11 @@ const css = `/* THEME 1: HERO POP LIGHT */
   -moz-user-select: text !important;
   user-select: text !important;
   -webkit-touch-callout: default !important;
-  touch-action: manipulation !important;
+  touch-action: auto !important;
   pointer-events: auto !important;
   cursor: text !important;
+  position: relative !important;
+  z-index: 11 !important;
 }
 
 .spelling-input.is-valid {
@@ -485,6 +490,13 @@ const css = `/* THEME 1: HERO POP LIGHT */
   width: 12px !important;
   height: 12px !important;
   fill: #000000 !important;
+}
+
+/* Suppress unwanted generic/uncontained Anki default audio replay buttons */
+#qa > .replay-button:not(.comic-audio-btn):not([class*="audio"]),
+#qa > a.replay-button:not(.comic-audio-btn):not([class*="audio"]),
+.card > a.replay-button:first-child:not([class*="audio"]) {
+  display: none !important;
 }
 `;
 

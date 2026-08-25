@@ -249,10 +249,21 @@ const css = `/* THEME 2: STORY STRIP LIGHT */
   pointer-events: auto !important;
 }
 
+.spelling-interactive-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100% !important;
+  position: relative !important;
+  z-index: 10 !important;
+  touch-action: auto !important;
+  pointer-events: auto !important;
+}
+
 .spelling-input {
   width: 100% !important;
   box-sizing: border-box !important;
-  padding: 10px 14px !important;
+  padding: 12px 14px !important;
   font-family: inherit !important;
   font-size: 16px !important;
   font-weight: 800 !important;
@@ -264,9 +275,11 @@ const css = `/* THEME 2: STORY STRIP LIGHT */
   -moz-user-select: text !important;
   user-select: text !important;
   -webkit-touch-callout: default !important;
-  touch-action: manipulation !important;
+  touch-action: auto !important;
   pointer-events: auto !important;
   cursor: text !important;
+  position: relative !important;
+  z-index: 11 !important;
 }
 
 .spelling-input.is-valid {
@@ -283,7 +296,7 @@ const css = `/* THEME 2: STORY STRIP LIGHT */
   background-color: #F59E0B !important;
   color: #000000 !important;
   font-weight: 900 !important;
-  padding: 8px 14px !important;
+  padding: 10px 16px !important;
   border: 2px solid #000000 !important;
   box-shadow: 2px 2px 0px #000000 !important;
   cursor: pointer !important;
@@ -337,6 +350,13 @@ const css = `/* THEME 2: STORY STRIP LIGHT */
 .replay-button:hover, .play-button:hover, a.replay-button:hover, .comic-audio-btn:hover {
   background-color: #fbbf24 !important;
   transform: translate(-1px, -1px);
+}
+
+/* Suppress unwanted generic/uncontained Anki default audio replay buttons */
+#qa > .replay-button:not(.comic-audio-btn):not([class*="audio"]),
+#qa > a.replay-button:not(.comic-audio-btn):not([class*="audio"]),
+.card > a.replay-button:first-child:not([class*="audio"]) {
+  display: none !important;
 }
 `;
 

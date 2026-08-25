@@ -265,7 +265,10 @@ const css = `/* THEME 4: INDEX NOTEBOOK DARK */
 .spelling-interactive-area {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  width: 100% !important;
+  position: relative !important;
+  z-index: 10 !important;
   touch-action: auto !important;
   pointer-events: auto !important;
 }
@@ -273,7 +276,7 @@ const css = `/* THEME 4: INDEX NOTEBOOK DARK */
 .spelling-input {
   width: 100% !important;
   box-sizing: border-box !important;
-  padding: 10px 14px !important;
+  padding: 12px 14px !important;
   font-family: inherit !important;
   font-size: 16px !important;
   font-weight: 800 !important;
@@ -285,9 +288,11 @@ const css = `/* THEME 4: INDEX NOTEBOOK DARK */
   -moz-user-select: text !important;
   user-select: text !important;
   -webkit-touch-callout: default !important;
-  touch-action: manipulation !important;
+  touch-action: auto !important;
   pointer-events: auto !important;
   cursor: text !important;
+  position: relative !important;
+  z-index: 11 !important;
 }
 
 .spelling-input.is-valid { background-color: #064E3B; border-color: #10B981; }
@@ -332,11 +337,18 @@ const css = `/* THEME 4: INDEX NOTEBOOK DARK */
   text-decoration: none !important;
   box-shadow: 1.5px 1.5px 0px #000000 !important;
   text-transform: uppercase !important;
-  border-radius: 0 !important;
+  border-radius: 4px !important;
 }
 
 .replay-button:hover, .play-button:hover, a.replay-button:hover, .comic-audio-btn:hover {
   background-color: #facc15 !important;
+}
+
+/* Suppress unwanted generic/uncontained Anki default audio replay buttons */
+#qa > .replay-button:not(.comic-audio-btn):not([class*="audio"]),
+#qa > a.replay-button:not(.comic-audio-btn):not([class*="audio"]),
+.card > a.replay-button:first-child:not([class*="audio"]) {
+  display: none !important;
 }
 `;
 

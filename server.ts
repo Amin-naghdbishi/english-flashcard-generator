@@ -95,12 +95,16 @@ const defaultSettings: AppSettings = {
     ],
     generateAmericanNormal: true,
     generateAmericanSlow: true,
-    generateBritishNormal: true,
-    generateBritishSlow: true,
+    generateBritishNormal: false,
+    generateBritishSlow: false,
+    generateExampleUsNormal: true,
+    generateExampleUsSlow: false,
+    generateExampleUkNormal: false,
+    generateExampleUkSlow: false,
     generateExampleUs: true,
     generateExampleUk: false,
     generateSlow: true,
-    generateBritish: true,
+    generateBritish: false,
     generateAmerican: true,
     generateSlowExample: false,
   },
@@ -168,6 +172,15 @@ function normalizeSettings(raw: any): AppSettings {
   // Normalize TTS config
   const tts = merged.tts || {};
   const ttsProvider = tts.provider || tts.engine || 'piper';
+  const genUsNorm = tts.generateAmericanNormal !== false;
+  const genUsSlow = tts.generateAmericanSlow !== false;
+  const genUkNorm = !!tts.generateBritishNormal;
+  const genUkSlow = !!tts.generateBritishSlow;
+  const genExUsNorm = typeof tts.generateExampleUsNormal === 'boolean' ? tts.generateExampleUsNormal : (tts.generateExampleUs !== false);
+  const genExUsSlow = typeof tts.generateExampleUsSlow === 'boolean' ? tts.generateExampleUsSlow : (tts.generateSlowExample === true);
+  const genExUkNorm = typeof tts.generateExampleUkNormal === 'boolean' ? tts.generateExampleUkNormal : (tts.generateExampleUk === true);
+  const genExUkSlow = !!tts.generateExampleUkSlow;
+
   merged.tts = {
     provider: ttsProvider,
     engine: ttsProvider,
@@ -178,16 +191,20 @@ function normalizeSettings(raw: any): AppSettings {
     slowSpeed: typeof tts.slowSpeed === 'number' ? tts.slowSpeed : 1.25,
     customProviders: Array.isArray(tts.customProviders) ? tts.customProviders : defaultSettings.tts.customProviders,
     activeCustomProviderId: tts.activeCustomProviderId,
-    generateAmericanNormal: tts.generateAmericanNormal !== false,
-    generateAmericanSlow: tts.generateAmericanSlow !== false,
-    generateBritishNormal: tts.generateBritishNormal !== false,
-    generateBritishSlow: tts.generateBritishSlow !== false,
-    generateExampleUs: tts.generateExampleUs !== false,
-    generateExampleUk: !!tts.generateExampleUk,
-    generateSlow: tts.generateSlow !== false,
-    generateBritish: tts.generateBritish !== false,
-    generateAmerican: tts.generateAmerican !== false,
-    generateSlowExample: !!tts.generateSlowExample,
+    generateAmericanNormal: genUsNorm,
+    generateAmericanSlow: genUsSlow,
+    generateBritishNormal: genUkNorm,
+    generateBritishSlow: genUkSlow,
+    generateExampleUsNormal: genExUsNorm,
+    generateExampleUsSlow: genExUsSlow,
+    generateExampleUkNormal: genExUkNorm,
+    generateExampleUkSlow: genExUkSlow,
+    generateExampleUs: genExUsNorm,
+    generateExampleUk: genExUkNorm,
+    generateSlow: genUsSlow || genUkSlow,
+    generateBritish: genUkNorm || genUkSlow,
+    generateAmerican: genUsNorm || genUsSlow,
+    generateSlowExample: genExUsSlow,
   };
 
   // Normalize Dictionary config
@@ -910,8 +927,10 @@ async function startServer() {
           generateAmericanSlow: appSettings.tts.generateAmericanSlow,
           generateBritishNormal: appSettings.tts.generateBritishNormal,
           generateBritishSlow: appSettings.tts.generateBritishSlow,
-          generateExampleUs: appSettings.tts.generateExampleUs,
-          generateExampleUk: appSettings.tts.generateExampleUk,
+          generateExampleUsNormal: appSettings.tts.generateExampleUsNormal,
+          generateExampleUsSlow: appSettings.tts.generateExampleUsSlow,
+          generateExampleUkNormal: appSettings.tts.generateExampleUkNormal,
+          generateExampleUkSlow: appSettings.tts.generateExampleUkSlow,
         });
 
         if (!onlineAudioRes.success || onlineAudioRes.files.length === 0) {
@@ -933,17 +952,21 @@ async function startServer() {
           wordAudioUkNormalBase64: onlineAudioRes.wordAudioUkNormalBase64,
           wordAudioUkSlowBase64: onlineAudioRes.wordAudioUkSlowBase64,
           exampleAudioUsNormalBase64: onlineAudioRes.exampleAudioUsNormalBase64,
+          exampleAudioUsSlowBase64: onlineAudioRes.exampleAudioUsSlowBase64,
           exampleAudioUkNormalBase64: onlineAudioRes.exampleAudioUkNormalBase64,
+          exampleAudioUkSlowBase64: onlineAudioRes.exampleAudioUkSlowBase64,
           wordAudioUsNormalFileName: onlineAudioRes.wordAudioUsNormalFileName,
           wordAudioUsSlowFileName: onlineAudioRes.wordAudioUsSlowFileName,
           wordAudioUkNormalFileName: onlineAudioRes.wordAudioUkNormalFileName,
           wordAudioUkSlowFileName: onlineAudioRes.wordAudioUkSlowFileName,
           exampleAudioUsNormalFileName: onlineAudioRes.exampleAudioUsNormalFileName,
+          exampleAudioUsSlowFileName: onlineAudioRes.exampleAudioUsSlowFileName,
           exampleAudioUkNormalFileName: onlineAudioRes.exampleAudioUkNormalFileName,
-          wordAudioBase64: onlineAudioRes.wordAudioUsNormalBase64 || onlineAudioRes.wordAudioUkNormalBase64,
-          exampleAudioBase64: onlineAudioRes.exampleAudioUsNormalBase64,
-          wordAudioFileName: onlineAudioRes.wordAudioUsNormalFileName || onlineAudioRes.wordAudioUkNormalFileName,
-          exampleAudioFileName: onlineAudioRes.exampleAudioUsNormalFileName,
+          exampleAudioUkSlowFileName: onlineAudioRes.exampleAudioUkSlowFileName,
+          wordAudioBase64: onlineAudioRes.wordAudioUsNormalBase64 || onlineAudioRes.wordAudioUsSlowBase64 || onlineAudioRes.wordAudioUkNormalBase64 || onlineAudioRes.wordAudioUkSlowBase64,
+          exampleAudioBase64: onlineAudioRes.exampleAudioUsNormalBase64 || onlineAudioRes.exampleAudioUsSlowBase64 || onlineAudioRes.exampleAudioUkNormalBase64 || onlineAudioRes.exampleAudioUkSlowBase64,
+          wordAudioFileName: onlineAudioRes.wordAudioUsNormalFileName || onlineAudioRes.wordAudioUsSlowFileName || onlineAudioRes.wordAudioUkNormalFileName || onlineAudioRes.wordAudioUkSlowFileName,
+          exampleAudioFileName: onlineAudioRes.exampleAudioUsNormalFileName || onlineAudioRes.exampleAudioUsSlowFileName || onlineAudioRes.exampleAudioUkNormalFileName || onlineAudioRes.exampleAudioUkSlowFileName,
           audioFiles: onlineAudioRes.files.map((f) => ({
             fileName: f.fileName,
             fieldSoundTag: f.fieldSoundTag,
@@ -995,8 +1018,10 @@ async function startServer() {
           generateAmericanSlow: appSettings.tts.generateAmericanSlow,
           generateBritishNormal: appSettings.tts.generateBritishNormal,
           generateBritishSlow: appSettings.tts.generateBritishSlow,
-          generateExampleUs: appSettings.tts.generateExampleUs,
-          generateExampleUk: appSettings.tts.generateExampleUk,
+          generateExampleUsNormal: appSettings.tts.generateExampleUsNormal,
+          generateExampleUsSlow: appSettings.tts.generateExampleUsSlow,
+          generateExampleUkNormal: appSettings.tts.generateExampleUkNormal,
+          generateExampleUkSlow: appSettings.tts.generateExampleUkSlow,
         });
 
         if (!audioGenRes.success || audioGenRes.files.length === 0) {
@@ -1018,17 +1043,21 @@ async function startServer() {
           wordAudioUkNormalBase64: audioGenRes.wordAudioUkNormalBase64,
           wordAudioUkSlowBase64: audioGenRes.wordAudioUkSlowBase64,
           exampleAudioUsNormalBase64: audioGenRes.exampleAudioUsNormalBase64,
+          exampleAudioUsSlowBase64: audioGenRes.exampleAudioUsSlowBase64,
           exampleAudioUkNormalBase64: audioGenRes.exampleAudioUkNormalBase64,
+          exampleAudioUkSlowBase64: audioGenRes.exampleAudioUkSlowBase64,
           wordAudioUsNormalFileName: audioGenRes.wordAudioUsNormalFileName,
           wordAudioUsSlowFileName: audioGenRes.wordAudioUsSlowFileName,
           wordAudioUkNormalFileName: audioGenRes.wordAudioUkNormalFileName,
           wordAudioUkSlowFileName: audioGenRes.wordAudioUkSlowFileName,
           exampleAudioUsNormalFileName: audioGenRes.exampleAudioUsNormalFileName,
+          exampleAudioUsSlowFileName: audioGenRes.exampleAudioUsSlowFileName,
           exampleAudioUkNormalFileName: audioGenRes.exampleAudioUkNormalFileName,
-          wordAudioBase64: audioGenRes.wordAudioUsNormalBase64 || audioGenRes.wordAudioUkNormalBase64,
-          exampleAudioBase64: audioGenRes.exampleAudioUsNormalBase64,
-          wordAudioFileName: audioGenRes.wordAudioUsNormalFileName || audioGenRes.wordAudioUkNormalFileName,
-          exampleAudioFileName: audioGenRes.exampleAudioUsNormalFileName,
+          exampleAudioUkSlowFileName: audioGenRes.exampleAudioUkSlowFileName,
+          wordAudioBase64: audioGenRes.wordAudioUsNormalBase64 || audioGenRes.wordAudioUsSlowBase64 || audioGenRes.wordAudioUkNormalBase64 || audioGenRes.wordAudioUkSlowBase64,
+          exampleAudioBase64: audioGenRes.exampleAudioUsNormalBase64 || audioGenRes.exampleAudioUsSlowBase64 || audioGenRes.exampleAudioUkNormalBase64 || audioGenRes.exampleAudioUkSlowBase64,
+          wordAudioFileName: audioGenRes.wordAudioUsNormalFileName || audioGenRes.wordAudioUsSlowFileName || audioGenRes.wordAudioUkNormalFileName || audioGenRes.wordAudioUkSlowFileName,
+          exampleAudioFileName: audioGenRes.exampleAudioUsNormalFileName || audioGenRes.exampleAudioUsSlowFileName || audioGenRes.exampleAudioUkNormalFileName || audioGenRes.exampleAudioUkSlowFileName,
           audioFiles: audioGenRes.files.map((f) => ({
             fileName: f.fileName,
             fieldSoundTag: f.fieldSoundTag,

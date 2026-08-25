@@ -245,6 +245,9 @@ const css = `/* THEME: MINIMAL DARK - Clean, Distraction-Free Practical Dark The
   display: flex !important;
   flex-direction: column !important;
   gap: 10px !important;
+  width: 100% !important;
+  position: relative !important;
+  z-index: 10 !important;
   touch-action: auto !important;
   pointer-events: auto !important;
 }
@@ -252,7 +255,7 @@ const css = `/* THEME: MINIMAL DARK - Clean, Distraction-Free Practical Dark The
 .spelling-input, .minimal-input {
   width: 100% !important;
   box-sizing: border-box !important;
-  padding: 10px 14px !important;
+  padding: 12px 14px !important;
   font-family: inherit !important;
   font-size: 16px !important;
   border: 1px solid #52525B !important;
@@ -264,9 +267,11 @@ const css = `/* THEME: MINIMAL DARK - Clean, Distraction-Free Practical Dark The
   -moz-user-select: text !important;
   user-select: text !important;
   -webkit-touch-callout: default !important;
-  touch-action: manipulation !important;
+  touch-action: auto !important;
   pointer-events: auto !important;
   cursor: text !important;
+  position: relative !important;
+  z-index: 11 !important;
 }
 
 .spelling-input::placeholder, .minimal-input::placeholder {
@@ -349,6 +354,13 @@ const css = `/* THEME: MINIMAL DARK - Clean, Distraction-Free Practical Dark The
   width: 12px !important;
   height: 12px !important;
   fill: #E4E4E7 !important;
+}
+
+/* Suppress unwanted generic/uncontained Anki default audio replay buttons */
+#qa > .replay-button:not(.comic-audio-btn):not([class*="audio"]),
+#qa > a.replay-button:not(.comic-audio-btn):not([class*="audio"]),
+.card > a.replay-button:first-child:not([class*="audio"]) {
+  display: none !important;
 }
 `;
 

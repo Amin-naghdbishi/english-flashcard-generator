@@ -16,7 +16,7 @@ function checkSpelling() {
   var typed = input.value.trim();
   if (!typed) {
     result.className = 'spelling-result is-empty';
-    result.innerHTML = '<span class="spelling-empty-msg">⚠️ Please type the word first!</span>';
+    result.innerHTML = '<span class="spelling-empty-msg">⚠️ Please type your answer first!</span>';
     return;
   }
   
@@ -48,21 +48,6 @@ function checkSpelling() {
         e.preventDefault();
         checkSpelling();
       }
-    });
-
-    // Ensure AnkiDroid gesture detector does not swallow touch events on the input
-    input.addEventListener('touchstart', function(e) {
-      e.stopPropagation();
-    }, { passive: true });
-
-    input.addEventListener('touchend', function(e) {
-      e.stopPropagation();
-      this.focus();
-    }, { passive: true });
-
-    input.addEventListener('click', function(e) {
-      e.stopPropagation();
-      this.focus();
     });
   }
 
@@ -142,10 +127,10 @@ export const heroPopFrontSpellingHtml = `
 
     <div class="comic-pronunciation-box">
       <div class="audio-region region-us">
-        <div class="audio-region-title">🇺🇸 Sentence / Word Audio</div>
+        <div class="audio-region-title">🇺🇸 Audio Clues</div>
         <div class="audio-buttons-row">
-          <div class="audio-item"><span class="speed-label">Word:</span> {{WordAudioUsNormal}}</div>
-          <div class="audio-item"><span class="speed-label">Sentence:</span> {{ExampleAudioUsNormal}}</div>
+          <div class="audio-item"><span class="speed-label">Word:</span> {{WordAudioUsNormal}} {{WordAudioUsSlow}}</div>
+          <div class="audio-item"><span class="speed-label">Sentence:</span> {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}</div>
         </div>
       </div>
     </div>
@@ -156,16 +141,13 @@ export const heroPopFrontSpellingHtml = `
         id="spelling-input"
         name="spelling_answer"
         class="spelling-input"
-        placeholder="Type the English spelling here..."
+        placeholder="Type English spelling here..."
         autocomplete="off"
         autocorrect="off"
         autocapitalize="none"
         spellcheck="false"
         inputmode="text"
         enterkeyhint="done"
-        onclick="event.stopPropagation(); this.focus();"
-        ontouchstart="event.stopPropagation();"
-        ontouchend="event.stopPropagation(); this.focus();"
       />
       <button type="button" class="spelling-check-btn" onclick="checkSpelling()">
         CHECK SPELLING
@@ -305,7 +287,7 @@ export const storyStripFrontSpellingHtml = `
       </div>
       <div class="strip-audio-inline">
         <span class="audio-caption">Listen carefully:</span>
-        {{WordAudioUsNormal}} {{ExampleAudioUsNormal}}
+        {{WordAudioUsNormal}} {{WordAudioUsSlow}} {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}
       </div>
     </div>
 
@@ -324,9 +306,6 @@ export const storyStripFrontSpellingHtml = `
           spellcheck="false"
           inputmode="text"
           enterkeyhint="done"
-          onclick="event.stopPropagation(); this.focus();"
-          ontouchstart="event.stopPropagation();"
-          ontouchend="event.stopPropagation(); this.focus();"
         />
         <button type="button" class="spelling-check-btn" onclick="checkSpelling()">SUBMIT</button>
       </div>
@@ -364,7 +343,7 @@ export const storyStripBackHtml = `
         <p class="bubble-fa" dir="rtl">{{Translation}}</p>
       </div>
       <div class="dialogue-audio-bar">
-        <span>Audio:</span> {{ExampleAudioUsNormal}} {{ExampleAudioUkNormal}}
+        <span>Audio:</span> {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}} {{ExampleAudioUkNormal}} {{ExampleAudioUkSlow}}
       </div>
     </div>
 
@@ -439,7 +418,7 @@ export const duoQuestFrontSpellingHtml = `
 
     <div class="quest-sound-dock-compact">
       <span class="sound-label">🔊 Pronunciation:</span>
-      {{WordAudioUsNormal}} {{ExampleAudioUsNormal}}
+      {{WordAudioUsNormal}} {{WordAudioUsSlow}} {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}
     </div>
 
     <div class="spelling-interactive-area">
@@ -455,9 +434,6 @@ export const duoQuestFrontSpellingHtml = `
         spellcheck="false"
         inputmode="text"
         enterkeyhint="done"
-        onclick="event.stopPropagation(); this.focus();"
-        ontouchstart="event.stopPropagation();"
-        ontouchend="event.stopPropagation(); this.focus();"
       />
       <button type="button" class="spelling-check-btn quest-btn" onclick="checkSpelling()">CHECK ANSWER</button>
     </div>
@@ -502,7 +478,7 @@ export const duoQuestBackHtml = `
     <div class="quest-example-card">
       <div class="example-quest-header">
         <span class="quest-tag">EXAMPLE & TRANSLATION</span>
-        <div class="dock-actions">{{ExampleAudioUsNormal}} {{ExampleAudioUkNormal}}</div>
+        <div class="dock-actions">{{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}} {{ExampleAudioUkNormal}} {{ExampleAudioUkSlow}}</div>
       </div>
       <p class="quest-sentence">{{Example}}</p>
       <p class="quest-translation-fa" dir="rtl">{{Translation}}</p>
@@ -568,7 +544,7 @@ export const indexNotebookFrontSpellingHtml = `
     </div>
 
     <div class="notebook-audio-strip">
-      <div class="tape-clip us-tape">🎧 Audio: {{WordAudioUsNormal}} {{ExampleAudioUsNormal}}</div>
+      <div class="tape-clip us-tape">🎧 Audio: {{WordAudioUsNormal}} {{WordAudioUsSlow}} {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}</div>
     </div>
 
     <div class="spelling-interactive-area">
@@ -584,9 +560,6 @@ export const indexNotebookFrontSpellingHtml = `
         spellcheck="false"
         inputmode="text"
         enterkeyhint="done"
-        onclick="event.stopPropagation(); this.focus();"
-        ontouchstart="event.stopPropagation();"
-        ontouchend="event.stopPropagation(); this.focus();"
       />
       <button type="button" class="spelling-check-btn notebook-check" onclick="checkSpelling()">CHECK</button>
     </div>
@@ -626,7 +599,7 @@ export const indexNotebookBackHtml = `
       <div class="sticky-header-row">
         <span class="sticky-pin">📌</span>
         <span class="sticky-title">Example & Translation:</span>
-        <div class="sticky-audio">{{ExampleAudioUsNormal}} {{ExampleAudioUkNormal}}</div>
+        <div class="sticky-audio">{{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}} {{ExampleAudioUkNormal}} {{ExampleAudioUkSlow}}</div>
       </div>
       <p class="sticky-text">{{Example}}</p>
       <p class="sticky-translation" dir="rtl">{{Translation}}</p>
@@ -699,7 +672,7 @@ export const arcadeRetroFrontSpellingHtml = `
 
     <div class="arcade-sound-controls arcade-single-sound">
       <span class="deck-title">AUDIO RADAR:</span>
-      {{WordAudioUsNormal}} {{ExampleAudioUsNormal}}
+      {{WordAudioUsNormal}} {{WordAudioUsSlow}} {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}
     </div>
 
     <div class="spelling-interactive-area arcade-interactive">
@@ -715,9 +688,6 @@ export const arcadeRetroFrontSpellingHtml = `
         spellcheck="false"
         inputmode="text"
         enterkeyhint="done"
-        onclick="event.stopPropagation(); this.focus();"
-        ontouchstart="event.stopPropagation();"
-        ontouchend="event.stopPropagation(); this.focus();"
       />
       <button type="button" class="spelling-check-btn arcade-check" onclick="checkSpelling()">EXECUTE</button>
     </div>
@@ -763,7 +733,7 @@ export const arcadeRetroBackHtml = `
     <div class="arcade-quest-box">
       <div class="quest-terminal-header">
         <span>► MISSION LOG & AUDIO</span>
-        <div class="arcade-example-audio">{{ExampleAudioUsNormal}} {{ExampleAudioUkNormal}}</div>
+        <div class="arcade-example-audio">{{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}} {{ExampleAudioUkNormal}} {{ExampleAudioUkSlow}}</div>
       </div>
       <p class="quest-log-en">{{Example}}</p>
       <p class="quest-log-fa" dir="rtl">{{Translation}}</p>
@@ -827,7 +797,7 @@ export const minimalFrontSpellingHtml = `
     </div>
 
     <div class="minimal-audio-row">
-      <span class="minimal-audio-label">Audio:</span> {{WordAudioUsNormal}} {{ExampleAudioUsNormal}}
+      <span class="minimal-audio-label">Audio:</span> {{WordAudioUsNormal}} {{WordAudioUsSlow}} {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}
     </div>
 
     <div class="spelling-interactive-area">
@@ -836,16 +806,13 @@ export const minimalFrontSpellingHtml = `
         id="spelling-input"
         name="spelling_answer"
         class="spelling-input minimal-input"
-        placeholder="Type the spelling here..."
+        placeholder="Type spelling here..."
         autocomplete="off"
         autocorrect="off"
         autocapitalize="none"
         spellcheck="false"
         inputmode="text"
         enterkeyhint="done"
-        onclick="event.stopPropagation(); this.focus();"
-        ontouchstart="event.stopPropagation();"
-        ontouchend="event.stopPropagation(); this.focus();"
       />
       <button type="button" class="spelling-check-btn minimal-btn" onclick="checkSpelling()">
         Check Spelling
@@ -891,7 +858,7 @@ export const minimalBackHtml = `
     <div class="minimal-example-block">
       <div class="minimal-example-header">
         <span class="minimal-example-label">Example & Translation</span>
-        <div class="minimal-example-audio">{{ExampleAudioUsNormal}} {{ExampleAudioUkNormal}}</div>
+        <div class="minimal-example-audio">{{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}} {{ExampleAudioUkNormal}} {{ExampleAudioUkSlow}}</div>
       </div>
       <p class="minimal-example">{{Example}}</p>
       <p class="minimal-translation" dir="rtl">{{Translation}}</p>
