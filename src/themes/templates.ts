@@ -38,39 +38,43 @@ function checkSpelling() {
 }
 
 (function initSpelling() {
-  function attachListeners() {
+  function setupInput() {
     var input = document.getElementById('spelling-input');
     if (!input) return;
     
     // Support enter key on hardware and mobile virtual keyboards
     input.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' || e.keyCode === 13) {
         e.preventDefault();
         checkSpelling();
       }
     });
 
-    // Ensure AnkiDroid gesture detector does not swallow touch events on the input
-    input.addEventListener('touchstart', function(e) {
-      e.stopPropagation();
-    }, { passive: true });
+    // Ensure virtual keyboard triggers on Android WebView
+    input.addEventListener('focus', function() {
+      if (navigator.virtualKeyboard && typeof navigator.virtualKeyboard.show === 'function') {
+        try {
+          navigator.virtualKeyboard.show();
+        } catch (e) {}
+      }
+    });
 
-    input.addEventListener('touchend', function(e) {
-      e.stopPropagation();
-      this.focus();
-    }, { passive: true });
-
-    input.addEventListener('click', function(e) {
-      e.stopPropagation();
-      this.focus();
+    input.addEventListener('click', function() {
+      input.focus();
+      if (navigator.virtualKeyboard && typeof navigator.virtualKeyboard.show === 'function') {
+        try {
+          navigator.virtualKeyboard.show();
+        } catch (e) {}
+      }
     });
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', attachListeners);
+    document.addEventListener('DOMContentLoaded', setupInput);
   } else {
-    attachListeners();
+    setupInput();
   }
+  window.addEventListener('load', setupInput);
 })();
 </script>
 `;
@@ -150,12 +154,12 @@ export const heroPopFrontSpellingHtml = `
       </div>
     </div>
 
-    <div class="spelling-interactive-area">
+    <div class="spelling-interactive-area tappable">
       <input
         type="text"
         id="spelling-input"
         name="spelling_answer"
-        class="spelling-input"
+        class="spelling-input tappable"
         placeholder="Type the English spelling here..."
         autocomplete="off"
         autocorrect="off"
@@ -163,11 +167,8 @@ export const heroPopFrontSpellingHtml = `
         spellcheck="false"
         inputmode="text"
         enterkeyhint="done"
-        onclick="event.stopPropagation(); this.focus();"
-        ontouchstart="event.stopPropagation();"
-        ontouchend="event.stopPropagation(); this.focus();"
       />
-      <button type="button" class="spelling-check-btn" onclick="checkSpelling()">
+      <button type="button" class="spelling-check-btn tappable" onclick="checkSpelling()">
         CHECK SPELLING
       </button>
     </div>
@@ -311,12 +312,12 @@ export const storyStripFrontSpellingHtml = `
 
     <div class="strip-panel panel-interactive">
       <div class="panel-tag">PANEL 3 • YOUR SPELLING</div>
-      <div class="spelling-interactive-area">
+      <div class="spelling-interactive-area tappable">
         <input
           type="text"
           id="spelling-input"
           name="spelling_answer"
-          class="spelling-input"
+          class="spelling-input tappable"
           placeholder="Spell the missing word..."
           autocomplete="off"
           autocorrect="off"
@@ -324,11 +325,8 @@ export const storyStripFrontSpellingHtml = `
           spellcheck="false"
           inputmode="text"
           enterkeyhint="done"
-          onclick="event.stopPropagation(); this.focus();"
-          ontouchstart="event.stopPropagation();"
-          ontouchend="event.stopPropagation(); this.focus();"
         />
-        <button type="button" class="spelling-check-btn" onclick="checkSpelling()">SUBMIT</button>
+        <button type="button" class="spelling-check-btn tappable" onclick="checkSpelling()">SUBMIT</button>
       </div>
       <div id="spelling-result" class="spelling-result"></div>
     </div>
@@ -442,12 +440,12 @@ export const duoQuestFrontSpellingHtml = `
       {{WordAudioUsNormal}} {{WordAudioUsSlow}} {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}
     </div>
 
-    <div class="spelling-interactive-area">
+    <div class="spelling-interactive-area tappable">
       <input
         type="text"
         id="spelling-input"
         name="spelling_answer"
-        class="spelling-input quest-input"
+        class="spelling-input quest-input tappable"
         placeholder="Type answer here..."
         autocomplete="off"
         autocorrect="off"
@@ -455,11 +453,8 @@ export const duoQuestFrontSpellingHtml = `
         spellcheck="false"
         inputmode="text"
         enterkeyhint="done"
-        onclick="event.stopPropagation(); this.focus();"
-        ontouchstart="event.stopPropagation();"
-        ontouchend="event.stopPropagation(); this.focus();"
       />
-      <button type="button" class="spelling-check-btn quest-btn" onclick="checkSpelling()">CHECK ANSWER</button>
+      <button type="button" class="spelling-check-btn quest-btn tappable" onclick="checkSpelling()">CHECK ANSWER</button>
     </div>
 
     <div id="spelling-result" class="spelling-result"></div>
@@ -571,12 +566,12 @@ export const indexNotebookFrontSpellingHtml = `
       <div class="tape-clip us-tape">🎧 Audio: {{WordAudioUsNormal}} {{WordAudioUsSlow}} {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}</div>
     </div>
 
-    <div class="spelling-interactive-area">
+    <div class="spelling-interactive-area tappable">
       <input
         type="text"
         id="spelling-input"
         name="spelling_answer"
-        class="spelling-input notebook-input"
+        class="spelling-input notebook-input tappable"
         placeholder="Write correct spelling..."
         autocomplete="off"
         autocorrect="off"
@@ -584,11 +579,8 @@ export const indexNotebookFrontSpellingHtml = `
         spellcheck="false"
         inputmode="text"
         enterkeyhint="done"
-        onclick="event.stopPropagation(); this.focus();"
-        ontouchstart="event.stopPropagation();"
-        ontouchend="event.stopPropagation(); this.focus();"
       />
-      <button type="button" class="spelling-check-btn notebook-check" onclick="checkSpelling()">CHECK</button>
+      <button type="button" class="spelling-check-btn notebook-check tappable" onclick="checkSpelling()">CHECK</button>
     </div>
 
     <div id="spelling-result" class="spelling-result"></div>
@@ -702,12 +694,12 @@ export const arcadeRetroFrontSpellingHtml = `
       {{WordAudioUsNormal}} {{WordAudioUsSlow}} {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}
     </div>
 
-    <div class="spelling-interactive-area arcade-interactive">
+    <div class="spelling-interactive-area arcade-interactive tappable">
       <input
         type="text"
         id="spelling-input"
         name="spelling_answer"
-        class="spelling-input arcade-input"
+        class="spelling-input arcade-input tappable"
         placeholder="ENTER SPELLING..."
         autocomplete="off"
         autocorrect="off"
@@ -715,11 +707,8 @@ export const arcadeRetroFrontSpellingHtml = `
         spellcheck="false"
         inputmode="text"
         enterkeyhint="done"
-        onclick="event.stopPropagation(); this.focus();"
-        ontouchstart="event.stopPropagation();"
-        ontouchend="event.stopPropagation(); this.focus();"
       />
-      <button type="button" class="spelling-check-btn arcade-check" onclick="checkSpelling()">EXECUTE</button>
+      <button type="button" class="spelling-check-btn arcade-check tappable" onclick="checkSpelling()">EXECUTE</button>
     </div>
 
     <div id="spelling-result" class="spelling-result arcade-result-screen"></div>
@@ -830,12 +819,12 @@ export const minimalFrontSpellingHtml = `
       <span class="minimal-audio-label">Audio:</span> {{WordAudioUsNormal}} {{WordAudioUsSlow}} {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}
     </div>
 
-    <div class="spelling-interactive-area">
+    <div class="spelling-interactive-area tappable">
       <input
         type="text"
         id="spelling-input"
         name="spelling_answer"
-        class="spelling-input minimal-input"
+        class="spelling-input minimal-input tappable"
         placeholder="Type the spelling here..."
         autocomplete="off"
         autocorrect="off"
@@ -843,11 +832,8 @@ export const minimalFrontSpellingHtml = `
         spellcheck="false"
         inputmode="text"
         enterkeyhint="done"
-        onclick="event.stopPropagation(); this.focus();"
-        ontouchstart="event.stopPropagation();"
-        ontouchend="event.stopPropagation(); this.focus();"
       />
-      <button type="button" class="spelling-check-btn minimal-btn" onclick="checkSpelling()">
+      <button type="button" class="spelling-check-btn minimal-btn tappable" onclick="checkSpelling()">
         Check Spelling
       </button>
     </div>
