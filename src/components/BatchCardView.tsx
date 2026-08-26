@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AppSettings, BatchItem, CardData, BatchFieldConfig, ManualOverrides, AppTheme } from '../types';
+import { AppSettings, BatchItem, CardData, BatchFieldConfig, ManualOverrides, AppTheme, CardType } from '../types';
 import {
   runFullPipeline,
   getAnkiDecks,

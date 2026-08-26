@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { CardData, ManualOverrides, AppSettings, StepLog, AnkiCardVerificationDetails, CardType, AppTheme } from '../types';
 import { CardPreview } from './CardPreview';
 import { AudioPlayer } from './AudioPlayer';
@@ -394,6 +394,25 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
       setIsReverifying(false);
     }
   };
+
+  const previewDisplayCard = useMemo(() => {
+    return (
+      generatedCard || {
+        word: word.trim() || 'abandon',
+        phonetic: overrides.phonetic || '/əˈbændən/',
+        partOfSpeech: overrides.partOfSpeech || 'verb',
+        meaningFa: overrides.meaningFa || 'رها کردن، ترک کردن',
+        example: overrides.example || 'He abandoned his car on the highway.',
+        translationFa: overrides.translationFa || 'او ماشین خود را در بزرگراه رها کرد.',
+        mnemonic: overrides.mnemonic || 'A-BAND-ON: Imagine a band left behind on the stage.',
+        cardType: cardType,
+        spellingSentence: 'He ______ his car on the highway.',
+        imageBase64: overrides.imageBase64,
+        imageFileName: overrides.imageFileName,
+        needsImage: !!overrides.imageBase64 || photoChoice === 'yes',
+      }
+    );
+  }, [generatedCard, word, overrides, cardType, photoChoice]);
 
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 p-4 sm:p-6 min-w-0">
@@ -1297,22 +1316,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
           }`}
         >
             <CardPreview
-              cardData={
-                generatedCard || {
-                  word: word.trim() || 'abandon',
-                  phonetic: overrides.phonetic || '/əˈbændən/',
-                  partOfSpeech: overrides.partOfSpeech || 'verb',
-                  meaningFa: overrides.meaningFa || 'رها کردن، ترک کردن',
-                  example: overrides.example || 'He abandoned his car on the highway.',
-                  translationFa: overrides.translationFa || 'او ماشین خود را در بزرگراه رها کرد.',
-                  mnemonic: overrides.mnemonic || 'A-BAND-ON: Imagine a band left behind on the stage.',
-                  cardType: cardType,
-                  spellingSentence: 'He ______ his car on the highway.',
-                  imageBase64: overrides.imageBase64,
-                  imageFileName: overrides.imageFileName,
-                  needsImage: !!overrides.imageBase64 || photoChoice === 'yes',
-                }
-              }
+              cardData={previewDisplayCard}
               themeId={settings.theme}
               emptyWordPlaceholder={word || 'abandon'}
               appTheme={isDark ? 'anki-dark' : 'anki-light'}

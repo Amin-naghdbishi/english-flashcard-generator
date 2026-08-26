@@ -56,8 +56,6 @@ export interface CardData {
   exampleAudioFileName?: string;
 
   needsPhoto?: boolean;
-  needsImage?: boolean;
-  imageReason?: string;
 
   // Array of all generated audio clips
   audioFiles?: CardAudioFile[];

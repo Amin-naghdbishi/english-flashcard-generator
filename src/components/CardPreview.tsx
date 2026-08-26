@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { CardData, ThemeDefinition, ThemeId, CardType, AppTheme } from '../types';
 import { THEMES, renderThemeHtml, getSpellingFrontHtml } from '../themes';
 import { Eye, Smartphone, Monitor } from 'lucide-react';
@@ -144,8 +144,14 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
   };
 
   const frontTemplate = previewCardType === 'spelling' ? getSpellingFrontHtml(theme.id) : theme.frontHtml;
-  const frontRendered = renderThemeHtml(frontTemplate, { ...displayData, cardType: previewCardType }, { isPreview: true, cardType: previewCardType });
-  const backRendered = renderThemeHtml(theme.backHtml, { ...displayData, cardType: previewCardType }, { isPreview: true, cardType: previewCardType });
+  const frontRendered = useMemo(
+    () => renderThemeHtml(frontTemplate, { ...displayData, cardType: previewCardType }, { isPreview: true, cardType: previewCardType }),
+    [frontTemplate, displayData, previewCardType]
+  );
+  const backRendered = useMemo(
+    () => renderThemeHtml(theme.backHtml, { ...displayData, cardType: previewCardType }, { isPreview: true, cardType: previewCardType }),
+    [theme.backHtml, displayData, previewCardType]
+  );
 
   return (
     <div className={`w-full flex flex-col h-full min-w-0 ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>

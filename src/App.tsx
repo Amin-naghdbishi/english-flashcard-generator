@@ -4,7 +4,7 @@ import { NavigationStrip, NavTab } from './components/NavigationStrip';
 import { CreateCardView } from './components/CreateCardView';
 import { BatchCardView } from './components/BatchCardView';
 import { SettingsView } from './components/SettingsView';
-import { fetchConfig, checkOllama, checkGemini, checkTTS, checkOnlineTTS, checkAnki } from './services/api';
+import { fetchConfig, saveConfig, checkOllama, checkGemini, checkTTS, checkOnlineTTS, checkAnki } from './services/api';
 import { AppThemeProvider, normalizeAppTheme } from './context/ThemeContext';
 
 const defaultSettings: AppSettings = {
@@ -39,6 +39,10 @@ const defaultSettings: AppSettings = {
     generateAmericanSlow: true,
     generateBritishNormal: true,
     generateBritishSlow: true,
+    generateExampleUsNormal: true,
+    generateExampleUsSlow: false,
+    generateExampleUkNormal: false,
+    generateExampleUkSlow: false,
     generateExampleUs: true,
     generateExampleUk: false,
     generateSlow: true,
@@ -161,10 +165,10 @@ export default function App() {
 
   const handleSetAppTheme = (newTheme: AppTheme) => {
     const normalized = normalizeAppTheme(newTheme);
-    setSettings((prev) => {
-      const updated = { ...prev, appTheme: normalized };
-      saveConfig(updated).catch(() => {});
-      return updated;
+    setSettings((prev) => ({ ...prev, appTheme: normalized }));
+    // Persist asynchronously without blocking state or throwing
+    saveConfig({ appTheme: normalized }).catch((e) => {
+      console.warn('Failed to persist app theme:', e);
     });
   };
 
@@ -189,23 +193,23 @@ export default function App() {
           appTheme={activeAppTheme}
         />
 
-        {/* Main Content Body */}
+        {/* Main Content Body - Persistent tabs for instant switching & state preservation */}
         <main className="flex-1 w-full min-w-0">
-          {currentTab === 'create' && (
+          <div className={currentTab === 'create' ? 'block' : 'hidden'}>
             <CreateCardView
               settings={settings}
               appTheme={activeAppTheme}
             />
-          )}
+          </div>
 
-          {currentTab === 'batch' && (
+          <div className={currentTab === 'batch' ? 'block' : 'hidden'}>
             <BatchCardView
               settings={settings}
               appTheme={activeAppTheme}
             />
-          )}
+          </div>
 
-          {currentTab === 'settings' && (
+          <div className={currentTab === 'settings' ? 'block' : 'hidden'}>
             <SettingsView
               settings={settings}
               appTheme={activeAppTheme}
@@ -214,7 +218,7 @@ export default function App() {
                 refreshStatuses();
               }}
             />
-          )}
+          </div>
         </main>
 
         {/* Desktop Footer */}

@@ -6,7 +6,7 @@
 export const spellingScript = `
 <script>
 function checkSpelling() {
-  var input = document.getElementById('spelling-input');
+  var input = document.getElementById('spelling-input') || document.getElementById('typeans');
   var result = document.getElementById('spelling-result');
   var targetEl = document.getElementById('spelling-target-word');
   var target = (targetEl ? (targetEl.innerText || targetEl.textContent) : '').trim().toLowerCase();
@@ -39,7 +39,7 @@ function checkSpelling() {
 
 (function initSpelling() {
   function setupInput() {
-    var input = document.getElementById('spelling-input');
+    var input = document.getElementById('spelling-input') || document.getElementById('typeans');
     if (!input) return;
     
     // Support enter key on hardware and mobile virtual keyboards

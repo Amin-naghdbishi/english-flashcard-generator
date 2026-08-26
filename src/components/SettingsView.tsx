@@ -1989,7 +1989,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         )}
                       </div>
                       <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                        {th.description}
+                        {th.desc}
                       </div>
                     </button>
                   );
@@ -2029,7 +2029,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         )}
                       </div>
                       <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                        {th.description}
+                        {th.desc}
                       </div>
                     </button>
                   );

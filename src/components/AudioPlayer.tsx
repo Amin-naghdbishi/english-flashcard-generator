@@ -28,7 +28,14 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       audioRef.current.currentTime = 0;
     }
 
-    const audio = new Audio(`data:audio/wav;base64,${base64Wav}`);
+    let src = base64Wav;
+    if (!src.startsWith('data:')) {
+      const isMp3 = !base64Wav.startsWith('UklGR');
+      const mime = isMp3 ? 'audio/mpeg' : 'audio/wav';
+      src = `data:${mime};base64,${base64Wav}`;
+    }
+
+    const audio = new Audio(src);
     audioRef.current = audio;
 
     setIsPlaying(true);
