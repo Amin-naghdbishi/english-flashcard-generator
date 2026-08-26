@@ -811,7 +811,7 @@ async function startServer() {
       const example = getVal('Example', 'example', 'Example Sentence', 'examplesentence', 'Sentence', 'sentence');
       const translation = getVal('Translation', 'translation', 'Example Translation', 'exampletranslation', 'Sentence Fa', 'sentencefa');
       const mnemonic = getVal('Mnemonic', 'mnemonic', 'Memory Aid', 'memoryaid', 'Aid', 'aid');
-      const cardImage = getVal('CardImage', 'cardimage', 'Image', 'image', 'Picture', 'picture');
+      const cardImage = getVal('CardImage', 'cardimage', 'Image', 'image', 'Picture', 'picture', 'Photo', 'photo', 'Illustration', 'illustration', 'Img', 'img');
       const wordAudio = getVal('WordAudio', 'wordaudio', 'WordAudioUsNormal', 'WordAudioUsSlow');
 
       const presentFields: string[] = [];
@@ -895,7 +895,7 @@ async function startServer() {
     const existingExample = getCleanVal('Example', 'example', 'Example Sentence', 'examplesentence', 'Sentence');
     const existingTranslation = getCleanVal('Translation', 'translation', 'Example Translation', 'exampletranslation', 'Sentence Fa');
     const existingMnemonic = getCleanVal('Mnemonic', 'mnemonic', 'Memory Aid', 'memoryaid');
-    const existingImageRaw = getRawVal('CardImage', 'cardimage', 'Image', 'image', 'Picture');
+    const existingImageRaw = getRawVal('CardImage', 'cardimage', 'Image', 'image', 'Picture', 'picture', 'Photo', 'photo', 'Illustration', 'illustration', 'Img', 'img');
     const existingCardType = (getCleanVal('CardType', 'cardtype') as CardType) || (note.modelName?.includes('Spelling') ? 'spelling' : 'normal');
 
     // 2. Prepare manual overrides with ALL existing user fields (never overwrite user-provided values!)
@@ -956,27 +956,39 @@ async function startServer() {
       return res.status(500).json({ success: false, error: `AI Generation error: ${aiErr.message}` });
     }
 
-    // 4. Image handling (Controlled by includeImage option)
+    // 4. Image handling (Strictly controlled by includeImage option)
     let cardImageTag = existingImageRaw;
-    if (includeImage && !existingImageRaw && appSettings.smartImages.enabled) {
+    const hasExistingValidImage = Boolean(
+      existingImageRaw &&
+      (existingImageRaw.includes('<img') ||
+       existingImageRaw.includes('src=') ||
+       existingImageRaw.replace(/<[^>]+>/g, '').trim().length > 0)
+    );
+
+    const isImageRequested = includeImage === true || includeImage === 'true' || includeImage === 1;
+
+    if (isImageRequested && !hasExistingValidImage) {
       try {
+        const smartConfig = appSettings.smartImages || { enabled: true, searchProvider: 'wikimedia' };
         const imgRes = await getSmartImage(
           generatedCardData.word,
           generatedCardData.partOfSpeech,
           generatedCardData.meaningFa,
-          appSettings.smartImages,
+          smartConfig,
           appSettings,
-          false
+          true // Always force fetch when image option is enabled by user
         );
-        if (imgRes.success && imgRes.needsImage && imgRes.imageBase64 && imgRes.imageFileName) {
+        if (imgRes.success && imgRes.imageBase64 && imgRes.imageFileName) {
           generatedCardData.imageBase64 = imgRes.imageBase64;
           generatedCardData.imageFileName = imgRes.imageFileName;
           await storeAnkiMediaFile(ankiUrl, imgRes.imageFileName, imgRes.imageBase64);
           cardImageTag = `<img src="${imgRes.imageFileName}" class="card-illustration" />`;
           generatedFieldsList.push('CardImage');
+        } else if (imgRes.error) {
+          console.warn(`[CompleteByTag] Image fetch for "${generatedCardData.word}" failed: ${imgRes.error}`);
         }
       } catch (imgErr) {
-        console.warn('Tag completion image error:', imgErr);
+        console.warn(`[CompleteByTag] Image generation error for "${generatedCardData.word}":`, imgErr);
       }
     }
 
@@ -1105,7 +1117,7 @@ async function startServer() {
         updatedFields[key] = generatedCardData.translationFa;
       } else if (kLow === 'mnemonic' || kLow === 'memoryaid' || kLow === 'aid') {
         updatedFields[key] = generatedCardData.mnemonic;
-      } else if (kLow === 'cardimage' || kLow === 'image' || kLow === 'picture') {
+      } else if (kLow === 'cardimage' || kLow === 'image' || kLow === 'picture' || kLow === 'photo' || kLow === 'illustration' || kLow === 'img') {
         updatedFields[key] = cardImageTag;
       } else if (kLow === 'spellingsentence') {
         updatedFields[key] = spellingSentence;

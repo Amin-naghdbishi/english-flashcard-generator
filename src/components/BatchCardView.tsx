@@ -215,6 +215,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
 
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isCancelled, setIsCancelled] = useState<boolean>(false);
+  const [isFinished, setIsFinished] = useState<boolean>(false);
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const [previewCard, setPreviewCard] = useState<CardData | null>(null);
   const [selectedItemForPreview, setSelectedItemForPreview] = useState<BatchItem | null>(null);
@@ -742,7 +743,6 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             </div>
           )}
 
-          {/* Action Buttons: [ Generate Batch Cards ] / In-progress button + [ Cancel ] */}
           <div className="space-y-2">
             {!isProcessing ? (
               <div className="flex flex-col sm:flex-row gap-2">
@@ -769,7 +769,6 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                 )}
               </div>
             ) : (
-              /* While Processing: BLUE/NEUTRAL in-progress button + CANCEL button (NEVER RED) */
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -799,29 +798,45 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             )}
           </div>
 
-          {/* Live Progress & Active Item Status while Processing */}
-          {isProcessing && (
+          {(isProcessing || isFinished || (completedCount > 0 && !isCancelled)) && (
             <div className="mt-4 pt-3 border-t border-zinc-700/50">
-              <div className="flex justify-between items-center text-xs font-semibold mb-1">
-                <span className="flex items-center gap-1.5 text-blue-400">
-                  <Loader2 className="w-3 h-3 animate-spin" />
+              <div className="flex justify-between items-center text-xs font-semibold mb-1.5">
+                <span className="flex items-center gap-1.5 text-blue-500 dark:text-blue-400">
+                  {isProcessing ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                  )}
                   <span>
-                    {t('batch.processingCount', { current: currentIndex + 1, total: items.length })}
+                    {isProcessing
+                      ? t('batch.generatingCards')
+                      : t('batch.batchCompleted')}
                   </span>
                 </span>
-                <span>{items.length > 0 ? Math.round(((completedCount + errorCount) / items.length) * 100) : 0}%</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
+                    {items.length > 0 ? (isFinished ? 100 : Math.min(100, Math.round(((completedCount + errorCount) / items.length) * 100))) : 0}%
+                  </span>
+                  <span className="text-[11px] text-zinc-500 font-medium">
+                    ({completedCount + errorCount} / {items.length} {t('batch.cardsProgressLabel')})
+                  </span>
+                </div>
               </div>
 
-              {/* Progress bar */}
-              <div className={`w-full h-2 rounded-full overflow-hidden ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`}>
+              <div className={`w-full h-2.5 rounded-full overflow-hidden shadow-inner ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`}>
                 <div
-                  className="h-full bg-blue-500 transition-all duration-200"
-                  style={{ width: `${items.length > 0 ? Math.round(((completedCount + errorCount) / items.length) * 100) : 0}%` }}
+                  className={`h-full transition-all duration-300 rounded-full ${
+                    isFinished && errorCount === 0
+                      ? 'bg-emerald-500'
+                      : errorCount > 0 && !isProcessing
+                      ? 'bg-amber-500'
+                      : 'bg-blue-600'
+                  }`}
+                  style={{ width: `${items.length > 0 ? (isFinished ? 100 : Math.min(100, Math.round(((completedCount + errorCount) / items.length) * 100))) : 0}%` }}
                 />
               </div>
 
-              {/* Currently processing item */}
-              {currentIndex >= 0 && currentIndex < items.length && (
+              {isProcessing && currentIndex >= 0 && currentIndex < items.length && (
                 <div className={`text-xs mt-2 font-medium flex items-center gap-1.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                   <span className="text-zinc-500">{t('batch.currentlyProcessing')}</span>
                   <span className="font-bold text-blue-500">{items[currentIndex].word}</span>
@@ -834,8 +849,10 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
               )}
 
               <div className="flex justify-between text-[11px] mt-2 font-medium">
-                <span className="text-emerald-500">✓ {t('common.completed')}: {completedCount}</span>
-                <span className="text-red-500">✕ {t('common.failed')}: {errorCount}</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">✓ {t('common.completed')}: {completedCount}</span>
+                {errorCount > 0 && (
+                  <span className="text-red-500 font-semibold">✕ {t('common.failed')}: {errorCount}</span>
+                )}
                 <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                   {t('common.total')}: {items.length}
                 </span>

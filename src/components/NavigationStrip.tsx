@@ -172,45 +172,45 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
           </button>
         </nav>
 
-        {/* Live Status Indicators */}
+        {/* Live Status Indicators (Anki ● | AI ● | TTS ●) */}
         <div className="flex items-center gap-2 sm:gap-3 py-2">
-          {/* AI / Ollama Status */}
-          <div
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
-              isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100 text-zinc-800'
-            } ${aiClasses.container}`}
-            title={aiTooltip}
-          >
-            <span className={`w-2 h-2 rounded-full transition-colors ${aiClasses.dot}`} />
-            <span className="hidden sm:inline">
-              {status.ai.label || 'Ollama'}
-            </span>
-          </div>
-
-          {/* TTS / Piper Status */}
-          <div
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
-              isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100 text-zinc-800'
-            } ${ttsClasses.container}`}
-            title={ttsTooltip}
-          >
-            <span className={`w-2 h-2 rounded-full transition-colors ${ttsClasses.dot}`} />
-            <span className="hidden sm:inline">
-              {status.tts.label || 'Piper'}
-            </span>
-          </div>
-
-          {/* Anki Status */}
+          {/* 1. Anki Status */}
           <div
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
               isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100 text-zinc-800'
             } ${ankiClasses.container}`}
             title={ankiTooltip}
           >
-            <span className={`w-2 h-2 rounded-full transition-colors ${ankiClasses.dot}`} />
-            <span className="hidden sm:inline">
+            <span className="hidden sm:inline font-semibold">
               Anki
             </span>
+            <span className={`w-2 h-2 rounded-full transition-colors ${ankiClasses.dot}`} />
+          </div>
+
+          {/* 2. AI Status */}
+          <div
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+              isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100 text-zinc-800'
+            } ${aiClasses.container}`}
+            title={aiTooltip}
+          >
+            <span className="hidden sm:inline font-semibold">
+              AI
+            </span>
+            <span className={`w-2 h-2 rounded-full transition-colors ${aiClasses.dot}`} />
+          </div>
+
+          {/* 3. TTS Status */}
+          <div
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+              isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100 text-zinc-800'
+            } ${ttsClasses.container}`}
+            title={ttsTooltip}
+          >
+            <span className="hidden sm:inline font-semibold">
+              TTS
+            </span>
+            <span className={`w-2 h-2 rounded-full transition-colors ${ttsClasses.dot}`} />
           </div>
 
           {/* Manual / Live Refresh Trigger */}

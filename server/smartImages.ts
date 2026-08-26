@@ -224,6 +224,7 @@ function downloadBinary(url: string, maxRedirects = 3): Promise<{ buffer: Buffer
  */
 async function searchWikipediaImage(searchTerm: string): Promise<string | null> {
   try {
+    // 1. Direct page title lookup
     const url = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=500&titles=${encodeURIComponent(searchTerm)}`;
     const { buffer } = await downloadBinary(url);
     const json = JSON.parse(buffer.toString('utf-8'));
@@ -231,7 +232,23 @@ async function searchWikipediaImage(searchTerm: string): Promise<string | null> 
 
     if (pages) {
       for (const pageId of Object.keys(pages)) {
+        if (pageId === '-1') continue;
         const page = pages[pageId];
+        if (page?.thumbnail?.source) {
+          return page.thumbnail.source;
+        }
+      }
+    }
+
+    // 2. Wikipedia search query generator (handles non-exact titles, plurals, disambiguations)
+    const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(searchTerm)}&gsrlimit=5&prop=pageimages&pithumbsize=500&format=json`;
+    const { buffer: sBuffer } = await downloadBinary(searchUrl);
+    const sJson = JSON.parse(sBuffer.toString('utf-8'));
+    const sPages = sJson?.query?.pages;
+
+    if (sPages) {
+      for (const pageId of Object.keys(sPages)) {
+        const page = sPages[pageId];
         if (page?.thumbnail?.source) {
           return page.thumbnail.source;
         }
@@ -246,7 +263,7 @@ async function searchWikipediaImage(searchTerm: string): Promise<string | null> 
  */
 async function searchCommonsImage(searchTerm: string): Promise<string | null> {
   try {
-    const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=${encodeURIComponent(searchTerm)}&gsrlimit=3&prop=imageinfo&iiprop=url|mime&iiurlwidth=500&format=json`;
+    const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=${encodeURIComponent(searchTerm)}&gsrlimit=5&prop=imageinfo&iiprop=url|mime&iiurlwidth=500&format=json`;
     const { buffer } = await downloadBinary(url);
     const json = JSON.parse(buffer.toString('utf-8'));
     const pages = json?.query?.pages;
