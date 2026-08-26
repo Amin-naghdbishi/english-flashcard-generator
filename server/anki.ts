@@ -625,3 +625,96 @@ export async function runAnkiPipelineDiagnostic(
     verification: noteRes.verification,
   };
 }
+
+export async function getAnkiTags(
+  baseUrl: string = 'http://127.0.0.1:8765'
+): Promise<{ success: boolean; tags: string[]; error?: string }> {
+  const res = await callAnkiConnect(baseUrl, 'getTags');
+  if (res.success && Array.isArray(res.result)) {
+    return { success: true, tags: res.result };
+  }
+  return { success: false, tags: [], error: res.error };
+}
+
+export async function findNotesByTag(
+  baseUrl: string = 'http://127.0.0.1:8765',
+  tag: string
+): Promise<{ success: boolean; noteIds: number[]; error?: string }> {
+  const cleanTag = (tag || '').trim();
+  if (!cleanTag) {
+    return { success: true, noteIds: [] };
+  }
+  const query = `tag:"${cleanTag}"`;
+  const res = await callAnkiConnect(baseUrl, 'findNotes', { query });
+  if (res.success && Array.isArray(res.result)) {
+    return { success: true, noteIds: res.result };
+  }
+  return { success: false, noteIds: [], error: res.error };
+}
+
+export async function getNotesInfo(
+  baseUrl: string = 'http://127.0.0.1:8765',
+  noteIds: number[]
+): Promise<{ success: boolean; notes: any[]; error?: string }> {
+  if (!noteIds.length) {
+    return { success: true, notes: [] };
+  }
+  const res = await callAnkiConnect(baseUrl, 'notesInfo', { notes: noteIds });
+  if (res.success && Array.isArray(res.result)) {
+    return { success: true, notes: res.result };
+  }
+  return { success: false, notes: [], error: res.error };
+}
+
+export async function updateAnkiNoteFields(
+  baseUrl: string = 'http://127.0.0.1:8765',
+  noteId: number,
+  fields: Record<string, string>
+): Promise<{ success: boolean; error?: string }> {
+  const res = await callAnkiConnect(baseUrl, 'updateNoteFields', {
+    note: {
+      id: noteId,
+      fields,
+    },
+  });
+  if (res.success) {
+    return { success: true };
+  }
+  return { success: false, error: res.error };
+}
+
+export async function removeAnkiNoteTag(
+  baseUrl: string = 'http://127.0.0.1:8765',
+  noteIds: number[],
+  tag: string
+): Promise<{ success: boolean; error?: string }> {
+  const cleanTag = (tag || '').trim();
+  if (!cleanTag || !noteIds.length) {
+    return { success: true };
+  }
+  const res = await callAnkiConnect(baseUrl, 'removeTags', {
+    notes: noteIds,
+    tags: cleanTag,
+  });
+  if (res.success) {
+    return { success: true };
+  }
+  return { success: false, error: res.error };
+}
+
+export async function storeAnkiMediaFile(
+  baseUrl: string = 'http://127.0.0.1:8765',
+  filename: string,
+  dataBase64: string
+): Promise<{ success: boolean; error?: string }> {
+  const cleanBase64 = dataBase64.replace(/^data:[^;]+;base64,/, '');
+  const res = await callAnkiConnect(baseUrl, 'storeMediaFile', {
+    filename,
+    data: cleanBase64,
+  });
+  if (res.success) {
+    return { success: true };
+  }
+  return { success: false, error: res.error };
+}
+

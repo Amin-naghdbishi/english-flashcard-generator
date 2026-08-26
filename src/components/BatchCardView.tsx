@@ -32,7 +32,7 @@ interface BatchCardViewProps {
   appTheme?: AppTheme;
 }
 
-export type BatchFormatType = 'formatA_simple' | 'formatB_structured';
+export type BatchFormatType = 'formatB_structured';
 
 export interface BatchParsedResult {
   format: BatchFormatType;
@@ -40,13 +40,6 @@ export interface BatchParsedResult {
   formatDescription: string;
   items: Array<{ word: string; deck: string; parsedFields: Partial<CardData> & { needsPhoto?: boolean; cardType?: CardType } }>;
 }
-
-const DEFAULT_SAMPLE_FORMAT_A = `apple
-bank
-photo
-abandon
-wander
-wonder`;
 
 const DEFAULT_SAMPLE_FORMAT_B = `--
 Word=eraser
@@ -91,107 +84,87 @@ export function autoDetectAndParseBatchInput(
   const trimmed = rawText.trim();
   if (!trimmed) {
     return {
-      format: 'formatA_simple',
-      formatLabel: 'Format A (Simple Word List)',
-      formatDescription: 'One English word per line. AI and dictionaries will automatically generate all details.',
+      format: 'formatB_structured',
+      formatLabel: 'Format B (Structured Blocks with --)',
+      formatDescription: 'All batch processing exclusively uses the advanced Format B structure.',
       items: [],
     };
   }
 
   const hasSeparator = /(?:^|\r?\n)\s*--\s*(?:\r?\n|$)/m.test(trimmed);
-  const hasKeyValuePairs = /(?:^|\r?\n)\s*(?:word|deck|phonetic|ipa|part\s*of\s*speech|pos|persian\s*meaning|meaning|example\s*sentence|example|memory\s*aid|mnemonic|photo|image|picture|spelling|cardtype)\s*[:=]/i.test(trimmed);
+  const rawBlocks = hasSeparator
+    ? trimmed.split(/(?:^|\r?\n)\s*--\s*(?:\r?\n|$)/m)
+    : trimmed.split(/\r?\n\s*\r?\n/);
 
-  if (hasSeparator || hasKeyValuePairs) {
-    const rawBlocks = hasSeparator
-      ? trimmed.split(/(?:^|\r?\n)\s*--\s*(?:\r?\n|$)/m)
-      : trimmed.split(/\r?\n\s*\r?\n/);
+  const blocks = rawBlocks.map((b) => b.trim()).filter(Boolean);
+  const results: Array<{ word: string; deck: string; parsedFields: Partial<CardData> & { needsPhoto?: boolean; cardType?: CardType } }> = [];
 
-    const blocks = rawBlocks.map((b) => b.trim()).filter(Boolean);
-    const results: Array<{ word: string; deck: string; parsedFields: Partial<CardData> & { needsPhoto?: boolean; cardType?: CardType } }> = [];
+  for (const block of blocks) {
+    const lines = block.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const fields: Record<string, string> = {};
 
-    for (const block of blocks) {
-      const lines = block.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-      const fields: Record<string, string> = {};
-
-      for (const line of lines) {
-        const sepIndex = line.indexOf('=') !== -1 ? line.indexOf('=') : line.indexOf(':');
-        if (sepIndex !== -1) {
-          const rawKey = line.slice(0, sepIndex).trim().toLowerCase().replace(/[\s_-]/g, '');
-          const val = line.slice(sepIndex + 1).trim();
-          fields[rawKey] = val;
-        } else if (!fields['word'] && line && !line.startsWith('--')) {
-          fields['word'] = line.trim();
-        }
+    for (const line of lines) {
+      const sepIndex = line.indexOf('=') !== -1 ? line.indexOf('=') : line.indexOf(':');
+      if (sepIndex !== -1) {
+        const rawKey = line.slice(0, sepIndex).trim().toLowerCase().replace(/[\s_-]/g, '');
+        const val = line.slice(sepIndex + 1).trim();
+        fields[rawKey] = val;
+      } else if (!fields['word'] && line && !line.startsWith('--')) {
+        fields['word'] = line.trim();
       }
-
-      const word = fields['word'] || fields['english'] || fields['term'] || '';
-      if (!word) continue;
-
-      let needsPhoto: boolean | undefined = undefined;
-      const photoRaw = fields['photo'] || fields['image'] || fields['picture'] || fields['needsphoto'] || fields['needsimage'];
-      if (photoRaw !== undefined) {
-        const pLow = photoRaw.trim().toLowerCase();
-        if (pLow === 'true' || pLow === 'yes' || pLow === '1' || pLow === 'y' || pLow === 'on') {
-          needsPhoto = true;
-        } else if (pLow === 'false' || pLow === 'no' || pLow === '0' || pLow === 'n' || pLow === 'off') {
-          needsPhoto = false;
-        }
-      }
-
-      let cardType: CardType | undefined = undefined;
-      const spellingRaw =
-        fields['spelling'] ||
-        fields['isspelling'] ||
-        fields['spellingcard'] ||
-        fields['cardtype'];
-
-      if (spellingRaw !== undefined) {
-        const sLow = spellingRaw.trim().toLowerCase();
-        if (sLow === 'true' || sLow === 'yes' || sLow === '1' || sLow === 'y' || sLow === 'on' || sLow === 'spelling') {
-          cardType = 'spelling';
-        } else if (sLow === 'false' || sLow === 'no' || sLow === '0' || sLow === 'n' || sLow === 'off' || sLow === 'normal') {
-          cardType = 'normal';
-        }
-      }
-
-      const deck = fields['deck'] || fields['deckname'] || fields['targetdeck'] || defaultDeck;
-      const parsedFields: Partial<CardData> & { needsPhoto?: boolean; cardType?: CardType } = {
-        word,
-        phonetic: fields['phonetic'] || fields['ipa'] || fields['pronunciation'] || undefined,
-        partOfSpeech: fields['partofspeech'] || fields['pos'] || fields['type'] || undefined,
-        meaningFa: fields['persianmeaning'] || fields['meaning'] || fields['meaningfa'] || fields['persian'] || fields['farsi'] || undefined,
-        example: fields['examplesentence'] || fields['example'] || fields['sentence'] || fields['sample'] || undefined,
-        translationFa: fields['exampletranslation'] || fields['translation'] || fields['translationfa'] || fields['sentencefa'] || undefined,
-        mnemonic: fields['memoryaid'] || fields['mnemonic'] || fields['aid'] || fields['code'] || undefined,
-        needsPhoto,
-        cardType,
-      };
-
-      results.push({ word, deck, parsedFields });
     }
 
-    if (results.length > 0) {
-      return {
-        format: 'formatB_structured',
-        formatLabel: 'Format B (Structured Blocks with --)',
-        formatDescription: 'Key-value pairs separated by "--". Custom fields are preserved with highest priority.',
-        items: results,
-      };
+    const word = fields['word'] || fields['english'] || fields['term'] || '';
+    if (!word) continue;
+
+    let needsPhoto: boolean | undefined = undefined;
+    const photoRaw = fields['photo'] || fields['image'] || fields['picture'] || fields['needsphoto'] || fields['needsimage'];
+    if (photoRaw !== undefined) {
+      const pLow = photoRaw.trim().toLowerCase();
+      if (pLow === 'true' || pLow === 'yes' || pLow === '1' || pLow === 'y' || pLow === 'on') {
+        needsPhoto = true;
+      } else if (pLow === 'false' || pLow === 'no' || pLow === '0' || pLow === 'n' || pLow === 'off') {
+        needsPhoto = false;
+      }
     }
+
+    let cardType: CardType | undefined = undefined;
+    const spellingRaw =
+      fields['spelling'] ||
+      fields['isspelling'] ||
+      fields['spellingcard'] ||
+      fields['cardtype'];
+
+    if (spellingRaw !== undefined) {
+      const sLow = spellingRaw.trim().toLowerCase();
+      if (sLow === 'true' || sLow === 'yes' || sLow === '1' || sLow === 'y' || sLow === 'on' || sLow === 'spelling') {
+        cardType = 'spelling';
+      } else if (sLow === 'false' || sLow === 'no' || sLow === '0' || sLow === 'n' || sLow === 'off' || sLow === 'normal') {
+        cardType = 'normal';
+      }
+    }
+
+    const deck = fields['deck'] || fields['deckname'] || fields['targetdeck'] || defaultDeck;
+    const parsedFields: Partial<CardData> & { needsPhoto?: boolean; cardType?: CardType } = {
+      word,
+      phonetic: fields['phonetic'] || fields['ipa'] || fields['pronunciation'] || undefined,
+      partOfSpeech: fields['partofspeech'] || fields['pos'] || fields['type'] || undefined,
+      meaningFa: fields['persianmeaning'] || fields['meaning'] || fields['meaningfa'] || fields['persian'] || fields['farsi'] || undefined,
+      example: fields['examplesentence'] || fields['example'] || fields['sentence'] || fields['sample'] || undefined,
+      translationFa: fields['exampletranslation'] || fields['translation'] || fields['translationfa'] || fields['sentencefa'] || undefined,
+      mnemonic: fields['memoryaid'] || fields['mnemonic'] || fields['aid'] || fields['code'] || undefined,
+      needsPhoto,
+      cardType,
+    };
+
+    results.push({ word, deck, parsedFields });
   }
 
-  const lines = trimmed.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const items = lines.map((w) => ({
-    word: w,
-    deck: defaultDeck,
-    parsedFields: { word: w },
-  }));
-
   return {
-    format: 'formatA_simple',
-    formatLabel: 'Format A (Simple Word List)',
-    formatDescription: 'One English word per line. AI and selected dictionaries will generate all fields.',
-    items,
+    format: 'formatB_structured',
+    formatLabel: 'Format B (Structured Blocks with --)',
+    formatDescription: 'All batch processing exclusively uses Format B. All custom fields, overrides, target decks, photo flags, and spelling modes are preserved.',
+    items: results,
   };
 }
 
@@ -199,8 +172,8 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
   const themeContext = useAppTheme();
   const isDark = themeContext.isDark;
 
-  const [inputText, setInputText] = useState<string>(DEFAULT_SAMPLE_FORMAT_A);
-  const [fileName, setFileName] = useState<string>('sample_words.txt');
+  const [inputText, setInputText] = useState<string>(DEFAULT_SAMPLE_FORMAT_B);
+  const [fileName, setFileName] = useState<string>('sample_batch_format_b.txt');
   const [deck, setDeck] = useState<string>(settings.anki.defaultDeck || 'English::B1');
   const [availableDecks, setAvailableDecks] = useState<string[]>(['English::B1', 'English::B2', 'IELTS']);
   const [items, setItems] = useState<BatchItem[]>([]);
@@ -209,9 +182,9 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
     formatLabel: string;
     formatDescription: string;
   }>({
-    format: 'formatA_simple',
-    formatLabel: 'Format A (Simple Word List)',
-    formatDescription: 'One English word per line. AI and dictionaries will automatically generate all details.',
+    format: 'formatB_structured',
+    formatLabel: 'Format B (Structured Blocks with --)',
+    formatDescription: 'All batch processing exclusively uses Format B. All custom fields, overrides, target decks, photo flags, and spelling modes are preserved.',
   });
 
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -526,23 +499,21 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
           >
             <div className="flex items-center justify-between gap-2 mb-1">
               <div className="flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-blue-500" />
+                <Sparkles className="w-4 h-4 text-purple-500" />
                 <span className="text-xs font-semibold">
-                  Detected Format:
+                  Batch Format:
                 </span>
               </div>
               <span
                 className={`px-2 py-0.5 text-[10px] font-semibold rounded border ${
-                  detectedFormatInfo.format === 'formatB_structured'
-                    ? 'bg-purple-900/40 text-purple-300 border-purple-800'
-                    : 'bg-blue-900/40 text-blue-300 border-blue-800'
+                  isDark ? 'bg-purple-900/40 text-purple-300 border-purple-800' : 'bg-purple-50 text-purple-800 border-purple-200'
                 }`}
               >
-                {detectedFormatInfo.format === 'formatB_structured' ? 'Format B (Structured)' : 'Format A (Simple List)'}
+                Format B (Structured Key-Value Blocks)
               </span>
             </div>
             <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-              {detectedFormatInfo.formatDescription}
+              Structured key-value blocks separated by &quot;--&quot;. All custom overrides, target decks, photo flags, and spelling modes are preserved.
             </p>
           </div>
 
@@ -594,47 +565,32 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             <button
               type="button"
               onClick={() => {
-                setFileName('sample_simple_list.txt');
-                setInputText(DEFAULT_SAMPLE_FORMAT_A);
-              }}
-              className={`flex-1 py-1.5 px-2 text-xs font-medium rounded border cursor-pointer flex items-center justify-center gap-1 transition-colors ${
-                isDark
-                  ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-200 border-zinc-700'
-                  : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-800 border-zinc-200'
-              }`}
-            >
-              <List className="w-3.5 h-3.5 text-blue-500" />
-              <span>Format A Example</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFileName('sample_structured_blocks.txt');
+                setFileName('sample_batch_format_b.txt');
                 setInputText(DEFAULT_SAMPLE_FORMAT_B);
               }}
-              className={`flex-1 py-1.5 px-2 text-xs font-medium rounded border cursor-pointer flex items-center justify-center gap-1 transition-colors ${
+              className={`w-full py-1.5 px-2 text-xs font-medium rounded border cursor-pointer flex items-center justify-center gap-1.5 transition-colors ${
                 isDark
                   ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-200 border-zinc-700'
                   : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-800 border-zinc-200'
               }`}
             >
               <Layers className="w-3.5 h-3.5 text-purple-500" />
-              <span>Format B Example</span>
+              <span>Load Format B Template Example</span>
             </button>
           </div>
 
           <div className="mb-3">
             <textarea
-              rows={6}
+              rows={7}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               disabled={isProcessing}
-              className={`w-full text-xs font-medium font-mono p-3 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+              className={`w-full text-xs font-medium font-mono p-3 border rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500 ${
                 isDark
                   ? 'bg-[#18181B] border-zinc-700 text-zinc-100 placeholder:text-zinc-500'
                   : 'bg-white border-zinc-300 text-zinc-900 placeholder:text-zinc-400'
               }`}
-              placeholder="Paste words or upload TXT file. Format is auto-detected automatically!"
+              placeholder="Paste Format B blocks (separated by --). Example:&#10;--&#10;Word=abandon&#10;Persian Meaning=رها کردن&#10;Photo=true&#10;Spelling=true&#10;--"
             />
           </div>
 

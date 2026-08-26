@@ -6,6 +6,7 @@ import {
   AnkiCardVerificationDetails,
   ThemeId,
   CardType,
+  TaggedNoteItem,
   CustomAIProviderConfig,
   CustomTTSProviderConfig,
   SmartImagesConfig,
@@ -362,5 +363,52 @@ export async function runFullPipeline(params: {
 
 export async function runFullDiagnostics(): Promise<DiagnosticsReport> {
   const res = await fetch('/api/diagnostics');
+  return res.json();
+}
+
+export async function getAnkiTags(url?: string): Promise<{ success: boolean; tags: string[]; error?: string }> {
+  const query = url ? `?url=${encodeURIComponent(url)}` : '';
+  const res = await fetch(`/api/anki/tags${query}`);
+  return res.json();
+}
+
+export async function findNotesByTag(params: {
+  tag: string;
+  url?: string;
+}): Promise<{
+  success: boolean;
+  tag: string;
+  notes: TaggedNoteItem[];
+  totalCount: number;
+  missingCount: number;
+  error?: string;
+}> {
+  const res = await fetch('/api/anki/notes-by-tag', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  return res.json();
+}
+
+export async function completeAnkiNote(params: {
+  noteId: number;
+  selectedTag?: string;
+  includeImage?: boolean;
+  url?: string;
+}): Promise<{
+  success: boolean;
+  noteId?: number;
+  word?: string;
+  cardData?: CardData;
+  generatedFields?: string[];
+  removedTag?: string;
+  error?: string;
+}> {
+  const res = await fetch('/api/anki/complete-note', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
   return res.json();
 }

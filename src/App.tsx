@@ -3,6 +3,7 @@ import { AppSettings, CardData, AppTheme } from './types';
 import { NavigationStrip, NavTab } from './components/NavigationStrip';
 import { CreateCardView } from './components/CreateCardView';
 import { BatchCardView } from './components/BatchCardView';
+import { CompleteCardsByTagView } from './components/CompleteCardsByTagView';
 import { SettingsView } from './components/SettingsView';
 import { fetchConfig, saveConfig, checkOllama, checkGemini, checkTTS, checkOnlineTTS, checkAnki } from './services/api';
 import { AppThemeProvider, normalizeAppTheme } from './context/ThemeContext';
@@ -204,6 +205,13 @@ export default function App() {
 
           <div className={currentTab === 'batch' ? 'block' : 'hidden'}>
             <BatchCardView
+              settings={settings}
+              appTheme={activeAppTheme}
+            />
+          </div>
+
+          <div className={currentTab === 'complete-by-tag' ? 'block' : 'hidden'}>
+            <CompleteCardsByTagView
               settings={settings}
               appTheme={activeAppTheme}
             />

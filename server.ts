@@ -33,8 +33,14 @@ import {
   verifyFullAnkiNoteAndCards,
   openInAnkiBrowser,
   changeCardsDeck,
+  getAnkiTags,
+  findNotesByTag,
+  getNotesInfo,
+  updateAnkiNoteFields,
+  removeAnkiNoteTag,
+  storeAnkiMediaFile,
 } from './server/anki';
-import { AppSettings, CardData, DiagnosticsReport, StepLog, ThemeId, CardType, CustomAIProviderConfig, CustomTTSProviderConfig } from './src/types';
+import { AppSettings, CardData, ManualOverrides, DiagnosticsReport, StepLog, ThemeId, CardType, CustomAIProviderConfig, CustomTTSProviderConfig } from './src/types';
 import { THEMES, makeSpellingSentence } from './src/themes';
 
 const SETTINGS_FILE = path.join(process.cwd(), 'user-settings.json');
@@ -624,6 +630,405 @@ async function startServer() {
     }
     const result = await changeCardsDeck(ankiUrl, cardIds, newDeck);
     res.json(result);
+  });
+
+  // --- Complete Cards by Tag Endpoints ---
+  app.get('/api/anki/tags', async (req, res) => {
+    const url = (req.query.url as string) || appSettings.anki.url || 'http://127.0.0.1:8765';
+    const result = await getAnkiTags(url);
+    res.json(result);
+  });
+
+  app.post('/api/anki/notes-by-tag', async (req, res) => {
+    const { tag, url } = req.body;
+    const ankiUrl = url || appSettings.anki.url || 'http://127.0.0.1:8765';
+    const cleanTag = (tag || '').trim();
+    if (!cleanTag) {
+      return res.status(400).json({ success: false, error: 'Tag parameter is required' });
+    }
+
+    const findRes = await findNotesByTag(ankiUrl, cleanTag);
+    if (!findRes.success) {
+      return res.status(500).json({ success: false, error: findRes.error || 'Failed to find notes with tag' });
+    }
+
+    const noteIds = findRes.noteIds;
+    if (noteIds.length === 0) {
+      return res.json({
+        success: true,
+        tag: cleanTag,
+        notes: [],
+        totalCount: 0,
+        missingCount: 0,
+      });
+    }
+
+    const infoRes = await getNotesInfo(ankiUrl, noteIds);
+    if (!infoRes.success) {
+      return res.status(500).json({ success: false, error: infoRes.error || 'Failed to get notes info' });
+    }
+
+    const inspectedNotes = (infoRes.notes || []).map((n: any) => {
+      const noteFields = n.fields || {};
+      const getVal = (...keys: string[]) => {
+        for (const k of keys) {
+          if (noteFields[k]?.value !== undefined) {
+            const raw = String(noteFields[k].value).replace(/<[^>]+>/g, '').trim();
+            if (raw) return raw;
+          }
+        }
+        return '';
+      };
+
+      const word = getVal('Word', 'word', 'Front', 'front', 'English', 'english', 'Term', 'term');
+      const meaning = getVal('Meaning', 'meaning', 'Persian Meaning', 'persianmeaning', 'Back', 'back', 'Translation', 'translation');
+      const phonetic = getVal('Phonetic', 'phonetic', 'IPA', 'ipa', 'Pronunciation', 'pronunciation');
+      const partOfSpeech = getVal('PartOfSpeech', 'partofspeech', 'Part of Speech', 'pos', 'POS', 'Type', 'type');
+      const example = getVal('Example', 'example', 'Example Sentence', 'examplesentence', 'Sentence', 'sentence');
+      const translation = getVal('Translation', 'translation', 'Example Translation', 'exampletranslation', 'Sentence Fa', 'sentencefa');
+      const mnemonic = getVal('Mnemonic', 'mnemonic', 'Memory Aid', 'memoryaid', 'Aid', 'aid');
+      const cardImage = getVal('CardImage', 'cardimage', 'Image', 'image', 'Picture', 'picture');
+      const wordAudio = getVal('WordAudio', 'wordaudio', 'WordAudioUsNormal', 'WordAudioUsSlow');
+
+      const presentFields: string[] = [];
+      const missingFields: string[] = [];
+
+      if (word) presentFields.push('Word'); else missingFields.push('Word');
+      if (meaning) presentFields.push('Meaning'); else missingFields.push('Meaning');
+      if (phonetic) presentFields.push('Phonetic'); else missingFields.push('Phonetic');
+      if (partOfSpeech) presentFields.push('PartOfSpeech'); else missingFields.push('PartOfSpeech');
+      if (example) presentFields.push('Example'); else missingFields.push('Example');
+      if (translation) presentFields.push('Translation'); else missingFields.push('Translation');
+      if (mnemonic) presentFields.push('Mnemonic'); else missingFields.push('Mnemonic');
+
+      const cleanFieldsMap: Record<string, string> = {};
+      for (const [k, v] of Object.entries(noteFields)) {
+        cleanFieldsMap[k] = (v as any)?.value || '';
+      }
+
+      return {
+        noteId: n.noteId,
+        tags: n.tags || [],
+        modelName: n.modelName || '',
+        word: word || `Note #${n.noteId}`,
+        fields: cleanFieldsMap,
+        presentFields,
+        missingFields,
+        needsCompletion: missingFields.length > 0,
+        status: 'idle' as const,
+      };
+    });
+
+    const missingCount = inspectedNotes.filter((n: any) => n.needsCompletion).length;
+
+    res.json({
+      success: true,
+      tag: cleanTag,
+      notes: inspectedNotes,
+      totalCount: inspectedNotes.length,
+      missingCount,
+    });
+  });
+
+  app.post('/api/anki/complete-note', async (req, res) => {
+    const { noteId, selectedTag, includeImage = true, url } = req.body;
+    const ankiUrl = url || appSettings.anki.url || 'http://127.0.0.1:8765';
+    if (!noteId) {
+      return res.status(400).json({ success: false, error: 'noteId is required' });
+    }
+
+    // 1. Fetch current note info from Anki
+    const infoRes = await getNotesInfo(ankiUrl, [noteId]);
+    if (!infoRes.success || !infoRes.notes?.length) {
+      return res.status(404).json({ success: false, error: `Note #${noteId} not found in Anki` });
+    }
+
+    const note = infoRes.notes[0];
+    const noteFields = note.fields || {};
+
+    const getRawVal = (...keys: string[]) => {
+      for (const k of keys) {
+        if (noteFields[k]?.value !== undefined) {
+          return String(noteFields[k].value);
+        }
+      }
+      return '';
+    };
+
+    const getCleanVal = (...keys: string[]) => {
+      const raw = getRawVal(...keys);
+      return raw.replace(/<[^>]+>/g, '').trim();
+    };
+
+    const cleanWord = getCleanVal('Word', 'word', 'Front', 'front', 'English', 'english');
+    if (!cleanWord) {
+      return res.status(400).json({ success: false, error: `Note #${noteId} has an empty Word field` });
+    }
+
+    const existingMeaning = getCleanVal('Meaning', 'meaning', 'Persian Meaning', 'persianmeaning', 'Back', 'back');
+    const existingPhonetic = getCleanVal('Phonetic', 'phonetic', 'IPA', 'ipa', 'Pronunciation', 'pronunciation');
+    const existingPOS = getCleanVal('PartOfSpeech', 'partofspeech', 'Part of Speech', 'pos', 'POS');
+    const existingExample = getCleanVal('Example', 'example', 'Example Sentence', 'examplesentence', 'Sentence');
+    const existingTranslation = getCleanVal('Translation', 'translation', 'Example Translation', 'exampletranslation', 'Sentence Fa');
+    const existingMnemonic = getCleanVal('Mnemonic', 'mnemonic', 'Memory Aid', 'memoryaid');
+    const existingImageRaw = getRawVal('CardImage', 'cardimage', 'Image', 'image', 'Picture');
+    const existingCardType = (getCleanVal('CardType', 'cardtype') as CardType) || (note.modelName?.includes('Spelling') ? 'spelling' : 'normal');
+
+    // 2. Prepare manual overrides with ALL existing user fields (never overwrite user-provided values!)
+    const manualOverrides: ManualOverrides = {
+      phonetic: existingPhonetic || undefined,
+      partOfSpeech: existingPOS || undefined,
+      meaningFa: existingMeaning || undefined,
+      example: existingExample || undefined,
+      translationFa: existingTranslation || undefined,
+      mnemonic: existingMnemonic || undefined,
+      cardType: existingCardType || 'normal',
+    };
+
+    const generatedFieldsList: string[] = [];
+
+    // 3. AI Generation for missing fields
+    let generatedCardData: CardData;
+    const aiProvider = appSettings.ai.provider;
+
+    try {
+      if (aiProvider === 'gemini') {
+        const gemRes = await generateWithGemini(
+          appSettings.ai.gemini.apiKey,
+          appSettings.ai.gemini.model,
+          cleanWord,
+          manualOverrides,
+          appSettings.ai.gemini.temperature
+        );
+        if (!gemRes.success || !gemRes.data) throw new Error(gemRes.error || 'Gemini generation failed');
+        generatedCardData = gemRes.data;
+      } else if (aiProvider === 'ollama') {
+        const olRes = await generateWithOllama(
+          appSettings.ai.ollama.url,
+          appSettings.ai.ollama.model,
+          cleanWord,
+          manualOverrides,
+          appSettings.ai.ollama.temperature,
+          appSettings.ai.ollama.contextLength
+        );
+        if (!olRes.success || !olRes.data) throw new Error(olRes.error || 'Ollama generation failed');
+        generatedCardData = olRes.data;
+      } else {
+        const customConfig = appSettings.ai.customProviders?.find((p) => p.id === aiProvider) || appSettings.ai.customProviders?.[0];
+        if (!customConfig) throw new Error(`Custom AI provider ${aiProvider} not found`);
+        const custRes = await generateWithCustomAI(customConfig, cleanWord, manualOverrides, customConfig.temperature || 0.2);
+        if (!custRes.success || !custRes.data) throw new Error(custRes.error || 'Custom AI generation failed');
+        generatedCardData = custRes.data;
+      }
+
+      // Track generated fields
+      if (!existingMeaning && generatedCardData.meaningFa) generatedFieldsList.push('Meaning');
+      if (!existingPhonetic && generatedCardData.phonetic) generatedFieldsList.push('Phonetic');
+      if (!existingPOS && generatedCardData.partOfSpeech) generatedFieldsList.push('PartOfSpeech');
+      if (!existingExample && generatedCardData.example) generatedFieldsList.push('Example');
+      if (!existingTranslation && generatedCardData.translationFa) generatedFieldsList.push('Translation');
+      if (!existingMnemonic && generatedCardData.mnemonic) generatedFieldsList.push('Mnemonic');
+    } catch (aiErr: any) {
+      return res.status(500).json({ success: false, error: `AI Generation error: ${aiErr.message}` });
+    }
+
+    // 4. Image handling (Controlled by includeImage option)
+    let cardImageTag = existingImageRaw;
+    if (includeImage && !existingImageRaw && appSettings.smartImages.enabled) {
+      try {
+        const imgRes = await getSmartImage(
+          generatedCardData.word,
+          generatedCardData.partOfSpeech,
+          generatedCardData.meaningFa,
+          appSettings.smartImages,
+          appSettings,
+          false
+        );
+        if (imgRes.success && imgRes.needsImage && imgRes.imageBase64 && imgRes.imageFileName) {
+          generatedCardData.imageBase64 = imgRes.imageBase64;
+          generatedCardData.imageFileName = imgRes.imageFileName;
+          await storeAnkiMediaFile(ankiUrl, imgRes.imageFileName, imgRes.imageBase64);
+          cardImageTag = `<img src="${imgRes.imageFileName}" class="card-illustration" />`;
+          generatedFieldsList.push('CardImage');
+        }
+      } catch (imgErr) {
+        console.warn('Tag completion image error:', imgErr);
+      }
+    }
+
+    // 5. Audio generation & storing into Anki media
+    try {
+      const ttsProvider = appSettings.tts.provider;
+      if (ttsProvider === 'online') {
+        const onlineAudio = await generateAllOnlineCardAudios({
+          word: generatedCardData.word,
+          example: generatedCardData.example,
+          generateAmericanNormal: appSettings.tts.generateAmericanNormal,
+          generateAmericanSlow: appSettings.tts.generateAmericanSlow,
+          generateBritishNormal: appSettings.tts.generateBritishNormal,
+          generateBritishSlow: appSettings.tts.generateBritishSlow,
+          generateExampleUsNormal: appSettings.tts.generateExampleUsNormal,
+          generateExampleUsSlow: appSettings.tts.generateExampleUsSlow,
+          generateExampleUkNormal: appSettings.tts.generateExampleUkNormal,
+          generateExampleUkSlow: appSettings.tts.generateExampleUkSlow,
+        });
+
+        for (const file of onlineAudio.files) {
+          await storeAnkiMediaFile(ankiUrl, file.fileName, file.base64);
+        }
+
+        generatedCardData.wordAudioUsNormalFileName = onlineAudio.wordAudioUsNormalFileName;
+        generatedCardData.wordAudioUsSlowFileName = onlineAudio.wordAudioUsSlowFileName;
+        generatedCardData.wordAudioUkNormalFileName = onlineAudio.wordAudioUkNormalFileName;
+        generatedCardData.wordAudioUkSlowFileName = onlineAudio.wordAudioUkSlowFileName;
+        generatedCardData.exampleAudioUsNormalFileName = onlineAudio.exampleAudioUsNormalFileName;
+        generatedCardData.exampleAudioUsSlowFileName = onlineAudio.exampleAudioUsSlowFileName;
+        generatedCardData.exampleAudioUkNormalFileName = onlineAudio.exampleAudioUkNormalFileName;
+        generatedCardData.exampleAudioUkSlowFileName = onlineAudio.exampleAudioUkSlowFileName;
+        generatedCardData.wordAudioUsNormalBase64 = onlineAudio.wordAudioUsNormalBase64;
+        generatedCardData.wordAudioUsSlowBase64 = onlineAudio.wordAudioUsSlowBase64;
+        generatedCardData.wordAudioUkNormalBase64 = onlineAudio.wordAudioUkNormalBase64;
+        generatedCardData.wordAudioUkSlowBase64 = onlineAudio.wordAudioUkSlowBase64;
+        generatedCardData.exampleAudioUsNormalBase64 = onlineAudio.exampleAudioUsNormalBase64;
+        generatedCardData.exampleAudioUsSlowBase64 = onlineAudio.exampleAudioUsSlowBase64;
+        generatedCardData.exampleAudioUkNormalBase64 = onlineAudio.exampleAudioUkNormalBase64;
+        generatedCardData.exampleAudioUkSlowBase64 = onlineAudio.exampleAudioUkSlowBase64;
+        generatedFieldsList.push('Audio');
+      } else if (ttsProvider === 'piper') {
+        const piperAudio = await generateAllCardAudios({
+          word: generatedCardData.word,
+          example: generatedCardData.example,
+          endpoint: appSettings.tts.endpoint,
+          americanVoice: appSettings.tts.americanVoice,
+          britishVoice: appSettings.tts.britishVoice,
+          normalSpeed: appSettings.tts.normalSpeed,
+          slowSpeed: appSettings.tts.slowSpeed,
+          generateAmericanNormal: appSettings.tts.generateAmericanNormal,
+          generateAmericanSlow: appSettings.tts.generateAmericanSlow,
+          generateBritishNormal: appSettings.tts.generateBritishNormal,
+          generateBritishSlow: appSettings.tts.generateBritishSlow,
+          generateExampleUsNormal: appSettings.tts.generateExampleUsNormal,
+          generateExampleUsSlow: appSettings.tts.generateExampleUsSlow,
+          generateExampleUkNormal: appSettings.tts.generateExampleUkNormal,
+          generateExampleUkSlow: appSettings.tts.generateExampleUkSlow,
+          speedAmericanNormal: appSettings.tts.speedAmericanNormal,
+          speedAmericanSlow: appSettings.tts.speedAmericanSlow,
+          speedBritishNormal: appSettings.tts.speedBritishNormal,
+          speedBritishSlow: appSettings.tts.speedBritishSlow,
+          speedExampleUsNormal: appSettings.tts.speedExampleUsNormal,
+          speedExampleUsSlow: appSettings.tts.speedExampleUsSlow,
+          speedExampleUkNormal: appSettings.tts.speedExampleUkNormal,
+          speedExampleUkSlow: appSettings.tts.speedExampleUkSlow,
+        });
+
+        for (const file of piperAudio.files) {
+          await storeAnkiMediaFile(ankiUrl, file.fileName, file.base64);
+        }
+
+        generatedCardData.wordAudioUsNormalFileName = piperAudio.wordAudioUsNormalFileName;
+        generatedCardData.wordAudioUsSlowFileName = piperAudio.wordAudioUsSlowFileName;
+        generatedCardData.wordAudioUkNormalFileName = piperAudio.wordAudioUkNormalFileName;
+        generatedCardData.wordAudioUkSlowFileName = piperAudio.wordAudioUkSlowFileName;
+        generatedCardData.exampleAudioUsNormalFileName = piperAudio.exampleAudioUsNormalFileName;
+        generatedCardData.exampleAudioUsSlowFileName = piperAudio.exampleAudioUsSlowFileName;
+        generatedCardData.exampleAudioUkNormalFileName = piperAudio.exampleAudioUkNormalFileName;
+        generatedCardData.exampleAudioUkSlowFileName = piperAudio.exampleAudioUkSlowFileName;
+        generatedCardData.wordAudioUsNormalBase64 = piperAudio.wordAudioUsNormalBase64;
+        generatedCardData.wordAudioUsSlowBase64 = piperAudio.wordAudioUsSlowBase64;
+        generatedCardData.wordAudioUkNormalBase64 = piperAudio.wordAudioUkNormalBase64;
+        generatedCardData.wordAudioUkSlowBase64 = piperAudio.wordAudioUkSlowBase64;
+        generatedCardData.exampleAudioUsNormalBase64 = piperAudio.exampleAudioUsNormalBase64;
+        generatedCardData.exampleAudioUsSlowBase64 = piperAudio.exampleAudioUsSlowBase64;
+        generatedCardData.exampleAudioUkNormalBase64 = piperAudio.exampleAudioUkNormalBase64;
+        generatedCardData.exampleAudioUkSlowBase64 = piperAudio.exampleAudioUkSlowBase64;
+        generatedFieldsList.push('Audio');
+      }
+    } catch (audioErr) {
+      console.warn('Tag completion audio generation error:', audioErr);
+    }
+
+    // 6. Format updated fields to store in Anki
+    const wordAudioSounds = [
+      generatedCardData.wordAudioUsNormalFileName ? `[sound:${generatedCardData.wordAudioUsNormalFileName}]` : '',
+      generatedCardData.wordAudioUsSlowFileName ? `[sound:${generatedCardData.wordAudioUsSlowFileName}]` : '',
+      generatedCardData.wordAudioUkNormalFileName ? `[sound:${generatedCardData.wordAudioUkNormalFileName}]` : '',
+      generatedCardData.wordAudioUkSlowFileName ? `[sound:${generatedCardData.wordAudioUkSlowFileName}]` : '',
+    ].filter(Boolean);
+
+    const exampleAudioSounds = [
+      generatedCardData.exampleAudioUsNormalFileName ? `[sound:${generatedCardData.exampleAudioUsNormalFileName}]` : '',
+      generatedCardData.exampleAudioUsSlowFileName ? `[sound:${generatedCardData.exampleAudioUsSlowFileName}]` : '',
+      generatedCardData.exampleAudioUkNormalFileName ? `[sound:${generatedCardData.exampleAudioUkNormalFileName}]` : '',
+      generatedCardData.exampleAudioUkSlowFileName ? `[sound:${generatedCardData.exampleAudioUkSlowFileName}]` : '',
+    ].filter(Boolean);
+
+    const spellingSentence = generatedCardData.spellingSentence || makeSpellingSentence(generatedCardData.example, generatedCardData.word);
+
+    const updatedFields: Record<string, string> = {};
+    for (const key of Object.keys(noteFields)) {
+      const kLow = key.toLowerCase().replace(/[\s_-]/g, '');
+      if (kLow === 'word' || kLow === 'front' || kLow === 'english') {
+        updatedFields[key] = cleanWord;
+      } else if (kLow === 'meaning' || kLow === 'persianmeaning' || kLow === 'back' || kLow === 'translationfa') {
+        updatedFields[key] = generatedCardData.meaningFa;
+      } else if (kLow === 'phonetic' || kLow === 'ipa' || kLow === 'pronunciation') {
+        updatedFields[key] = generatedCardData.phonetic;
+      } else if (kLow === 'partofspeech' || kLow === 'pos' || kLow === 'type') {
+        updatedFields[key] = generatedCardData.partOfSpeech;
+      } else if (kLow === 'example' || kLow === 'examplesentence' || kLow === 'sentence') {
+        updatedFields[key] = generatedCardData.example;
+      } else if (kLow === 'translation' || kLow === 'exampletranslation' || kLow === 'sentencefa') {
+        updatedFields[key] = generatedCardData.translationFa;
+      } else if (kLow === 'mnemonic' || kLow === 'memoryaid' || kLow === 'aid') {
+        updatedFields[key] = generatedCardData.mnemonic;
+      } else if (kLow === 'cardimage' || kLow === 'image' || kLow === 'picture') {
+        updatedFields[key] = cardImageTag;
+      } else if (kLow === 'spellingsentence') {
+        updatedFields[key] = spellingSentence;
+      } else if (kLow === 'cardtype') {
+        updatedFields[key] = generatedCardData.cardType || 'normal';
+      } else if (kLow === 'wordaudio') {
+        updatedFields[key] = wordAudioSounds.join(' ');
+      } else if (kLow === 'exampleaudio') {
+        updatedFields[key] = exampleAudioSounds.join(' ');
+      } else if (kLow === 'wordaudiousnormal') {
+        updatedFields[key] = generatedCardData.wordAudioUsNormalFileName ? `[sound:${generatedCardData.wordAudioUsNormalFileName}]` : '';
+      } else if (kLow === 'wordaudiousslow') {
+        updatedFields[key] = generatedCardData.wordAudioUsSlowFileName ? `[sound:${generatedCardData.wordAudioUsSlowFileName}]` : '';
+      } else if (kLow === 'wordaudiouknormal') {
+        updatedFields[key] = generatedCardData.wordAudioUkNormalFileName ? `[sound:${generatedCardData.wordAudioUkNormalFileName}]` : '';
+      } else if (kLow === 'wordaudioukslow') {
+        updatedFields[key] = generatedCardData.wordAudioUkSlowFileName ? `[sound:${generatedCardData.wordAudioUkSlowFileName}]` : '';
+      } else if (kLow === 'exampleaudiousnormal') {
+        updatedFields[key] = generatedCardData.exampleAudioUsNormalFileName ? `[sound:${generatedCardData.exampleAudioUsNormalFileName}]` : '';
+      } else if (kLow === 'exampleaudiousslow') {
+        updatedFields[key] = generatedCardData.exampleAudioUsSlowFileName ? `[sound:${generatedCardData.exampleAudioUsSlowFileName}]` : '';
+      } else if (kLow === 'exampleaudiouknormal') {
+        updatedFields[key] = generatedCardData.exampleAudioUkNormalFileName ? `[sound:${generatedCardData.exampleAudioUkNormalFileName}]` : '';
+      } else if (kLow === 'exampleaudioukslow') {
+        updatedFields[key] = generatedCardData.exampleAudioUkSlowFileName ? `[sound:${generatedCardData.exampleAudioUkSlowFileName}]` : '';
+      }
+    }
+
+    // 7. Update Note directly in Anki
+    const updateRes = await updateAnkiNoteFields(ankiUrl, noteId, updatedFields);
+    if (!updateRes.success) {
+      return res.status(500).json({ success: false, error: `Failed to update note in Anki: ${updateRes.error}` });
+    }
+
+    // 8. Remove the processing tag ONLY upon successful completion
+    if (selectedTag) {
+      await removeAnkiNoteTag(ankiUrl, [noteId], selectedTag);
+    }
+
+    return res.json({
+      success: true,
+      noteId,
+      word: cleanWord,
+      cardData: generatedCardData,
+      generatedFields: generatedFieldsList,
+      removedTag: selectedTag,
+    });
   });
 
   // --- Diagnostics All-In-One ---

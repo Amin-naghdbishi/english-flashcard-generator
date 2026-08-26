@@ -1,9 +1,9 @@
 import React from 'react';
-import { Sparkles, Layers, Sliders, RefreshCw } from 'lucide-react';
+import { Sparkles, Layers, Sliders, RefreshCw, Tags } from 'lucide-react';
 import { AppTheme } from '../types';
 import { useAppTheme } from '../context/ThemeContext';
 
-export type NavTab = 'create' | 'batch' | 'settings';
+export type NavTab = 'create' | 'batch' | 'complete-by-tag' | 'settings';
 
 interface NavigationStripProps {
   currentTab: NavTab;
@@ -68,6 +68,23 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
           >
             <Layers className="w-4 h-4 shrink-0" />
             <span>Batch</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSelectTab('complete-by-tag')}
+            className={`py-3 sm:py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 transition-colors cursor-pointer ${
+              currentTab === 'complete-by-tag'
+                ? isDark
+                  ? 'border-blue-500 text-blue-400 bg-blue-950/25 font-semibold'
+                  : 'border-blue-600 text-blue-600 bg-blue-50/60 font-semibold'
+                : isDark
+                ? 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
+                : 'border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/70'
+            }`}
+          >
+            <Tags className="w-4 h-4 shrink-0" />
+            <span>Complete by Tag</span>
           </button>
 
           <button

@@ -267,6 +267,28 @@ export interface BatchItem {
   isDuplicate?: boolean;
 }
 
+export interface TaggedNoteFieldInspection {
+  field: string;
+  label: string;
+  hasValue: boolean;
+  value: string;
+}
+
+export interface TaggedNoteItem {
+  noteId: number;
+  word: string;
+  tags: string[];
+  modelName: string;
+  fields: Record<string, string>;
+  presentFields: string[];
+  missingFields: string[];
+  needsCompletion: boolean;
+  status: 'idle' | 'scanning' | 'generating_ai' | 'generating_audio' | 'updating_anki' | 'success' | 'error' | 'skipped';
+  error?: string;
+  updatedCardData?: CardData;
+  generatedFieldsSummary?: string[];
+}
+
 export interface StepLog {
   step: number;
   name: string;
