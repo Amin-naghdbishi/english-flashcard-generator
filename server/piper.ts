@@ -7,7 +7,7 @@ const execPromise = promisify(exec);
 export interface PiperVoice {
   id: string;
   name: string;
-  accent: 'american' | 'british';
+  accent: 'american' | 'british' | 'other';
   defaultModel: string;
 }
 
@@ -17,6 +17,12 @@ export const PIPER_VOICES: PiperVoice[] = [
     name: 'American English (Lessac High)',
     accent: 'american',
     defaultModel: 'en_US-lessac-high',
+  },
+  {
+    id: 'en_US-lessac-medium',
+    name: 'American English (Lessac Medium)',
+    accent: 'american',
+    defaultModel: 'en_US-lessac-medium',
   },
   {
     id: 'en_GB-cori-high',
@@ -73,8 +79,154 @@ export interface PiperDiagnosticResult {
 }
 
 /**
+ * Checks if Piper TTS HTTP server is alive and reachable.
+ * Tests /voices first, then falls back to /synthesize.
+ */
+export async function checkPiperHealth(endpoint: string = 'http://127.0.0.1:5000'): Promise<{
+  connected: boolean;
+  endpoint: string;
+  voicesCount?: number;
+  error?: string;
+}> {
+  const cleanEndpoint = endpoint.replace(/\/+$/, '');
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+    // 1. Try standard /voices endpoint
+    try {
+      const voicesRes = await fetch(`${cleanEndpoint}/voices`, {
+        method: 'GET',
+        headers: { Accept: 'application/json, text/plain, */*' },
+        signal: controller.signal,
+      });
+
+      if (voicesRes && voicesRes.ok) {
+        clearTimeout(timeoutId);
+        let count = 0;
+        try {
+          const data = await voicesRes.json();
+          if (Array.isArray(data)) count = data.length;
+          else if (data && typeof data === 'object') {
+            count = Array.isArray(data.voices) ? data.voices.length : Object.keys(data).length;
+          }
+        } catch {}
+        return { connected: true, endpoint: cleanEndpoint, voicesCount: count };
+      }
+    } catch {}
+
+    // 2. Try OPTIONS or GET on /synthesize or root
+    const controller2 = new AbortController();
+    const timeoutId2 = setTimeout(() => controller2.abort(), 3000);
+    const synthRes = await fetch(`${cleanEndpoint}/synthesize`, {
+      method: 'OPTIONS',
+      signal: controller2.signal,
+    }).catch(() => null);
+    clearTimeout(timeoutId2);
+
+    if (synthRes && (synthRes.ok || synthRes.status === 405 || synthRes.status === 200 || synthRes.status === 404)) {
+      return { connected: true, endpoint: cleanEndpoint };
+    }
+
+    return {
+      connected: false,
+      endpoint: cleanEndpoint,
+      error: `Piper TTS is unreachable at ${cleanEndpoint}`,
+    };
+  } catch (err: any) {
+    return {
+      connected: false,
+      endpoint: cleanEndpoint,
+      error: `Piper TTS is unreachable at ${cleanEndpoint} (${err?.message || 'Connection refused'})`,
+    };
+  }
+}
+
+/**
+ * Dynamically retrieves available voices from Piper's /voices HTTP endpoint.
+ * Parses both array and object formats, falling back to default voice list if Piper is offline.
+ */
+export async function getAvailablePiperVoices(endpoint: string = 'http://127.0.0.1:5000'): Promise<{
+  success: boolean;
+  voices: PiperVoice[];
+  error?: string;
+}> {
+  const cleanEndpoint = endpoint.replace(/\/+$/, '');
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+    const res = await fetch(`${cleanEndpoint}/voices`, {
+      method: 'GET',
+      headers: { Accept: 'application/json, text/plain, */*' },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      return {
+        success: false,
+        voices: PIPER_VOICES,
+        error: `Piper HTTP error ${res.status}: ${res.statusText}`,
+      };
+    }
+
+    const data = await res.json();
+    let rawList: string[] = [];
+
+    if (Array.isArray(data)) {
+      rawList = data.map((v) => (typeof v === 'string' ? v : v.id || v.name || v.key || String(v))).filter(Boolean);
+    } else if (data && typeof data === 'object') {
+      if (Array.isArray(data.voices)) {
+        rawList = data.voices.map((v: any) => (typeof v === 'string' ? v : v.id || v.name || v.key || String(v))).filter(Boolean);
+      } else {
+        rawList = Object.keys(data);
+      }
+    }
+
+    if (rawList.length > 0) {
+      const parsedVoices: PiperVoice[] = rawList.map((id) => {
+        const lower = id.toLowerCase();
+        const isBritish = lower.includes('en_gb') || lower.includes('en-gb') || lower.includes('cori') || lower.includes('alan');
+        const isAmerican = lower.includes('en_us') || lower.includes('en-us') || lower.includes('lessac') || lower.includes('ryan') || lower.includes('amy') || !isBritish;
+        
+        // Clean display name
+        const cleanName = id
+          .replace(/^en_US-|^en_GB-|^en-US-|^en-GB-/, '')
+          .replace(/[-_]/g, ' ')
+          .replace(/\b\w/g, (c) => c.toUpperCase());
+        
+        const regionPrefix = isBritish ? 'British' : (isAmerican ? 'American' : 'English');
+
+        return {
+          id,
+          name: `${regionPrefix} (${cleanName})`,
+          accent: isBritish ? 'british' : (isAmerican ? 'american' : 'other'),
+          defaultModel: id,
+        };
+      });
+
+      return {
+        success: true,
+        voices: parsedVoices,
+      };
+    }
+
+    return {
+      success: true,
+      voices: PIPER_VOICES,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      voices: PIPER_VOICES,
+      error: `Could not fetch voices from Piper: ${err?.message || 'Connection refused'}`,
+    };
+  }
+}
+
+/**
  * Synthesizes audio using the real Piper TTS local HTTP server.
- * Never uses fake/browser audio.
  * Endpoint: POST /synthesize
  * Body: { text: string, voice: string, length_scale: number }
  */
@@ -97,12 +249,13 @@ export async function synthesizePiperAudio(
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
 
+    const safeLengthScale = typeof lengthScale === 'number' && lengthScale > 0 ? lengthScale : 1.0;
     const payload = {
       text: trimmed,
-      voice: voice,
-      length_scale: Number(lengthScale) || 1.0,
+      voice: voice || 'en_US-lessac-high',
+      length_scale: safeLengthScale,
     };
 
     let response: Response;
@@ -111,7 +264,7 @@ export async function synthesizePiperAudio(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Accept: 'audio/x-wav, audio/wav, audio/*, application/octet-stream',
+          Accept: 'audio/wav, audio/x-wav, audio/*, application/octet-stream',
         },
         body: JSON.stringify(payload),
         signal: controller.signal,
@@ -121,7 +274,7 @@ export async function synthesizePiperAudio(
       const isAbort = networkErr.name === 'AbortError';
       const msg = isAbort
         ? `Request timed out connecting to Piper TTS at ${cleanEndpoint}`
-        : `Piper TTS is not running. Failed to connect to ${cleanEndpoint} (${networkErr.message || 'Connection refused'})`;
+        : `Piper TTS is unreachable at ${cleanEndpoint} (${networkErr.message || 'Connection refused'})`;
       return {
         success: false,
         error: msg,
@@ -137,7 +290,7 @@ export async function synthesizePiperAudio(
       } catch {}
       return {
         success: false,
-        error: `Piper HTTP error ${response.status}: ${errBody || response.statusText || 'Failed to synthesize audio'}`,
+        error: `Piper HTTP error ${response.status} (${response.statusText}): ${errBody || 'Failed to synthesize audio'}`,
       };
     }
 
@@ -149,7 +302,7 @@ export async function synthesizePiperAudio(
     if (!validation.isValid || wavBuffer.length === 0) {
       return {
         success: false,
-        error: `Piper output is not a valid WAV file: ${validation.error || 'Empty audio buffer'}`,
+        error: `Piper output is not a valid WAV file: ${validation.error || 'Empty audio buffer'} (size: ${wavBuffer.length} bytes)`,
       };
     }
 
@@ -158,65 +311,13 @@ export async function synthesizePiperAudio(
       wavBuffer,
       wavBase64: wavBuffer.toString('base64'),
       voice,
-      speed: lengthScale,
+      speed: safeLengthScale,
       validation,
     };
   } catch (err: any) {
     return {
       success: false,
       error: `Piper TTS exception: ${err?.message || 'Unknown error'}`,
-    };
-  }
-}
-
-/**
- * Check if Piper TTS server is alive and reachable.
- */
-export async function checkPiperHealth(endpoint: string = 'http://127.0.0.1:5000'): Promise<{
-  connected: boolean;
-  endpoint: string;
-  error?: string;
-}> {
-  const cleanEndpoint = endpoint.replace(/\/+$/, '');
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-    // Try a lightweight request to check server
-    const res = await fetch(cleanEndpoint, {
-      method: 'GET',
-      signal: controller.signal,
-    }).catch(() => null);
-
-    clearTimeout(timeoutId);
-
-    if (res && (res.ok || res.status === 404 || res.status === 405 || res.status === 200)) {
-      return { connected: true, endpoint: cleanEndpoint };
-    }
-
-    // Try OPTIONS or HEAD on /synthesize
-    const controller2 = new AbortController();
-    const timeoutId2 = setTimeout(() => controller2.abort(), 3000);
-    const synthCheck = await fetch(`${cleanEndpoint}/synthesize`, {
-      method: 'OPTIONS',
-      signal: controller2.signal,
-    }).catch(() => null);
-    clearTimeout(timeoutId2);
-
-    if (synthCheck && (synthCheck.ok || synthCheck.status === 405 || synthCheck.status === 200)) {
-      return { connected: true, endpoint: cleanEndpoint };
-    }
-
-    return {
-      connected: false,
-      endpoint: cleanEndpoint,
-      error: `Piper TTS is not running at ${cleanEndpoint}`,
-    };
-  } catch (err: any) {
-    return {
-      connected: false,
-      endpoint: cleanEndpoint,
-      error: `Piper TTS is not running. (${err?.message || 'Connection refused'})`,
     };
   }
 }
@@ -257,15 +358,8 @@ export interface GeneratedPiperCardAudios {
 }
 
 /**
- * Generates audio files for a flashcard using Piper TTS strictly based on enabled variants:
- * 1. American normal pronunciation (length_scale = 1.0) -> [word]_us_normal.wav
- * 2. American slow pronunciation (length_scale = slowSpeed) -> [word]_us_slow.wav
- * 3. British normal pronunciation (length_scale = 1.0) -> [word]_uk_normal.wav
- * 4. British slow pronunciation (length_scale = slowSpeed) -> [word]_uk_slow.wav
- * 5. Example sentence American normal (length_scale = 1.0) -> [word]_example_us_normal.wav
- * 6. Example sentence American slow (length_scale = slowSpeed) -> [word]_example_us_slow.wav
- * 7. Example sentence British normal (length_scale = 1.0) -> [word]_example_uk_normal.wav
- * 8. Example sentence British slow (length_scale = slowSpeed) -> [word]_example_uk_slow.wav
+ * Generates audio files for a flashcard using Piper TTS based on enabled variants.
+ * Accurately tracks errors from each requested synthesis and provides clean diagnostic summaries.
  */
 export async function generateAllCardAudios(params: {
   word: string;
@@ -330,6 +424,7 @@ export async function generateAllCardAudios(params: {
 
   const safeWord = word.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
   const resultFiles: GeneratedPiperCardAudios['files'] = [];
+  const synthesisErrors: string[] = [];
 
   const wordSoundTags: string[] = [];
   const exampleSoundTags: string[] = [];
@@ -346,7 +441,7 @@ export async function generateAllCardAudios(params: {
   if (!health.connected) {
     return {
       success: false,
-      error: `Piper TTS is not running at ${endpoint}. Please start Piper HTTP server before creating cards.`,
+      error: `Piper TTS is not running at ${endpoint}. ${health.error || 'Please start Piper HTTP server before creating cards.'}`,
       files: [],
       wordAudioField: '',
       exampleAudioField: '',
@@ -371,6 +466,8 @@ export async function generateAllCardAudios(params: {
       wordSoundTags.push(`[sound:${usNormalFile}]`);
       returnData.wordAudioUsNormalBase64 = usNormalRes.wavBase64;
       returnData.wordAudioUsNormalFileName = usNormalFile;
+    } else {
+      synthesisErrors.push(`American Normal (${americanVoice}): ${usNormalRes.error || 'Failed'}`);
     }
   }
 
@@ -391,6 +488,8 @@ export async function generateAllCardAudios(params: {
       wordSoundTags.push(`[sound:${usSlowFile}]`);
       returnData.wordAudioUsSlowBase64 = usSlowRes.wavBase64;
       returnData.wordAudioUsSlowFileName = usSlowFile;
+    } else {
+      synthesisErrors.push(`American Slow (${americanVoice}): ${usSlowRes.error || 'Failed'}`);
     }
   }
 
@@ -411,6 +510,8 @@ export async function generateAllCardAudios(params: {
       exampleSoundTags.push(`[sound:${exampleUsFile}]`);
       returnData.exampleAudioUsNormalBase64 = exampleUsRes.wavBase64;
       returnData.exampleAudioUsNormalFileName = exampleUsFile;
+    } else {
+      synthesisErrors.push(`Example American Normal (${americanVoice}): ${exampleUsRes.error || 'Failed'}`);
     }
   }
 
@@ -431,6 +532,8 @@ export async function generateAllCardAudios(params: {
       exampleSoundTags.push(`[sound:${exampleUsSlowFile}]`);
       returnData.exampleAudioUsSlowBase64 = exampleUsSlowRes.wavBase64;
       returnData.exampleAudioUsSlowFileName = exampleUsSlowFile;
+    } else {
+      synthesisErrors.push(`Example American Slow (${americanVoice}): ${exampleUsSlowRes.error || 'Failed'}`);
     }
   }
 
@@ -452,6 +555,8 @@ export async function generateAllCardAudios(params: {
       wordSoundTags.push(`[sound:${ukNormalFile}]`);
       returnData.wordAudioUkNormalBase64 = ukNormalRes.wavBase64;
       returnData.wordAudioUkNormalFileName = ukNormalFile;
+    } else {
+      synthesisErrors.push(`British Normal (${britishVoice}): ${ukNormalRes.error || 'Failed'}`);
     }
   }
 
@@ -472,6 +577,8 @@ export async function generateAllCardAudios(params: {
       wordSoundTags.push(`[sound:${ukSlowFile}]`);
       returnData.wordAudioUkSlowBase64 = ukSlowRes.wavBase64;
       returnData.wordAudioUkSlowFileName = ukSlowFile;
+    } else {
+      synthesisErrors.push(`British Slow (${britishVoice}): ${ukSlowRes.error || 'Failed'}`);
     }
   }
 
@@ -492,6 +599,8 @@ export async function generateAllCardAudios(params: {
       exampleSoundTags.push(`[sound:${exampleUkFile}]`);
       returnData.exampleAudioUkNormalBase64 = exampleUkRes.wavBase64;
       returnData.exampleAudioUkNormalFileName = exampleUkFile;
+    } else {
+      synthesisErrors.push(`Example British Normal (${britishVoice}): ${exampleUkRes.error || 'Failed'}`);
     }
   }
 
@@ -512,22 +621,28 @@ export async function generateAllCardAudios(params: {
       exampleSoundTags.push(`[sound:${exampleUkSlowFile}]`);
       returnData.exampleAudioUkSlowBase64 = exampleUkSlowRes.wavBase64;
       returnData.exampleAudioUkSlowFileName = exampleUkSlowFile;
+    } else {
+      synthesisErrors.push(`Example British Slow (${britishVoice}): ${exampleUkSlowRes.error || 'Failed'}`);
     }
   }
 
-  returnData.files = resultFiles;
-  returnData.wordAudioField = wordSoundTags.join(' ');
-  returnData.exampleAudioField = exampleSoundTags.join(' ');
+  if (resultFiles.length === 0) {
+    returnData.success = false;
+    returnData.error = synthesisErrors.length > 0
+      ? synthesisErrors.join(' | ')
+      : 'No audio variants were enabled for synthesis.';
+  } else {
+    returnData.success = true;
+    returnData.files = resultFiles;
+    returnData.wordAudioField = wordSoundTags.join(' ');
+    returnData.exampleAudioField = exampleSoundTags.join(' ');
+  }
+
   return returnData;
 }
 
 /**
- * Diagnostic test for [Test Piper] button:
- * 1. Send "Hello Amin, this is Stitch." to American voice (en_US-lessac-high)
- * 2. Send the same text to British voice (en_GB-cori-high)
- * 3. Generate both normal (1.0) and slow (1.25) versions
- * 4. Verify all 4 WAV files
- * 5. Return status checklist
+ * Diagnostic test for [Run Voice Diagnostic] button.
  */
 export async function runPiperDiagnostics(params?: {
   endpoint?: string;
@@ -562,7 +677,7 @@ export async function runPiperDiagnostics(params?: {
       step: 1,
       title: 'Connecting to Piper TTS',
       status: 'error',
-      message: `Piper TTS is not running at ${endpoint}`,
+      message: `Piper TTS is unreachable at ${endpoint}: ${health.error || 'Connection refused'}`,
     });
     return {
       engine: 'piper',
@@ -582,7 +697,7 @@ export async function runPiperDiagnostics(params?: {
     message: `Piper HTTP server is online at ${endpoint}`,
   });
 
-  // Step 2: Test American Voice (Normal Speed 1.0)
+  // Step 2: Test American Voice (Normal Speed)
   const usNormal = await synthesizePiperAudio(testPhrase, americanVoice, normalSpeed, endpoint);
   if (!usNormal.success || !usNormal.wavBase64) {
     steps.push({
@@ -612,7 +727,7 @@ export async function runPiperDiagnostics(params?: {
     details: usNormal.validation,
   });
 
-  // Step 3: Test American Voice (Slow Speed 1.25)
+  // Step 3: Test American Voice (Slow Speed)
   const usSlow = await synthesizePiperAudio(testPhrase, americanVoice, slowSpeed, endpoint);
   if (!usSlow.success || !usSlow.wavBase64) {
     steps.push({
@@ -641,7 +756,7 @@ export async function runPiperDiagnostics(params?: {
     details: usSlow.validation,
   });
 
-  // Step 4: Test British Voice (Normal Speed 1.0)
+  // Step 4: Test British Voice (Normal Speed)
   const ukNormal = await synthesizePiperAudio(testPhrase, britishVoice, normalSpeed, endpoint);
   if (!ukNormal.success || !ukNormal.wavBase64) {
     steps.push({
@@ -670,7 +785,7 @@ export async function runPiperDiagnostics(params?: {
     details: ukNormal.validation,
   });
 
-  // Step 5: Test British Voice (Slow Speed 1.25)
+  // Step 5: Test British Voice (Slow Speed)
   const ukSlow = await synthesizePiperAudio(testPhrase, britishVoice, slowSpeed, endpoint);
   if (!ukSlow.success || !ukSlow.wavBase64) {
     steps.push({
@@ -713,36 +828,45 @@ export async function runPiperDiagnostics(params?: {
 
 export interface PiperServiceStatus {
   active: boolean;
-  status: string; // 'active' | 'inactive' | 'failed' | 'activating' | 'deactivating' | 'not-found' | string
+  status: string; // 'active' | 'inactive' | 'failed' | 'not-found'
   detail?: string;
   error?: string;
 }
 
 /**
- * Checks actual systemd user service state for piper.service
+ * Checks systemd user service state for piper.service and checks HTTP health.
  * Executes: systemctl --user is-active piper.service
  */
 export async function getPiperServiceStatus(): Promise<PiperServiceStatus> {
+  const health = await checkPiperHealth();
+
+  let systemdStatus = 'unknown';
+  let systemdActive = false;
+  let systemdError = '';
+
   try {
     const { stdout } = await execPromise('systemctl --user is-active piper.service');
-    const statusText = (stdout || '').trim();
-    return {
-      active: statusText === 'active',
-      status: statusText || 'inactive',
-      detail: `systemctl status: ${statusText}`,
-    };
+    systemdStatus = (stdout || '').trim();
+    systemdActive = systemdStatus === 'active';
   } catch (err: any) {
-    // systemctl is-active returns non-zero exit status if inactive/failed/not-found
-    const statusText = (err.stdout || err.stderr || '').trim() || 'inactive';
-    const isActive = statusText === 'active';
-    const errorDetail = (err.stderr || err.stdout || err.message || '').trim();
-    return {
-      active: isActive,
-      status: statusText,
-      error: errorDetail || 'Service is not active',
-      detail: `systemctl status: ${statusText}`,
-    };
+    systemdStatus = (err.stdout || err.stderr || '').trim() || 'inactive';
+    systemdActive = systemdStatus === 'active';
+    systemdError = (err.stderr || err.stdout || err.message || '').trim();
   }
+
+  const isActive = systemdActive || health.connected;
+  const statusStr = systemdActive
+    ? 'active'
+    : (health.connected ? 'active' : (systemdStatus !== 'unknown' ? systemdStatus : 'inactive'));
+
+  return {
+    active: isActive,
+    status: statusStr,
+    detail: systemdActive
+      ? 'systemd: active (running)'
+      : (health.connected ? 'HTTP Server: Online (port 5000)' : `systemd: ${systemdStatus}`),
+    error: isActive ? undefined : (systemdError || 'Piper service is not running'),
+  };
 }
 
 export interface PiperServiceControlResult {
@@ -755,30 +879,31 @@ export interface PiperServiceControlResult {
 }
 
 /**
- * Starts or stops the actual Linux systemd user service for Piper
+ * Starts or stops the Linux systemd user service for Piper
  * Executes: systemctl --user start piper.service | systemctl --user stop piper.service
  */
 export async function controlPiperService(action: 'start' | 'stop' | 'restart'): Promise<PiperServiceControlResult> {
   const cmd = `systemctl --user ${action} piper.service`;
   try {
     const { stderr } = await execPromise(cmd);
-    // Brief sleep to allow systemd to update process table if needed
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    // Allow process a moment to initialize or stop
+    await new Promise((resolve) => setTimeout(resolve, 600));
     const currentStatus = await getPiperServiceStatus();
 
     const isExpected = action === 'start' ? currentStatus.active : (action === 'stop' ? !currentStatus.active : currentStatus.active);
 
     return {
-      success: isExpected,
+      success: isExpected || (action === 'start' && currentStatus.active),
       active: currentStatus.active,
       status: currentStatus.status,
       command: cmd,
       message: isExpected
         ? `Successfully executed: ${cmd} (Service is ${currentStatus.status})`
-        : `Executed: ${cmd}, but service is now ${currentStatus.status}`,
+        : `Executed: ${cmd}. Current status: ${currentStatus.status}`,
       error: (stderr || '').trim() || undefined,
     };
   } catch (err: any) {
+    await new Promise((resolve) => setTimeout(resolve, 400));
     const currentStatus = await getPiperServiceStatus();
     const errMsg = (err.stderr || err.stdout || err.message || '').trim() || `Failed to execute: ${cmd}`;
     return {
@@ -791,4 +916,3 @@ export async function controlPiperService(action: 'start' | 'stop' | 'restart'):
     };
   }
 }
-

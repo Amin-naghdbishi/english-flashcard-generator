@@ -196,6 +196,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     refreshOnlineTtsInfo();
     refreshPiperServiceStatus();
     refreshAnkiInfo();
+
+    // Auto-refresh service statuses in background every 10s
+    const timer = setInterval(() => {
+      refreshPiperServiceStatus();
+      refreshTTSInfo();
+      refreshAnkiInfo();
+    }, 10000);
+
+    return () => clearInterval(timer);
   }, [settings]);
 
   const refreshOllamaInfo = async () => {
@@ -220,10 +229,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     } catch {}
   };
 
-  const refreshTTSInfo = async () => {
+  const refreshTTSInfo = async (endpoint?: string) => {
     try {
-      const voicesRes = await getTTSVoices();
-      if (voicesRes.success) setPiperVoices(voicesRes.voices);
+      const targetEndpoint = endpoint || form.tts.endpoint || 'http://127.0.0.1:5000';
+      const voicesRes = await getTTSVoices(targetEndpoint);
+      if (voicesRes.success && Array.isArray(voicesRes.voices) && voicesRes.voices.length > 0) {
+        setPiperVoices(voicesRes.voices);
+      }
     } catch {}
   };
 
@@ -241,6 +253,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       setServiceStatus(st);
     } catch {}
     setCheckingService(false);
+  };
+
+  const handleControlPiperService = async (action: 'start' | 'stop' | 'restart') => {
+    setTogglingService(true);
+    try {
+      const res = await controlPiperService(action);
+      setServiceStatus(res);
+      await refreshPiperServiceStatus();
+      await refreshTTSInfo();
+    } catch (err: any) {
+      console.error('Failed to control Piper service:', err);
+    } finally {
+      setTogglingService(false);
+    }
   };
 
   const refreshAnkiInfo = async () => {
@@ -1100,36 +1126,158 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
               }`}
             >
-              <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
-                <h3 className="font-semibold text-sm uppercase">Piper TTS Configuration</h3>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setTestingPiper(true);
-                    const res = await runTTSDiagnostics();
-                    setPiperDiag(res);
-                    setTestingPiper(false);
-                  }}
-                  className={`px-3 py-1 font-medium text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
-                    isDark
-                      ? 'bg-zinc-800 text-zinc-200 border-zinc-700 hover:bg-zinc-750'
-                      : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
-                  }`}
-                >
-                  <Zap className={`w-3.5 h-3.5 text-blue-500 ${testingPiper ? 'animate-spin' : ''}`} />
-                  <span>Run Voice Diagnostic</span>
-                </button>
+              <div className={`flex flex-wrap items-center justify-between gap-2 pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+                <h3 className="font-semibold text-sm uppercase flex items-center gap-2">
+                  <Volume2 className="w-4 h-4 text-blue-500" />
+                  <span>Piper TTS Configuration & Service</span>
+                </h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => refreshTTSInfo(form.tts.endpoint)}
+                    className={`px-2.5 py-1 font-medium text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-zinc-800 text-zinc-200 border-zinc-700 hover:bg-zinc-750'
+                        : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
+                    }`}
+                    title="Fetch available voices from Piper /voices endpoint"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Fetch Voices</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setTestingPiper(true);
+                      const res = await runTTSDiagnostics({
+                        endpoint: form.tts.endpoint,
+                        americanVoice: form.tts.americanVoice,
+                        britishVoice: form.tts.britishVoice,
+                        normalSpeed: form.tts.normalSpeed,
+                        slowSpeed: form.tts.slowSpeed,
+                      });
+                      setPiperDiag(res);
+                      setTestingPiper(false);
+                    }}
+                    disabled={testingPiper}
+                    className={`px-3 py-1 font-medium text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-zinc-800 text-zinc-200 border-zinc-700 hover:bg-zinc-750'
+                        : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
+                    }`}
+                  >
+                    <Zap className={`w-3.5 h-3.5 text-blue-500 ${testingPiper ? 'animate-spin' : ''}`} />
+                    <span>Run Voice Diagnostic</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* PIPER SYSTEMD SERVICE CONTROL PANEL */}
+              <div
+                className={`p-4 border rounded-md space-y-3 ${
+                  isDark ? 'bg-zinc-800/80 border-zinc-750' : 'bg-zinc-50 border-zinc-200'
+                }`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <HardDrive className="w-4 h-4 text-blue-500" />
+                    <div>
+                      <span className="text-xs font-bold uppercase tracking-wide block">
+                        Piper Linux Service (systemd --user)
+                      </span>
+                      <span className="text-[11px] text-zinc-500 font-mono">
+                        {serviceStatus?.detail || 'systemctl --user {start|stop} piper.service'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* Status Badge */}
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                        serviceStatus?.active
+                          ? isDark
+                            ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
+                            : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : isDark
+                          ? 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                          : 'bg-zinc-200 text-zinc-700 border border-zinc-300'
+                      }`}
+                    >
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          serviceStatus?.active ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'
+                        }`}
+                      />
+                      <span>{serviceStatus?.active ? 'Running' : 'Stopped'}</span>
+                    </span>
+
+                    {/* Service Control Buttons */}
+                    {serviceStatus?.active ? (
+                      <button
+                        type="button"
+                        onClick={() => handleControlPiperService('stop')}
+                        disabled={togglingService}
+                        className={`px-3 py-1 text-xs font-semibold rounded-md border flex items-center gap-1.5 cursor-pointer transition-colors ${
+                          isDark
+                            ? 'bg-rose-950/60 text-rose-300 border-rose-800 hover:bg-rose-900/60'
+                            : 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100'
+                        }`}
+                        title="Stop systemd user service (systemctl --user stop piper.service)"
+                      >
+                        {togglingService ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <PowerOff className="w-3.5 h-3.5 text-rose-500" />
+                        )}
+                        <span>Stop Service</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleControlPiperService('start')}
+                        disabled={togglingService}
+                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                        title="Start systemd user service (systemctl --user start piper.service)"
+                      >
+                        {togglingService ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Power className="w-3.5 h-3.5" />
+                        )}
+                        <span>Start Service</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => handleControlPiperService('restart')}
+                      disabled={togglingService}
+                      className={`px-2.5 py-1 text-xs font-medium rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                        isDark
+                          ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700'
+                          : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-100'
+                      }`}
+                      title="Restart Piper systemd service"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${togglingService ? 'animate-spin' : ''}`} />
+                      <span>Restart</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* ENDPOINT & VOICE SELECTORS */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                    Piper Endpoint
+                    Piper Endpoint URL
                   </label>
                   <input
                     type="text"
                     value={form.tts.endpoint}
                     onChange={(e) => setForm({ ...form, tts: { ...form.tts, endpoint: e.target.value } })}
+                    placeholder="http://127.0.0.1:5000"
                     className={`w-full text-xs font-mono font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                       isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
                     }`}
@@ -1138,31 +1286,54 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
                 <div>
                   <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                    Default Piper Voice
+                    🇺🇸 American Voice
                   </label>
                   <select
-                    value={form.tts.voice}
-                    onChange={(e) => setForm({ ...form, tts: { ...form.tts, voice: e.target.value } })}
+                    value={form.tts.americanVoice}
+                    onChange={(e) => setForm({ ...form, tts: { ...form.tts, americanVoice: e.target.value } })}
                     className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
                       isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
                     }`}
                   >
                     {piperVoices.map((v) => (
-                      <option key={v.key} value={v.key}>
-                        {v.name} ({v.quality})
+                      <option key={v.id} value={v.id}>
+                        {v.name} ({v.id})
                       </option>
                     ))}
-                    {!piperVoices.some((v) => v.key === form.tts.voice) && (
-                      <option value={form.tts.voice}>{form.tts.voice}</option>
+                    {!piperVoices.some((v) => v.id === form.tts.americanVoice) && (
+                      <option value={form.tts.americanVoice}>{form.tts.americanVoice}</option>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                    🇬🇧 British Voice
+                  </label>
+                  <select
+                    value={form.tts.britishVoice}
+                    onChange={(e) => setForm({ ...form, tts: { ...form.tts, britishVoice: e.target.value } })}
+                    className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                      isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                    }`}
+                  >
+                    {piperVoices.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name} ({v.id})
+                      </option>
+                    ))}
+                    {!piperVoices.some((v) => v.id === form.tts.britishVoice) && (
+                      <option value={form.tts.britishVoice}>{form.tts.britishVoice}</option>
                     )}
                   </select>
                 </div>
               </div>
 
+              {/* DIAGNOSTIC RESULTS */}
               {piperDiag && (
                 <div
-                  className={`p-3 border rounded-md text-xs space-y-1.5 ${
-                    piperDiag.success
+                  className={`p-3 border rounded-md text-xs space-y-2 ${
+                    piperDiag.ready
                       ? isDark
                         ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
                         : 'bg-emerald-50 text-emerald-900 border-emerald-200'
@@ -1172,12 +1343,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   }`}
                 >
                   <div className="font-semibold flex items-center gap-1.5">
-                    {piperDiag.success ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <XCircle className="w-4 h-4 text-rose-500" />}
-                    <span>{piperDiag.message}</span>
+                    {piperDiag.ready ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-rose-500" />
+                    )}
+                    <span>{piperDiag.error || (piperDiag.ready ? 'All Piper voice diagnostics passed!' : 'Piper Diagnostic Failed')}</span>
                   </div>
-                  {piperDiag.audioBase64 && (
-                    <div className="pt-1">
-                      <AudioPlayer base64Wav={piperDiag.audioBase64} label="Test Voice Sample" size="sm" />
+
+                  {piperDiag.testAudios && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1">
+                      {piperDiag.testAudios.usNormalBase64 && (
+                        <AudioPlayer base64Wav={piperDiag.testAudios.usNormalBase64} label="🇺🇸 US Normal" size="sm" />
+                      )}
+                      {piperDiag.testAudios.usSlowBase64 && (
+                        <AudioPlayer base64Wav={piperDiag.testAudios.usSlowBase64} label="🇺🇸 US Slow" size="sm" />
+                      )}
+                      {piperDiag.testAudios.ukNormalBase64 && (
+                        <AudioPlayer base64Wav={piperDiag.testAudios.ukNormalBase64} label="🇬🇧 UK Normal" size="sm" />
+                      )}
+                      {piperDiag.testAudios.ukSlowBase64 && (
+                        <AudioPlayer base64Wav={piperDiag.testAudios.ukSlowBase64} label="🇬🇧 UK Slow" size="sm" />
+                      )}
                     </div>
                   )}
                 </div>

@@ -109,16 +109,24 @@ export async function testCustomTTS(
 }
 
 // --- Piper TTS ---
-export async function checkTTS(endpoint?: string, voice?: string): Promise<PiperDiagnosticResult> {
+export async function checkTTS(endpoint?: string): Promise<{
+  success: boolean;
+  ready: boolean;
+  connected: boolean;
+  endpoint: string;
+  voicesCount?: number;
+  error?: string;
+}> {
   const params = new URLSearchParams();
   if (endpoint) params.set('endpoint', endpoint);
-  if (voice) params.set('voice', voice);
   const res = await fetch(`/api/tts/health?${params.toString()}`);
   return res.json();
 }
 
-export async function getTTSVoices(): Promise<{ success: boolean; voices: PiperVoice[] }> {
-  const res = await fetch('/api/tts/voices');
+export async function getTTSVoices(endpoint?: string): Promise<{ success: boolean; voices: PiperVoice[]; error?: string }> {
+  const params = new URLSearchParams();
+  if (endpoint) params.set('endpoint', endpoint);
+  const res = await fetch(`/api/tts/voices?${params.toString()}`);
   return res.json();
 }
 

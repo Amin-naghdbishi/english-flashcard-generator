@@ -14,6 +14,7 @@ import {
   runPiperDiagnostics,
   getPiperServiceStatus,
   controlPiperService,
+  getAvailablePiperVoices,
   PIPER_VOICES,
 } from './server/piper';
 import {
@@ -495,19 +496,22 @@ async function startServer() {
 
   // --- Piper TTS Endpoints ---
   app.get('/api/tts/health', async (req, res) => {
-    const endpoint = (req.query.endpoint as string) || appSettings.tts.endpoint;
-    const diag = await runPiperDiagnostics({
-      endpoint,
-      americanVoice: appSettings.tts.americanVoice,
-      britishVoice: appSettings.tts.britishVoice,
-      normalSpeed: appSettings.tts.normalSpeed,
-      slowSpeed: appSettings.tts.slowSpeed,
+    const endpoint = (req.query.endpoint as string) || appSettings.tts.endpoint || 'http://127.0.0.1:5000';
+    const health = await checkPiperHealth(endpoint);
+    res.json({
+      success: true,
+      ready: health.connected,
+      connected: health.connected,
+      endpoint: health.endpoint,
+      voicesCount: health.voicesCount,
+      error: health.error,
     });
-    res.json(diag);
   });
 
-  app.get('/api/tts/voices', (req, res) => {
-    res.json({ success: true, voices: PIPER_VOICES });
+  app.get('/api/tts/voices', async (req, res) => {
+    const endpoint = (req.query.endpoint as string) || appSettings.tts.endpoint || 'http://127.0.0.1:5000';
+    const result = await getAvailablePiperVoices(endpoint);
+    res.json(result);
   });
 
   app.get('/api/piper/service', async (req, res) => {

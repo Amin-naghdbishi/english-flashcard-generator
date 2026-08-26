@@ -138,8 +138,8 @@ export default function App() {
         ttsLabel = 'Custom TTS';
         ttsReady = true;
       } else {
-        const piperRes = await checkTTS(settings.tts.endpoint).catch(() => ({ ready: false }));
-        ttsReady = !!piperRes.ready;
+        const piperRes = await checkTTS(settings.tts.endpoint).catch(() => ({ ready: false, connected: false }));
+        ttsReady = !!(piperRes.ready ?? piperRes.connected);
         ttsLabel = 'Piper';
       }
 
@@ -163,6 +163,24 @@ export default function App() {
       console.error('Error checking connections:', e);
     }
   };
+
+  // Periodic automatic background refresh for status indicators (every 10s)
+  useEffect(() => {
+    refreshStatuses();
+    const timer = setInterval(() => {
+      refreshStatuses();
+    }, 10000);
+
+    return () => clearInterval(timer);
+  }, [
+    settings.ai.provider,
+    settings.ai.ollama?.url,
+    settings.ai.gemini?.apiKey,
+    settings.ai.gemini?.model,
+    settings.tts.provider,
+    settings.tts.endpoint,
+    settings.anki.url,
+  ]);
 
   const handleSetAppTheme = (newTheme: AppTheme) => {
     const normalized = normalizeAppTheme(newTheme);
