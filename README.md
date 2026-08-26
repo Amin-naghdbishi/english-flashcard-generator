@@ -1,124 +1,515 @@
-# Local AI English Flashcard Generator
+# 🗂️ راهنمای جامع و دفترچه راهنمای فارسی Flashcard Generator
 
-A real, local-first vocabulary flashcard generator with **Ollama / Gemini / OpenRouter AI**, **Piper / Online TTS audio synthesis**, **Card Themes (Hero Pop, Duo Quest, Story Strip, Index Notebook, Arcade Retro, Minimal)**, and direct **AnkiConnect** synchronization.
+نرم‌افزار **Flashcard Generator** یک ابزار حرفه‌ای، سریع و مدرن برای ساخت خودکار و هوشمند فلش‌کارت‌های آموزش زبان انگلیسی برای نرم‌افزار محبوب **Anki** است. این برنامه با بهره‌گیری از **هوش مصنوعی محلی (Ollama)**، **موتور تبدیل متن به گفتار آفلاین (Piper TTS)**، **جستجوی هوشمند تصویر** و **۱۲ تم اختصاصی و چشم‌نواز**، فرآیند زمان‌بر ساخت کارت‌های آموزشی استاندارد را به یک کلیک ساده تبدیل می‌کند.
+
+---
+
+## 📑 فهرست مطالب
+
+1. [معرفی کامل برنامه](#۱-معرفی-کامل-برنامه)
+2. [پیشنیازها و نیازمندی‌ها](#۲-پیشنیازها-و-نیازمندیها)
+3. [نصب و راه‌اندازی برای اولین بار — Linux](#۳-نصب-و-راهاندازی-برای-اولین-بار--linux)
+4. [نصب و راه‌اندازی برای اولین بار — Windows](#۴-نصب-و-راهاندازی-برای-اولین-بار--windows)
+5. [حالت کاملاً آفلاین (Offline Mode)](#۵-حالت-کاملا-آفلاین-offline-mode)
+6. [حالت آنلاین و خدمات ابری](#۶-حالت-آنلاین-و-خدمات-ابری)
+7. [آموزش بخش‌ها و منوهای مختلف برنامه](#۷-آموزش-بخشها-و-منوهای-مختلف-برنامه)
+8. [آموزش گام‌به‌گام ساخت اولین فلش‌کارت](#۸-آموزش-گامبهگام-ساخت-اولین-فلشکارت)
+9. [ساخت دسته‌ای کارت‌ها (Batch Processing) با فرمت B](#۹-ساخت-دستهای-کارتها-batch-processing-با-فرمت-b)
+10. [تکمیل هوشمند کارت‌های ناقص با تگ (Complete by Tag)](#۱۰-تکمیل-هوشمند-کارتهای-ناقص-با-تگ-complete-by-tag)
+11. [سیستم هوشمند انتخاب و الحاق تصویر](#۱۱-سیستم-هوشمند-انتخاب-و-الحاق-تصویر)
+12. [سیستم تولید صدا با Piper TTS و لهجه‌ها](#۱۲-سیستم-تولید-صدا-با-piper-tts-و-لهجهها)
+13. [سیستم هوش مصنوعی محلی با Ollama](#۱۳-سیستم-هوش-مصنوعی-محلی-با-ollama)
+14. [تنظیمات زبان فارسی و جهت مستقل چیدمان (LTR / RTL)](#۱۴-تنظیمات-زبان-فارسی-و-جهت-مستقل-چیدمان-ltr--rtl)
+15. [آموزش فعال‌سازی آزمون املا (Spelling) در گوشی](#۱۵-آموزش-فعالسازی-آزمون-املا-spelling-در-گوشی)
+16. [همگام‌سازی و استفاده هم‌زمان روی کامپیوتر و موبایل](#۱۶-همگامسازی-و-استفاده-همزمان-روی-کامپیوتر-و-موبایل)
+17. [راهنمای جامع عیب‌یابی و حل مشکلات (Troubleshooting)](#۱۷-راهنمای-جامع-عیبیابی-و-حل-مشکلات-troubleshooting)
+18. [نحوه اجرای نسخه لینوکس (AppImage)](#۱۸-نحوه-اجرای-نسخه-لینوکس-appimage)
+19. [نحوه استفاده در ویندوز (Windows)](#۱۹-نحوه-استفاده-در-ویندوز-windows)
+20. [معماری فنی و مستندات توسعه‌دهندگان](#۲۰-معماری-فنی-و-مستندات-توسعهدهندگان)
+21. [پرسش‌های متداول (FAQ)](#۲۱-پرسشهای-متداول-faq)
+
+---
+
+## ۱. معرفی کامل برنامه
+
+### این برنامه چیست و چه مشکلی را حل می‌کند؟
+یکی از بهترین و علمی‌ترین روش‌های یادگیری و تثبیت واژگان زبان انگلیسی، استفاده از متد **تکرار فاصله‌دار (Spaced Repetition)** در نرم‌افزار Anki است. اما ساخت دستی فلش‌کارت‌های کامل و اصولی کاری بسیار طاقت‌فرسا است. برای هر کلمه، زبان‌آموز باید:
+- تلفظ صوتی باکیفیت و استاندارد با لهجه‌های مختلف پیدا کند.
+- نمادهای فونتیک بین‌المللی (IPA) و نقش دستوری (Part of Speech) کلمه را ثبت کند.
+- معنی دقیق فارسی را به همراه جملات مثال کاربردی و ترجمه فارسی بنویسد.
+- یک کد یا کلید یادسپاری (Mnemonic) برای فراموش نکردن کلمه ایجاد کند.
+- در صورت امکان یک تصویر مفهومی و مرتبط اضافه کند.
+
+نرم‌افزار **Flashcard Generator** تمامی این مراحل را به‌صورت خودکار، در کسری از ثانیه و بدون نیاز به اینترنت (در صورت استفاده از سرویس‌های محلی) انجام می‌دهد.
+
+### معماری کلی سیستم
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                       کاربر (User)                           │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ (ورود کلمه / فایل دسته‌ای / تگ)
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Flashcard Generator Core                    │
+│   (مدیریت فرآیند، استخراج فیلدها و ساخت قالب استاندارد)       │
+└───────┬──────────────────────┬──────────────────────┬───────┘
+        │                      │                      │
+        ▼                      ▼                      ▼
+┌───────────────┐      ┌───────────────┐      ┌───────────────┐
+│  بخش AI       │      │  بخش TTS      │      │  بخش Anki     │
+│ (Ollama یا    │      │ (Piper محلی   │      │ (افزونه       │
+│  Gemini ابری) │      │  یا آنلاین)   │      │  AnkiConnect) │
+└───────┬───────┘      └───────┬───────┘      └───────┬───────┘
+        │                      │                      │
+        ▼                      ▼                      ▼
+ تولید فونتیک،        تولید فایل صوتی        افزودن کارت با تم
+ معنی، مثال و         با کیفیت بالا          اختصاصی و مدیا به
+ کد یادسپاری          (WAV / PCM)            کالکشن Anki شما
+```
+
+### حریم خصوصی و امنیت داده‌ها
+تمام پردازش‌ها، پایگاه داده و فایل‌های ساخته شده مستقیماً روی رایانه شخصی شما قرار دارند و هیچ اطلاعاتی به سرورهای ناشناس ارسال نمی‌شود.
+
+---
+
+## ۲. پیشنیازها و نیازمندی‌ها
+
+برای استفاده کامل از تمام قابلیت‌های برنامه، نرم‌افزارهای زیر مورد نیاز یا پیشنهادی هستند:
+
+| نرم‌افزار / ماژول | وضعیت | کاربرد | لینک وب‌سایت رسمی |
+| :--- | :---: | :--- | :--- |
+| **Anki Desktop** | **اجباری** | نرم‌افزار اصلی مدیریت و مرور فلش‌کارت‌ها | [apps.ankiweb.net](https://apps.ankiweb.net/) |
+| **AnkiConnect** | **اجباری** | افزونه رابط برای اتصال خودکار برنامه به Anki | [AnkiWeb Add-on 2055492159](https://ankiweb.net/shared/info/2055492159) |
+| **Ollama** | **پیشنهادی (آفلاین)** | اجرای مدل‌های هوش مصنوعی زبانی روی سیستم شما | [ollama.com](https://ollama.com/) |
+| **Piper TTS** | **پیشنهادی (آفلاین)** | تولید صدای طبیعی و آفلاین برای کلمات و جملات | [github.com/rhasspy/piper](https://github.com/rhasspy/piper) |
+| **Google Gemini API** | اختیاری (آنلاین) | جایگزین ابری هوش مصنوعی برای سیستم‌های ضعیف | [ai.google.dev](https://ai.google.dev/) |
+
+---
+
+## ۳. نصب و راه‌اندازی برای اولین بار — Linux
+
+اگر از سیستم‌عامل لینوکس (مانند Ubuntu, Debian, Fedora, Arch, Manjaro, Mint) استفاده می‌کنید، مراحل زیر را به ترتیب انجام دهید:
+
+### مرحله ۱: نصب نرم‌افزار Anki و افزونه AnkiConnect
+1. نرم‌افزار Anki را از مخازن توزیع خود یا به صورت Flatpak نصب کنید:
+   ```bash
+   # اوبونتو و دبیان:
+   sudo apt install anki
+   # یا از طریق فلت‌پک (پیشنهادی):
+   flatpak install flathub net.ankiweb.Anki
+   ```
+2. نرم‌افزار Anki را باز کنید.
+3. از منوی بالا به مسیر **Tools (ابزارها) → Add-ons (افزونه‌ها) → Get Add-ons... (دریافت افزونه...)** بروید.
+4. کد افزونه AnkiConnect را وارد کنید:
+   ```text
+   2055492159
+   ```
+5. دکمه **OK** را بزنید و پس از دانلود، Anki را یک‌بار ببندید و دوباره باز کنید.
+
+> [!TIP]
+> برای اطمینان از دسترسی کامل AnkiConnect، در Anki به منوی `Tools → Add-ons → AnkiConnect → Config` رفته و مطمئن شوید مقدار `"webBindAddress": "127.0.0.1"` و `"webBindPort": 8765` تنظیم شده است.
+
+---
+
+### مرحله ۲: نصب و راه‌اندازی Ollama (هوش مصنوعی محلی)
+1. ترمینال را باز کرده و دستور زیر را برای نصب خودکار Ollama اجرا کنید:
+   ```bash
+   curl -fsSL https://ollama.com/install.sh | sh
+   ```
+2. یک مدل زبانی بهینه‌شده برای کارت‌سازی دانلود کنید (مدل `qwen3:4b` یا `gemma3:4b` بسیار دقیق و سریع هستند):
+   ```bash
+   ollama pull qwen3:4b
+   ```
+3. برای اطمینان از اجرای سرویس، وضعیت آن را بررسی کنید:
+   ```bash
+   ollama list
+   ```
+
+---
+
+### مرحله ۳: راه‌اندازی Piper TTS (صدای آفلاین)
+1. پایتون و ابزار Piper را آماده کنید:
+   ```bash
+   pip install piper-tts
+   ```
+2. مدل‌های صوتی انگلیسی باکیفیت را دانلود کنید:
+   - مدل لهجه آمریکایی: `en_US-lessac-high`
+   - مدل لهجه بریتانیایی: `en_GB-cori-high`
+3. سرور محلی Piper را روی پورت `5000` اجرا کنید یا از اسکریپت سرویس‌دهنده استاندارد استفاده نمایید:
+   ```bash
+   python3 -m piper.http_server --model en_US-lessac-high.onnx --port 5000
+   ```
+
+---
+
+### مرحله ۴: اجرای برنامه Flashcard Generator
+1. فایل اجرایی مستقل **`Flashcard-Generator-v1.0.3.AppImage`** را از صفحه [Releases گیت‌هاب](https://github.com/Amin-naghdbishi/english-flashcard-generator/releases) دانلود کنید.
+2. مجوز اجرای فایل را صادر کرده و آن را اجرا نمایید:
+   ```bash
+   chmod +x Flashcard-Generator-v1.0.3.AppImage
+   ./Flashcard-Generator-v1.0.3.AppImage
+   ```
+3. برنامه به طور خودکار مرورگر شما را باز کرده و صفحه برنامه در آدرس `http://localhost:3000` نمایان می‌شود.
+4. نشانگرهای بالای صفحه را نگاه کنید: باید هر سه دایره **Anki**، **AI** و **TTS** به رنگ **سبز** درآیند.
+
+---
+
+## ۴. نصب و راه‌اندازی برای اولین بار — Windows
+
+برای کاربران سیستم‌عامل ویندوز (Windows 10 / 11):
+
+### مرحله ۱: نصب Anki و AnkiConnect
+1. نرم‌افزار Anki را از سایت رسمی [apps.ankiweb.net](https://apps.ankiweb.net/) دانلود و نصب کنید.
+2. Anki را باز کنید و از منوی `Tools → Add-ons → Get Add-ons` کد `2055492159` را وارد کرده و پس از نصب Anki را ریستارت کنید.
+3. در هنگام باز بودن Anki، پورت `8765` آماده دریافت درخواست‌ها خواهد بود.
+
+### مرحله ۲: نصب Ollama برای ویندوز
+1. فایل نصبی `OllamaSetup.exe` را از وب‌سایت رسمی [ollama.com/download/windows](https://ollama.com/download/windows) دانلود و نصب کنید.
+2. برنامه **PowerShell** یا **Command Prompt** را باز کنید و دستور زیر را تایپ کنید:
+   ```powershell
+   ollama pull qwen3:4b
+   ```
+3. سرویس Ollama در پس‌زمینه ویندوز فعال می‌ماند.
+
+### مرحله ۳: اجرای Flashcard Generator در ویندوز
+1. مخزن پروژه را دانلود کنید یا با Git کلون کنید:
+   ```powershell
+   git clone https://github.com/Amin-naghdbishi/english-flashcard-generator.git
+   cd english-flashcard-generator
+   ```
+2. پکیج‌ها را نصب کرده و سرور را اجرا کنید:
+   ```powershell
+   npm install
+   npm run build
+   npm start
+   ```
+3. مرورگر را باز کرده و به آدرس `http://localhost:3000` بروید.
+
+---
+
+## ۵. حالت کاملاً آفلاین (Offline Mode)
+
+یکی از بزرگ‌ترین مزایای این نرم‌افزار، امکان کارکرد **۱۰۰٪ مستقل از اینترنت** است.
+
+### اجزای محلی و بدون نیاز به اینترنت:
+- **تولید محتوای متنی با هوش مصنوعی:** از طریق Ollama و مدل دانلود شده روی سیستم شما پردازش می‌شود.
+- **تلفظ و صداگذاری کلمات و جملات:** توسط موتور Piper TTS و فایل‌های صوتی ONNX کاملاً آفلاین ساخته می‌شوند.
+- **بانک اطلاعاتی و فلش‌کارت‌ها:** مستقیماً در نرم‌افزار محلی Anki ذخیره می‌گردند.
+
+### چه مواردی نیاز به دانلود اولیه دارند؟
+1. فایل مدل هوش مصنوعی در Ollama (یک‌بار دانلود اولیه).
+2. فایل‌های مدل صوتی Piper (یک‌بار دانلود اولیه).
+
+---
+
+## ۶. حالت آنلاین و خدمات ابری
+
+اگر رایانه شما سخت‌افزار کافی (مانند رم یا کارت گرافیک مناسب) برای اجرای مدل‌های محلی ندارد، می‌توانید از قابلیت‌های ابری استفاده کنید:
+
+1. **Google Gemini:** با دریافت یک کلید API رایگان از [Google AI Studio](https://aistudio.google.com/)، می‌توانید تولید متون را به سریع‌ترین مدل‌های ابری گوگل بسپارید.
+2. **Online TTS:** تولید آنلاین صوت بدون نیاز به نصب هیچ‌گونه ابزار اضافی.
+3. **جستجوی آنلاین تصاویر:** جستجوی مستقیم و الحاق خودکار تصاویر رایگان از مخازن عمومی دانشنامه **Wikipedia** و **Wikimedia Commons**.
+
+---
+
+## ۷. آموزش بخش‌ها و منوهای مختلف برنامه
+
+رابط کاربری نرم‌افزار به ۴ زبانه (تب) اصلی تقسیم شده است:
+
+### ۱. ساخت تک کارت (Create Card)
+- **Word / Expression:** کلمه انگلیسی مورد نظر را وارد می‌کنید.
+- **Target Anki Deck:** دسته (Deck) هدف در Anki را انتخاب می‌کنید یا نام دسته جدیدی را می‌نویسید.
+- **Card Type:** نوع کارت (عادی یا آزمون املا).
+- **Smart Image Illustration:** فعال یا غیرفعال کردن الحاق خودکار عکس.
+- **Advanced Overrides:** در صورتی که تمایل دارید معنی یا مثال خاصی توسط خودتان نوشته شود، این بخش را باز کرده و مقادیر دستی را وارد کنید (هوش مصنوعی مقادیر دستی شما را حفظ خواهد کرد).
+
+### ۲. ساخت دسته‌ای کارت‌ها (Batch Processing)
+- بارگذاری فایل‌های متنی بزرگ حاوی ده‌ها یا صدها واژه به فرمت ساختاریافته B (`--`).
+- نوار پیشرفت درصدی زنده و دقیق.
+- امکان توقف (Cancel) و ادامه هوشمند (Resume).
+
+### ۳. تکمیل هوشمند کارت‌ها با تگ (Complete by Tag)
+- بررسی تمام کارت‌های دارای یک برچسب خاص در Anki.
+- شناسایی خودکار فیلدهای ناقص (مثلاً کارت‌هایی که فقط کلمه دارند اما معنی، فونتیک، صدا یا مثال ندارند).
+- پر کردن فیلدهای خالی بدون دستکاری مقادیر قبلی کاربر.
+
+### ۴. تنظیمات و شخصی‌سازی (Settings)
+- **AI Providers:** انتخاب بین Ollama، Gemini یا ارائه‌دهنده‌های سفارشی سازگار با OpenAI.
+- **Text-to-Speech:** تنظیمات Piper، مدیریت صداهای زن و مرد، تنظیم سرعت صوت.
+- **Dictionaries:** انتخاب منابع استخراج معانی و ترجمه‌ها.
+- **Smart Images:** مدیریت جستجوگرهای تصویر و فیلترهای هوشمند.
+- **Appearance & Themes:** انتخاب تم برنامه (روشن / تاریک)، انتخاب **زبان رابط کاربری (فارسی / انگلیسی)** و انتخاب **جهت متن (راست‌به‌چپ / چپ‌به‌راست)**.
+
+---
+
+## ۸. آموزش گام‌به‌گام ساخت اولین فلش‌کارت
+
+بیایید با هم یک کارت نمونه برای کلمه **`telescope`** بسازیم:
 
 ```text
-Word → AI Provider (Structured JSON) → Piper TTS (WAV) → Card Theme → AnkiConnect (Exact HTML/CSS Note)
+۱. نرم‌افزار Anki را باز نگه دارید.
+۲. برنامه Flashcard Generator را باز کنید.
+۳. در تب "ساخت کارت"، کلمه "telescope" را بنویسید.
+۴. دسته مورد نظر را انتخاب کنید (مثلاً English::Vocabulary).
+۵. دکمه آبی‌رنگ "تولید فلش‌کارت در آنکی" را فشار دهید.
 ```
+
+### در پس‌زمینه چه اتفاقی می‌افتد؟
+1. **مرحله ۱ (AI Generation):** هوش مصنوعی فونتیک `/ˈtel.ə.skoʊp/`، نقش دستوری `noun`، معنی فارسی `تلسکوپ، دوربین نجومی`، جمله مثال و ترجمه و کد یادسپاری را تولید می‌کند.
+2. **مرحله ۲ (Smart Image):** تصویر واقعی و باکیفیت تلسکوپ از دانشنامه استخراج می‌شود.
+3. **مرحله ۳ (TTS Audio):** تلفظ آمریکایی کلمه و تلفظ جمله مثال با صدای طبیعی ساخته می‌شود.
+4. **مرحله ۴ (AnkiConnect):** کارت با یکی از ۱۲ قالب زیبا در Anki ثبت می‌گردد.
+5. پیش‌نمایش کارت بلافاصله در سمت راست نمایش داده می‌شود و می‌توانید تلفظ آن را بشنوید!
 
 ---
 
-## 📦 Linux AppImage (Standalone Executable)
+## ۹. ساخت دسته‌ای کارت‌ها (Batch Processing) با فرمت B
 
-You can run the application directly on Linux without installing Node.js:
+برای ساخت هم‌زمان صدها کارت، از فرمت ساختاریافته B استفاده کنید:
 
-1. Download **`FlashcardGenerator-x86_64.AppImage`** from the [GitHub Releases](https://github.com/Amin-naghdbishi/english-flashcard-generator/releases) page.
-2. Make it executable and run:
-
-```bash
-chmod +x FlashcardGenerator-x86_64.AppImage
-./FlashcardGenerator-x86_64.AppImage
+```text
+--
+Word=eraser
+Deck=English::B1
+Persian Meaning=پاک‌کن
+Photo=true
+Spelling=false
+--
+Word=abandon
+Deck=English::B1
+Photo=false
+Spelling=true
+--
+Word=telescope
+Photo=true
+--
 ```
 
-The AppImage will launch the background server and open the web interface in your default browser at `http://localhost:3000`.
-
-### ⚙️ Command-Line Options
-```bash
-./FlashcardGenerator-x86_64.AppImage --port 4000     # Run on a custom port
-./FlashcardGenerator-x86_64.AppImage --no-browser   # Run headless without auto-opening browser
-./FlashcardGenerator-x86_64.AppImage --help         # Show help and external connection URLs
-```
-
-> [!NOTE]
-> **External Services**: External tools such as **Ollama** (`http://127.0.0.1:11434`), **Piper TTS** (`http://127.0.0.1:5000`), and **Anki / AnkiConnect** (`http://127.0.0.1:8765`) are **not bundled** inside the AppImage. The application connects to these external services when they are running on your computer or local network.
+### ویژگی‌های نوار پیشرفت درصدی Batch:
+- نمایش پیام زنده **`...Generating cards`**
+- نمایش درصد واقعی تکمیل (مثلاً `37%`)
+- نمایش تعداد کارت‌های پردازش شده (مثلاً `37 / 100 cards`)
+- ثبت ایمن کارت‌های ساخته شده در Anki حتی در صورت انصراف یا قطعی وسط فرآیند.
 
 ---
 
-## 🚀 Quick Start & Setup Guide
+## ۱۰. تکمیل هوشمند کارت‌های ناقص با تگ (Complete by Tag)
 
-### 1. Install & Run Ollama
-Install and start Ollama on your machine:
+اگر قبلاً کارت‌هایی در Anki دارید که فقط کلمه دارند یا اطلاعاتشان ناقص است:
+
+1. در Anki به کارت‌های مورد نظر یک تگ بدهید (مثلاً `to_complete`).
+2. در برنامه به تب **تکمیل کارت‌ها با تگ (Complete by Tag)** بروید.
+3. نام تگ `to_complete` را وارد کرده و دکمه **اسکن کارت‌ها** را بزنید.
+4. برنامه خلاصه وضعیت کارت‌ها و فیلدهای نیازمند تکمیل را نمایش می‌دهد.
+5. دکمه **تکمیل کارت‌ها** را بزنید تا هوش مصنوعی فیلدهای خالی را پر کرده و صوت و تصویر را اضافه کند.
+6. پس از موفقیت، تگ مذکور به صورت خودکار از کارت در Anki برداشته می‌شود.
+
+---
+
+## ۱۱. سیستم هوشمند انتخاب و الحاق تصویر
+
+سیستم هوشمند تصاویر بر اساس اصول روانشناسی یادگیری طراحی شده است:
+- **کلمات عینی (Concrete Nouns):** کلماتی مانند `elephant`, `telescope`, `apple`, `car` به طور خودکار دارای تصویر واضح می‌شوند.
+- **کلمات انتزاعی (Abstract Concepts):** مفاهیمی مانند `justice`, `freedom`, `diligence` به طور پیش‌فرض فاقد تصویر می‌شوند تا از سردرگمی بصری جلوگیری شود.
+- **اولویت کاربر:** اگر در تنظیمات یا فرمت B گزینه `Photo=true` را انتخاب کنید، برنامه بدون در نظر گرفتن انتزاعی بودن کلمه، بهترین تصویر متناظر را جستجو و اضافه می‌کند.
+
+---
+
+## ۱۲. سیستم تولید صدا با Piper TTS و لهجه‌ها
+
+موتور قدرتمند **Piper TTS** صداهایی با وضوح بالا در قالب فایل‌های استاندارد WAV و PCM 16-bit تولید می‌کند:
+- **لهجه آمریکایی (US Voice):** استفاده از مدل استاندارد Lessac.
+- **لهجه بریتانیایی (UK Voice):** استفاده از مدل استاندارد Cori.
+- **سرعت عادی و آهسته:** تولید دو نسخه از تلفظ (Normal Speed برای مکالمه واقعی و Slow Speed برای درک تک‌تک هجاها).
+
+---
+
+## ۱۳. سیستم هوش مصنوعی محلی با Ollama
+
+برای مدیریت و انتخاب مدل‌های هوش مصنوعی محلی:
+
+### دستورات پرکاربرد در ترمینال:
 ```bash
-# Linux / macOS
-curl -fsSL https://ollama.com/install.sh | sh
+# مشاهده مدل‌های نصب شده روی سیستم شما
+ollama list
 
-# Start Ollama server
-ollama serve
-
-# Pull vocabulary model (e.g. Qwen 2.5/3, Gemma, or Llama)
+# دریافت مدل‌های پیشنهادی برای برنامه
 ollama pull qwen3:4b
-# or
 ollama pull gemma3:4b
+ollama pull llama3.2:3b
+
+# حذف یک مدل اضافی
+ollama rm model_name
 ```
-*Default URL:* `http://127.0.0.1:11434`
+
+در تنظیمات برنامه (**Settings → AI Providers**)، می‌توانید با فشردن دکمه **Refresh Models**، مدل‌های موجود را مستقیماً از داخل برنامه انتخاب نمایید.
 
 ---
 
-### 2. Install Anki & AnkiConnect Addon
-1. Download and run **Anki** from [apps.ankiweb.net](https://apps.ankiweb.net/).
-2. In Anki, go to **Tools → Add-ons → Get Add-ons...**
-3. Enter Add-on Code: `2055492159` (**AnkiConnect**)
-4. Restart Anki.
-*Default AnkiConnect URL:* `http://127.0.0.1:8765`
+## ۱۴. تنظیمات زبان فارسی و جهت مستقل چیدمان (LTR / RTL)
+
+در این نرم‌افزار، **زبان رابط کاربری** و **جهت نمایش متن** دو گزینه کاملاً **مستقل و تفکیک‌شده** هستند:
+
+شما می‌توانید در منوی `Settings → Personalization`:
+1. **زبان (Language):** بین `فارسی` و `English` انتخاب کنید.
+2. **جهت چیدمان (Interface Direction):** بین `چپ‌به‌راست (LTR)` و `راست‌به‌چپ (RTL)` انتخاب کنید.
+
+### امکان انتخاب هر ۴ حالت:
+- **فارسی + RTL:** حالت استاندارد زبان فارسی.
+- **فارسی + LTR:** مناسب افرادی که منوهای مدرن چپ‌چین را با متن فارسی ترجیح می‌دهند.
+- **English + LTR:** حالت استاندارد بین‌المللی انگلیسی.
+- **English + RTL:** متن انگلیسی با چینش راست‌به‌چپ.
 
 ---
 
-### 3. Configure Kokoro Offline TTS
-Kokoro (82M parameter lightweight open-weight model) generates verified 16-bit PCM WAV audio offline for the target word and example sentence.
-```bash
-# Optional Kokoro python runtime
-pip install kokoro-onnx soundfile
+## ۱۵. آموزش فعال‌سازی آزمون املا (Spelling) در گوشی
+
+اگر از کارت‌های نوع **Spelling (آزمون تایپ و املا)** استفاده می‌کنید، برای اینکه کادر تایپ و کیبورد روی گوشی در اپلیکیشن **AnkiDroid** ظاهر شود، باید یک تنظیم کوچک را در گوشی فعال کنید:
+
+### مسیر تنظیم در AnkiDroid (اندروید):
+```text
+منوی برنامه AnkiDroid (سه خط بالا سمت چپ)
+  └── Settings (تنظیمات)
+       └── Advanced (پیشرفته)
+            └── فعال کردن گزینه: Type answer into the card (تایپ پاسخ در کارت)
 ```
-*Default TTS Endpoint:* `http://127.0.0.1:8880`
+
+> [!IMPORTANT]
+> با فعال کردن تیک **Type answer into the card**، در هنگام مرور کارت‌های املا در گوشی، کیبورد به صورت خودکار باز شده و می‌توانید املای صحیح کلمه را تایپ کنید و بازخورد رنگی دریافت نمایید.
 
 ---
 
-### 4. Launch Flashcard Application
-```bash
-npm run dev
-```
-Open your browser at `http://localhost:3000`.
+## ۱۶. همگام‌سازی و استفاده هم‌زمان روی کامپیوتر و موبایل
 
----
-
-## 🎨 Themes & Template Fidelity
-
-Cards use a **Classic Comic Theme** (Dark & Light) featuring:
-- Sharp 2px/3px ink borders
-- Vibrant pop-art badges (`#facc15` Yellow, `#38bdf8` Sky, `#4ade80` Green, `#fb923c` Orange, `#c084fc` Purple)
-- Persian meaning & RTL layout support
-- Embedded pronunciation and sentence audio triggers
-- 100% Template Fidelity: The live preview in the app renders the **exact same HTML template & CSS** installed into Anki.
-
----
-
-## 📁 Architecture Overview
+چرخه استاندارد و ایده‌آل کار با این نرم‌افزار به صورت زیر است:
 
 ```text
-Application
-│
-├── UI Layer (React + Tailwind CSS)
-│   ├── NavigationStrip (Connected 3-Color Strip: CREATE | BATCH | SETTINGS)
-│   ├── CreateCardView (Single word creation with live pipeline progress)
-│   ├── BatchCardView (TXT upload, preflight checks, independent word processing)
-│   ├── SettingsView (AI, Kokoro TTS, AnkiConnect, Appearance & Diagnostics)
-│   └── CardPreview (Exact template and CSS preview with live audio)
-│
-├── Server Layer (Express + Node.js)
-│   ├── OllamaProvider (Structured output, JSON schema enforcement, User Data Priority)
-│   ├── KokoroTTSProvider (5-step diagnostics, WAV header verification, PCM audio)
-│   ├── AnkiConnectProvider (Model creation, media uploads, note creation)
-│   └── WavHelper (Validates RIFF PCM headers, sample rate, channels, duration)
-│
-└── Themes
-    ├── Comic Dark (Deep ink panels, high contrast)
-    └── Comic Light (Warm comic paper, crisp black ink outlines)
+┌─────────────────────────────────────────────────────────────┐
+│                 روی کامپیوتر (PC / Laptop)                   │
+│                                                             │
+│  ۱. ساخت کارت‌ها با Flashcard Generator                      │
+│  ۲. ثبت کارت‌ها، صداها و تصاویر در نرم‌افزار Anki کامپیوتر   │
+│  ۳. فشردن دکمه Sync در Anki (همگام‌سازی با AnkiWeb)         │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               │ اینترنت / حساب رایگان AnkiWeb
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│               روی گوشی موبایل (Android / iOS)                │
+│                                                             │
+│  ۱. باز کردن AnkiDroid یا AnkiMobile                         │
+│  ۲. فشردن دکمه Sync و دریافت کارت‌ها                         │
+│  ۳. مرور روزانه، شنیدن صداها و حل آزمون‌های املایی           │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🧪 Real Verification Guarantee
+## ۱۷. راهنمای جامع عیب‌یابی و حل مشکلات (Troubleshooting)
 
-- **No Mocks**: Every status is a real test against local endpoints.
-- **WAV Validation**: Every audio file is checked for valid RIFF headers, valid sample rate, and duration > 0s before note creation.
-- **User Data Priority**: If the user inputs a manual override (meaning, phonetic, example), AI **never** overwrites the user's data.
+### ۱. نشانگر Anki قرمز است (عدم اتصال به Anki)
+- **علت:** نرم‌افزار Anki Desktop باز نیست یا افزونه AnkiConnect نصب نشده است.
+- **راه‌حل:**
+  1. مطمئن شوید Anki روی کامپیوتر باز و در حال اجرا است.
+  2. مطمئن شوید افزونه با کد `2055492159` نصب شده است.
+  3. در تنظیمات برنامه پورت Anki را بررسی کنید (پیش‌فرض: `http://127.0.0.1:8765`).
+
+### ۲. نشانگر AI قرمز است (عدم اتصال به Ollama)
+- **علت:** سرویس Ollama در پس‌زمینه در حال اجرا نیست.
+- **راه‌حل:** در ترمینال یا خط فرمان دستور `ollama serve` یا `ollama list` را اجرا کنید.
+
+### ۳. نشانگر TTS قرمز یا زرد است
+- **علت:** سرور محلی Piper روی پورت ۵۰۰۰ اجرا نشده است.
+- **راه‌حل:** می‌توانید در منوی تنظیمات، ارائه‌دهنده صدا را روی **Online TTS** قرار دهید تا صداها به صورت آنلاین تولید شوند.
+
+### ۴. خطای اشغال بودن پورت ۳۰۰۰
+- **راه‌حل:** نرم‌افزار مجهز به **سیستم تغییر خودکار پورت (Automatic Port Fallback)** است. اگر پورت ۳۰۰۰ اشغال باشد، برنامه به صورت خودکار روی پورت‌های بعدی (مانند ۳۰۰۱ یا ۳۰۰۲) اجرا می‌شود.
+
+---
+
+## ۱۸. نحوه اجرای نسخه لینوکس (AppImage)
+
+فایل‌های AppImage نیازی به نصب ندارند و مستقیماً اجرا می‌شوند:
+
+```bash
+# ۱. دادن دسترسی اجرایی به فایل:
+chmod +x Flashcard-Generator-v1.0.3.AppImage
+
+# ۲. اجرای برنامه:
+./Flashcard-Generator-v1.0.3.AppImage
+
+# گزینه‌های اضافی (اختیاری):
+./Flashcard-Generator-v1.0.3.AppImage --port 4000     # اجرا روی پورت دلخواه
+./Flashcard-Generator-v1.0.3.AppImage --no-browser   # اجرا بدون باز کردن خودکار مرورگر
+```
+
+---
+
+## ۱۹. نحوه استفاده در ویندوز (Windows)
+
+در محیط ویندوز می‌توانید با نصب Node.js (نسخه ۱۸ یا بالاتر) برنامه را اجرا کنید:
+
+```powershell
+npm install
+npm run build
+npm start
+```
+
+---
+
+## ۲۰. معماری فنی و مستندات توسعه‌دهندگان
+
+ساختار کدهای منبع پروژه:
+
+```text
+english-flashcard-generator/
+├── server.ts                  # سرور اصلی Express و مدیریت APIها
+├── server/
+│   ├── anki.ts                # کلاینت ارتباطی AnkiConnect و ساخت Modelها
+│   ├── ollama.ts              # ارتباط با Ollama و JSON Schema enforcement
+│   ├── gemini.ts              # ارتباط با مدل‌های ابری گوگل
+│   ├── piper.ts               # ترکیب و اعتبارسنجی فایل‌های صوتی WAV/PCM
+│   ├── smartImages.ts         # موتور جستجو و دانلود تصاویر ویکی‌پدیا/ویکی‌مدیا
+│   └── onlineTts.ts           # ماژول پشتیبان تبدیل متن به گفتار آنلاین
+├── src/
+│   ├── App.tsx                # هسته کامپوننت React و ارائه‌دهنده Theme/i18n
+│   ├── components/
+│   │   ├── NavigationStrip.tsx       # هدر و نشانگرهای وضعیت سرویس‌ها
+│   │   ├── CreateCardView.tsx        # صفحه ساخت تک کارت
+│   │   ├── BatchCardView.tsx         # صفحه پردازش دسته‌ای با نوار درصد
+│   │   ├── CompleteCardsByTagView.tsx# صفحه تکمیل هوشمند کارت‌ها با تگ
+│   │   ├── SettingsView.tsx          # صفحه تنظیمات جامع (۹ زبانه)
+│   │   └── CardPreview.tsx           # شبیه‌ساز زنده تم‌های آنکی و انکی‌دروید
+│   ├── i18n/                         # سیستم بومی‌سازی (فارسی و انگلیسی)
+│   └── themes/                       # فایل‌های CSS و تمپلیت ۱۲ تم اختصاصی
+└── packaging/
+    └── build-appimage.sh      # اسکریپت ساخت پکیج مستقل لینوکس
+```
+
+---
+
+## ۲۱. پرسش‌های متداول (FAQ)
+
+#### آیا این برنامه کاملاً رایگان و متن‌باز است؟
+بله، تمامی بخش‌های این نرم‌افزار به صورت رایگان و متن‌باز تحت مجوز MIT ارائه شده است.
+
+#### آیا استفاده از Ollama و Piper هزینه‌ای دارد؟
+خیر، هر دو ابزار کاملاً رایگان، متن‌باز و آفلاین هستند و روی سخت‌افزار خود شما اجرا می‌شوند.
+
+#### آیا بدون اینترنت می‌توانم فلش‌کارت بسازم؟
+بله، در صورتی که Ollama و Piper را نصب داشته باشید، ۱۰۰٪ مراحل ساخت کارت، صداگذاری و ثبت در Anki به صورت کاملاً آفلاین انجام می‌شود.
+
+#### آیا حتماً باید نرم‌افزار Anki روی سیستم نصب باشد؟
+بله، برنامه کارت‌ها را مستقیماً درون پایگاه‌داده Anki شما ثبت می‌کند، بنابراین نرم‌افزار Anki Desktop به همراه افزونه AnkiConnect باید فعال باشد.
+
+#### آیا انتخاب زبان فارسی باعث راست‌به‌چپ شدن اجباری برنامه می‌شود؟
+خیر، زبان برنامه و جهت چیدمان دو گزینه کاملاً مجزا هستند و می‌توانید زبان را فارسی اما جهت را چپ‌به‌راست (یا برعکس) تنظیم کنید.
+
+#### چطور کارت‌های ساخته شده را روی گوشی مطالعه کنم؟
+کافیست در نرم‌افزار Anki کامپیوتر دکمه **Sync** را بزنید و سپس در اپلیکیشن **AnkiDroid** گوشی نیز دکمه **Sync** را فشار دهید تا تمام کارت‌ها، تم‌ها، تصاویر و فایل‌های صوتی به گوشی منتقل شوند.
+
+---
+
+<div align="center">
+  <sub>طراحی و توسعه‌یافته با ❤️ برای جامعه زبان‌آموزان و کاربران فارسی‌زبان Anki</sub>
+</div>
