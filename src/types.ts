@@ -259,12 +259,13 @@ export interface BatchItem {
   id: string;
   word: string;
   deck?: string;
-  status: 'idle' | 'checking_duplicate' | 'generating_ai' | 'generating_audio' | 'creating_anki' | 'success' | 'error' | 'duplicate';
+  status: 'idle' | 'waiting' | 'checking_duplicate' | 'generating_ai' | 'generating_audio' | 'creating_anki' | 'retrying' | 'success' | 'error' | 'duplicate';
   cardData?: CardData;
   parsedFields?: Partial<CardData>;
   error?: string;
   noteId?: number;
   isDuplicate?: boolean;
+  retryCount?: number;
 }
 
 export interface TaggedNoteFieldInspection {
@@ -283,10 +284,11 @@ export interface TaggedNoteItem {
   presentFields: string[];
   missingFields: string[];
   needsCompletion: boolean;
-  status: 'idle' | 'scanning' | 'generating_ai' | 'generating_audio' | 'updating_anki' | 'success' | 'error' | 'skipped';
+  status: 'idle' | 'waiting' | 'scanning' | 'generating_ai' | 'generating_audio' | 'updating_anki' | 'retrying' | 'success' | 'error' | 'skipped';
   error?: string;
   updatedCardData?: CardData;
   generatedFieldsSummary?: string[];
+  retryCount?: number;
 }
 
 export interface StepLog {
