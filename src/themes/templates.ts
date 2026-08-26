@@ -9,7 +9,8 @@ function checkSpelling() {
   var input = document.getElementById('spelling-input') || document.getElementById('typeans');
   var result = document.getElementById('spelling-result');
   var targetEl = document.getElementById('spelling-target-word');
-  var target = (targetEl ? (targetEl.innerText || targetEl.textContent) : '').trim().toLowerCase();
+  var originalTarget = (targetEl ? (targetEl.innerText || targetEl.textContent) : '').trim();
+  var target = originalTarget.toLowerCase();
   
   if (!input || !result || !target) return;
   
@@ -22,7 +23,7 @@ function checkSpelling() {
   
   if (typed.toLowerCase() === target) {
     result.className = 'spelling-result is-correct';
-    result.innerHTML = '<div class="spelling-success-badge">✓ EXCELLENT! PERFECT SPELLING!</div><div class="spelling-word-reveal">' + target + '</div>';
+    result.innerHTML = '<div class="spelling-success-badge">✓ EXCELLENT! PERFECT SPELLING!</div><div class="spelling-word-reveal">' + originalTarget + '</div>';
     input.classList.remove('has-error');
     input.classList.add('is-valid');
   } else {
@@ -30,7 +31,7 @@ function checkSpelling() {
     result.innerHTML = '<div class="spelling-error-badge">✕ INCORRECT SPELLING</div>' +
       '<div class="spelling-compare-box">' +
         '<div class="spelling-user-typed"><span class="spelling-label">You typed:</span> <del class="spelling-mistake">' + typed + '</del></div>' +
-        '<div class="spelling-correct-ans"><span class="spelling-label">Correct spelling:</span> <strong class="spelling-exact">' + target + '</strong></div>' +
+        '<div class="spelling-correct-ans"><span class="spelling-label">Correct spelling:</span> <strong class="spelling-exact">' + originalTarget + '</strong></div>' +
       '</div>';
     input.classList.add('has-error');
     input.classList.remove('is-valid');

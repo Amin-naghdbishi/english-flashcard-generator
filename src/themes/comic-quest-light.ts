@@ -108,7 +108,6 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   font-size: clamp(24px, 7vw, 36px);
   font-weight: 900;
   color: #0F172A;
-  text-transform: uppercase;
   line-height: 1.15;
   white-space: normal;
   word-break: normal;
@@ -355,14 +354,14 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
 }
 
 .spelling-success-badge { font-size: 13px !important; font-weight: 900 !important; color: #15803D !important; }
-.spelling-word-reveal { font-size: 20px !important; font-weight: 900 !important; text-transform: uppercase !important; color: #0F172A !important; margin-top: 4px !important; }
+.spelling-word-reveal { font-size: 20px !important; font-weight: 900 !important; color: #0F172A !important; margin-top: 4px !important; }
 .spelling-error-badge { font-size: 13px !important; font-weight: 900 !important; color: #DC2626 !important; margin-bottom: 4px !important; }
 .spelling-compare-box { font-size: 13px !important; font-weight: 800 !important; color: #0F172A !important; }
 .spelling-user-typed { color: #0F172A !important; margin-bottom: 2px !important; }
 .spelling-label { color: #475569 !important; font-weight: 700 !important; }
 .spelling-mistake { color: #DC2626 !important; text-decoration: line-through !important; font-weight: 900 !important; }
 .spelling-correct-ans { color: #0F172A !important; margin-top: 4px !important; }
-.spelling-exact { color: #15803D !important; font-size: 16px !important; font-weight: 900 !important; text-transform: uppercase !important; }
+.spelling-exact { color: #15803D !important; font-size: 16px !important; font-weight: 900 !important; }
 
 /* AUDIO BUTTONS */
 .replay-button, .play-button, a.replay-button, .comic-audio-btn {

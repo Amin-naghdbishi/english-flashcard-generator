@@ -84,7 +84,6 @@ const css = `/* THEME 5: ARCADE RETRO DARK */
   font-size: clamp(24px, 7vw, 36px);
   font-weight: 900;
   color: #FDE047;
-  text-transform: uppercase;
   line-height: 1.15;
   white-space: normal;
   word-break: normal;
@@ -273,11 +272,11 @@ const css = `/* THEME 5: ARCADE RETRO DARK */
 }
 
 .spelling-success-badge { font-size: 12px; font-weight: 900; color: #34D399; }
-.spelling-word-reveal { font-size: 18px; font-weight: 900; color: #FFFFFF; text-transform: uppercase; }
+.spelling-word-reveal { font-size: 18px; font-weight: 900; color: #FFFFFF; }
 .spelling-error-badge { font-size: 12px; font-weight: 900; color: #FCA5A5; margin-bottom: 4px; }
 .spelling-compare-box { font-size: 13px; font-weight: 800; }
 .spelling-mistake { color: #FCA5A5; text-decoration: line-through; }
-.spelling-exact { color: #34D399; font-size: 15px; text-transform: uppercase; }
+.spelling-exact { color: #34D399; font-size: 15px; }
 
 /* AUDIO BUTTONS */
 .replay-button, .play-button, a.replay-button, .comic-audio-btn {

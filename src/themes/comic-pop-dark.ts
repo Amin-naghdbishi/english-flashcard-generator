@@ -104,7 +104,6 @@ const css = `/* THEME 1: HERO POP DARK */
   font-weight: 900;
   color: #F8FAFC;
   letter-spacing: -0.5px;
-  text-transform: uppercase;
   line-height: 1.15;
   white-space: normal;
   word-break: normal;
@@ -438,7 +437,6 @@ const css = `/* THEME 1: HERO POP DARK */
   font-weight: 900;
   color: #F8FAFC;
   margin-top: 4px;
-  text-transform: uppercase;
 }
 
 .spelling-error-badge {
@@ -465,7 +463,6 @@ const css = `/* THEME 1: HERO POP DARK */
 .spelling-exact {
   color: #34D399;
   font-size: 18px;
-  text-transform: uppercase;
 }
 
 /* AUDIO BUTTONS */

@@ -92,7 +92,6 @@ const css = `/* THEME 2: STORY STRIP DARK */
   font-size: clamp(24px, 6.5vw, 34px);
   font-weight: 900;
   color: #F8FAFC;
-  text-transform: uppercase;
   line-height: 1.15;
   white-space: normal;
   word-break: normal;
@@ -326,11 +325,11 @@ const css = `/* THEME 2: STORY STRIP DARK */
 }
 
 .spelling-success-badge { font-size: 12px; font-weight: 900; color: #34D399; }
-.spelling-word-reveal { font-size: 18px; font-weight: 900; color: #F8FAFC; text-transform: uppercase; }
+.spelling-word-reveal { font-size: 18px; font-weight: 900; color: #F8FAFC; }
 .spelling-error-badge { font-size: 12px; font-weight: 900; color: #FCA5A5; margin-bottom: 4px; }
 .spelling-compare-box { font-size: 13px; font-weight: 800; }
 .spelling-mistake { color: #FCA5A5; text-decoration: line-through; }
-.spelling-exact { color: #34D399; text-transform: uppercase; font-size: 15px; }
+.spelling-exact { color: #34D399; font-size: 15px; }
 
 /* AUDIO BUTTONS */
 .replay-button, .play-button, a.replay-button, .comic-audio-btn {

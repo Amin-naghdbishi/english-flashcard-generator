@@ -155,7 +155,6 @@ const css = `/* COMIC LIGHT BENTO THEME FOR ANKI & PREVIEW */
   color: #000000;
   letter-spacing: -0.5px;
   word-break: break-word;
-  text-transform: uppercase;
   line-height: 1.1;
 }
 

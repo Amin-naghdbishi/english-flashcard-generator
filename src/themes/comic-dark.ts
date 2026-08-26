@@ -155,7 +155,6 @@ const css = `/* COMIC DARK BENTO THEME FOR ANKI & PREVIEW */
   color: #FFFFFF;
   letter-spacing: -0.5px;
   word-break: break-word;
-  text-transform: uppercase;
   line-height: 1.1;
 }
 
