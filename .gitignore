@@ -103,14 +103,11 @@ coverage/
 *.bak
 
 # ------------------------------------------------------------------------------
-# OS-Generated Files
+# AppImage & Packaging Temp Files
 # ------------------------------------------------------------------------------
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-Thumbs.db
-ehthumbs.db
-[Dd]esktop.ini
-$RECYCLE.BIN/
+*.AppImage
+packaging/AppDir/
+packaging/cache/
+packaging/tools/
+scratch/
+

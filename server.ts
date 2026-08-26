@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import { createServer as createViteServer } from 'vite';
 import { checkOllamaConnection, listOllamaModels, generateWithOllama } from './server/ollama';
 import { checkGeminiConnection, generateWithGemini, GEMINI_MODELS } from './server/gemini';
 import { checkCustomAIConnection, getCustomAIModels, generateWithCustomAI } from './server/customAi';
@@ -43,7 +42,39 @@ import {
 import { AppSettings, CardData, ManualOverrides, DiagnosticsReport, StepLog, ThemeId, CardType, CustomAIProviderConfig, CustomTTSProviderConfig } from './src/types';
 import { THEMES, makeSpellingSentence } from './src/themes';
 
-const SETTINGS_FILE = path.join(process.cwd(), 'user-settings.json');
+function getSettingsFilePath(): string {
+  if (process.env.FLASHCARD_GENERATOR_CONFIG_FILE) {
+    return process.env.FLASHCARD_GENERATOR_CONFIG_FILE;
+  }
+  
+  // Standard XDG config location
+  const configHome = process.env.XDG_CONFIG_HOME || (process.env.HOME ? path.join(process.env.HOME, '.config') : null);
+  if (configHome) {
+    const appConfigDir = path.join(configHome, 'flashcard-generator');
+    try {
+      if (!fs.existsSync(appConfigDir)) {
+        fs.mkdirSync(appConfigDir, { recursive: true });
+      }
+      const xdgSettingsPath = path.join(appConfigDir, 'user-settings.json');
+      
+      // If XDG config doesn't exist yet, but a local user-settings.json exists in cwd, copy it
+      const localCwdPath = path.join(process.cwd(), 'user-settings.json');
+      if (!fs.existsSync(xdgSettingsPath) && fs.existsSync(localCwdPath)) {
+        try {
+          fs.copyFileSync(localCwdPath, xdgSettingsPath);
+        } catch (_) {}
+      }
+      
+      return xdgSettingsPath;
+    } catch (e) {
+      console.warn('Could not create app config dir in XDG_CONFIG_HOME:', e);
+    }
+  }
+  
+  return path.join(process.cwd(), 'user-settings.json');
+}
+
+const SETTINGS_FILE = getSettingsFilePath();
 
 const defaultSettings: AppSettings = {
   appTheme: 'anki-light',
@@ -297,7 +328,7 @@ let appSettings = loadSettings();
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   app.use(express.json({ limit: '35mb' }));
 
@@ -1663,13 +1694,21 @@ async function startServer() {
 
   // --- Vite / Static Assets ---
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    const candidateDistPaths = [
+      __dirname,
+      path.join(__dirname, 'dist'),
+      path.join(process.cwd(), 'dist'),
+      path.join(__dirname, '..', 'dist'),
+    ].filter((p): p is string => Boolean(p && fs.existsSync(path.join(p, 'index.html'))));
+
+    const distPath = candidateDistPaths[0] || path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));

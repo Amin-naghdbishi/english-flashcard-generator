@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Flashcard Generator
+GenericName=Flashcard Generator
+Comment=AI English Flashcard Generator for Anki with Piper TTS
+Exec=flashcard-generator %U
+Icon=flashcard-generator
+Terminal=false
+Categories=Education;Languages;Utility;
+StartupWMClass=flashcard-generator
+Keywords=anki;flashcards;english;vocabulary;ai;tts;piper;

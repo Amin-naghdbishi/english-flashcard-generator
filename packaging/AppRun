@@ -1,0 +1,117 @@
+#!/bin/sh
+set -e
+
+# Determine AppDir path
+if [ -z "$APPDIR" ]; then
+  APPDIR="$(dirname "$(readlink -f "$0")")"
+fi
+export APPDIR
+
+# Locate Node runtime (prefer bundled binary matching CPU architecture, fallback to host node)
+NODE_BIN=""
+HOST_ARCH="$(uname -m)"
+
+if [ -x "$APPDIR/usr/bin/node" ]; then
+  if [ "$HOST_ARCH" = "x86_64" ] || [ "$HOST_ARCH" = "amd64" ]; then
+    if file "$APPDIR/usr/bin/node" 2>/dev/null | grep -qiE "x86-64|x86_64"; then
+      NODE_BIN="$APPDIR/usr/bin/node"
+    fi
+  elif [ "$HOST_ARCH" = "aarch64" ] || [ "$HOST_ARCH" = "arm64" ]; then
+    if file "$APPDIR/usr/bin/node" 2>/dev/null | grep -qiE "aarch64|arm64"; then
+      NODE_BIN="$APPDIR/usr/bin/node"
+    fi
+  fi
+fi
+
+if [ -z "$NODE_BIN" ]; then
+  if command -v node >/dev/null 2>&1; then
+    NODE_BIN="$(command -v node)"
+  elif [ -x "/usr/bin/node" ]; then
+    NODE_BIN="/usr/bin/node"
+  elif [ -x "/usr/local/bin/node" ]; then
+    NODE_BIN="/usr/local/bin/node"
+  else
+    echo "Error: Node.js runtime not found in AppImage or host system." >&2
+    exit 1
+  fi
+fi
+
+# Environment setup
+export PATH="$APPDIR/usr/bin:$PATH"
+export NODE_PATH="$APPDIR/usr/share/flashcard-generator/dist:$NODE_PATH"
+export NODE_ENV="production"
+
+PORT="${PORT:-3000}"
+
+# Argument parsing
+AUTO_OPEN=true
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --no-browser)
+      AUTO_OPEN=false
+      shift
+      ;;
+    --port)
+      PORT="$2"
+      shift 2
+      ;;
+    --port=*)
+      PORT="${1#*=}"
+      shift
+      ;;
+    --help|-h)
+      echo "Flashcard Generator - AI Vocabulary Flashcards for Anki"
+      echo ""
+      echo "Usage: ./FlashcardGenerator-x86_64.AppImage [options]"
+      echo ""
+      echo "Options:"
+      echo "  --port <PORT>   Specify custom server port (default: 3000)"
+      echo "  --no-browser    Do not automatically open the default web browser"
+      echo "  --help, -h      Display this help message and exit"
+      echo ""
+      echo "External Services (Optional, connect automatically when active):"
+      echo "  - Anki / AnkiConnect: http://127.0.0.1:8765"
+      echo "  - Ollama:             http://127.0.0.1:11434"
+      echo "  - Piper TTS:          http://127.0.0.1:5000"
+      exit 0
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+export PORT
+
+# If running in a graphical session, open default web browser once server is ready
+if [ "$AUTO_OPEN" = "true" ] && [ -n "$DISPLAY$WAYLAND_DISPLAY" ]; then
+  (
+    # Wait for server to start listening
+    for i in $(seq 1 40); do
+      if command -v curl >/dev/null 2>&1; then
+        if curl -s "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1 || curl -s "http://127.0.0.1:$PORT/" >/dev/null 2>&1; then
+          break
+        fi
+      elif command -v wget >/dev/null 2>&1; then
+        if wget -q -O- "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1 || wget -q -O- "http://127.0.0.1:$PORT/" >/dev/null 2>&1; then
+          break
+        fi
+      fi
+      sleep 0.25
+    done
+
+    # Open user's default browser
+    if command -v xdg-open >/dev/null 2>&1; then
+      xdg-open "http://localhost:$PORT" >/dev/null 2>&1 || true
+    elif command -v sensible-browser >/dev/null 2>&1; then
+      sensible-browser "http://localhost:$PORT" >/dev/null 2>&1 || true
+    elif command -v x-www-browser >/dev/null 2>&1; then
+      x-www-browser "http://localhost:$PORT" >/dev/null 2>&1 || true
+    fi
+  ) &
+fi
+
+echo "Starting Flashcard Generator on port $PORT..."
+echo "Web UI will open at http://localhost:$PORT"
+echo "Press Ctrl+C to stop the server."
+
+exec "$NODE_BIN" "$APPDIR/usr/share/flashcard-generator/dist/server.cjs" "$@"

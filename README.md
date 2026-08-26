@@ -1,10 +1,36 @@
 # Local AI English Flashcard Generator
 
-A real, local-first vocabulary flashcard generator with **Ollama AI**, **offline Kokoro TTS audio synthesis**, **Classic Comic Card Themes**, and direct **AnkiConnect** synchronization.
+A real, local-first vocabulary flashcard generator with **Ollama / Gemini / OpenRouter AI**, **Piper / Online TTS audio synthesis**, **Card Themes (Hero Pop, Duo Quest, Story Strip, Index Notebook, Arcade Retro, Minimal)**, and direct **AnkiConnect** synchronization.
 
 ```text
-Word → Ollama (Structured JSON) → Offline Kokoro TTS (WAV) → Comic Card Theme → AnkiConnect (Real Note)
+Word → AI Provider (Structured JSON) → Piper TTS (WAV) → Card Theme → AnkiConnect (Exact HTML/CSS Note)
 ```
+
+---
+
+## 📦 Linux AppImage (Standalone Executable)
+
+You can run the application directly on Linux without installing Node.js:
+
+1. Download **`FlashcardGenerator-x86_64.AppImage`** from the [GitHub Releases](https://github.com/Amin-naghdbishi/english-flashcard-generator/releases) page.
+2. Make it executable and run:
+
+```bash
+chmod +x FlashcardGenerator-x86_64.AppImage
+./FlashcardGenerator-x86_64.AppImage
+```
+
+The AppImage will launch the background server and open the web interface in your default browser at `http://localhost:3000`.
+
+### ⚙️ Command-Line Options
+```bash
+./FlashcardGenerator-x86_64.AppImage --port 4000     # Run on a custom port
+./FlashcardGenerator-x86_64.AppImage --no-browser   # Run headless without auto-opening browser
+./FlashcardGenerator-x86_64.AppImage --help         # Show help and external connection URLs
+```
+
+> [!NOTE]
+> **External Services**: External tools such as **Ollama** (`http://127.0.0.1:11434`), **Piper TTS** (`http://127.0.0.1:5000`), and **Anki / AnkiConnect** (`http://127.0.0.1:8765`) are **not bundled** inside the AppImage. The application connects to these external services when they are running on your computer or local network.
 
 ---
 
