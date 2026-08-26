@@ -1,4 +1,6 @@
 import express from 'express';
+import http from 'http';
+import net from 'net';
 import path from 'path';
 import fs from 'fs';
 import { checkOllamaConnection, listOllamaModels, generateWithOllama } from './server/ollama';
@@ -327,15 +329,100 @@ function saveSettings(settings: AppSettings) {
 
 let appSettings = loadSettings();
 
+/**
+ * Checks if a TCP port is currently free and available for binding on a given host.
+ */
+function isPortAvailable(port: number, host: string = '0.0.0.0'): Promise<boolean> {
+  return new Promise((resolve) => {
+    const tester = net.createServer();
+    tester.unref();
+    tester.once('error', () => {
+      resolve(false);
+    });
+    tester.listen(port, host, () => {
+      tester.close(() => {
+        resolve(true);
+      });
+    });
+  });
+}
+
+/**
+ * Proactively scans for the first available port starting from startPort.
+ * e.g. 3000 -> occupied -> 3001 -> occupied -> 3002 -> available.
+ */
+async function findAvailablePort(startPort: number = 3000, maxAttempts: number = 100, host: string = '0.0.0.0'): Promise<number> {
+  let current = startPort;
+  for (let i = 0; i < maxAttempts; i++) {
+    const available = await isPortAvailable(current, host);
+    if (available) {
+      if (current !== startPort) {
+        console.log(`Port ${startPort} is occupied. Automatically falling back to available port ${current}.`);
+      }
+      return current;
+    }
+    console.log(`Port ${current} is occupied, checking port ${current + 1}...`);
+    current++;
+  }
+  return startPort;
+}
+
+/**
+ * Starts an HTTP server on the first available port with automatic fallback and race condition handling.
+ */
+function listenWithPortFallback(
+  app: express.Express,
+  initialPort: number,
+  host: string = '0.0.0.0',
+  maxAttempts: number = 100
+): Promise<{ server: http.Server; port: number }> {
+  return new Promise((resolve, reject) => {
+    let currentPort = initialPort;
+    const maxPort = initialPort + maxAttempts;
+
+    function tryListen(portToTry: number) {
+      if (portToTry > maxPort) {
+        return reject(new Error(`Could not find an available port between ${initialPort} and ${maxPort}`));
+      }
+
+      const serverInstance = http.createServer(app);
+
+      serverInstance.once('error', (err: any) => {
+        if (err.code === 'EADDRINUSE') {
+          console.log(`Port ${portToTry} is already in use (EADDRINUSE), retrying on port ${portToTry + 1}...`);
+          tryListen(portToTry + 1);
+        } else {
+          reject(err);
+        }
+      });
+
+      serverInstance.listen(portToTry, host, () => {
+        const address = serverInstance.address();
+        const boundPort = typeof address === 'object' && address ? address.port : portToTry;
+        resolve({ server: serverInstance, port: boundPort });
+      });
+    }
+
+    tryListen(currentPort);
+  });
+}
+
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const preferredPort = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const initialPort = await findAvailablePort(preferredPort);
+  let activePort = initialPort;
 
   app.use(express.json({ limit: '35mb' }));
 
   // --- Health ---
   app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', time: new Date().toISOString() });
+    res.json({
+      status: 'ok',
+      port: activePort,
+      uptime: process.uptime(),
+      time: new Date().toISOString(),
+    });
   });
 
   // --- Settings ---
@@ -1719,9 +1806,11 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Flashcard Generator server running at http://localhost:${PORT}`);
-  });
+  const { server, port } = await listenWithPortFallback(app, initialPort, '0.0.0.0');
+  activePort = port;
+
+  console.log(`🚀 Flashcard Generator server running at http://localhost:${port}`);
+  console.log(`🌐 Web UI accessible at http://127.0.0.1:${port}`);
 }
 
 startServer().catch((err) => {

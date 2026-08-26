@@ -4,13 +4,15 @@ set -e
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-APP_NAME="FlashcardGenerator"
+DEFAULT_APP_NAME="Flashcard-Maker-v2"
+APP_NAME="${APPIMAGE_NAME:-$DEFAULT_APP_NAME}"
 TARGET_ARCH="${ARCH:-x86_64}"
 HOST_ARCH="$(uname -m)"
 NODE_VERSION="v20.18.0"
 
 echo "=================================================="
 echo "  Building Linux AppImage for Flashcard Generator"
+echo "  Target AppImage:     ${APP_NAME}.AppImage"
 echo "  Target Architecture: $TARGET_ARCH"
 echo "  Host Architecture:   $HOST_ARCH"
 echo "=================================================="
@@ -114,7 +116,7 @@ else
 fi
 
 # 10. Generate AppImage
-OUTPUT_NAME="${APP_NAME}-${TARGET_ARCH}.AppImage"
+OUTPUT_NAME="${APP_NAME}.AppImage"
 OUTPUT_PATH="$ROOT_DIR/$OUTPUT_NAME"
 rm -f "$OUTPUT_PATH"
 

@@ -4,17 +4,50 @@ import { AppTheme } from '../types';
 import { useAppTheme } from '../context/ThemeContext';
 
 export type NavTab = 'create' | 'batch' | 'complete-by-tag' | 'settings';
+export type ServiceState = 'connected' | 'checking' | 'disconnected';
+
+export interface ServiceIndicatorInfo {
+  state?: ServiceState;
+  connected?: boolean;
+  ready?: boolean;
+  label?: string;
+  version?: number;
+  checking?: boolean;
+  error?: string;
+}
+
+export interface NavigationStatus {
+  ai: ServiceIndicatorInfo;
+  tts: ServiceIndicatorInfo;
+  anki: ServiceIndicatorInfo;
+  isChecking?: boolean;
+}
 
 interface NavigationStripProps {
   currentTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
-  status: {
-    ai: { connected: boolean; label?: string };
-    tts: { ready: boolean; label?: string };
-    anki: { connected: boolean; version?: number };
-  };
+  status: NavigationStatus;
   onRefreshStatus: () => void;
   appTheme?: AppTheme;
+}
+
+function getIndicatorClasses(isChecking: boolean, isOnline: boolean): { dot: string; container: string } {
+  if (isChecking) {
+    return {
+      dot: 'bg-amber-500 animate-pulse',
+      container: 'border-amber-500/30',
+    };
+  }
+  if (isOnline) {
+    return {
+      dot: 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)]',
+      container: 'border-emerald-500/20',
+    };
+  }
+  return {
+    dot: 'bg-rose-500',
+    container: 'border-rose-500/20',
+  };
 }
 
 export const NavigationStrip: React.FC<NavigationStripProps> = ({
@@ -26,6 +59,38 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
 }) => {
   const themeContext = useAppTheme();
   const isDark = (propTheme || themeContext.appTheme) === 'anki-dark';
+
+  // AI state
+  const isAiChecking = status.ai.state === 'checking' || !!status.ai.checking;
+  const isAiOnline = status.ai.state === 'connected' || (!isAiChecking && !!status.ai.connected);
+  const aiClasses = getIndicatorClasses(isAiChecking, isAiOnline);
+  const aiTooltip = isAiChecking
+    ? `${status.ai.label || 'AI'}: Checking status...`
+    : isAiOnline
+    ? `${status.ai.label || 'AI'}: Connected / Available`
+    : `${status.ai.label || 'AI'}: Disconnected / Offline`;
+
+  // TTS state
+  const isTtsChecking = status.tts.state === 'checking' || !!status.tts.checking;
+  const isTtsOnline = status.tts.state === 'connected' || (!isTtsChecking && (!!status.tts.ready || !!status.tts.connected));
+  const ttsClasses = getIndicatorClasses(isTtsChecking, isTtsOnline);
+  const ttsTooltip = isTtsChecking
+    ? `${status.tts.label || 'TTS'}: Checking status...`
+    : isTtsOnline
+    ? `${status.tts.label || 'TTS'}: Ready / Available`
+    : `${status.tts.label || 'TTS'}: Disconnected / Offline`;
+
+  // Anki state
+  const isAnkiChecking = status.anki.state === 'checking' || !!status.anki.checking;
+  const isAnkiOnline = status.anki.state === 'connected' || (!isAnkiChecking && !!status.anki.connected);
+  const ankiClasses = getIndicatorClasses(isAnkiChecking, isAnkiOnline);
+  const ankiTooltip = isAnkiChecking
+    ? 'AnkiConnect: Checking status...'
+    : isAnkiOnline
+    ? `AnkiConnect: Connected ${status.anki.version ? `(v${status.anki.version})` : ''}`
+    : 'AnkiConnect: Disconnected / Offline';
+
+  const isGlobalChecking = !!status.isChecking || isAiChecking || isTtsChecking || isAnkiChecking;
 
   return (
     <header
@@ -107,65 +172,58 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
 
         {/* Live Status Indicators */}
         <div className="flex items-center gap-2 sm:gap-3 py-2">
+          {/* AI / Ollama Status */}
           <div
-            className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium ${
-              isDark ? 'bg-zinc-800/60 text-zinc-300' : 'bg-zinc-100 text-zinc-700'
-            }`}
-            title={`${status.ai.label || 'AI'}: ${status.ai.connected ? 'Connected' : 'Offline'}`}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+              isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100 text-zinc-800'
+            } ${aiClasses.container}`}
+            title={aiTooltip}
           >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                status.ai.connected ? 'bg-emerald-500' : 'bg-rose-500'
-              }`}
-            />
+            <span className={`w-2 h-2 rounded-full transition-colors ${aiClasses.dot}`} />
             <span className="hidden sm:inline">
-              {status.ai.label || 'AI'}
+              {status.ai.label || 'Ollama'}
             </span>
           </div>
 
+          {/* TTS / Piper Status */}
           <div
-            className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium ${
-              isDark ? 'bg-zinc-800/60 text-zinc-300' : 'bg-zinc-100 text-zinc-700'
-            }`}
-            title={`${status.tts.label || 'TTS'}: ${status.tts.ready ? 'Ready' : 'Standby'}`}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+              isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100 text-zinc-800'
+            } ${ttsClasses.container}`}
+            title={ttsTooltip}
           >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                status.tts.ready ? 'bg-emerald-500' : 'bg-amber-500'
-              }`}
-            />
+            <span className={`w-2 h-2 rounded-full transition-colors ${ttsClasses.dot}`} />
             <span className="hidden sm:inline">
-              {status.tts.label || 'TTS'}
+              {status.tts.label || 'Piper'}
             </span>
           </div>
 
+          {/* Anki Status */}
           <div
-            className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium ${
-              isDark ? 'bg-zinc-800/60 text-zinc-300' : 'bg-zinc-100 text-zinc-700'
-            }`}
-            title={`AnkiConnect: ${status.anki.connected ? 'Connected' : 'Offline'}`}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+              isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100 text-zinc-800'
+            } ${ankiClasses.container}`}
+            title={ankiTooltip}
           >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                status.anki.connected ? 'bg-emerald-500' : 'bg-rose-500'
-              }`}
-            />
+            <span className={`w-2 h-2 rounded-full transition-colors ${ankiClasses.dot}`} />
             <span className="hidden sm:inline">
               Anki
             </span>
           </div>
 
+          {/* Manual / Live Refresh Trigger */}
           <button
             type="button"
             onClick={onRefreshStatus}
-            title="Refresh Connections"
-            className={`p-1.5 rounded border transition-colors cursor-pointer ${
+            title={isGlobalChecking ? 'Checking connections...' : 'Refresh status indicators'}
+            disabled={isGlobalChecking}
+            className={`p-1.5 rounded-md border transition-colors cursor-pointer ${
               isDark
                 ? 'border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
                 : 'border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
             }`}
           >
-            <RefreshCw className="w-3.5 h-3.5" />
+            <RefreshCw className={`w-3.5 h-3.5 ${isGlobalChecking ? 'animate-spin text-blue-500' : ''}`} />
           </button>
 
           {/* Quick Anki Light / Anki Dark Theme Toggle */}
@@ -196,4 +254,3 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
     </header>
   );
 };
-

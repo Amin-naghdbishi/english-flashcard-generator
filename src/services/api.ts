@@ -32,11 +32,31 @@ export async function saveConfig(settings: Partial<AppSettings>): Promise<AppSet
   return data.settings;
 }
 
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = 3500): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: options.signal || controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+}
+
 // --- Ollama ---
 export async function checkOllama(url?: string): Promise<{ connected: boolean; version?: string; error?: string }> {
-  const q = url ? `?url=${encodeURIComponent(url)}` : '';
-  const res = await fetch(`/api/ollama/health${q}`);
-  return res.json();
+  try {
+    const q = url ? `?url=${encodeURIComponent(url)}` : '';
+    const res = await fetchWithTimeout(`/api/ollama/health${q}`, {}, 3500);
+    return await res.json();
+  } catch (err: any) {
+    return { connected: false, error: err?.message || 'Ollama offline' };
+  }
 }
 
 export async function getOllamaModels(url?: string): Promise<{ success: boolean; models: OllamaModelTag[]; error?: string }> {
@@ -47,12 +67,16 @@ export async function getOllamaModels(url?: string): Promise<{ success: boolean;
 
 // --- Gemini ---
 export async function checkGemini(apiKey: string, model?: string): Promise<{ connected: boolean; model?: string; error?: string }> {
-  const res = await fetch('/api/gemini/health', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ apiKey, model }),
-  });
-  return res.json();
+  try {
+    const res = await fetchWithTimeout('/api/gemini/health', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey, model }),
+    }, 4000);
+    return await res.json();
+  } catch (err: any) {
+    return { connected: false, error: err?.message || 'Gemini check timed out' };
+  }
 }
 
 export async function getGeminiModels(): Promise<{ success: boolean; models: Array<{ id: string; name: string }> }> {
@@ -117,10 +141,14 @@ export async function checkTTS(endpoint?: string): Promise<{
   voicesCount?: number;
   error?: string;
 }> {
-  const params = new URLSearchParams();
-  if (endpoint) params.set('endpoint', endpoint);
-  const res = await fetch(`/api/tts/health?${params.toString()}`);
-  return res.json();
+  try {
+    const params = new URLSearchParams();
+    if (endpoint) params.set('endpoint', endpoint);
+    const res = await fetchWithTimeout(`/api/tts/health?${params.toString()}`, {}, 3500);
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, ready: false, connected: false, endpoint: endpoint || '', error: err?.message || 'Piper offline' };
+  }
 }
 
 export async function getTTSVoices(endpoint?: string): Promise<{ success: boolean; voices: PiperVoice[]; error?: string }> {
@@ -136,8 +164,12 @@ export async function getPiperServiceStatus(): Promise<{
   detail?: string;
   error?: string;
 }> {
-  const res = await fetch('/api/piper/service');
-  return res.json();
+  try {
+    const res = await fetchWithTimeout('/api/piper/service', {}, 3500);
+    return await res.json();
+  } catch (err: any) {
+    return { active: false, status: 'inactive', error: err?.message };
+  }
 }
 
 export async function controlPiperService(action: 'start' | 'stop' | 'restart'): Promise<{
@@ -182,8 +214,12 @@ export async function runTTSDiagnostics(params?: {
 
 // --- Online TTS ---
 export async function checkOnlineTTS(): Promise<{ connected: boolean; error?: string }> {
-  const res = await fetch('/api/online-tts/health');
-  return res.json();
+  try {
+    const res = await fetchWithTimeout('/api/online-tts/health', {}, 3500);
+    return await res.json();
+  } catch (err: any) {
+    return { connected: false, error: err?.message || 'Online TTS offline' };
+  }
 }
 
 export async function runOnlineTTSDiagnostics(): Promise<OnlineTTSDiagnosticResult> {
@@ -242,9 +278,13 @@ export async function lookupFreeDict(word: string) {
 
 // --- Anki ---
 export async function checkAnki(url?: string): Promise<{ connected: boolean; version?: number; error?: string }> {
-  const q = url ? `?url=${encodeURIComponent(url)}` : '';
-  const res = await fetch(`/api/anki/health${q}`);
-  return res.json();
+  try {
+    const q = url ? `?url=${encodeURIComponent(url)}` : '';
+    const res = await fetchWithTimeout(`/api/anki/health${q}`, {}, 3500);
+    return await res.json();
+  } catch (err: any) {
+    return { connected: false, error: err?.message || 'AnkiConnect unreachable' };
+  }
 }
 
 export async function getAnkiDecks(url?: string): Promise<{ success: boolean; decks: string[]; error?: string }> {
