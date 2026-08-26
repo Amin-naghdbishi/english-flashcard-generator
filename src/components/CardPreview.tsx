@@ -309,8 +309,8 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             <div
               className={`w-full transition-all duration-200 ${
                 viewMode === 'mobile'
-                  ? `max-w-[340px] border-x-2 border-dashed ${isDark ? 'border-zinc-700' : 'border-zinc-300'} p-1`
-                  : 'max-w-md'
+                  ? `max-w-[360px] border-x-2 border-dashed ${isDark ? 'border-zinc-700' : 'border-zinc-300'} p-1`
+                  : 'w-full max-w-3xl'
               }`}
               dangerouslySetInnerHTML={{ __html: frontRendered }}
             />
@@ -333,8 +333,8 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             <div
               className={`w-full transition-all duration-200 ${
                 viewMode === 'mobile'
-                  ? `max-w-[340px] border-x-2 border-dashed ${isDark ? 'border-zinc-700' : 'border-zinc-300'} p-1`
-                  : 'max-w-md'
+                  ? `max-w-[360px] border-x-2 border-dashed ${isDark ? 'border-zinc-700' : 'border-zinc-300'} p-1`
+                  : 'w-full max-w-3xl'
               }`}
               dangerouslySetInnerHTML={{ __html: backRendered }}
             />

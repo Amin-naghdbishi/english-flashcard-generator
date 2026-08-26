@@ -3,41 +3,46 @@ import { duoQuestFrontNormalHtml, duoQuestBackHtml } from './templates';
 
 const css = `/* THEME 3: DUO QUEST LIGHT */
 .card {
-  background-color: #F0FDF4 !important;
+  background-color: #FFFFFF !important;
   color: #1E293B !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
   margin: 0 !important;
-  padding: 16px 20px !important;
+  padding: 0 !important;
   display: flex !important;
   flex-direction: column !important;
   justify-content: flex-start !important;
   align-items: stretch !important;
   min-height: 100vh !important;
+  width: 100% !important;
   box-sizing: border-box !important;
 }
 
 .nightMode .card, .nightMode.card {
-  background-color: #F0FDF4 !important;
+  background-color: #FFFFFF !important;
   color: #1E293B !important;
 }
 
 .comic-card-wrapper.theme-quest {
   width: 100% !important;
-  max-width: 900px !important;
-  margin: 0 auto !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
   flex: 1 !important;
   display: flex !important;
   flex-direction: column !important;
   box-sizing: border-box !important;
+  background-color: #FFFFFF !important;
 }
 
 .quest-card {
   width: 100% !important;
+  max-width: 100% !important;
   background-color: #FFFFFF !important;
-  border: 4px solid #000000 !important;
-  border-radius: 16px !important;
-  box-shadow: 0 6px 0px #000000 !important;
-  padding: 20px !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 16px 20px !important;
+  margin: 0 !important;
   box-sizing: border-box !important;
   text-align: left !important;
   flex: 1 !important;

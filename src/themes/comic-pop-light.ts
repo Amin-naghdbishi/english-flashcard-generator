@@ -3,40 +3,51 @@ import { heroPopFrontNormalHtml, heroPopBackHtml } from './templates';
 
 const css = `/* THEME 1: HERO POP LIGHT */
 .card {
-  background-color: #FEF9C3 !important;
+  background-color: #FFFFFF !important;
   color: #000000 !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
   margin: 0 !important;
-  padding: 16px 20px !important;
+  padding: 0 !important;
   display: flex !important;
   flex-direction: column !important;
   justify-content: flex-start !important;
   align-items: stretch !important;
   min-height: 100vh !important;
+  width: 100% !important;
   box-sizing: border-box !important;
 }
 
 .nightMode .card, .nightMode.card {
-  background-color: #FEF9C3 !important;
+  background-color: #FFFFFF !important;
   color: #000000 !important;
 }
 
 .comic-card-wrapper {
-  width: 100%;
-  max-width: 900px !important; flex: 1 !important; display: flex !important; flex-direction: column !important;
-  margin: 0 auto;
-  box-sizing: border-box;
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  background-color: #FFFFFF !important;
 }
 
 .comic-card {
-  width: 100%;
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
   background-color: #FFFFFF;
-  border: 4px solid #000000;
-  box-shadow: 6px 6px 0px #000000;
-  padding: 20px;
-  box-sizing: border-box;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 16px 20px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
   text-align: left;
-  border-radius: 4px;
 }
 
 .card-hero-header {

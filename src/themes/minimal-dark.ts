@@ -7,12 +7,13 @@ const css = `/* THEME: MINIMAL DARK - Clean, Distraction-Free Practical Dark The
   color: #F4F4F5 !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
   margin: 0 !important;
-  padding: 20px 24px !important;
+  padding: 0 !important;
   display: flex !important;
   flex-direction: column !important;
   justify-content: flex-start !important;
   align-items: stretch !important;
   min-height: 100vh !important;
+  width: 100% !important;
   box-sizing: border-box !important;
   text-align: left !important;
 }
@@ -24,22 +25,26 @@ const css = `/* THEME: MINIMAL DARK - Clean, Distraction-Free Practical Dark The
 
 .minimal-card-wrapper {
   width: 100% !important;
-  max-width: 860px !important;
-  margin: 0 auto !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
   flex: 1 !important;
   display: flex !important;
   flex-direction: column !important;
   box-sizing: border-box !important;
+  background-color: #18181B !important;
 }
 
 .minimal-card {
   width: 100% !important;
-  background-color: #27272A !important;
-  border: 1px solid #3F3F46 !important;
-  border-radius: 8px !important;
-  padding: 24px 28px !important;
+  max-width: 100% !important;
+  background-color: #18181B !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 16px 20px !important;
+  margin: 0 !important;
   box-sizing: border-box !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+  box-shadow: none !important;
   flex: 1 !important;
   display: flex !important;
   flex-direction: column !important;

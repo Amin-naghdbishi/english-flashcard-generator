@@ -3,37 +3,48 @@ import { indexNotebookFrontNormalHtml, indexNotebookBackHtml } from './templates
 
 const css = `/* THEME 4: INDEX NOTEBOOK DARK */
 .card {
-  background-color: #0F172A !important;
+  background-color: #1E293B !important;
   color: #F8FAFC !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
   margin: 0 !important;
-  padding: 16px 20px !important;
+  padding: 0 !important;
   display: flex !important;
   flex-direction: column !important;
   justify-content: flex-start !important;
   align-items: stretch !important;
   min-height: 100vh !important;
+  width: 100% !important;
   box-sizing: border-box !important;
 }
 
 .nightMode .card, .nightMode.card {
-  background-color: #0F172A !important;
+  background-color: #1E293B !important;
   color: #F8FAFC !important;
 }
 
 .comic-card-wrapper.theme-notebook {
-  width: 100%;
-  max-width: 900px !important; flex: 1 !important; display: flex !important; flex-direction: column !important;
-  margin: 0 auto;
-  box-sizing: border-box;
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  background-color: #1E293B !important;
 }
 
 .notebook-sheet {
-  width: 100%;
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
   background-color: #1E293B;
-  border: 3px solid #475569;
-  box-shadow: 6px 6px 0px #000000;
-  padding: 24px 20px 20px 32px;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 20px 20px 20px 32px;
+  margin: 0 !important;
   box-sizing: border-box;
   position: relative;
   background-image: repeating-linear-gradient(transparent, transparent 27px, #334155 28px);

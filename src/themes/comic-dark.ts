@@ -62,34 +62,46 @@ const backHtml = `<div class="comic-card-wrapper">
 
 const css = `/* COMIC DARK BENTO THEME FOR ANKI & PREVIEW */
 .card {
-  background-color: #12131A;
+  background-color: #1E202B;
   color: #FFFFFF;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   margin: 0;
-  padding: 16px;
+  padding: 0;
   display: flex;
-  justify-content: center;
-  align-items: center;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
   min-height: 100vh;
+  width: 100%;
   box-sizing: border-box;
 }
 
 .comic-card-wrapper {
   width: 100%;
-  max-width: 480px;
-  margin: 0 auto;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   box-sizing: border-box;
+  background-color: #1E202B;
 }
 
 .comic-card {
   width: 100%;
+  max-width: 100%;
   background-color: #1E202B;
-  border: 6px solid #000000;
-  box-shadow: 8px 8px 0px #000000;
-  padding: 24px;
+  border: none;
+  box-shadow: none;
+  padding: 16px 20px;
+  margin: 0;
   box-sizing: border-box;
   text-align: left;
   border-radius: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .comic-header {

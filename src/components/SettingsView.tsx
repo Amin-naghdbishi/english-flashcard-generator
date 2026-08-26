@@ -4,9 +4,12 @@ import {
   DiagnosticsReport,
   ThemeId,
   AppTheme,
+  CardData,
+  CardType,
   CustomAIProviderConfig,
   CustomTTSProviderConfig,
 } from '../types';
+import { CardPreview } from './CardPreview';
 import {
   saveConfig,
   checkOllama,
@@ -2034,6 +2037,50 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                     </button>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Live Theme Preview Panel */}
+            <div className={`mt-6 pt-5 border-t ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-blue-500" />
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    Live Theme Preview: {THEMES[form.theme]?.name || form.theme}
+                  </span>
+                </div>
+                <div className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  Exact full-screen Anki layout & interactive spelling preview for this theme
+                </div>
+              </div>
+
+              <div
+                className={`border rounded-lg p-3 sm:p-5 relative overflow-hidden shadow-xs ${
+                  isDark ? 'bg-[#18181B] border-zinc-700 text-zinc-100' : 'bg-zinc-100 border-zinc-200 text-zinc-900'
+                }`}
+              >
+                <CardPreview
+                  cardData={{
+                    word: 'wanderlust',
+                    phonetic: '/ˈwɑːn.dɚ.lʌst/',
+                    partOfSpeech: 'noun',
+                    meaningFa: 'اشتیاق شدید به سفر، گشت‌وگذار و کشف ناشناخته‌ها',
+                    example: 'Her wanderlust led her on an unforgettable backpacking journey across South America.',
+                    translationFa: 'اشتیاق شدید او به سفر باعث شد سفری فراموش‌نشدنی را در آمریکای جنوبی آغاز کند.',
+                    mnemonic: 'WANDER (گشت زدن) + LUST (میل شدید): میل و اشتیاق بی‌پایان به جهانگردی.',
+                    cardType: form.defaultCard?.cardType || 'normal',
+                    spellingSentence: 'Her ______ led her on an unforgettable backpacking journey across South America.',
+                    wordAudioUsNormalBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
+                    wordAudioUsSlowBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
+                    wordAudioUkNormalBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
+                    wordAudioUkSlowBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
+                    exampleAudioUsNormalBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
+                    exampleAudioUsSlowBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
+                  }}
+                  themeId={form.theme}
+                  emptyWordPlaceholder="wanderlust"
+                  appTheme={isDark ? 'anki-dark' : 'anki-light'}
+                />
               </div>
             </div>
           </div>
