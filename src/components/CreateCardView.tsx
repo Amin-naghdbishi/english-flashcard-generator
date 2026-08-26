@@ -3,6 +3,7 @@ import { CardData, ManualOverrides, AppSettings, StepLog, AnkiCardVerificationDe
 import { CardPreview } from './CardPreview';
 import { AudioPlayer } from './AudioPlayer';
 import { useAppTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n';
 import {
   runFullPipeline,
   getAnkiDecks,
@@ -54,6 +55,7 @@ const DEFAULT_STEPS: Array<{ step: number; name: string }> = [
 
 export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCardCreated }) => {
   const themeContext = useAppTheme();
+  const { t, isRTL } = useTranslation();
   const isDark = themeContext.isDark;
 
   const [word, setWord] = useState('abandon');
@@ -426,14 +428,14 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base sm:text-lg font-bold tracking-tight">
-              Build Flashcard
+              {t('create.title')}
             </h2>
             <span
               className={`text-[11px] font-semibold px-2 py-0.5 rounded border ${
                 isDark ? 'bg-zinc-800 text-zinc-300 border-zinc-700' : 'bg-zinc-100 text-zinc-700 border-zinc-200'
               }`}
             >
-              Single Card
+              {t('create.title')}
             </span>
           </div>
 
@@ -451,13 +453,13 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                   isDark ? 'text-zinc-300' : 'text-zinc-700'
                 }`}
               >
-                Word (واژه انگلیسی)
+                {t('create.wordLabel')}
               </label>
               <input
                 type="text"
                 value={word}
                 onChange={(e) => setWord(e.target.value)}
-                placeholder="e.g. abandon, accurate..."
+                placeholder={t('create.wordPlaceholder')}
                 disabled={isGenerating || testingAnkiOnly}
                 className={`w-full p-2.5 text-sm font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                   isDark
@@ -475,7 +477,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                   isDark ? 'text-zinc-300' : 'text-zinc-700'
                 }`}
               >
-                Card Type (نوع کارت)
+                {t('create.cardTypeLabel')}
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -490,7 +492,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                       : 'bg-white border-zinc-300 text-zinc-700 hover:bg-zinc-50'
                   }`}
                 >
-                  <span>Normal Vocab</span>
+                  <span>{t('common.normal')}</span>
                 </button>
                 <button
                   type="button"
@@ -504,7 +506,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                       : 'bg-white border-zinc-300 text-zinc-700 hover:bg-zinc-50'
                   }`}
                 >
-                  <span>Spelling Challenge</span>
+                  <span>{t('common.spelling')}</span>
                 </button>
               </div>
             </div>
@@ -516,8 +518,8 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                   isDark ? 'text-zinc-300' : 'text-zinc-700'
                 }`}
               >
-                <span>Photo (تصویر کارت)</span>
-                <span className="text-[11px] opacity-75 font-normal">{photoChoice === 'yes' ? 'Include Image' : 'No Image'}</span>
+                <span>{t('create.photoLabel')}</span>
+                <span className="text-[11px] opacity-75 font-normal">{photoChoice === 'yes' ? t('create.photoYes') : t('create.photoNo')}</span>
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -533,7 +535,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                   }`}
                 >
                   <ImageIcon className="w-3.5 h-3.5" />
-                  <span>Yes</span>
+                  <span>{t('common.yes')}</span>
                 </button>
                 <button
                   type="button"
@@ -547,7 +549,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                       : 'bg-white border-zinc-300 text-zinc-700 hover:bg-zinc-50'
                   }`}
                 >
-                  <span>No</span>
+                  <span>{t('common.no')}</span>
                 </button>
               </div>
             </div>
@@ -560,14 +562,14 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                     isDark ? 'text-zinc-300' : 'text-zinc-700'
                   }`}
                 >
-                  <span>Deck (دسته در انکی)</span>
+                  <span>{t('create.deckLabel')}</span>
                   {loadingDecks && <Loader2 className="w-3 h-3 animate-spin inline text-blue-500" />}
                 </label>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={loadDecks}
-                    title="Refresh Decks from Anki"
+                    title={t('common.refresh')}
                     className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-medium flex items-center gap-0.5"
                   >
                     <RefreshCw className="w-3 h-3" />
@@ -577,7 +579,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                     onClick={() => setIsCustomDeck(!isCustomDeck)}
                     className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-medium"
                   >
-                    {isCustomDeck ? 'List Decks' : '+ Custom Deck'}
+                    {isCustomDeck ? t('create.selectDeck') : t('create.customDeckToggle')}
                   </button>
                 </div>
               </div>
@@ -587,7 +589,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                   type="text"
                   value={deck}
                   onChange={(e) => setDeck(e.target.value)}
-                  placeholder="e.g. English::Vocabulary"
+                  placeholder={t('create.customDeckPlaceholder')}
                   disabled={isGenerating || testingAnkiOnly}
                   className={`w-full p-2.5 text-sm font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                     isDark
@@ -601,7 +603,9 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                     value={deck}
                     onChange={(e) => setDeck(e.target.value)}
                     disabled={isGenerating || testingAnkiOnly}
-                    className={`w-full p-2.5 text-sm font-medium rounded-md border appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer pr-10 ${
+                    className={`w-full p-2.5 text-sm font-medium rounded-md border appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                      isRTL ? 'pl-10 pr-3' : 'pr-10 pl-3'
+                    } ${
                       isDark
                         ? 'bg-[#18181B] border-zinc-700 text-zinc-100'
                         : 'bg-white border-zinc-300 text-zinc-900'
@@ -613,7 +617,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                       </option>
                     ))}
                   </select>
-                  <div className={`absolute right-3 top-3 pointer-events-none text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  <div className={`absolute ${isRTL ? 'left-3' : 'right-3'} top-3 pointer-events-none text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                     ▼
                   </div>
                 </div>
@@ -634,7 +638,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                 }`}
               >
                 <span className="flex items-center gap-1.5">
-                  <span>⚙</span> Advanced Overrides (اختیاری)
+                  <span>⚙</span> {showAdvanced ? t('create.advancedToggleHide') : t('create.advancedToggleShow')}
                 </span>
                 {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </button>
@@ -642,14 +646,14 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
               {showAdvanced && (
                 <div className={`mt-3 pt-3 grid grid-cols-1 gap-2 text-xs border-t ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
                   <p className={`text-[11px] mb-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                    * Manual values entered here override AI and are permanently stored in the note.
+                    {t('create.advancedDesc')}
                   </p>
 
                   <div>
-                    <label className={`text-[11px] font-semibold block mb-0.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>IPA Phonetic</label>
+                    <label className={`text-[11px] font-semibold block mb-0.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>{t('common.phonetic')}</label>
                     <input
                       type="text"
-                      placeholder="e.g. /əˈbændən/"
+                      placeholder={t('create.ipaPlaceholder')}
                       value={overrides.phonetic}
                       onChange={(e) => setOverrides({ ...overrides, phonetic: e.target.value })}
                       className={`w-full p-2 border rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 ${
@@ -659,10 +663,10 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                   </div>
 
                   <div>
-                    <label className={`text-[11px] font-semibold block mb-0.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>Part of Speech</label>
+                    <label className={`text-[11px] font-semibold block mb-0.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>{t('common.partOfSpeech')}</label>
                     <input
                       type="text"
-                      placeholder="e.g. verb, noun"
+                      placeholder={t('create.posPlaceholder')}
                       value={overrides.partOfSpeech}
                       onChange={(e) => setOverrides({ ...overrides, partOfSpeech: e.target.value })}
                       className={`w-full p-2 border rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 ${
@@ -672,11 +676,11 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                   </div>
 
                   <div>
-                    <label className={`text-[11px] font-semibold block mb-0.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>Persian Meaning (معنی فارسی)</label>
+                    <label className={`text-[11px] font-semibold block mb-0.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>{t('common.meaning')}</label>
                     <input
                       type="text"
                       dir="rtl"
-                      placeholder="رها کردن، ترک کردن"
+                      placeholder={t('create.meaningPlaceholder')}
                       value={overrides.meaningFa}
                       onChange={(e) => setOverrides({ ...overrides, meaningFa: e.target.value })}
                       className={`w-full p-2 border rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 ${
@@ -686,10 +690,10 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                   </div>
 
                   <div>
-                    <label className={`text-[11px] font-semibold block mb-0.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>Example Sentence (جمله نمونه)</label>
+                    <label className={`text-[11px] font-semibold block mb-0.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>{t('common.example')}</label>
                     <input
                       type="text"
-                      placeholder="He abandoned his car on the road."
+                      placeholder={t('create.examplePlaceholder')}
                       value={overrides.example}
                       onChange={(e) => setOverrides({ ...overrides, example: e.target.value })}
                       className={`w-full p-2 border rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 ${
@@ -699,11 +703,11 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                   </div>
 
                   <div>
-                    <label className={`text-[11px] font-semibold block mb-0.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>Example Translation (ترجمه مثال)</label>
+                    <label className={`text-[11px] font-semibold block mb-0.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>{t('common.translation')}</label>
                     <input
                       type="text"
                       dir="rtl"
-                      placeholder="او ماشین خود را در جاده رها کرد."
+                      placeholder={t('create.translationPlaceholder')}
                       value={overrides.translationFa}
                       onChange={(e) => setOverrides({ ...overrides, translationFa: e.target.value })}
                       className={`w-full p-2 border rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 ${
@@ -713,10 +717,10 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                   </div>
 
                   <div>
-                    <label className={`text-[11px] font-semibold block mb-0.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>Memory Aid (کدگذاری و یادافزا)</label>
+                    <label className={`text-[11px] font-semibold block mb-0.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>{t('common.mnemonic')}</label>
                     <input
                       type="text"
-                      placeholder="A-BAND-ON: Imagine a band left on the stage."
+                      placeholder={t('create.mnemonicPlaceholder')}
                       value={overrides.mnemonic}
                       onChange={(e) => setOverrides({ ...overrides, mnemonic: e.target.value })}
                       className={`w-full p-2 border rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 ${
@@ -730,10 +734,10 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                     <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
                       <label className={`text-[11px] font-semibold flex items-center gap-1.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                         <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
-                        <span>Image (تصویر دستی کارت)</span>
+                        <span>{t('create.imageSourceTitle')}</span>
                         {overrides.imageBase64 && (
                           <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                            ✓ Image Selected
+                            ✓ {t('common.selected')}
                           </span>
                         )}
                       </label>
@@ -754,10 +758,10 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                               ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700'
                               : 'bg-white hover:bg-zinc-100 text-zinc-800 border-zinc-300 shadow-xs'
                           }`}
-                          title="Select image from your computer"
+                          title={t('create.uploadLocalImage')}
                         >
                           <span className="text-xs">📁</span>
-                          <span className="text-[11px]">Computer</span>
+                          <span className="text-[11px]">{t('common.browse')}</span>
                         </button>
 
                         <button
@@ -768,10 +772,10 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                               ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700'
                               : 'bg-white hover:bg-zinc-100 text-zinc-800 border-zinc-300 shadow-xs'
                           }`}
-                          title="Open new tab to search and import internet image"
+                          title={t('create.searchInternet')}
                         >
                           <span className="text-xs">🌐</span>
-                          <span className="text-[11px]">Internet</span>
+                          <span className="text-[11px]">{t('common.search')}</span>
                         </button>
                       </div>
                     </div>
@@ -797,7 +801,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                               {overrides.imageFileName || 'custom_image.jpg'}
                             </p>
                             <p className="text-[10px] text-zinc-500">
-                              Will be saved in Anki media and used for this card.
+                              {t('create.cardCreatedSuccess')}
                             </p>
                           </div>
                         </div>
@@ -806,12 +810,12 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                           onClick={handleRemoveImageOverride}
                           className="px-2 py-1 text-[11px] font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded border border-rose-200 dark:border-rose-800 cursor-pointer shrink-0"
                         >
-                          ✕ Remove
+                          ✕ {t('common.cancel')}
                         </button>
                       </div>
                     ) : (
                       <p className={`text-[10px] ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                        Choose an image from your computer or search on the internet.
+                        {t('create.photoDesc')}
                       </p>
                     )}
 
@@ -824,7 +828,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                         <div className="flex items-center justify-between">
                           <span className="font-semibold text-[11px] flex items-center gap-1">
                             <Globe className="w-3.5 h-3.5 text-blue-500" />
-                            <span>Import Internet Image for "{word.trim() || 'word'}"</span>
+                            <span>{t('create.searchInternet')}</span>
                           </span>
                           <button
                             type="button"
@@ -836,7 +840,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                         </div>
 
                         <p className="text-[10px] text-zinc-500">
-                          Search opened in a new tab. Copy any image address, paste below and click Import:
+                          {t('create.pasteImageUrl')}
                         </p>
 
                         <div className="flex gap-1.5">
@@ -857,7 +861,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                             className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium text-xs rounded cursor-pointer shrink-0 flex items-center gap-1"
                           >
                             {isDownloadingImage ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                            <span>Import</span>
+                            <span>{t('create.fetchUrl')}</span>
                           </button>
                         </div>
 
@@ -868,14 +872,14 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                         {isSearchingOnline && (
                           <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 py-1">
                             <Loader2 className="w-3 h-3 animate-spin" />
-                            <span>Searching quick suggestions...</span>
+                            <span>{t('create.searching')}</span>
                           </div>
                         )}
 
                         {onlineSearchResults.length > 0 && (
                           <div className="space-y-1 pt-1">
                             <span className="text-[10px] text-zinc-500 block font-medium">
-                              Or click a quick suggestion to import:
+                              {t('create.searchOnline')}:
                             </span>
                             <div className="grid grid-cols-4 gap-1.5 max-h-36 overflow-y-auto p-0.5">
                               {onlineSearchResults.map((res, i) => (
@@ -915,7 +919,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
               >
                 <div className="flex items-center gap-1.5 font-bold">
                   <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
-                  <span>Word already exists in "{deck}"!</span>
+                  <span>{t('create.duplicateWarning', { deck, noteId: duplicateWarning.noteIds[0] || '' })}</span>
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -927,14 +931,14 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                         : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
                     }`}
                   >
-                    Skip
+                    {t('common.cancel')}
                   </button>
                   <button
                     type="button"
                     onClick={() => handleCreate(true)}
                     className="flex-1 px-3 py-1.5 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 text-xs cursor-pointer shadow-xs"
                   >
-                    Add Anyway
+                    {t('common.yes')}
                   </button>
                 </div>
               </div>
@@ -950,7 +954,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                 }`}
               >
                 <span className="font-semibold uppercase tracking-wider flex items-center gap-1">
-                  <XCircle className="w-4 h-4 shrink-0 text-rose-500" /> Error in Stage: {failedStage || 'Execution'}
+                  <XCircle className="w-4 h-4 shrink-0 text-rose-500" /> {t('create.stageError')} {failedStage || 'Execution'}
                 </span>
                 <p className="text-xs">{errorMessage}</p>
               </div>
@@ -965,12 +969,12 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
               {isGenerating ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  <span>Generating & Syncing...</span>
+                  <span>{t('create.generating')}</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  <span>Create Flashcard</span>
+                  <span>{t('create.generateCardBtn')}</span>
                 </>
               )}
             </button>
@@ -989,12 +993,12 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
               {testingAnkiOnly ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Testing Anki Connection...</span>
+                  <span>{t('create.testingCard')}</span>
                 </>
               ) : (
                 <>
                   <Zap className="w-3.5 h-3.5 text-blue-500" />
-                  <span>Test Anki Direct Creation</span>
+                  <span>{t('create.testCardBtn')}</span>
                 </>
               )}
             </button>
@@ -1009,7 +1013,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
         >
           <div className={`flex items-center justify-between mb-3 pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
             <h3 className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
-              Execution Pipeline
+              {t('create.diagnosticPipelineTitle')}
             </h3>
             {createdNoteId && (
               <span
@@ -1019,7 +1023,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                     : 'bg-emerald-100 text-emerald-800 border-emerald-200'
                 }`}
               >
-                <CheckCircle2 className="w-3 h-3" /> Note #{createdNoteId}
+                <CheckCircle2 className="w-3 h-3" /> {t('create.noteIdLabel')} #{createdNoteId}
               </span>
             )}
           </div>
@@ -1038,7 +1042,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
               }`}
             >
               <div className="font-semibold uppercase mb-1">
-                {testAnkiResult.success ? '✓ Anki Direct Test Passed' : '✕ Anki Direct Test Failed'}
+                {testAnkiResult.success ? `✓ ${t('common.success')}` : `✕ ${t('common.failed')}`}
               </div>
               <div className="space-y-1">
                 {testAnkiResult.steps.map((st, i) => (
@@ -1144,29 +1148,25 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                 <div className={`flex items-center justify-between font-semibold uppercase text-xs pb-1 border-b ${isDark ? 'border-emerald-800' : 'border-emerald-200'}`}>
                   <span className="flex items-center gap-1">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <span>Anki Verified Status</span>
+                    <span>{t('create.cardCreatedSuccess')}</span>
                   </span>
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${isDark ? 'bg-emerald-900 text-emerald-100' : 'bg-emerald-200 text-emerald-900'}`}>
-                    VERIFIED
+                    {t('common.ready')}
                   </span>
                 </div>
 
                 <div className="space-y-1 text-[11px]">
                   <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
                     <span>✓</span>
-                    <span>Note created in Anki (ID: #{createdNoteId})</span>
+                    <span>{t('create.noteIdLabel')} #{createdNoteId}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
                     <span>✓</span>
-                    <span>Model: <code className={`font-mono px-1 rounded ${isDark ? 'bg-zinc-800 border border-zinc-700' : 'bg-white border border-zinc-200'}`}>{verificationDetails?.modelName || 'AI Vocabulary'}</code></span>
+                    <span>{t('common.deck')}: <code className={`font-mono px-1 rounded ${isDark ? 'bg-zinc-800 border border-zinc-700' : 'bg-white border border-zinc-200'}`}>{verificationDetails?.actualDeck || deck}</code></span>
                   </div>
                   <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
                     <span>✓</span>
-                    <span>Deck: <code className={`font-mono px-1 rounded ${isDark ? 'bg-zinc-800 border border-zinc-700' : 'bg-white border border-zinc-200'}`}>{verificationDetails?.actualDeck || deck}</code></span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
-                    <span>✓</span>
-                    <span>Cards: <code className={`font-mono px-1 rounded ${isDark ? 'bg-zinc-800 border border-zinc-700' : 'bg-white border border-zinc-200'}`}>{createdCardIds.map((id) => `#${id}`).join(', ') || `#${createdNoteId}`}</code></span>
+                    <span>{t('create.cardIdsLabel')} <code className={`font-mono px-1 rounded ${isDark ? 'bg-zinc-800 border border-zinc-700' : 'bg-white border border-zinc-200'}`}>{createdCardIds.map((id) => `#${id}`).join(', ') || `#${createdNoteId}`}</code></span>
                   </div>
                 </div>
 
@@ -1183,7 +1183,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                     ) : (
                       <ExternalLink className="w-3.5 h-3.5" />
                     )}
-                    <span>Open in Anki</span>
+                    <span>{t('create.openInAnkiBtn')}</span>
                   </button>
 
                   <button
@@ -1195,14 +1195,14 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                         ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-200 border-zinc-700'
                         : 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-300'
                     }`}
-                    title="Query AnkiConnect again to re-verify"
+                    title={t('create.reverifyBtn')}
                   >
                     {isReverifying ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
                       <RefreshCw className="w-3.5 h-3.5" />
                     )}
-                    <span>Re-Verify</span>
+                    <span>{t('create.reverifyBtn')}</span>
                   </button>
 
                   <button
@@ -1213,10 +1213,10 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
                         ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-200 border-zinc-700'
                         : 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-300'
                     }`}
-                    title="View Raw Anki Diagnostics"
+                    title={t('create.showLogs')}
                   >
                     <Info className="w-3.5 h-3.5" />
-                    <span>{showDiagnosticsDetail ? 'Hide' : 'Details'}</span>
+                    <span>{showDiagnosticsDetail ? t('create.hideLogs') : t('create.showLogs')}</span>
                   </button>
                 </div>
 

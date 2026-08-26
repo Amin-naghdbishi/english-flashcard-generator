@@ -3,6 +3,7 @@ import { AppSettings, AppTheme, TaggedNoteItem, CardData } from '../types';
 import { getAnkiTags, findNotesByTag, completeAnkiNote, checkAnki } from '../services/api';
 import { CardPreview } from './CardPreview';
 import { useAppTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n';
 import {
   Tag,
   Tags,
@@ -67,6 +68,7 @@ function noteItemToCardData(item: TaggedNoteItem | null): CardData | null {
 
 export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ settings }) => {
   const themeContext = useAppTheme();
+  const { t, isRTL } = useTranslation();
   const isDark = themeContext.isDark;
 
   const [selectedTag, setSelectedTag] = useState<string>('');
@@ -419,13 +421,13 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
           <div className={`flex items-center justify-between border-b pb-3 mb-4 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
             <h2 className="text-base sm:text-lg font-bold tracking-tight flex items-center gap-2">
               <Tags className="w-5 h-5 text-blue-500" />
-              <span>Complete Cards by Tag</span>
+              <span>{t('completeByTag.title')}</span>
             </h2>
             <button
               type="button"
               onClick={loadTags}
               disabled={isFetchingTags || isProcessing}
-              title="Refresh tag list from Anki"
+              title={t('completeByTag.refreshTagsTooltip')}
               className={`p-1.5 rounded-md border cursor-pointer transition-colors ${
                 isDark ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700' : 'bg-zinc-100 border-zinc-200 text-zinc-700 hover:bg-zinc-200'
               }`}
@@ -437,18 +439,18 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
           {/* Tag Selection & Input */}
           <div className="mb-3">
             <label className={`block text-xs font-semibold uppercase mb-1.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-              Select or Enter Anki Tag:
+              {t('completeByTag.tagLabel')}:
             </label>
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Tag className="w-4 h-4 text-zinc-400 absolute left-2.5 top-2.5" />
+                <Tag className={`w-4 h-4 text-zinc-400 absolute ${isRTL ? 'right-2.5' : 'left-2.5'} top-2.5`} />
                 <input
                   type="text"
                   value={selectedTag}
                   onChange={(e) => setSelectedTag(e.target.value)}
                   disabled={isProcessing || isScanningNotes}
-                  placeholder="e.g. abc, to-complete, vocab"
-                  className={`w-full text-xs font-medium pl-8 pr-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  placeholder={t('completeByTag.tagPlaceholder')}
+                  className={`w-full text-xs font-medium ${isRTL ? 'pr-8 pl-3' : 'pl-8 pr-3'} py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                     isDark
                       ? 'bg-zinc-900 border-zinc-700 text-zinc-100 placeholder:text-zinc-500'
                       : 'bg-white border-zinc-300 text-zinc-900 placeholder:text-zinc-400'
@@ -465,12 +467,12 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                 {isScanningNotes ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Scanning...</span>
+                    <span>{t('completeByTag.scanning')}</span>
                   </>
                 ) : (
                   <>
                     <Search className="w-3.5 h-3.5" />
-                    <span>Scan Notes</span>
+                    <span>{t('completeByTag.scanBtn')}</span>
                   </>
                 )}
               </button>
@@ -479,21 +481,21 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
             {/* Quick Tag Pills from Anki collection */}
             {availableTags.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5 max-h-24 overflow-y-auto py-1">
-                {availableTags.map((t) => (
+                {availableTags.map((tTag) => (
                   <button
-                    key={t}
+                    key={tTag}
                     type="button"
-                    onClick={() => setSelectedTag(t)}
+                    onClick={() => setSelectedTag(tTag)}
                     disabled={isProcessing || isScanningNotes}
                     className={`px-2 py-0.5 text-[11px] rounded border transition-colors cursor-pointer ${
-                      selectedTag === t
+                      selectedTag === tTag
                         ? 'bg-blue-600 text-white border-blue-600 font-semibold'
                         : isDark
                         ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700'
                         : 'bg-zinc-100 text-zinc-700 border-zinc-200 hover:bg-zinc-200'
                     }`}
                   >
-                    #{t}
+                    #{tTag}
                   </button>
                 ))}
               </div>
@@ -510,9 +512,9 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
               <div className="flex items-center gap-2">
                 <ImageIcon className="w-4 h-4 text-blue-500" />
                 <div>
-                  <div className="text-xs font-semibold">Generate / Attach Image:</div>
+                  <div className="text-xs font-semibold">{t('completeByTag.attachImageLabel')}</div>
                   <div className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                    Smart illustrations for cards missing an image
+                    {t('completeByTag.attachImageDesc')}
                   </div>
                 </div>
               </div>
@@ -531,7 +533,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                       : 'text-zinc-600 hover:text-zinc-900'
                   }`}
                 >
-                  Yes
+                  {t('common.yes')}
                 </button>
                 <button
                   type="button"
@@ -545,7 +547,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                       : 'text-zinc-600 hover:text-zinc-900'
                   }`}
                 >
-                  No
+                  {t('common.no')}
                 </button>
               </div>
             </div>
@@ -569,24 +571,24 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
               <div className="text-xs font-bold uppercase tracking-wider text-blue-500 flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Pre-flight Inspection Summary</span>
+                  <span>{t('completeByTag.inspectionTitle')}</span>
                 </div>
                 <span className="font-mono text-[11px] text-zinc-400">#{selectedTag}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
                 <div className="flex flex-col">
-                  <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>Words found:</span>
+                  <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{t('completeByTag.wordsFound')}</span>
                   <span className="font-bold text-sm">{notes.length}</span>
                 </div>
                 <div className="flex flex-col">
-                  <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>Needing Completion:</span>
+                  <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{t('completeByTag.needingCompletion')}</span>
                   <span className="font-bold text-sm text-amber-500">{missingFieldsCount}</span>
                 </div>
               </div>
 
               <div className={`text-[11px] pt-1 border-t ${isDark ? 'border-zinc-800 text-zinc-400' : 'border-zinc-200 text-zinc-500'}`}>
-                Existing user fields are 100% preserved. Automatic retry enabled (up to 2 retries per card).
+                {t('completeByTag.preservationNotice')}
               </div>
             </div>
           )}
@@ -603,7 +605,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                     className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
                   >
                     <Play className="w-4 h-4" />
-                    <span>Complete Cards ({missingFieldsCount > 0 ? `${missingFieldsCount} cards` : 'All Done'})</span>
+                    <span>{t('completeByTag.completeCardsBtn', { count: missingFieldsCount > 0 ? missingFieldsCount : 0 })}</span>
                   </button>
 
                   {failedCount > 0 && (
@@ -614,7 +616,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                       title="Retry only the failed cards"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Retry Failed ({failedCount})</span>
+                      <span>{t('completeByTag.retryFailedBtn', { count: failedCount })}</span>
                     </button>
                   )}
                 </div>
@@ -632,7 +634,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                   >
                     <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
                     <span className="font-semibold">
-                      ⋯ Processing {currentIndex + 1} / {notes.length}
+                      {t('completeByTag.processingProgress', { current: currentIndex + 1, total: notes.length })}
                     </span>
                   </button>
 
@@ -643,7 +645,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                     title="Safely cancel processing and keep completed cards"
                   >
                     <Square className="w-3.5 h-3.5 text-zinc-300" />
-                    <span>Cancel</span>
+                    <span>{t('completeByTag.cancelBtn')}</span>
                   </button>
                 </div>
               )}
@@ -657,7 +659,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                 <span className="flex items-center gap-1.5 text-blue-400">
                   <Loader2 className="w-3 h-3 animate-spin" />
                   <span>
-                    Processing {currentIndex + 1} / {notes.length}
+                    {t('completeByTag.processingProgress', { current: currentIndex + 1, total: notes.length })}
                   </span>
                 </span>
                 <span>{progressPercent}%</span>
@@ -674,21 +676,21 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
               {/* Currently processing word */}
               {currentProcessingNote && (
                 <div className={`text-xs mt-2 font-medium flex items-center gap-1.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                  <span className="text-zinc-500">Currently processing:</span>
+                  <span className="text-zinc-500">{t('batch.currentlyProcessing')}</span>
                   <span className="font-bold text-blue-500">{currentProcessingNote.word}</span>
                   {currentProcessingNote.retryCount !== undefined && currentProcessingNote.retryCount > 0 && (
                     <span className="text-[10px] text-amber-500 font-semibold px-1.5 py-0.2 rounded bg-amber-500/10">
-                      Retry {currentProcessingNote.retryCount}/{MAX_AUTO_RETRIES}
+                      {t('batch.retryAttemptBadge', { current: currentProcessingNote.retryCount, max: MAX_AUTO_RETRIES })}
                     </span>
                   )}
                 </div>
               )}
 
               <div className="flex justify-between text-[11px] mt-2 font-medium">
-                <span className="text-emerald-500">✓ Completed: {completedCount}</span>
-                <span className="text-red-500">✕ Failed: {failedCount}</span>
+                <span className="text-emerald-500">✓ {t('common.completed')}: {completedCount}</span>
+                <span className="text-red-500">✕ {t('common.failed')}: {failedCount}</span>
                 <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  Skipped: {skippedCount}
+                  {t('common.skipped')}: {skippedCount}
                 </span>
               </div>
             </div>
@@ -705,10 +707,10 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
             >
               <div className="font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
                 <PauseCircle className="w-4 h-4 text-amber-500" />
-                <span>Processing Cancelled</span>
+                <span>{t('completeByTag.cancelledTitle')}</span>
               </div>
               <p className="text-xs mb-2">
-                {completedCount} / {notes.length} completed. All successfully completed cards are safely preserved in Anki.
+                {t('completeByTag.cancelledDesc', { completed: completedCount, total: notes.length })}
               </p>
               <div className="flex gap-2">
                 <button
@@ -717,7 +719,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                   className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs rounded shadow-xs flex items-center gap-1 cursor-pointer transition-colors"
                 >
                   <Play className="w-3 h-3" />
-                  <span>Resume Remaining Cards</span>
+                  <span>{t('completeByTag.resumeBtn')}</span>
                 </button>
               </div>
             </div>
@@ -738,29 +740,29 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
             >
               <div className="font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                <span>Tag Completion Summary</span>
+                <span>{t('completeByTag.summaryTitle')}</span>
               </div>
               <div className="grid grid-cols-3 gap-2 py-1 text-center font-semibold">
                 <div className="p-1 rounded bg-emerald-500/20 text-emerald-400">
-                  Completed: {completedCount}
+                  {t('common.completed')}: {completedCount}
                 </div>
                 <div className="p-1 rounded bg-red-500/20 text-red-400">
-                  Failed: {failedCount}
+                  {t('common.failed')}: {failedCount}
                 </div>
                 <div className="p-1 rounded bg-zinc-500/20 text-zinc-400">
-                  Skipped: {skippedCount}
+                  {t('common.skipped')}: {skippedCount}
                 </div>
               </div>
               {failedCount > 0 && (
                 <div className="mt-2 text-[11px] flex items-center justify-between">
-                  <span>Failed cards retained tag #{selectedTag}.</span>
+                  <span>{t('completeByTag.tagRetainedNotice', { tag: selectedTag })}</span>
                   <button
                     type="button"
                     onClick={() => handleStartCompletion(true)}
                     className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-medium text-[11px] rounded flex items-center gap-1 cursor-pointer"
                   >
                     <RotateCcw className="w-3 h-3" />
-                    <span>Retry Failed</span>
+                    <span>{t('completeByTag.retryFailedBtn', { count: failedCount })}</span>
                   </button>
                 </div>
               )}
@@ -779,7 +781,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
               <div className="flex items-center gap-2">
                 <List className="w-4 h-4 text-blue-500" />
                 <span className="text-xs font-bold uppercase tracking-wider">
-                  Words found: {notes.length}
+                  {t('completeByTag.queueTitle', { count: notes.length })}
                 </span>
               </div>
               <div className="flex items-center gap-2 text-xs font-semibold">
@@ -842,7 +844,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                             <span className={`text-[10px] px-1.5 py-0.2 rounded border ${
                               isDark ? 'bg-amber-950/50 text-amber-400 border-amber-800/80' : 'bg-amber-50 text-amber-700 border-amber-300'
                             }`}>
-                              missing {n.missingFields.length}
+                              {t('completeByTag.missingCountBadge', { count: n.missingFields.length })}
                             </span>
                           )}
                         </div>
@@ -859,31 +861,31 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                       {isSuccess && (
                         <span className="flex items-center gap-1 text-[11px] text-emerald-500 font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10">
                           <CheckCircle2 className="w-3 h-3" />
-                          <span>Complete</span>
+                          <span>{t('common.completed')}</span>
                         </span>
                       )}
                       {(isGenerating || isCurrentProcessing) && !isRetrying && (
                         <span className="flex items-center gap-1 text-[11px] text-blue-400 font-medium px-1.5 py-0.5 rounded bg-blue-500/10">
                           <Loader2 className="w-3 h-3 animate-spin" />
-                          <span>Processing</span>
+                          <span>{t('common.processing')}</span>
                         </span>
                       )}
                       {isRetrying && (
                         <span className="flex items-center gap-1 text-[11px] text-amber-400 font-medium px-1.5 py-0.5 rounded bg-amber-500/10">
                           <Loader2 className="w-3 h-3 animate-spin" />
-                          <span>Retry {n.retryCount || 1}</span>
+                          <span>{t('batch.retryAttemptBadge', { current: n.retryCount || 1, max: MAX_AUTO_RETRIES })}</span>
                         </span>
                       )}
                       {isWaiting && (
                         <span className="text-[11px] text-zinc-400 px-1.5 py-0.5 rounded bg-zinc-700/30">
-                          Waiting
+                          {t('common.waiting')}
                         </span>
                       )}
                       {isFailed && (
                         <div className="flex items-center gap-1.5">
                           <span className="flex items-center gap-1 text-[11px] text-red-500 font-semibold px-1.5 py-0.5 rounded bg-red-500/10">
                             <XCircle className="w-3 h-3" />
-                            <span>Failed</span>
+                            <span>{t('common.failed')}</span>
                           </span>
                           <button
                             type="button"
@@ -893,7 +895,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                             }}
                             disabled={isProcessing}
                             className="p-1 bg-red-600 hover:bg-red-700 text-white rounded cursor-pointer transition-colors"
-                            title="Retry this card"
+                            title={t('common.retry')}
                           >
                             <RotateCcw className="w-3 h-3" />
                           </button>
@@ -901,7 +903,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                       )}
                       {n.status === 'skipped' && (
                         <span className="text-[11px] text-zinc-500 px-1.5 py-0.5 rounded bg-zinc-700/20">
-                          Skipped
+                          {t('common.skipped')}
                         </span>
                       )}
 
@@ -919,7 +921,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                             ? 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700'
                             : 'bg-zinc-100 border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200'
                         }`}
-                        title="Preview card details"
+                        title={t('common.preview')}
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>
@@ -944,7 +946,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
             <div className="flex items-center gap-2">
               <Eye className="w-4 h-4 text-blue-500" />
               <span className="text-xs font-bold uppercase tracking-wider">
-                Live Card Preview
+                {t('completeByTag.livePreviewTitle')}
               </span>
               {selectedNoteForPreview && (
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
@@ -960,14 +962,14 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                 {selectedNoteForPreview.status === 'success' ? (
                   <span className="text-emerald-500 font-semibold flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Completed</span>
+                    <span>{t('completeByTag.completedBadge')}</span>
                   </span>
                 ) : selectedNoteForPreview.needsCompletion ? (
                   <span className="text-amber-500 font-medium">
-                    Draft ({selectedNoteForPreview.missingFields.length} missing)
+                    {t('completeByTag.draftBadge', { count: selectedNoteForPreview.missingFields.length })}
                   </span>
                 ) : (
-                  <span className="text-zinc-400">Complete Note</span>
+                  <span className="text-zinc-400">{t('completeByTag.completeNoteBadge')}</span>
                 )}
               </div>
             )}

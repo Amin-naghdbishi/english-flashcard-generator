@@ -179,6 +179,8 @@ const defaultSettings: AppSettings = {
     noteType: 'AI Vocabulary',
   },
   theme: 'comic-pop-dark',
+  language: 'en',
+  direction: 'ltr',
 };
 
 function normalizeSettings(raw: any): AppSettings {

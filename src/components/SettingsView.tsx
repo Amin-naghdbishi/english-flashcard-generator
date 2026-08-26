@@ -42,6 +42,7 @@ import { OnlineTTSDiagnosticResult } from '../../server/onlineTts';
 import { THEME_GROUPS, THEMES } from '../themes';
 import { AudioPlayer } from './AudioPlayer';
 import { useAppTheme, normalizeAppTheme } from '../context/ThemeContext';
+import { useTranslation, AppLanguage, AppDirection } from '../i18n';
 import {
   Sliders,
   Cpu,
@@ -73,6 +74,8 @@ import {
   EyeOff,
   Radio,
   HelpCircle,
+  Languages,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 interface SettingsViewProps {
@@ -83,6 +86,7 @@ interface SettingsViewProps {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSettings }) => {
   const themeContext = useAppTheme();
+  const { t, language, setLanguage, direction, setDirection, isRTL } = useTranslation();
   const [form, setForm] = useState<AppSettings>(settings);
   const [activeSubTab, setActiveSubTab] = useState<
     'ai' | 'tts' | 'dictionary' | 'smartImages' | 'defaultCard' | 'appearance' | 'anki' | 'diagnostics' | 'guide'
@@ -97,6 +101,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     const updated = { ...form, appTheme: normalized };
     setForm(updated);
     themeContext.setAppTheme(normalized);
+    onUpdateSettings(updated);
+    saveConfig(updated).catch(() => {});
+  };
+
+  // Immediate Language Selector
+  const handleLanguageSelect = (newLang: AppLanguage) => {
+    const updated = { ...form, language: newLang };
+    setForm(updated);
+    setLanguage(newLang);
+    onUpdateSettings(updated);
+    saveConfig(updated).catch(() => {});
+  };
+
+  // Immediate Direction Selector
+  const handleDirectionSelect = (newDir: AppDirection) => {
+    const updated = { ...form, direction: newDir };
+    setForm(updated);
+    setDirection(newDir);
     onUpdateSettings(updated);
     saveConfig(updated).catch(() => {});
   };
@@ -397,7 +419,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
         <div>
           <h1 className="text-lg sm:text-xl font-bold tracking-tight flex items-center gap-2">
             <Sliders className="w-5 h-5 text-blue-500" />
-            <span>Settings & Configuration</span>
+            <span>{t('settings.headerTitle')}</span>
           </h1>
         </div>
 
@@ -419,7 +441,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
           >
             <Save className="w-4 h-4" />
-            <span>Save Settings</span>
+            <span>{t('settings.saveBtn')}</span>
           </button>
         </div>
       </div>
@@ -427,15 +449,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       {/* Navigation Sub-Tabs */}
       <div className={`flex flex-wrap gap-1.5 border-b pb-2 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
         {[
-          { id: 'ai', label: 'AI Providers', icon: Cpu },
-          { id: 'tts', label: 'TTS', icon: Volume2 },
-          { id: 'dictionary', label: 'Dictionaries', icon: BookOpen },
-          { id: 'smartImages', label: 'Smart Images', icon: ImageIcon },
-          { id: 'defaultCard', label: 'Default Card', icon: CheckSquare },
-          { id: 'appearance', label: 'Appearance & Themes', icon: Palette },
-          { id: 'anki', label: 'Anki', icon: Bookmark },
-          { id: 'diagnostics', label: 'Diagnostics', icon: Activity },
-          { id: 'guide', label: 'Guide', icon: HelpCircle },
+          { id: 'ai', label: t('settings.tabs.ai'), icon: Cpu },
+          { id: 'tts', label: t('settings.tabs.tts'), icon: Volume2 },
+          { id: 'dictionary', label: t('settings.tabs.dictionary'), icon: BookOpen },
+          { id: 'smartImages', label: t('settings.tabs.smartImages'), icon: ImageIcon },
+          { id: 'defaultCard', label: t('settings.tabs.defaultCard'), icon: CheckSquare },
+          { id: 'appearance', label: t('settings.tabs.appearance'), icon: Palette },
+          { id: 'anki', label: t('settings.tabs.anki'), icon: Bookmark },
+          { id: 'diagnostics', label: t('settings.tabs.diagnostics'), icon: Activity },
+          { id: 'guide', label: t('settings.tabs.guide'), icon: HelpCircle },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSubTab === tab.id;
@@ -2076,7 +2098,146 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       {/* SUBTAB 6: APPEARANCE & THEMES */}
       {activeSubTab === 'appearance' && (
         <div className="space-y-6">
-          {/* 1. APPLICATION UI THEME SELECTOR - ONLY ANKI LIGHT AND ANKI DARK */}
+          {/* 1. APPLICATION LANGUAGE SELECTOR */}
+          <div
+            className={`p-5 border rounded-lg shadow-xs ${
+              isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+            }`}
+          >
+            <h3 className="font-semibold text-sm uppercase mb-1 flex items-center gap-2">
+              <Languages className="w-4 h-4 text-blue-500" />
+              <span>{t('settings.appearance.languageTitle')}</span>
+            </h3>
+            <p className={`text-xs mb-3 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+              {t('settings.appearance.languageDesc')}
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Option 1: English */}
+              <button
+                type="button"
+                onClick={() => handleLanguageSelect('en')}
+                className={`p-3.5 border text-left cursor-pointer transition-all rounded-md ${
+                  language === 'en'
+                    ? 'bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-200 border-blue-600 dark:border-blue-500 font-semibold shadow-xs'
+                    : isDark
+                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold">{t('settings.appearance.langEnglish')}</span>
+                  {language === 'en' && (
+                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                      {t('settings.appearance.activeBadge')}
+                    </span>
+                  )}
+                </div>
+                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  {t('settings.appearance.langEnglishDesc')}
+                </div>
+              </button>
+
+              {/* Option 2: Persian (فارسی) */}
+              <button
+                type="button"
+                onClick={() => handleLanguageSelect('fa')}
+                className={`p-3.5 border text-left cursor-pointer transition-all rounded-md ${
+                  language === 'fa'
+                    ? 'bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-200 border-blue-600 dark:border-blue-500 font-semibold shadow-xs'
+                    : isDark
+                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold">{t('settings.appearance.langPersian')}</span>
+                  {language === 'fa' && (
+                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                      {t('settings.appearance.activeBadge')}
+                    </span>
+                  )}
+                </div>
+                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  {t('settings.appearance.langPersianDesc')}
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* 2. APPLICATION INTERFACE DIRECTION SELECTOR */}
+          <div
+            className={`p-5 border rounded-lg shadow-xs ${
+              isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+            }`}
+          >
+            <h3 className="font-semibold text-sm uppercase mb-1 flex items-center gap-2">
+              <ArrowLeftRight className="w-4 h-4 text-blue-500" />
+              <span>{t('settings.appearance.directionTitle')}</span>
+            </h3>
+            <p className={`text-xs mb-3 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+              {t('settings.appearance.directionDesc')}
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              {/* Option 1: Left-to-Right (LTR) */}
+              <button
+                type="button"
+                onClick={() => handleDirectionSelect('ltr')}
+                className={`p-3.5 border text-left cursor-pointer transition-all rounded-md ${
+                  direction === 'ltr'
+                    ? 'bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-200 border-blue-600 dark:border-blue-500 font-semibold shadow-xs'
+                    : isDark
+                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold">{t('settings.appearance.dirLTR')}</span>
+                  {direction === 'ltr' && (
+                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                      {t('settings.appearance.activeBadge')}
+                    </span>
+                  )}
+                </div>
+                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  {t('settings.appearance.dirLTRDesc')}
+                </div>
+              </button>
+
+              {/* Option 2: Right-to-Left (RTL) */}
+              <button
+                type="button"
+                onClick={() => handleDirectionSelect('rtl')}
+                className={`p-3.5 border text-left cursor-pointer transition-all rounded-md ${
+                  direction === 'rtl'
+                    ? 'bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-200 border-blue-600 dark:border-blue-500 font-semibold shadow-xs'
+                    : isDark
+                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold">{t('settings.appearance.dirRTL')}</span>
+                  {direction === 'rtl' && (
+                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                      {t('settings.appearance.activeBadge')}
+                    </span>
+                  )}
+                </div>
+                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  {t('settings.appearance.dirRTLDesc')}
+                </div>
+              </button>
+            </div>
+
+            <div className={`p-3 border rounded-md text-xs ${isDark ? 'bg-zinc-900/60 border-zinc-700 text-zinc-300' : 'bg-zinc-50 border-zinc-200 text-zinc-700'}`}>
+              <div className="font-semibold text-blue-500 mb-0.5">ℹ {t('settings.appearance.independentNoticeTitle')}</div>
+              <div>{t('settings.appearance.independentNoticeDesc')}</div>
+            </div>
+          </div>
+
+          {/* 3. APPLICATION UI THEME SELECTOR - ONLY ANKI LIGHT AND ANKI DARK */}
           <div
             className={`p-5 border rounded-lg shadow-xs ${
               isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
@@ -2084,7 +2245,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           >
             <h3 className="font-semibold text-sm uppercase mb-3 flex items-center gap-2">
               <Sliders className="w-4 h-4 text-blue-500" />
-              <span>Application Theme</span>
+              <span>{t('settings.appearance.appThemeTitle')}</span>
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2099,15 +2260,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold">Anki Light</span>
+                  <span className="text-xs font-semibold">{t('settings.appearance.themeLight')}</span>
                   {!isDark && (
                     <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
-                      ACTIVE
+                      {t('settings.appearance.activeBadge')}
                     </span>
                   )}
                 </div>
                 <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  Clean light desktop interface with functional styling.
+                  {t('settings.appearance.themeLightDesc')}
                 </div>
               </button>
 
@@ -2122,21 +2283,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold">Anki Dark</span>
+                  <span className="text-xs font-semibold">{t('settings.appearance.themeDark')}</span>
                   {isDark && (
                     <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
-                      ACTIVE
+                      {t('settings.appearance.activeBadge')}
                     </span>
                   )}
                 </div>
                 <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  Clean dark desktop interface with restrained contrast.
+                  {t('settings.appearance.themeDarkDesc')}
                 </div>
               </button>
             </div>
           </div>
 
-          {/* 2. FLASHCARD NOTE THEMES (All 12 Note Themes preserved) */}
+          {/* 4. FLASHCARD NOTE THEMES (All 12 Note Themes preserved) */}
           <div
             className={`p-5 border rounded-lg shadow-xs ${
               isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
@@ -2144,13 +2305,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           >
             <h3 className="font-semibold text-sm uppercase mb-4 flex items-center gap-2">
               <Palette className="w-4 h-4 text-blue-500" />
-              <span>Card Note Themes (Applied inside Anki)</span>
+              <span>{t('settings.appearance.cardThemesTitle')}</span>
             </h3>
 
             {/* Light Card Themes */}
             <div className="mb-5">
               <div className={`text-xs font-semibold uppercase mb-2 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                Light Card Themes
+                {t('settings.appearance.lightThemesCategory')}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {THEME_GROUPS.light.map((th) => {
@@ -2174,7 +2335,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         <span className="text-xs font-semibold">{th.name}</span>
                         {isSelected && (
                           <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
-                            SELECTED
+                            {t('settings.appearance.selectedBadge')}
                           </span>
                         )}
                       </div>
@@ -2190,7 +2351,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             {/* Dark Card Themes */}
             <div>
               <div className={`text-xs font-semibold uppercase mb-2 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                Dark Card Themes
+                {t('settings.appearance.darkThemesCategory')}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {THEME_GROUPS.dark.map((th) => {
@@ -2214,7 +2375,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         <span className="text-xs font-semibold">{th.name}</span>
                         {isSelected && (
                           <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
-                            SELECTED
+                            {t('settings.appearance.selectedBadge')}
                           </span>
                         )}
                       </div>
@@ -2233,11 +2394,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 <div className="flex items-center gap-2">
                   <Eye className="w-4 h-4 text-blue-500" />
                   <span className="text-xs font-bold uppercase tracking-wider">
-                    Live Theme Preview: {THEMES[form.theme]?.name || form.theme}
+                    {t('settings.appearance.liveThemePreview', { theme: THEMES[form.theme]?.name || form.theme })}
                   </span>
                 </div>
                 <div className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  Exact full-screen Anki layout & interactive spelling preview for this theme
+                  {t('settings.appearance.previewSubtitle')}
                 </div>
               </div>
 

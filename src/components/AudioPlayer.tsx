@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Volume2, Loader2 } from 'lucide-react';
 import { useAppTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n';
 
 interface AudioPlayerProps {
   base64Wav?: string;
@@ -16,6 +17,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   size = 'md',
 }) => {
   const { isDark } = useAppTheme();
+  const { t } = useTranslation();
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -68,7 +70,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       type="button"
       onClick={handlePlay}
       disabled={!base64Wav}
-      title={base64Wav ? 'Play Audio' : 'Audio not generated yet'}
+      title={base64Wav ? t('common.playAudio') : t('common.noAudio')}
       className={`inline-flex items-center gap-1.5 transition-all select-none ${btnClasses} ${
         isSmall ? 'text-[11px] px-2 py-1' : 'text-xs px-3 py-1.5'
       } ${className}`}
@@ -78,7 +80,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       ) : (
         <Volume2 className={`${isSmall ? 'w-3 h-3' : 'w-3.5 h-3.5'}`} />
       )}
-      <span>{label || (isPlaying ? 'Playing...' : 'Audio')}</span>
+      <span>{label || (isPlaying ? t('common.playing') : t('common.audio'))}</span>
     </button>
   );
 };

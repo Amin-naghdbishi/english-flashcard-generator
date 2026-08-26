@@ -7,9 +7,12 @@ import { CompleteCardsByTagView } from './components/CompleteCardsByTagView';
 import { SettingsView } from './components/SettingsView';
 import { fetchConfig, saveConfig, checkOllama, checkGemini, checkTTS, checkOnlineTTS, checkAnki } from './services/api';
 import { AppThemeProvider, normalizeAppTheme } from './context/ThemeContext';
+import { I18nProvider, useTranslation, AppLanguage, AppDirection } from './i18n';
 
 const defaultSettings: AppSettings = {
   appTheme: 'anki-light',
+  language: 'en',
+  direction: 'ltr',
   ai: {
     provider: 'ollama',
     ollama: {
@@ -75,172 +78,24 @@ const defaultSettings: AppSettings = {
   theme: 'comic-pop-dark',
 };
 
-export default function App() {
+function AppShell({
+  settings,
+  setSettings,
+  activeAppTheme,
+  handleSetAppTheme,
+  status,
+  refreshStatuses,
+}: {
+  settings: AppSettings;
+  setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
+  activeAppTheme: AppTheme;
+  handleSetAppTheme: (newTheme: AppTheme) => void;
+  status: NavigationStatus;
+  refreshStatuses: (isManual?: boolean) => Promise<void>;
+}) {
   const [currentTab, setCurrentTab] = useState<NavTab>('create');
-  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
-  const [loadingConfig, setLoadingConfig] = useState(true);
-
-  const activeAppTheme: AppTheme = normalizeAppTheme(settings.appTheme);
+  const { t } = useTranslation();
   const isDark = activeAppTheme === 'anki-dark';
-
-  // Service status for header
-  const [status, setStatus] = useState<NavigationStatus>({
-    ai: { state: 'checking', connected: false, label: 'Ollama', checking: true },
-    tts: { state: 'checking', ready: false, label: 'Piper', checking: true },
-    anki: { state: 'checking', connected: false, checking: true },
-    isChecking: true,
-  });
-
-  const isPollingRef = useRef(false);
-  const settingsRef = useRef(settings);
-  settingsRef.current = settings;
-
-  // Load initial settings
-  useEffect(() => {
-    fetchConfig()
-      .then((cfg) => {
-        setSettings(cfg);
-      })
-      .catch((err) => {
-        console.error('Could not load config:', err);
-      })
-      .finally(() => {
-        setLoadingConfig(false);
-      });
-  }, []);
-
-  // Check connection status asynchronously across all services concurrently
-  const refreshStatuses = useCallback(async (isManual: boolean = false) => {
-    if (isPollingRef.current) return;
-    isPollingRef.current = true;
-
-    if (isManual) {
-      setStatus((prev) => ({
-        ...prev,
-        isChecking: true,
-        ai: { ...prev.ai, checking: true },
-        tts: { ...prev.tts, checking: true },
-        anki: { ...prev.anki, checking: true },
-      }));
-    }
-
-    const currentSettings = settingsRef.current;
-
-    try {
-      // 1. Check AI Provider
-      const checkAiPromise = (async () => {
-        let aiConnected = false;
-        let aiLabel = 'Ollama';
-
-        if (currentSettings.ai.provider === 'gemini') {
-          aiLabel = 'Gemini';
-          if (currentSettings.ai.gemini?.apiKey) {
-            const res = await checkGemini(currentSettings.ai.gemini.apiKey, currentSettings.ai.gemini.model).catch(() => ({ connected: false }));
-            aiConnected = !!res.connected;
-          }
-        } else if (currentSettings.ai.provider === 'custom') {
-          aiLabel = 'Custom AI';
-          aiConnected = true;
-        } else {
-          aiLabel = 'Ollama';
-          const ollamaUrl = currentSettings.ai.ollama?.url || 'http://127.0.0.1:11434';
-          const res = await checkOllama(ollamaUrl).catch(() => ({ connected: false }));
-          aiConnected = !!res.connected;
-        }
-
-        return {
-          state: (aiConnected ? 'connected' : 'disconnected') as ServiceState,
-          connected: aiConnected,
-          label: aiLabel,
-          checking: false,
-        };
-      })();
-
-      // 2. Check TTS Provider
-      const checkTtsPromise = (async () => {
-        let ttsReady = false;
-        let ttsLabel = 'Piper';
-
-        if (currentSettings.tts.provider === 'online') {
-          ttsLabel = 'Online TTS';
-          const res = await checkOnlineTTS().catch(() => ({ connected: false }));
-          ttsReady = !!res.connected;
-        } else if (currentSettings.tts.provider === 'custom') {
-          ttsLabel = 'Custom TTS';
-          ttsReady = true;
-        } else {
-          ttsLabel = 'Piper';
-          const piperEndpoint = currentSettings.tts.endpoint || 'http://127.0.0.1:5000';
-          const res = await checkTTS(piperEndpoint).catch(() => ({ ready: false, connected: false }));
-          ttsReady = !!(res.ready ?? res.connected);
-        }
-
-        return {
-          state: (ttsReady ? 'connected' : 'disconnected') as ServiceState,
-          ready: ttsReady,
-          connected: ttsReady,
-          label: ttsLabel,
-          checking: false,
-        };
-      })();
-
-      // 3. Check AnkiConnect
-      const checkAnkiPromise = (async () => {
-        const ankiUrl = currentSettings.anki?.url || 'http://127.0.0.1:8765';
-        const res = await checkAnki(ankiUrl).catch(() => ({ connected: false, version: undefined }));
-        const isAnkiConnected = !!res.connected;
-
-        return {
-          state: (isAnkiConnected ? 'connected' : 'disconnected') as ServiceState,
-          connected: isAnkiConnected,
-          version: res.version,
-          checking: false,
-        };
-      })();
-
-      const [aiResult, ttsResult, ankiResult] = await Promise.allSettled([
-        checkAiPromise,
-        checkTtsPromise,
-        checkAnkiPromise,
-      ]);
-
-      setStatus((prev) => ({
-        ai: aiResult.status === 'fulfilled' ? aiResult.value : { ...prev.ai, state: 'disconnected', connected: false, checking: false },
-        tts: ttsResult.status === 'fulfilled' ? ttsResult.value : { ...prev.tts, state: 'disconnected', ready: false, connected: false, checking: false },
-        anki: ankiResult.status === 'fulfilled' ? ankiResult.value : { ...prev.anki, state: 'disconnected', connected: false, checking: false },
-        isChecking: false,
-      }));
-    } catch (err) {
-      console.error('Service status check encountered an error:', err);
-      setStatus((prev) => ({ ...prev, isChecking: false }));
-    } finally {
-      isPollingRef.current = false;
-    }
-  }, []);
-
-  // Continuous background status polling (runs automatically every 5 seconds)
-  useEffect(() => {
-    // Initial check on mount
-    refreshStatuses(true);
-
-    const timer = setInterval(() => {
-      refreshStatuses(false);
-    }, 5000);
-
-    return () => {
-      clearInterval(timer);
-      isPollingRef.current = false;
-    };
-  }, [refreshStatuses]);
-
-  const handleSetAppTheme = (newTheme: AppTheme) => {
-    const normalized = normalizeAppTheme(newTheme);
-    setSettings((prev) => ({ ...prev, appTheme: normalized }));
-    // Persist asynchronously without blocking state or throwing
-    saveConfig({ appTheme: normalized }).catch((e) => {
-      console.warn('Failed to persist app theme:', e);
-    });
-  };
 
   return (
     <AppThemeProvider
@@ -309,7 +164,7 @@ export default function App() {
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-                Pipeline:
+                {t('common.pipeline')}:
               </span>
               <span className="font-mono text-xs opacity-80">
                 Word → AI ({settings.ai.provider}) → TTS ({settings.tts.provider}) → 12 Note Themes → AnkiConnect
@@ -322,5 +177,209 @@ export default function App() {
         </footer>
       </div>
     </AppThemeProvider>
+  );
+}
+
+export default function App() {
+  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
+  const [loadingConfig, setLoadingConfig] = useState(true);
+
+  const activeAppTheme: AppTheme = normalizeAppTheme(settings.appTheme);
+
+  // Service status for header
+  const [status, setStatus] = useState<NavigationStatus>({
+    ai: { state: 'checking', connected: false, label: 'Ollama', checking: true },
+    tts: { state: 'checking', ready: false, label: 'Piper', checking: true },
+    anki: { state: 'checking', connected: false, checking: true },
+    isChecking: true,
+  });
+
+  const isPollingRef = useRef(false);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+
+  // Load initial settings
+  useEffect(() => {
+    fetchConfig()
+      .then((cfg) => {
+        setSettings(cfg);
+      })
+      .catch((err) => {
+        console.error('Could not load config:', err);
+      })
+      .finally(() => {
+        setLoadingConfig(false);
+      });
+  }, []);
+
+  // Check connection status asynchronously across all services concurrently
+  const refreshStatuses = useCallback(async (isManual: boolean = false) => {
+    if (isPollingRef.current) return;
+    isPollingRef.current = true;
+
+    if (isManual) {
+      setStatus((prev) => ({
+        ...prev,
+        isChecking: true,
+        ai: { ...prev.ai, checking: true },
+        tts: { ...prev.tts, checking: true },
+        anki: { ...prev.anki, checking: true },
+      }));
+    }
+
+    const currentSettings = settingsRef.current;
+
+    try {
+      // 1. Check AI Provider
+      const checkAiPromise = (async () => {
+        let aiConnected = false;
+        let aiLabel = 'Ollama';
+
+        if (currentSettings.ai.provider === 'gemini') {
+          aiLabel = 'Gemini';
+          if (currentSettings.ai.gemini?.apiKey) {
+            const res = await checkGemini(currentSettings.ai.gemini.apiKey, currentSettings.ai.gemini.model).catch(() => ({ connected: false }));
+            aiConnected = !!res.connected;
+          }
+        } else if (currentSettings.ai.provider === 'custom') {
+          aiLabel = 'Custom AI';
+          aiConnected = true;
+        } else {
+          aiLabel = 'Ollama';
+          const ollamaUrl = currentSettings.ai.ollama?.url || 'http://127.0.0.1:11434';
+          const res = await checkOllama(ollamaUrl).catch(() => ({ connected: false }));
+          aiConnected = !!res.connected;
+        }
+
+        return {
+          connected: aiConnected,
+          state: (aiConnected ? 'ready' : 'offline') as ServiceState,
+          label: aiLabel,
+        };
+      })();
+
+      // 2. Check TTS Provider
+      const checkTtsPromise = (async () => {
+        let ttsReady = false;
+        let ttsLabel = 'Piper';
+
+        if (currentSettings.tts.provider === 'online') {
+          ttsLabel = 'Online TTS';
+          const res = await checkOnlineTTS().catch(() => ({ connected: false }));
+          ttsReady = !!res.connected;
+        } else if (currentSettings.tts.provider === 'custom') {
+          ttsLabel = 'Custom TTS';
+          ttsReady = true;
+        } else {
+          ttsLabel = 'Piper';
+          const piperEndpoint = currentSettings.tts.endpoint || 'http://127.0.0.1:5000';
+          const res = await checkTTS(piperEndpoint).catch(() => ({ ready: false }));
+          ttsReady = !!res.ready;
+        }
+
+        return {
+          ready: ttsReady,
+          state: (ttsReady ? 'ready' : 'offline') as ServiceState,
+          label: ttsLabel,
+        };
+      })();
+
+      // 3. Check AnkiConnect
+      const checkAnkiPromise = (async () => {
+        const ankiUrl = currentSettings.anki.url || 'http://127.0.0.1:8765';
+        const res = await checkAnki(ankiUrl).catch(() => ({ connected: false }));
+        const ankiConnected = !!res.connected;
+
+        return {
+          connected: ankiConnected,
+          state: (ankiConnected ? 'ready' : 'offline') as ServiceState,
+        };
+      })();
+
+      // Execute all checks concurrently in parallel
+      const [aiRes, ttsRes, ankiRes] = await Promise.all([
+        checkAiPromise,
+        checkTtsPromise,
+        checkAnkiPromise,
+      ]);
+
+      setStatus({
+        ai: { ...aiRes, checking: false },
+        tts: { ...ttsRes, checking: false },
+        anki: { ...ankiRes, checking: false },
+        isChecking: false,
+      });
+    } catch (e) {
+      console.error('Error during concurrent service check:', e);
+      setStatus((prev) => ({
+        ...prev,
+        isChecking: false,
+      }));
+    } finally {
+      isPollingRef.current = false;
+    }
+  }, []);
+
+  // Initial status check on mount
+  useEffect(() => {
+    refreshStatuses();
+  }, [refreshStatuses]);
+
+  // Background status polling every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refreshStatuses(false);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [refreshStatuses]);
+
+  const handleSetAppTheme = (newTheme: AppTheme) => {
+    const normalized = normalizeAppTheme(newTheme);
+    setSettings((prev) => ({
+      ...prev,
+      appTheme: normalized,
+    }));
+    saveConfig({ appTheme: normalized }).catch((e) => {
+      console.warn('Failed to persist app theme:', e);
+    });
+  };
+
+  const handleLanguageChange = (newLang: AppLanguage) => {
+    setSettings((prev) => ({
+      ...prev,
+      language: newLang,
+    }));
+    saveConfig({ language: newLang }).catch((e) => {
+      console.warn('Failed to persist language:', e);
+    });
+  };
+
+  const handleDirectionChange = (newDir: AppDirection) => {
+    setSettings((prev) => ({
+      ...prev,
+      direction: newDir,
+    }));
+    saveConfig({ direction: newDir }).catch((e) => {
+      console.warn('Failed to persist direction:', e);
+    });
+  };
+
+  return (
+    <I18nProvider
+      initialLanguage={settings.language || 'en'}
+      initialDirection={settings.direction || 'ltr'}
+      onLanguageChange={handleLanguageChange}
+      onDirectionChange={handleDirectionChange}
+    >
+      <AppShell
+        settings={settings}
+        setSettings={setSettings}
+        activeAppTheme={activeAppTheme}
+        handleSetAppTheme={handleSetAppTheme}
+        status={status}
+        refreshStatuses={refreshStatuses}
+      />
+    </I18nProvider>
   );
 }

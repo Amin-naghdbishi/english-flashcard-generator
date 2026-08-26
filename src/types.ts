@@ -233,6 +233,9 @@ export interface AnkiConfig {
   tags?: string[];
 }
 
+export type AppLanguage = 'en' | 'fa';
+export type AppDirection = 'ltr' | 'rtl';
+
 export interface AppSettings {
   ai: AIConfig;
   tts: TTSConfig;
@@ -242,6 +245,8 @@ export interface AppSettings {
   anki: AnkiConfig;
   theme: ThemeId;
   appTheme?: AppTheme;
+  language?: AppLanguage;
+  direction?: AppDirection;
 }
 
 export interface BatchFieldConfig {

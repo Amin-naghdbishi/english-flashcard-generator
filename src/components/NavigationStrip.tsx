@@ -2,6 +2,7 @@ import React from 'react';
 import { Sparkles, Layers, Sliders, RefreshCw, Tags } from 'lucide-react';
 import { AppTheme } from '../types';
 import { useAppTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n';
 
 export type NavTab = 'create' | 'batch' | 'complete-by-tag' | 'settings';
 export type ServiceState = 'connected' | 'checking' | 'disconnected';
@@ -58,6 +59,7 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
   appTheme: propTheme,
 }) => {
   const themeContext = useAppTheme();
+  const { t } = useTranslation();
   const isDark = (propTheme || themeContext.appTheme) === 'anki-dark';
 
   // AI state
@@ -65,30 +67,30 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
   const isAiOnline = status.ai.state === 'connected' || (!isAiChecking && !!status.ai.connected);
   const aiClasses = getIndicatorClasses(isAiChecking, isAiOnline);
   const aiTooltip = isAiChecking
-    ? `${status.ai.label || 'AI'}: Checking status...`
+    ? t('nav.aiChecking', { label: status.ai.label || 'AI' })
     : isAiOnline
-    ? `${status.ai.label || 'AI'}: Connected / Available`
-    : `${status.ai.label || 'AI'}: Disconnected / Offline`;
+    ? t('nav.aiConnected', { label: status.ai.label || 'AI' })
+    : t('nav.aiDisconnected', { label: status.ai.label || 'AI' });
 
   // TTS state
   const isTtsChecking = status.tts.state === 'checking' || !!status.tts.checking;
   const isTtsOnline = status.tts.state === 'connected' || (!isTtsChecking && (!!status.tts.ready || !!status.tts.connected));
   const ttsClasses = getIndicatorClasses(isTtsChecking, isTtsOnline);
   const ttsTooltip = isTtsChecking
-    ? `${status.tts.label || 'TTS'}: Checking status...`
+    ? t('nav.ttsChecking', { label: status.tts.label || 'TTS' })
     : isTtsOnline
-    ? `${status.tts.label || 'TTS'}: Ready / Available`
-    : `${status.tts.label || 'TTS'}: Disconnected / Offline`;
+    ? t('nav.ttsReady', { label: status.tts.label || 'TTS' })
+    : t('nav.ttsDisconnected', { label: status.tts.label || 'TTS' });
 
   // Anki state
   const isAnkiChecking = status.anki.state === 'checking' || !!status.anki.checking;
   const isAnkiOnline = status.anki.state === 'connected' || (!isAnkiChecking && !!status.anki.connected);
   const ankiClasses = getIndicatorClasses(isAnkiChecking, isAnkiOnline);
   const ankiTooltip = isAnkiChecking
-    ? 'AnkiConnect: Checking status...'
+    ? t('nav.ankiChecking')
     : isAnkiOnline
-    ? `AnkiConnect: Connected ${status.anki.version ? `(v${status.anki.version})` : ''}`
-    : 'AnkiConnect: Disconnected / Offline';
+    ? t('nav.ankiConnected', { version: status.anki.version ? `(v${status.anki.version})` : '' })
+    : t('nav.ankiDisconnected');
 
   const isGlobalChecking = !!status.isChecking || isAiChecking || isTtsChecking || isAnkiChecking;
 
@@ -115,7 +117,7 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
             }`}
           >
             <Sparkles className="w-4 h-4 shrink-0" />
-            <span>Create</span>
+            <span>{t('nav.create')}</span>
           </button>
 
           <button
@@ -132,7 +134,7 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
             }`}
           >
             <Layers className="w-4 h-4 shrink-0" />
-            <span>Batch</span>
+            <span>{t('nav.batch')}</span>
           </button>
 
           <button
@@ -149,7 +151,7 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
             }`}
           >
             <Tags className="w-4 h-4 shrink-0" />
-            <span>Complete by Tag</span>
+            <span>{t('nav.completeByTag')}</span>
           </button>
 
           <button
@@ -166,7 +168,7 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
             }`}
           >
             <Sliders className="w-4 h-4 shrink-0" />
-            <span>Settings</span>
+            <span>{t('nav.settings')}</span>
           </button>
         </nav>
 
@@ -215,7 +217,7 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
           <button
             type="button"
             onClick={onRefreshStatus}
-            title={isGlobalChecking ? 'Checking connections...' : 'Refresh status indicators'}
+            title={isGlobalChecking ? t('nav.checkingStatus') : t('nav.refreshStatus')}
             disabled={isGlobalChecking}
             className={`p-1.5 rounded-md border transition-colors cursor-pointer ${
               isDark
@@ -230,7 +232,7 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
           <button
             type="button"
             onClick={() => themeContext.toggleTheme()}
-            title={isDark ? 'Switch to Anki Light' : 'Switch to Anki Dark'}
+            title={isDark ? t('nav.switchToLight') : t('nav.switchToDark')}
             className={`px-2 py-1 rounded border text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
               isDark
                 ? 'border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-750'
@@ -240,12 +242,12 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
             {isDark ? (
               <>
                 <span className="text-amber-400">☀️</span>
-                <span className="hidden md:inline">Light</span>
+                <span className="hidden md:inline">{t('nav.light')}</span>
               </>
             ) : (
               <>
                 <span className="text-blue-500">🌙</span>
-                <span className="hidden md:inline">Dark</span>
+                <span className="hidden md:inline">{t('nav.dark')}</span>
               </>
             )}
           </button>

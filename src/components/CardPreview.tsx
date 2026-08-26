@@ -3,6 +3,7 @@ import { CardData, ThemeDefinition, ThemeId, CardType, AppTheme } from '../types
 import { THEMES, renderThemeHtml, getSpellingFrontHtml } from '../themes';
 import { Eye, Smartphone, Monitor } from 'lucide-react';
 import { useAppTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n';
 
 interface CardPreviewProps {
   cardData: CardData | null;
@@ -20,6 +21,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
   appTheme: propTheme,
 }) => {
   const themeContext = useAppTheme();
+  const { t } = useTranslation();
   const isDark = (propTheme || themeContext.appTheme) === 'anki-dark';
 
   const [activeSide, setActiveSide] = useState<'front' | 'back' | 'both'>('back');
@@ -99,76 +101,80 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
 
     const checkBtn = (e.target as HTMLElement).closest('.spelling-check-btn');
     if (checkBtn) {
+      e.stopPropagation();
       const container = checkBtn.closest('.spelling-card, .spelling-strip, .spelling-quest, .spelling-notebook, .spelling-arcade, .spelling-minimal, .comic-card-wrapper');
-      if (container) {
-        const input = container.querySelector('#typeans, #spelling-input') as HTMLInputElement;
-        const result = container.querySelector('#spelling-result') as HTMLElement;
-        const targetEl = container.querySelector('#spelling-target-word') as HTMLElement;
-        const target = (targetEl ? (targetEl.innerText || targetEl.textContent) : displayData.word).trim().toLowerCase();
-        if (input && result && target) {
-          const typed = input.value.trim();
-          if (!typed) {
-            result.className = 'spelling-result is-empty';
-            result.innerHTML = '<span class="spelling-empty-msg">⚠️ Please type your answer first!</span>';
-            return;
-          }
-          if (typed.toLowerCase() === target) {
-            result.className = 'spelling-result is-correct';
-            result.innerHTML = `<div class="spelling-success-badge">✓ EXCELLENT! PERFECT SPELLING!</div><div class="spelling-word-reveal">${target}</div>`;
-            input.classList.remove('has-error');
-            input.classList.add('is-valid');
-          } else {
-            result.className = 'spelling-result is-incorrect';
-            result.innerHTML = `<div class="spelling-error-badge">✕ INCORRECT SPELLING</div><div class="spelling-compare-box"><div class="spelling-user-typed"><span class="spelling-label">You typed:</span> <del class="spelling-mistake">${typed}</del></div><div class="spelling-correct-ans"><span class="spelling-label">Correct spelling:</span> <strong class="spelling-exact">${target}</strong></div></div>`;
-            input.classList.add('has-error');
-            input.classList.remove('is-valid');
-          }
+      if (!container) return;
+
+      const input = (container.querySelector('#spelling-input, #typeans') as HTMLInputElement) || null;
+      const feedback = (container.querySelector('#spelling-feedback, .spelling-feedback') as HTMLElement) || null;
+      const expectedWord = displayData.word.trim();
+
+      if (input && feedback) {
+        const typed = input.value.trim();
+        if (!typed) return;
+
+        if (typed.toLowerCase() === expectedWord.toLowerCase()) {
+          feedback.style.display = 'block';
+          feedback.style.color = '#10b981';
+          feedback.innerHTML = `✓ ${t('preview.spellingCorrect')}`;
+          input.style.borderColor = '#10b981';
+        } else {
+          feedback.style.display = 'block';
+          feedback.style.color = '#ef4444';
+          feedback.innerHTML = `✕ ${t('preview.spellingIncorrect', { expected: expectedWord })}`;
+          input.style.borderColor = '#ef4444';
         }
       }
     }
   };
 
-  const playAudio = (base64Data: string) => {
+  const playAudio = (b64: string) => {
     try {
-      let audioUrl = base64Data;
-      if (!audioUrl.startsWith('data:')) {
-        const isMp3 = !base64Data.startsWith('UklGR');
-        const mime = isMp3 ? 'audio/mpeg' : 'audio/wav';
-        audioUrl = `data:${mime};base64,${base64Data}`;
-      }
-      const audio = new Audio(audioUrl);
-      audio.play().catch((err) => console.error('Audio play error:', err));
-    } catch (e) {
-      console.error('Failed to create Audio instance:', e);
+      const audio = new Audio(`data:audio/wav;base64,${b64}`);
+      audio.play().catch((err) => console.error('Preview audio play error:', err));
+    } catch (err) {
+      console.error('Audio playback error:', err);
     }
   };
 
-  const frontTemplate = previewCardType === 'spelling' ? getSpellingFrontHtml(theme.id) : theme.frontHtml;
-  const frontRendered = useMemo(
-    () => renderThemeHtml(frontTemplate, { ...displayData, cardType: previewCardType }, { isPreview: true, cardType: previewCardType }),
-    [frontTemplate, displayData, previewCardType]
-  );
-  const backRendered = useMemo(
-    () => renderThemeHtml(theme.backHtml, { ...displayData, cardType: previewCardType }, { isPreview: true, cardType: previewCardType }),
-    [theme.backHtml, displayData, previewCardType]
-  );
+  // Render front/back HTML
+  const frontRendered = useMemo(() => {
+    const activeData = { ...displayData, cardType: previewCardType };
+    if (previewCardType === 'spelling') {
+      return getSpellingFrontHtml(theme.id);
+    }
+    return renderThemeHtml(theme.frontHtml, activeData, { isPreview: true, cardType: previewCardType });
+  }, [displayData, theme, previewCardType]);
+
+  const backRendered = useMemo(() => {
+    const activeData = { ...displayData, cardType: previewCardType };
+    return renderThemeHtml(theme.backHtml, activeData, { isPreview: true, cardType: previewCardType });
+  }, [displayData, theme, previewCardType]);
 
   return (
-    <div className={`w-full flex flex-col h-full min-w-0 ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+    <div className="w-full flex-1 flex flex-col min-h-0">
       {/* Inject Selected Card Theme CSS (isolated to the card content) */}
       <style>{theme.css}</style>
 
-      {/* Preview Header & Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+      {/* Top Preview Controls Bar */}
+      <div className={`flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b text-xs ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
         <div className="flex items-center gap-2">
-          <Eye className="w-4 h-4 text-blue-500" />
-          <span className={`text-xs font-semibold ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-            {theme.name} • {previewCardType === 'spelling' ? 'Spelling Challenge' : 'Vocabulary'}
+          <span className={`text-[11px] font-semibold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+            {t('preview.previewThemeLabel')}:
+          </span>
+          <span
+            className={`font-semibold px-2 py-0.5 rounded text-[11px] border ${
+              isDark
+                ? 'bg-zinc-800 text-blue-400 border-zinc-700'
+                : 'bg-blue-50 text-blue-800 border-blue-200'
+            }`}
+          >
+            {theme.name}
           </span>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Card Type Toggle [ Normal | Spelling ] */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Card Type Preview Switch (Normal / Spelling) */}
           <div className={`inline-flex border p-0.5 rounded-md shadow-xs ${isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'}`}>
             <button
               type="button"
@@ -181,7 +187,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                   : 'text-zinc-600 hover:text-zinc-900'
               }`}
             >
-              Normal
+              {t('common.normal')}
             </button>
             <button
               type="button"
@@ -194,7 +200,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                   : 'text-zinc-600 hover:text-zinc-900'
               }`}
             >
-              Spelling
+              {t('common.spelling')}
             </button>
           </div>
 
@@ -203,7 +209,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             <button
               type="button"
               onClick={() => setViewMode('desktop')}
-              title="Desktop View (Full Width)"
+              title={t('preview.desktopViewTitle')}
               className={`p-1 text-xs font-medium rounded transition-colors cursor-pointer flex items-center gap-1 ${
                 viewMode === 'desktop'
                   ? isDark
@@ -215,12 +221,12 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               }`}
             >
               <Monitor className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline text-[10px] font-medium">Desktop</span>
+              <span className="hidden sm:inline text-[10px] font-medium">{t('preview.desktop')}</span>
             </button>
             <button
               type="button"
               onClick={() => setViewMode('mobile')}
-              title="Mobile / AnkiDroid View (~340px)"
+              title={t('preview.ankiDroidViewTitle')}
               className={`p-1 text-xs font-medium rounded transition-colors cursor-pointer flex items-center gap-1 ${
                 viewMode === 'mobile'
                   ? isDark
@@ -232,7 +238,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               }`}
             >
               <Smartphone className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline text-[10px] font-medium">AnkiDroid</span>
+              <span className="hidden sm:inline text-[10px] font-medium">{t('preview.ankiDroid')}</span>
             </button>
           </div>
 
@@ -247,11 +253,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                     ? 'bg-zinc-100 text-zinc-900 font-semibold'
                     : 'bg-zinc-900 text-white font-semibold'
                   : isDark
-                  ? 'text-zinc-400 hover:bg-zinc-700'
+                  ? 'text-zinc-400 hover:bg-zinc-750'
                   : 'text-zinc-600 hover:bg-zinc-100'
               }`}
             >
-              Front
+              {t('preview.front')}
             </button>
             <button
               type="button"
@@ -262,11 +268,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                     ? 'bg-zinc-100 text-zinc-900 font-semibold'
                     : 'bg-zinc-900 text-white font-semibold'
                   : isDark
-                  ? 'text-zinc-400 hover:bg-zinc-700'
+                  ? 'text-zinc-400 hover:bg-zinc-750'
                   : 'text-zinc-600 hover:bg-zinc-100'
               }`}
             >
-              Back
+              {t('preview.back')}
             </button>
             <button
               type="button"
@@ -277,11 +283,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                     ? 'bg-zinc-100 text-zinc-900 font-semibold'
                     : 'bg-zinc-900 text-white font-semibold'
                   : isDark
-                  ? 'text-zinc-400 hover:bg-zinc-700'
+                  ? 'text-zinc-400 hover:bg-zinc-750'
                   : 'text-zinc-600 hover:bg-zinc-100'
               }`}
             >
-              Both
+              {t('preview.both')}
             </button>
           </div>
         </div>
@@ -303,7 +309,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                     : 'bg-zinc-100 text-zinc-700 border-zinc-200'
                 }`}
               >
-                — FRONT CARD ({previewCardType.toUpperCase()}) —
+                — {t('preview.frontCardBanner', { type: previewCardType.toUpperCase() })} —
               </div>
             )}
             <div
@@ -327,7 +333,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                     : 'bg-zinc-100 text-zinc-700 border-zinc-200'
                 }`}
               >
-                — BACK CARD —
+                — {t('preview.backCardBanner')} —
               </div>
             )}
             <div

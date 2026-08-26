@@ -11,6 +11,7 @@ import {
 } from '../services/api';
 import { CardPreview } from './CardPreview';
 import { useAppTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n';
 import {
   FileText,
   Upload,
@@ -194,6 +195,7 @@ export function autoDetectAndParseBatchInput(
 
 export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
   const themeContext = useAppTheme();
+  const { t, isRTL } = useTranslation();
   const isDark = themeContext.isDark;
 
   const [inputText, setInputText] = useState<string>(DEFAULT_SAMPLE_FORMAT_B);
@@ -557,7 +559,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
         >
           <div className={`flex items-center justify-between border-b pb-3 mb-4 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
             <h2 className="text-base sm:text-lg font-bold tracking-tight flex items-center gap-2">
-              Batch Import (TXT)
+              {t('batch.title')}
             </h2>
             <div className="flex items-center gap-2">
               <input
@@ -573,7 +575,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                 className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
               >
                 <Upload className="w-3.5 h-3.5" />
-                <span>Upload TXT</span>
+                <span>{t('batch.uploadTxtBtn')}</span>
               </button>
             </div>
           </div>
@@ -587,19 +589,12 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
               <div className="flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-purple-500" />
                 <span className="text-xs font-semibold">
-                  Batch Format:
+                  {t('batch.formatTitle')}
                 </span>
               </div>
-              <span
-                className={`px-2 py-0.5 text-[10px] font-semibold rounded border ${
-                  isDark ? 'bg-purple-900/40 text-purple-300 border-purple-800' : 'bg-purple-50 text-purple-800 border-purple-200'
-                }`}
-              >
-                Format B (Structured Key-Value Blocks)
-              </span>
             </div>
             <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-              Structured key-value blocks separated by &quot;--&quot;. All custom overrides, target decks, photo flags, and spelling modes are preserved.
+              {t('batch.formatDescription')}
             </p>
           </div>
 
@@ -620,7 +615,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                   isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-zinc-100 text-zinc-700'
                 }`}
               >
-                {items.length} cards
+                {items.length} {t('common.total')}
               </span>
             </div>
 
@@ -629,7 +624,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                 isDark ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-zinc-200'
               }`}
             >
-              <label className="text-xs font-semibold">Deck:</label>
+              <label className="text-xs font-semibold">{t('common.deck')}:</label>
               <select
                 value={deck}
                 onChange={(e) => setDeck(e.target.value)}
@@ -661,7 +656,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
               }`}
             >
               <Layers className="w-3.5 h-3.5 text-purple-500" />
-              <span>Load Format B Template Example</span>
+              <span>{t('batch.loadTemplateBtn')}</span>
             </button>
           </div>
 
@@ -676,7 +671,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                   ? 'bg-[#18181B] border-zinc-700 text-zinc-100 placeholder:text-zinc-500'
                   : 'bg-white border-zinc-300 text-zinc-900 placeholder:text-zinc-400'
               }`}
-              placeholder="Paste Format B blocks (separated by --). Example:&#10;--&#10;Word=abandon&#10;Persian Meaning=رها کردن&#10;Photo=true&#10;Spelling=true&#10;--"
+              placeholder={t('batch.textareaPlaceholder')}
             />
           </div>
 
@@ -692,7 +687,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             >
               <span className="flex items-center gap-1.5">
                 <Sliders className="w-3.5 h-3.5" />
-                <span>Field Settings ({totalParsedFieldsCount} parsed values found)</span>
+                <span>{t('batch.fieldSettingsTitle', { count: totalParsedFieldsCount })}</span>
               </span>
               {showFieldConfig ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
@@ -700,40 +695,40 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             {showFieldConfig && (
               <div className={`mt-3 pt-3 border-t text-xs space-y-2 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
                 <p className={`text-[11px] mb-2 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  * If present in TXT, the file's data is preserved with top priority. Missing fields are generated by AI / dictionary.
+                  {t('batch.fieldSettingsNotice')}
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" checked={fieldConfig.word} disabled className="w-3.5 h-3.5" />
-                    <span className="text-[11px] font-medium">Word</span>
+                    <span className="text-[11px] font-medium">{t('common.word')}</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" checked={fieldConfig.deck} onChange={(e) => setFieldConfig({ ...fieldConfig, deck: e.target.checked })} className="w-3.5 h-3.5" />
-                    <span className="text-[11px] font-medium">Deck</span>
+                    <span className="text-[11px] font-medium">{t('common.deck')}</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" checked={fieldConfig.phonetic} onChange={(e) => setFieldConfig({ ...fieldConfig, phonetic: e.target.checked })} className="w-3.5 h-3.5" />
-                    <span className="text-[11px] font-medium">Phonetic</span>
+                    <span className="text-[11px] font-medium">{t('common.phonetic')}</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" checked={fieldConfig.partOfSpeech} onChange={(e) => setFieldConfig({ ...fieldConfig, partOfSpeech: e.target.checked })} className="w-3.5 h-3.5" />
-                    <span className="text-[11px] font-medium">Part of Speech</span>
+                    <span className="text-[11px] font-medium">{t('common.partOfSpeech')}</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" checked={fieldConfig.meaningFa} onChange={(e) => setFieldConfig({ ...fieldConfig, meaningFa: e.target.checked })} className="w-3.5 h-3.5" />
-                    <span className="text-[11px] font-medium">Persian Meaning</span>
+                    <span className="text-[11px] font-medium">{t('common.meaning')}</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" checked={fieldConfig.example} onChange={(e) => setFieldConfig({ ...fieldConfig, example: e.target.checked })} className="w-3.5 h-3.5" />
-                    <span className="text-[11px] font-medium">Example Sentence</span>
+                    <span className="text-[11px] font-medium">{t('common.example')}</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" checked={fieldConfig.translationFa} onChange={(e) => setFieldConfig({ ...fieldConfig, translationFa: e.target.checked })} className="w-3.5 h-3.5" />
-                    <span className="text-[11px] font-medium">Example Translation</span>
+                    <span className="text-[11px] font-medium">{t('common.translation')}</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" checked={fieldConfig.mnemonic} onChange={(e) => setFieldConfig({ ...fieldConfig, mnemonic: e.target.checked })} className="w-3.5 h-3.5" />
-                    <span className="text-[11px] font-medium">Memory Aid</span>
+                    <span className="text-[11px] font-medium">{t('common.mnemonic')}</span>
                   </label>
                 </div>
               </div>
@@ -758,7 +753,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                   className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
                 >
                   <Play className="w-4 h-4" />
-                  <span>Generate Batch Cards ({items.length} cards)</span>
+                  <span>{t('batch.generateBatchBtn', { count: items.length })}</span>
                 </button>
 
                 {errorCount > 0 && (
@@ -769,7 +764,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                     title="Retry only failed cards"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Retry Failed ({errorCount})</span>
+                    <span>{t('batch.retryFailedBtn', { count: errorCount })}</span>
                   </button>
                 )}
               </div>
@@ -787,7 +782,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                 >
                   <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
                   <span className="font-semibold">
-                    ⋯ Processing {currentIndex + 1} / {items.length}
+                    {t('batch.processingCount', { current: currentIndex + 1, total: items.length })}
                   </span>
                 </button>
 
@@ -798,7 +793,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                   title="Safely cancel batch and keep created cards"
                 >
                   <Square className="w-3.5 h-3.5 text-zinc-300" />
-                  <span>Cancel</span>
+                  <span>{t('batch.cancelBtn')}</span>
                 </button>
               </div>
             )}
@@ -811,7 +806,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                 <span className="flex items-center gap-1.5 text-blue-400">
                   <Loader2 className="w-3 h-3 animate-spin" />
                   <span>
-                    Processing {currentIndex + 1} / {items.length}
+                    {t('batch.processingCount', { current: currentIndex + 1, total: items.length })}
                   </span>
                 </span>
                 <span>{items.length > 0 ? Math.round(((completedCount + errorCount) / items.length) * 100) : 0}%</span>
@@ -828,21 +823,21 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
               {/* Currently processing item */}
               {currentIndex >= 0 && currentIndex < items.length && (
                 <div className={`text-xs mt-2 font-medium flex items-center gap-1.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                  <span className="text-zinc-500">Currently processing:</span>
+                  <span className="text-zinc-500">{t('batch.currentlyProcessing')}</span>
                   <span className="font-bold text-blue-500">{items[currentIndex].word}</span>
                   {items[currentIndex].retryCount !== undefined && items[currentIndex].retryCount! > 0 && (
                     <span className="text-[10px] text-amber-500 font-semibold px-1.5 py-0.2 rounded bg-amber-500/10">
-                      Retry {items[currentIndex].retryCount}/{MAX_AUTO_RETRIES}
+                      {t('batch.retryAttemptBadge', { current: items[currentIndex].retryCount, max: MAX_AUTO_RETRIES })}
                     </span>
                   )}
                 </div>
               )}
 
               <div className="flex justify-between text-[11px] mt-2 font-medium">
-                <span className="text-emerald-500">✓ Completed: {completedCount}</span>
-                <span className="text-red-500">✕ Failed: {errorCount}</span>
+                <span className="text-emerald-500">✓ {t('common.completed')}: {completedCount}</span>
+                <span className="text-red-500">✕ {t('common.failed')}: {errorCount}</span>
                 <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  Total: {items.length}
+                  {t('common.total')}: {items.length}
                 </span>
               </div>
             </div>
@@ -859,10 +854,10 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             >
               <div className="font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
                 <PauseCircle className="w-4 h-4 text-amber-500" />
-                <span>Processing Cancelled</span>
+                <span>{t('batch.cancelledTitle')}</span>
               </div>
               <p className="text-xs mb-2">
-                {completedCount} / {items.length} completed. Successfully created cards remain in Anki.
+                {t('batch.cancelledDesc', { completed: completedCount, total: items.length })}
               </p>
               <div className="flex gap-2">
                 <button
@@ -871,7 +866,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                   className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs rounded shadow-xs flex items-center gap-1 cursor-pointer transition-colors"
                 >
                   <Play className="w-3 h-3" />
-                  <span>Resume Remaining Cards</span>
+                  <span>{t('batch.resumeBtn')}</span>
                 </button>
               </div>
             </div>
@@ -887,7 +882,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
           <div className={`flex items-center justify-between border-b pb-2 mb-3 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
             <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
               <List className="w-3.5 h-3.5 text-blue-500" />
-              <span>Batch Queue ({completedCount} / {items.length})</span>
+              <span>{t('batch.queueTitle', { completed: completedCount, total: items.length })}</span>
             </span>
             <div className="flex items-center gap-2 text-xs font-semibold">
               {completedCount > 0 && <span className="text-emerald-600 dark:text-emerald-400">{completedCount} ✓</span>}
@@ -949,21 +944,21 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                           <span className={`text-[9px] font-semibold px-1.5 py-0.2 rounded border ${
                             isDark ? 'bg-amber-950/60 text-amber-300 border-amber-800' : 'bg-amber-50 text-amber-800 border-amber-300'
                           }`}>
-                            Spelling
+                            {t('common.spelling')}
                           </span>
                         )}
                         {item.parsedFields?.cardType === 'normal' && (
                           <span className={`text-[9px] font-semibold px-1.5 py-0.2 rounded border ${
                             isDark ? 'bg-blue-950/60 text-blue-300 border-blue-800' : 'bg-blue-50 text-blue-800 border-blue-300'
                           }`}>
-                            Normal
+                            {t('common.normal')}
                           </span>
                         )}
                         {item.parsedFields?.needsPhoto === true && (
                           <span className={`text-[9px] font-semibold px-1.5 py-0.2 rounded border ${
                             isDark ? 'bg-purple-950/60 text-purple-300 border-purple-800' : 'bg-purple-50 text-purple-800 border-purple-300'
                           }`}>
-                            Photo
+                            {t('common.photo')}
                           </span>
                         )}
                       </div>
@@ -984,31 +979,31 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                     {isSuccess && (
                       <span className="flex items-center gap-1 text-[11px] text-emerald-500 font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10">
                         <CheckCircle2 className="w-3 h-3" />
-                        <span>Complete</span>
+                        <span>{t('common.completed')}</span>
                       </span>
                     )}
                     {isRunning && (
                       <span className="flex items-center gap-1 text-[11px] text-blue-400 font-medium px-1.5 py-0.5 rounded bg-blue-500/10">
                         <Loader2 className="w-3 h-3 animate-spin" />
-                        <span>Processing</span>
+                        <span>{t('common.processing')}</span>
                       </span>
                     )}
                     {isRetrying && (
                       <span className="flex items-center gap-1 text-[11px] text-amber-400 font-medium px-1.5 py-0.5 rounded bg-amber-500/10">
                         <Loader2 className="w-3 h-3 animate-spin" />
-                        <span>Retry {item.retryCount || 1}</span>
+                        <span>{t('batch.retryAttemptBadge', { current: item.retryCount || 1, max: MAX_AUTO_RETRIES })}</span>
                       </span>
                     )}
                     {isWaiting && (
                       <span className="text-[11px] text-zinc-400 px-1.5 py-0.5 rounded bg-zinc-700/30">
-                        Waiting
+                        {t('common.waiting')}
                       </span>
                     )}
                     {isFailed && (
                       <div className="flex items-center gap-1.5">
                         <span className="flex items-center gap-1 text-[11px] text-red-500 font-semibold px-1.5 py-0.5 rounded bg-red-500/10">
                           <XCircle className="w-3 h-3" />
-                          <span>Failed</span>
+                          <span>{t('common.failed')}</span>
                         </span>
                         <button
                           type="button"
@@ -1018,7 +1013,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                           }}
                           disabled={isProcessing}
                           className="p-1 bg-red-600 hover:bg-red-700 text-white rounded cursor-pointer transition-colors"
-                          title="Retry this card"
+                          title={t('common.retry')}
                         >
                           <RotateCcw className="w-3 h-3" />
                         </button>
@@ -1039,7 +1034,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                           ? 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700'
                           : 'bg-zinc-100 border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200'
                       }`}
-                      title="Preview card details"
+                      title={t('common.preview')}
                     >
                       <Eye className="w-3.5 h-3.5" />
                     </button>
@@ -1063,7 +1058,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             <div className="flex items-center gap-2">
               <Eye className="w-4 h-4 text-blue-500" />
               <span className="text-xs font-bold uppercase tracking-wider">
-                Live Card Preview
+                {t('batch.livePreviewTitle')}
               </span>
               {selectedItemForPreview && (
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
@@ -1079,11 +1074,11 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                 {selectedItemForPreview.status === 'success' ? (
                   <span className="text-emerald-500 font-semibold flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Created in Anki</span>
+                    <span>{t('batch.createdInAnkiBadge')}</span>
                   </span>
                 ) : (
                   <span className="text-zinc-400">
-                    Draft ({selectedItemForPreview.deck || deck})
+                    {t('batch.draftBadge', { deck: selectedItemForPreview.deck || deck })}
                   </span>
                 )}
               </div>
