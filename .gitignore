@@ -106,6 +106,7 @@ coverage/
 # AppImage & Packaging Temp Files
 # ------------------------------------------------------------------------------
 *.AppImage
+SHA256SUMS
 packaging/AppDir/
 packaging/cache/
 packaging/tools/
