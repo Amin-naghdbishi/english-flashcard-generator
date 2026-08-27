@@ -4,7 +4,7 @@ set -e
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-DEFAULT_APP_NAME="Flashcard-Maker-v2"
+DEFAULT_APP_NAME="Flashcard-Generator-v1.0.7"
 APP_NAME="${APPIMAGE_NAME:-$DEFAULT_APP_NAME}"
 TARGET_ARCH="${ARCH:-x86_64}"
 HOST_ARCH="$(uname -m)"

@@ -8,6 +8,7 @@ import {
   checkTTS,
   checkOnlineTTS,
   checkAnki,
+  updateAnkiNote,
 } from '../services/api';
 import { CardPreview } from './CardPreview';
 import { useAppTheme } from '../context/ThemeContext';
@@ -30,6 +31,11 @@ import {
   CheckCircle2,
   XCircle,
   PauseCircle,
+  Save,
+  Check,
+  Edit3,
+  Layers3,
+  ArrowRight,
 } from 'lucide-react';
 
 interface BatchCardViewProps {
@@ -37,7 +43,7 @@ interface BatchCardViewProps {
   appTheme?: AppTheme;
 }
 
-export type BatchFormatType = 'formatB_structured';
+export type BatchFormatType = 'structured_txt';
 
 export interface BatchParsedResult {
   format: BatchFormatType;
@@ -66,7 +72,7 @@ function batchItemToCardData(item: BatchItem | null): CardData | null {
   };
 }
 
-const DEFAULT_SAMPLE_FORMAT_B = `--
+const DEFAULT_SAMPLE_BATCH_TXT = `--
 Word=eraser
 Deck=English::B1
 Phonetic=/ɪˈreɪzər/
@@ -109,9 +115,9 @@ export function autoDetectAndParseBatchInput(
   const trimmed = rawText.trim();
   if (!trimmed) {
     return {
-      format: 'formatB_structured',
-      formatLabel: 'Format B (Structured Blocks with --)',
-      formatDescription: 'All batch processing exclusively uses the advanced Format B structure.',
+      format: 'structured_txt',
+      formatLabel: 'Batch TXT File',
+      formatDescription: 'Upload or paste your vocabulary list to generate Anki flashcards.',
       items: [],
     };
   }
@@ -186,9 +192,9 @@ export function autoDetectAndParseBatchInput(
   }
 
   return {
-    format: 'formatB_structured',
-    formatLabel: 'Format B (Structured Blocks with --)',
-    formatDescription: 'All batch processing exclusively uses Format B. All custom fields, overrides, target decks, photo flags, and spelling modes are preserved.',
+    format: 'structured_txt',
+    formatLabel: 'Batch TXT File',
+    formatDescription: 'Upload or paste your vocabulary list to generate Anki flashcards.',
     items: results,
   };
 }
@@ -198,21 +204,19 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
   const { t, isRTL } = useTranslation();
   const isDark = themeContext.isDark;
 
-  const [inputText, setInputText] = useState<string>(DEFAULT_SAMPLE_FORMAT_B);
-  const [fileName, setFileName] = useState<string>('sample_batch_format_b.txt');
+  const [inputText, setInputText] = useState<string>(DEFAULT_SAMPLE_BATCH_TXT);
+  const [fileName, setFileName] = useState<string>('sample_batch.txt');
   const [deck, setDeck] = useState<string>(settings.anki.defaultDeck || 'English::B1');
   const [availableDecks, setAvailableDecks] = useState<string[]>(['English::B1', 'English::B2', 'IELTS']);
   const [items, setItems] = useState<BatchItem[]>([]);
-  const [detectedFormatInfo, setDetectedFormatInfo] = useState<{
-    format: BatchFormatType;
-    formatLabel: string;
-    formatDescription: string;
-  }>({
-    format: 'formatB_structured',
-    formatLabel: 'Format B (Structured Blocks with --)',
-    formatDescription: 'All batch processing exclusively uses Format B. All custom fields, overrides, target decks, photo flags, and spelling modes are preserved.',
-  });
 
+  // Batch Grouping State (Requirement 3)
+  const [isGroupingEnabled, setIsGroupingEnabled] = useState<boolean>(false);
+  const [groupSize, setGroupSize] = useState<number>(10);
+  const [currentGroupIndex, setCurrentGroupIndex] = useState<number>(0);
+  const [groupJustFinished, setGroupJustFinished] = useState<boolean>(false);
+
+  // Processing state
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isCancelled, setIsCancelled] = useState<boolean>(false);
   const [isFinished, setIsFinished] = useState<boolean>(false);
@@ -221,6 +225,11 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
   const [selectedItemForPreview, setSelectedItemForPreview] = useState<BatchItem | null>(null);
   const [preflightError, setPreflightError] = useState<string | null>(null);
   const [showFieldConfig, setShowFieldConfig] = useState<boolean>(false);
+
+  // Anki Update sync state (Requirement 2 & 4)
+  const [isSavingCardToAnki, setIsSavingCardToAnki] = useState<boolean>(false);
+  const [isSavingAllEdited, setIsSavingAllEdited] = useState<boolean>(false);
+  const [saveActionMessage, setSaveActionMessage] = useState<string | null>(null);
 
   const [fieldConfig, setFieldConfig] = useState<BatchFieldConfig>({
     word: true,
@@ -246,11 +255,6 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
 
   useEffect(() => {
     const parseResult = autoDetectAndParseBatchInput(inputText, deck);
-    setDetectedFormatInfo({
-      format: parseResult.format,
-      formatLabel: parseResult.formatLabel,
-      formatDescription: parseResult.formatDescription,
-    });
 
     const newItems: BatchItem[] = parseResult.items.map((parsed, idx) => ({
       id: `${parsed.word}_${idx}_${Date.now()}`,
@@ -261,6 +265,8 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
     }));
 
     setItems(newItems);
+    setCurrentGroupIndex(0);
+    setGroupJustFinished(false);
     if (newItems.length > 0) {
       setSelectedItemForPreview(newItems[0]);
       setPreviewCard(batchItemToCardData(newItems[0]));
@@ -326,25 +332,22 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
     item: BatchItem,
     index: number
   ): Promise<{ success: boolean; cardData?: CardData; noteId?: number; error?: string }> => {
-    let attempts = 0;
-    let lastError = 'Unknown error';
+    let lastError = '';
 
-    while (attempts <= MAX_AUTO_RETRIES) {
+    for (let attempt = 0; attempt <= MAX_AUTO_RETRIES; attempt++) {
       if (abortControllerRef.current) {
         return { success: false, error: 'Cancelled by user' };
       }
 
-      attempts++;
-
-      if (attempts > 1) {
+      if (attempt > 0) {
         setItems((prev) =>
           prev.map((it, idx) =>
             idx === index
               ? {
                   ...it,
                   status: 'retrying',
-                  retryCount: attempts - 1,
-                  error: `Attempt ${attempts}/${MAX_AUTO_RETRIES + 1}: Retrying...`,
+                  retryCount: attempt,
+                  error: `Retrying (attempt ${attempt}/${MAX_AUTO_RETRIES}): ${lastError}`,
                 }
               : it
           )
@@ -404,7 +407,12 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
     return { success: false, error: lastError };
   };
 
-  const handleBuildAll = async (retryOnlyFailed: boolean = false) => {
+  // Group calculations
+  const totalCards = items.length;
+  const safeGroupSize = Math.max(1, groupSize || 10);
+  const totalGroups = isGroupingEnabled ? Math.ceil(totalCards / safeGroupSize) : 1;
+
+  const handleBuildBatch = async (retryOnlyFailed: boolean = false) => {
     if (items.length === 0 || isProcessing) return;
 
     const preflightOk = await runPreflightChecks();
@@ -413,21 +421,35 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
     abortControllerRef.current = false;
     setIsProcessing(true);
     setIsCancelled(false);
+    setGroupJustFinished(false);
+    setSaveActionMessage(null);
 
-    // Mark pending items as 'waiting'
+    // Determine range of indices to process
+    let startIndex = 0;
+    let endIndex = items.length;
+
+    if (isGroupingEnabled) {
+      startIndex = currentGroupIndex * safeGroupSize;
+      endIndex = Math.min((currentGroupIndex + 1) * safeGroupSize, items.length);
+    }
+
+    // Mark items in range as 'waiting'
     setItems((prev) =>
-      prev.map((it) => {
-        if (retryOnlyFailed) {
-          if (it.status === 'error') return { ...it, status: 'waiting', error: undefined };
-          return it;
-        } else {
-          if (it.status !== 'success') return { ...it, status: 'waiting', error: undefined };
-          return it;
+      prev.map((it, idx) => {
+        if (idx >= startIndex && idx < endIndex) {
+          if (retryOnlyFailed) {
+            if (it.status === 'error') return { ...it, status: 'waiting', error: undefined };
+            return it;
+          } else {
+            if (it.status !== 'success') return { ...it, status: 'waiting', error: undefined };
+            return it;
+          }
         }
+        return it;
       })
     );
 
-    for (let i = 0; i < items.length; i++) {
+    for (let i = startIndex; i < endIndex; i++) {
       if (abortControllerRef.current) {
         setIsCancelled(true);
         break;
@@ -453,21 +475,36 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
         break;
       }
 
+      // REQUIREMENT 4: CARDS MUST BE AVAILABLE IMMEDIATELY!
       if (result.success && result.cardData) {
+        const updatedCardData = result.cardData;
+        const updatedNoteId = result.noteId;
+
         setItems((prev) =>
           prev.map((item, idx) =>
             idx === i
               ? {
                   ...item,
                   status: 'success',
-                  cardData: result.cardData,
-                  noteId: result.noteId,
+                  cardData: updatedCardData,
+                  noteId: updatedNoteId,
                   error: undefined,
                 }
               : item
           )
         );
-        setPreviewCard(result.cardData);
+
+        setPreviewCard(updatedCardData);
+        setSelectedItemForPreview((prev) =>
+          prev && prev.id === currentItem.id
+            ? {
+                ...prev,
+                status: 'success',
+                cardData: updatedCardData,
+                noteId: updatedNoteId,
+              }
+            : prev
+        );
       } else {
         setItems((prev) =>
           prev.map((item, idx) =>
@@ -483,81 +520,144 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
       }
     }
 
-    // Reset remaining 'waiting' items back to idle if cancelled
-    setItems((prev) =>
-      prev.map((it) => (it.status === 'waiting' ? { ...it, status: 'idle' } : it))
-    );
-
     setIsProcessing(false);
     setCurrentIndex(-1);
-  };
 
-  const handleCancelProcessing = () => {
-    abortControllerRef.current = true;
-    setIsProcessing(false);
-    setIsCancelled(true);
-  };
-
-  const handleRetrySingle = async (index: number) => {
-    const itemToRetry = items[index];
-    if (!itemToRetry || isProcessing) return;
-
-    setCurrentIndex(index);
-    setSelectedItemForPreview(itemToRetry);
-
-    const result = await processBatchItemWithRetries(itemToRetry, index);
-
-    if (result.success && result.cardData) {
-      setItems((prev) =>
-        prev.map((it, idx) =>
-          idx === index
-            ? {
-                ...it,
-                status: 'success',
-                cardData: result.cardData,
-                noteId: result.noteId,
-                error: undefined,
-              }
-            : it
-        )
-      );
-      setPreviewCard(result.cardData);
-    } else {
-      setItems((prev) =>
-        prev.map((it, idx) =>
-          idx === index
-            ? {
-                ...it,
-                status: 'error',
-                error: result.error || 'Error occurred during retry',
-              }
-            : it
-        )
-      );
+    if (!abortControllerRef.current) {
+      if (isGroupingEnabled) {
+        setGroupJustFinished(true);
+        if (currentGroupIndex < totalGroups - 1) {
+          // Prepared for next group
+        } else {
+          setIsFinished(true);
+        }
+      } else {
+        setIsFinished(true);
+      }
     }
+  };
 
-    setCurrentIndex(-1);
+  const handleNextGroup = () => {
+    if (currentGroupIndex < totalGroups - 1) {
+      setCurrentGroupIndex((prev) => prev + 1);
+      setGroupJustFinished(false);
+      // Automatically trigger generation for next group
+      setTimeout(() => {
+        handleBuildBatch(false);
+      }, 100);
+    }
+  };
+
+  const handleCancel = () => {
+    abortControllerRef.current = true;
+    setIsCancelled(true);
+    setIsProcessing(false);
   };
 
   const handleSelectForPreview = (item: BatchItem) => {
     setSelectedItemForPreview(item);
     setPreviewCard(batchItemToCardData(item));
+    setSaveActionMessage(null);
+  };
+
+  // REQUIREMENT 2: EDIT CARD AND SAVE TO ANKI (IN-PLACE WITHOUT DUPLICATES)
+  const handleCardChange = (updatedCard: CardData) => {
+    setPreviewCard(updatedCard);
+    if (!selectedItemForPreview) return;
+
+    setItems((prev) =>
+      prev.map((it) =>
+        it.id === selectedItemForPreview.id
+          ? {
+              ...it,
+              cardData: updatedCard,
+              isEdited: true,
+            }
+          : it
+      )
+    );
+
+    setSelectedItemForPreview((prev) =>
+      prev ? { ...prev, cardData: updatedCard, isEdited: true } : prev
+    );
+  };
+
+  const handleSaveSingleCardToAnki = async () => {
+    if (!selectedItemForPreview || !selectedItemForPreview.noteId || !previewCard) return;
+    setIsSavingCardToAnki(true);
+    setSaveActionMessage(null);
+
+    try {
+      const res = await updateAnkiNote(
+        selectedItemForPreview.noteId,
+        previewCard,
+        settings.theme
+      );
+
+      if (res.success) {
+        setItems((prev) =>
+          prev.map((it) =>
+            it.id === selectedItemForPreview.id
+              ? { ...it, isEdited: false }
+              : it
+          )
+        );
+        setSelectedItemForPreview((prev) => (prev ? { ...prev, isEdited: false } : prev));
+        setSaveActionMessage(`✓ Note #${selectedItemForPreview.noteId} successfully updated in Anki!`);
+      } else {
+        setSaveActionMessage(`✕ Failed to update in Anki: ${res.error || 'Unknown error'}`);
+      }
+    } catch (e: any) {
+      setSaveActionMessage(`✕ Error: ${e?.message}`);
+    } finally {
+      setIsSavingCardToAnki(false);
+    }
+  };
+
+  // Save all edited cards in batch
+  const handleSaveAllEditedCards = async () => {
+    const editedItems = items.filter((it) => it.isEdited && it.noteId && it.cardData);
+    if (editedItems.length === 0) return;
+
+    setIsSavingAllEdited(true);
+    setSaveActionMessage(null);
+
+    let savedCount = 0;
+    for (const it of editedItems) {
+      try {
+        const res = await updateAnkiNote(it.noteId!, it.cardData!, settings.theme);
+        if (res.success) {
+          savedCount++;
+          setItems((prev) =>
+            prev.map((item) => (item.id === it.id ? { ...item, isEdited: false } : item))
+          );
+        }
+      } catch (err) {
+        console.error(`Failed to update note #${it.noteId}:`, err);
+      }
+    }
+
+    setIsSavingAllEdited(false);
+    setSaveActionMessage(t('batch.allEditedSaved') || `✓ Successfully updated ${savedCount} edited cards in Anki!`);
   };
 
   const completedCount = items.filter((i) => i.status === 'success').length;
   const errorCount = items.filter((i) => i.status === 'error').length;
+  const editedCount = items.filter((i) => i.isEdited && i.noteId).length;
   const totalParsedFieldsCount = items.reduce((acc, it) => {
     return acc + Object.keys(it.parsedFields || {}).length;
   }, 0);
 
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 p-4 sm:p-6 min-w-0">
+      {/* LEFT COLUMN: Controls, Upload TXT, Grouping, Queue */}
       <section className="w-full lg:w-[480px] flex flex-col gap-6 shrink-0 min-w-0">
         <div
           className={`p-4 sm:p-5 border rounded-lg shadow-xs ${
             isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
           }`}
         >
+          {/* Header & Simple Upload TXT Button (Requirement 1) */}
           <div className={`flex items-center justify-between border-b pb-3 mb-4 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
             <h2 className="text-base sm:text-lg font-bold tracking-tight flex items-center gap-2">
               {t('batch.title')}
@@ -573,7 +673,8 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                title="Upload any .txt vocabulary file"
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>{t('batch.uploadTxtBtn')}</span>
@@ -581,24 +682,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             </div>
           </div>
 
-          <div
-            className={`p-3 border rounded-md shadow-xs mb-3 ${
-              isDark ? 'bg-zinc-900 border-zinc-700 text-zinc-200' : 'bg-zinc-50 border-zinc-200 text-zinc-800'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <div className="flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-purple-500" />
-                <span className="text-xs font-semibold">
-                  {t('batch.formatTitle')}
-                </span>
-              </div>
-            </div>
-            <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-              {t('batch.formatDescription')}
-            </p>
-          </div>
-
+          {/* Clean TXT File & Deck Selection */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
             <div
               className={`p-2.5 border rounded-md flex items-center justify-between ${
@@ -643,12 +727,13 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             </div>
           </div>
 
+          {/* Load Sample TXT */}
           <div className="flex gap-2 mb-3">
             <button
               type="button"
               onClick={() => {
-                setFileName('sample_batch_format_b.txt');
-                setInputText(DEFAULT_SAMPLE_FORMAT_B);
+                setFileName('sample_batch.txt');
+                setInputText(DEFAULT_SAMPLE_BATCH_TXT);
               }}
               className={`w-full py-1.5 px-2 text-xs font-medium rounded border cursor-pointer flex items-center justify-center gap-1.5 transition-colors ${
                 isDark
@@ -661,9 +746,10 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             </button>
           </div>
 
+          {/* Text Area */}
           <div className="mb-3">
             <textarea
-              rows={7}
+              rows={6}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               disabled={isProcessing}
@@ -676,6 +762,67 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             />
           </div>
 
+          {/* BATCH GROUPING CONTROLS (Requirement 3) */}
+          <div
+            className={`border rounded-md p-3 mb-3 shadow-xs ${
+              isDark ? 'bg-zinc-900/60 border-zinc-700' : 'bg-zinc-50 border-zinc-200'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isGroupingEnabled}
+                  onChange={(e) => {
+                    setIsGroupingEnabled(e.target.checked);
+                    setCurrentGroupIndex(0);
+                    setGroupJustFinished(false);
+                  }}
+                  disabled={isProcessing}
+                  className="w-4 h-4 text-purple-600 rounded cursor-pointer"
+                />
+                <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+                  <Layers3 className="w-3.5 h-3.5 text-purple-500" />
+                  <span>{t('batch.groupingTitle')}</span>
+                </span>
+              </label>
+
+              {isGroupingEnabled && (
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-[11px] text-zinc-500">{t('batch.groupSizeLabel')}:</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={groupSize}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setGroupSize(isNaN(val) || val < 1 ? 1 : val);
+                      setCurrentGroupIndex(0);
+                      setGroupJustFinished(false);
+                    }}
+                    disabled={isProcessing}
+                    className={`w-14 p-1 text-center font-bold text-xs border rounded focus:outline-none ${
+                      isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-white border-zinc-300 text-zinc-900'
+                    }`}
+                  />
+                </div>
+              )}
+            </div>
+
+            {isGroupingEnabled && (
+              <div className="mt-2 text-[11px] text-zinc-400">
+                {t('batch.groupSummary', { size: safeGroupSize, totalGroups })}
+                {totalGroups > 1 && (
+                  <span className="ml-1 text-purple-400 font-semibold">
+                    (Current: Group {currentGroupIndex + 1} of {totalGroups})
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Field Settings Toggle */}
           <div
             className={`border rounded-md p-3 mb-4 shadow-xs ${
               isDark ? 'bg-zinc-900/40 border-zinc-700' : 'bg-zinc-50 border-zinc-200'
@@ -743,25 +890,64 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             </div>
           )}
 
+          {/* Group Just Finished Inspection Notice (Requirement 3) */}
+          {groupJustFinished && !isProcessing && (
+            <div className="mb-3 p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800 text-xs rounded-md shadow-xs space-y-2">
+              <div className="flex items-center gap-2 font-semibold">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>
+                  {t('batch.groupCompletedNotice', {
+                    current: currentGroupIndex + 1,
+                    total: totalGroups,
+                    count: Math.min(safeGroupSize, items.length - currentGroupIndex * safeGroupSize),
+                  })}
+                </span>
+              </div>
+              {currentGroupIndex < totalGroups - 1 && (
+                <button
+                  type="button"
+                  onClick={handleNextGroup}
+                  className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-md shadow-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <span>
+                    {t('batch.nextGroupBtn', {
+                      start: (currentGroupIndex + 1) * safeGroupSize + 1,
+                      end: Math.min((currentGroupIndex + 2) * safeGroupSize, items.length),
+                    })}
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Action Buttons */}
           <div className="space-y-2">
             {!isProcessing ? (
               <div className="flex flex-col sm:flex-row gap-2">
                 <button
                   type="button"
-                  onClick={() => handleBuildAll(false)}
+                  onClick={() => handleBuildBatch(false)}
                   disabled={items.length === 0}
-                  className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                  className="flex-1 py-2.5 px-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors"
                 >
-                  <Play className="w-4 h-4" />
-                  <span>{t('batch.generateBatchBtn', { count: items.length })}</span>
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>
+                    {isGroupingEnabled
+                      ? t('batch.generateGroupBtn', {
+                          current: currentGroupIndex + 1,
+                          total: totalGroups,
+                          count: Math.min(safeGroupSize, items.length - currentGroupIndex * safeGroupSize),
+                        })
+                      : t('batch.generateBatchBtn', { count: items.length })}
+                  </span>
                 </button>
 
                 {errorCount > 0 && (
                   <button
                     type="button"
-                    onClick={() => handleBuildAll(true)}
+                    onClick={() => handleBuildBatch(true)}
                     className="py-2.5 px-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                    title="Retry only failed cards"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>{t('batch.retryFailedBtn', { count: errorCount })}</span>
@@ -773,288 +959,141 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                 <button
                   type="button"
                   disabled
-                  className={`flex-1 py-2.5 px-4 rounded-md font-medium text-xs flex items-center justify-center gap-2 cursor-wait border ${
-                    isDark
-                      ? 'bg-blue-900/40 border-blue-700 text-blue-200'
-                      : 'bg-blue-50 border-blue-300 text-blue-900'
-                  }`}
+                  className="flex-1 py-2.5 px-4 bg-zinc-600 text-white font-medium text-xs rounded-md flex items-center justify-center gap-2 opacity-80"
                 >
-                  <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                  <span className="font-semibold">
-                    {t('batch.processingCount', { current: currentIndex + 1, total: items.length })}
+                  <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
+                  <span>
+                    {t('batch.processingCount', {
+                      current: currentIndex + 1,
+                      total: isGroupingEnabled
+                        ? Math.min((currentGroupIndex + 1) * safeGroupSize, items.length)
+                        : items.length,
+                    })}
                   </span>
                 </button>
-
                 <button
                   type="button"
-                  onClick={handleCancelProcessing}
-                  className="py-2.5 px-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-600 font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                  title="Safely cancel batch and keep created cards"
+                  onClick={handleCancel}
+                  className="py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
-                  <Square className="w-3.5 h-3.5 text-zinc-300" />
+                  <Square className="w-3.5 h-3.5 fill-current" />
                   <span>{t('batch.cancelBtn')}</span>
                 </button>
               </div>
             )}
-          </div>
 
-          {(isProcessing || isFinished || (completedCount > 0 && !isCancelled)) && (
-            <div className="mt-4 pt-3 border-t border-zinc-700/50">
-              <div className="flex justify-between items-center text-xs font-semibold mb-1.5">
-                <span className="flex items-center gap-1.5 text-blue-500 dark:text-blue-400">
-                  {isProcessing ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                  )}
-                  <span>
-                    {isProcessing
-                      ? t('batch.generatingCards')
-                      : t('batch.batchCompleted')}
-                  </span>
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
-                    {items.length > 0 ? (isFinished ? 100 : Math.min(100, Math.round(((completedCount + errorCount) / items.length) * 100))) : 0}%
-                  </span>
-                  <span className="text-[11px] text-zinc-500 font-medium">
-                    ({completedCount + errorCount} / {items.length} {t('batch.cardsProgressLabel')})
-                  </span>
-                </div>
-              </div>
-
-              <div className={`w-full h-2.5 rounded-full overflow-hidden shadow-inner ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`}>
-                <div
-                  className={`h-full transition-all duration-300 rounded-full ${
-                    isFinished && errorCount === 0
-                      ? 'bg-emerald-500'
-                      : errorCount > 0 && !isProcessing
-                      ? 'bg-amber-500'
-                      : 'bg-blue-600'
-                  }`}
-                  style={{ width: `${items.length > 0 ? (isFinished ? 100 : Math.min(100, Math.round(((completedCount + errorCount) / items.length) * 100))) : 0}%` }}
-                />
-              </div>
-
-              {isProcessing && currentIndex >= 0 && currentIndex < items.length && (
-                <div className={`text-xs mt-2 font-medium flex items-center gap-1.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                  <span className="text-zinc-500">{t('batch.currentlyProcessing')}</span>
-                  <span className="font-bold text-blue-500">{items[currentIndex].word}</span>
-                  {items[currentIndex].retryCount !== undefined && items[currentIndex].retryCount! > 0 && (
-                    <span className="text-[10px] text-amber-500 font-semibold px-1.5 py-0.2 rounded bg-amber-500/10">
-                      {t('batch.retryAttemptBadge', { current: items[currentIndex].retryCount, max: MAX_AUTO_RETRIES })}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              <div className="flex justify-between text-[11px] mt-2 font-medium">
-                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">✓ {t('common.completed')}: {completedCount}</span>
-                {errorCount > 0 && (
-                  <span className="text-red-500 font-semibold">✕ {t('common.failed')}: {errorCount}</span>
+            {/* SAVE ALL EDITED CARDS BUTTON (Requirement 4) */}
+            {editedCount > 0 && (
+              <button
+                type="button"
+                onClick={handleSaveAllEditedCards}
+                disabled={isSavingAllEdited}
+                className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors"
+              >
+                {isSavingAllEdited ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
                 )}
-                <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  {t('common.total')}: {items.length}
+                <span>
+                  {isSavingAllEdited
+                    ? t('batch.savingEdited')
+                    : t('batch.saveAllEditedBtn', { count: editedCount })}
                 </span>
-              </div>
-            </div>
-          )}
+              </button>
+            )}
 
-          {/* Cancellation Notification Banner */}
-          {isCancelled && !isProcessing && (
-            <div
-              className={`mt-4 p-3.5 border rounded-lg text-xs ${
-                isDark
-                  ? 'bg-amber-950/40 border-amber-800 text-amber-300'
-                  : 'bg-amber-50 border-amber-300 text-amber-900'
-              }`}
-            >
-              <div className="font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                <PauseCircle className="w-4 h-4 text-amber-500" />
-                <span>{t('batch.cancelledTitle')}</span>
+            {/* Feedback Message */}
+            {saveActionMessage && (
+              <div
+                className={`p-2 rounded text-xs font-semibold flex items-center gap-1.5 ${
+                  saveActionMessage.startsWith('✓')
+                    ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-500/30'
+                    : 'bg-rose-50 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-500/30'
+                }`}
+              >
+                <span>{saveActionMessage}</span>
               </div>
-              <p className="text-xs mb-2">
-                {t('batch.cancelledDesc', { completed: completedCount, total: items.length })}
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleBuildAll(false)}
-                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs rounded shadow-xs flex items-center gap-1 cursor-pointer transition-colors"
-                >
-                  <Play className="w-3 h-3" />
-                  <span>{t('batch.resumeBtn')}</span>
-                </button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        {/* Batch Queue Section */}
+        {/* Batch Queue & Status List (Requirement 4: immediately available!) */}
         <div
-          className={`border rounded-lg p-4 sm:p-5 shadow-xs flex flex-col ${
+          className={`border rounded-lg p-4 shadow-xs flex-1 flex flex-col min-h-[260px] ${
             isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
           }`}
         >
-          <div className={`flex items-center justify-between border-b pb-2 mb-3 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
-            <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
-              <List className="w-3.5 h-3.5 text-blue-500" />
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-zinc-200 dark:border-zinc-700 text-xs">
+            <h3 className="font-bold flex items-center gap-2">
+              <List className="w-4 h-4 text-zinc-400" />
               <span>{t('batch.queueTitle', { completed: completedCount, total: items.length })}</span>
-            </span>
-            <div className="flex items-center gap-2 text-xs font-semibold">
-              {completedCount > 0 && <span className="text-emerald-600 dark:text-emerald-400">{completedCount} ✓</span>}
-              {errorCount > 0 && <span className="text-rose-600 dark:text-rose-400">{errorCount} ✕</span>}
-            </div>
+            </h3>
+            {editedCount > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700">
+                {editedCount} {t('batch.editedBadge') || 'Edited'}
+              </span>
+            )}
           </div>
 
-          <div className="space-y-1.5 max-h-[380px] overflow-y-auto pr-1">
+          <div className="flex-1 overflow-y-auto max-h-[420px] space-y-1 pr-1 text-xs">
             {items.map((item, idx) => {
               const isSelected = selectedItemForPreview?.id === item.id;
-              const isSuccess = item.status === 'success';
-              const isRunning = item.status === 'generating_ai' || item.status === 'generating_audio' || item.status === 'creating_anki';
-              const isRetrying = item.status === 'retrying';
-              const isWaiting = item.status === 'waiting';
-              const isFailed = item.status === 'error';
-              const customMeaning = item.parsedFields?.meaningFa;
+              const isCurrent = currentIndex === idx;
 
               return (
                 <div
                   key={item.id}
                   onClick={() => handleSelectForPreview(item)}
-                  className={`p-2.5 border rounded-md flex items-center justify-between gap-2.5 text-xs transition-colors cursor-pointer ${
+                  className={`p-2 rounded-md border flex items-center justify-between gap-2 cursor-pointer transition-colors ${
                     isSelected
                       ? isDark
-                        ? 'border-blue-500 bg-blue-950/40 ring-1 ring-blue-500'
-                        : 'border-blue-600 bg-blue-50/70 ring-1 ring-blue-600'
-                      : isSuccess
-                      ? isDark
-                        ? 'bg-emerald-950/20 border-emerald-900/60 text-emerald-200'
-                        : 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
-                      : isFailed
-                      ? isDark
-                        ? 'bg-rose-950/20 border-rose-900/60 text-rose-200'
-                        : 'bg-rose-50/70 border-rose-200 text-rose-950'
-                      : isRunning || isRetrying
-                      ? isDark
-                        ? 'bg-blue-950/30 border-blue-800 text-blue-200 animate-pulse'
-                        : 'bg-blue-50 border-blue-300 text-blue-950 animate-pulse'
+                        ? 'bg-purple-950/40 border-purple-600'
+                        : 'bg-purple-50 border-purple-300'
                       : isDark
-                      ? 'bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-850'
-                      : 'bg-white border-zinc-200 text-zinc-800 hover:bg-zinc-50'
+                      ? 'bg-zinc-850 hover:bg-zinc-800 border-zinc-750'
+                      : 'bg-white hover:bg-zinc-50 border-zinc-200'
                   }`}
                 >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="font-mono text-xs text-zinc-500 w-5 text-right shrink-0">
-                      {idx + 1}.
+                  <div className="flex items-center gap-2 min-w-0">
+                    {/* Status Icon */}
+                    {item.status === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
+                    {item.status === 'error' && <XCircle className="w-4 h-4 text-rose-500 shrink-0" />}
+                    {(item.status === 'generating_ai' || item.status === 'retrying') && (
+                      <Loader2 className="w-4 h-4 animate-spin text-purple-500 shrink-0" />
+                    )}
+                    {item.status === 'waiting' && <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />}
+                    {item.status === 'idle' && <span className="w-2 h-2 rounded-full bg-zinc-400 shrink-0" />}
+
+                    <span className={`font-semibold truncate ${isSelected ? 'text-purple-600 dark:text-purple-400' : ''}`}>
+                      {item.word}
                     </span>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-semibold text-sm truncate">{item.word}</span>
-                        {item.noteId && (
-                          <span className={`text-[10px] font-mono font-medium px-1.5 py-0.2 rounded ${
-                            isDark ? 'bg-zinc-800 text-emerald-400' : 'bg-zinc-100 text-emerald-700'
-                          }`}>
-                            #{item.noteId}
-                          </span>
-                        )}
-                        {item.parsedFields?.cardType === 'spelling' && (
-                          <span className={`text-[9px] font-semibold px-1.5 py-0.2 rounded border ${
-                            isDark ? 'bg-amber-950/60 text-amber-300 border-amber-800' : 'bg-amber-50 text-amber-800 border-amber-300'
-                          }`}>
-                            {t('common.spelling')}
-                          </span>
-                        )}
-                        {item.parsedFields?.cardType === 'normal' && (
-                          <span className={`text-[9px] font-semibold px-1.5 py-0.2 rounded border ${
-                            isDark ? 'bg-blue-950/60 text-blue-300 border-blue-800' : 'bg-blue-50 text-blue-800 border-blue-300'
-                          }`}>
-                            {t('common.normal')}
-                          </span>
-                        )}
-                        {item.parsedFields?.needsPhoto === true && (
-                          <span className={`text-[9px] font-semibold px-1.5 py-0.2 rounded border ${
-                            isDark ? 'bg-purple-950/60 text-purple-300 border-purple-800' : 'bg-purple-50 text-purple-800 border-purple-300'
-                          }`}>
-                            {t('common.photo')}
-                          </span>
-                        )}
-                      </div>
-                      {customMeaning && (
-                        <span className="text-[11px] text-zinc-500 font-normal block truncate max-w-[200px]" dir="rtl">
-                          {customMeaning}
-                        </span>
-                      )}
-                      {item.error && (
-                        <span className="text-[11px] text-red-500 font-normal block truncate max-w-[220px]">
-                          {item.error}
-                        </span>
-                      )}
-                    </div>
+
+                    {item.noteId && (
+                      <span className="text-[10px] font-mono text-zinc-400">
+                        #{item.noteId}
+                      </span>
+                    )}
+
+                    {item.isEdited && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
+                        {t('batch.editedBadge') || 'Edited'}
+                      </span>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    {isSuccess && (
-                      <span className="flex items-center gap-1 text-[11px] text-emerald-500 font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10">
-                        <CheckCircle2 className="w-3 h-3" />
-                        <span>{t('common.completed')}</span>
-                      </span>
-                    )}
-                    {isRunning && (
-                      <span className="flex items-center gap-1 text-[11px] text-blue-400 font-medium px-1.5 py-0.5 rounded bg-blue-500/10">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        <span>{t('common.processing')}</span>
-                      </span>
-                    )}
-                    {isRetrying && (
-                      <span className="flex items-center gap-1 text-[11px] text-amber-400 font-medium px-1.5 py-0.5 rounded bg-amber-500/10">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        <span>{t('batch.retryAttemptBadge', { current: item.retryCount || 1, max: MAX_AUTO_RETRIES })}</span>
-                      </span>
-                    )}
-                    {isWaiting && (
-                      <span className="text-[11px] text-zinc-400 px-1.5 py-0.5 rounded bg-zinc-700/30">
-                        {t('common.waiting')}
-                      </span>
-                    )}
-                    {isFailed && (
-                      <div className="flex items-center gap-1.5">
-                        <span className="flex items-center gap-1 text-[11px] text-red-500 font-semibold px-1.5 py-0.5 rounded bg-red-500/10">
-                          <XCircle className="w-3 h-3" />
-                          <span>{t('common.failed')}</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRetrySingle(idx);
-                          }}
-                          disabled={isProcessing}
-                          className="p-1 bg-red-600 hover:bg-red-700 text-white rounded cursor-pointer transition-colors"
-                          title={t('common.retry')}
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Eye Preview Button (👁) */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSelectForPreview(item);
-                      }}
-                      className={`p-1.5 rounded-md border transition-colors cursor-pointer ${
-                        isSelected
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : isDark
-                          ? 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700'
-                          : 'bg-zinc-100 border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200'
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                        item.status === 'success'
+                          ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                          : item.status === 'error'
+                          ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
+                          : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
                       }`}
-                      title={t('common.preview')}
                     >
-                      <Eye className="w-3.5 h-3.5" />
-                    </button>
+                      {item.status}
+                    </span>
                   </div>
                 </div>
               );
@@ -1063,31 +1102,36 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
         </div>
       </section>
 
-      {/* Right Column: Live Card Preview Panel */}
-      <section className="flex-1 flex flex-col min-h-[560px] min-w-0">
+      {/* RIGHT COLUMN: EXPANDED CARD PREVIEW & EDITOR PANEL (Requirement 2 & 7) */}
+      <section className="flex-1 flex flex-col min-h-[580px] min-w-0">
         <div
-          className={`flex-1 border rounded-lg p-4 sm:p-6 relative overflow-hidden shadow-xs flex flex-col ${
+          className={`flex-1 border rounded-lg p-4 sm:p-5 relative overflow-hidden shadow-xs flex flex-col ${
             isDark ? 'bg-[#1F1F23] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
           }`}
         >
-          {/* Header over preview with selected word and status */}
-          <div className={`flex items-center justify-between pb-3 mb-3 border-b shrink-0 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+          <div className="flex items-center justify-between pb-2 mb-3 border-b border-zinc-200 dark:border-zinc-700/80">
             <div className="flex items-center gap-2">
               <Eye className="w-4 h-4 text-blue-500" />
-              <span className="text-xs font-bold uppercase tracking-wider">
-                {t('batch.livePreviewTitle')}
-              </span>
+              <h3 className="text-sm font-bold">{t('batch.livePreviewTitle')}</h3>
               {selectedItemForPreview && (
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                  isDark ? 'bg-zinc-800 text-blue-400' : 'bg-blue-50 text-blue-700'
-                }`}>
+                <span
+                  className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                    isDark ? 'bg-zinc-800 text-blue-400' : 'bg-blue-50 text-blue-700'
+                  }`}
+                >
                   {selectedItemForPreview.word} {selectedItemForPreview.noteId ? `(#${selectedItemForPreview.noteId})` : ''}
                 </span>
               )}
             </div>
 
             {selectedItemForPreview && (
-              <div className="text-xs">
+              <div className="text-xs flex items-center gap-2">
+                {selectedItemForPreview.isEdited && (
+                  <span className="text-amber-500 font-bold flex items-center gap-1 text-[11px]">
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Unsaved Changes</span>
+                  </span>
+                )}
                 {selectedItemForPreview.status === 'success' ? (
                   <span className="text-emerald-500 font-semibold flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" />
@@ -1102,12 +1146,18 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             )}
           </div>
 
-          <div className="relative z-10 w-full flex-1 flex flex-col justify-center min-w-0">
+          {/* Full CardPreview & Editor Panel */}
+          <div className="relative z-10 w-full flex-1 flex flex-col min-w-0">
             <CardPreview
               cardData={previewCard}
               themeId={settings.theme}
               emptyWordPlaceholder={selectedItemForPreview?.word || items[0]?.word || 'batch card'}
               appTheme={isDark ? 'anki-dark' : 'anki-light'}
+              editable={true}
+              canSaveToAnki={Boolean(selectedItemForPreview?.noteId)}
+              isSavingToAnki={isSavingCardToAnki}
+              onCardChange={handleCardChange}
+              onSaveToAnki={handleSaveSingleCardToAnki}
             />
           </div>
         </div>

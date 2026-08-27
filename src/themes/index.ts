@@ -129,6 +129,17 @@ export function isRTLText(text?: string): boolean {
   return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
 }
 
+export function getContrastTextColor(hexColor?: string): string {
+  if (!hexColor) return '#ffffff';
+  let c = hexColor.replace('#', '');
+  if (c.length === 3) c = c.split('').map(x => x + x).join('');
+  const r = parseInt(c.substring(0, 2), 16) || 0;
+  const g = parseInt(c.substring(2, 4), 16) || 0;
+  const b = parseInt(c.substring(4, 6), 16) || 0;
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 140 ? '#0f172a' : '#f8fafc';
+}
+
 export function renderCustomBlocksHtml(
   customBlocks: CustomCardBlock[] | undefined | null,
   themeId: ThemeId = 'comic-pop-dark'
@@ -144,7 +155,10 @@ export function renderCustomBlocksHtml(
     const content = (block.content || '').trim();
     if (!title && !content) continue;
 
-    const accentColor = block.color || '#38BDF8';
+    const bgColor = block.color || '#1E293B';
+    const textColor = getContrastTextColor(bgColor);
+    const badgeBg = textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.2)';
+    const badgeBorder = textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.3)';
     const dir = block.dir || (isRTLText(content) ? 'rtl' : 'ltr');
     const contentHtml = renderMarkdown(content);
 
@@ -156,18 +170,18 @@ export function renderCustomBlocksHtml(
       case 'comic-light':
       case 'comic-dark':
         blockHtml = `
-<div class="comic-mnemonic-box custom-card-block" style="border-left: 6px solid ${accentColor}; margin-top: 14px;">
-  <span class="box-label" style="background-color: ${accentColor}; color: #000000; font-weight: 900;">${escapeHtml(title)}</span>
-  <div class="custom-block-content" dir="${dir}">${contentHtml}</div>
+<div class="comic-mnemonic-box custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; margin-top: 14px;">
+  <span class="box-label" style="background-color: ${badgeBg}; color: ${textColor}; border: 2px solid ${badgeBorder}; font-weight: 900;">${escapeHtml(title)}</span>
+  <div class="custom-block-content" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>
 </div>`;
         break;
 
       case 'comic-strip-light':
       case 'comic-strip-dark':
         blockHtml = `
-<div class="strip-panel panel-custom custom-card-block" style="border-top: 5px solid ${accentColor}; margin-top: 14px;">
-  <div class="panel-tag" style="background-color: ${accentColor}; color: #ffffff; font-weight: 900;">${escapeHtml(title)}</div>
-  <div class="custom-block-content" dir="${dir}">${contentHtml}</div>
+<div class="strip-panel panel-custom custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; margin-top: 14px;">
+  <div class="panel-tag" style="background-color: ${badgeBg}; color: ${textColor}; font-weight: 900;">${escapeHtml(title)}</div>
+  <div class="custom-block-content" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>
 </div>`;
         break;
 
@@ -176,27 +190,27 @@ export function renderCustomBlocksHtml(
       case 'comic-manga-light':
       case 'comic-manga-dark':
         blockHtml = `
-<div class="quest-mnemonic-card custom-card-block" style="border-left: 6px solid ${accentColor}; margin-top: 14px;">
-  <span class="quest-tag-purple" style="background-color: ${accentColor}; color: #ffffff; font-weight: 800;">${escapeHtml(title)}</span>
-  <div class="quest-custom-content" dir="${dir}">${contentHtml}</div>
+<div class="quest-mnemonic-card custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; margin-top: 14px;">
+  <span class="quest-tag-purple" style="background-color: ${badgeBg}; color: ${textColor}; font-weight: 800;">${escapeHtml(title)}</span>
+  <div class="quest-custom-content" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>
 </div>`;
         break;
 
       case 'comic-notebook-light':
       case 'comic-notebook-dark':
         blockHtml = `
-<div class="notebook-washi-mnemonic custom-card-block" style="border-left: 5px solid ${accentColor}; margin-top: 14px;">
-  <span class="washi-title" style="color: ${accentColor}; font-weight: 800;">📌 ${escapeHtml(title)}</span>
-  <div class="washi-text" dir="${dir}">${contentHtml}</div>
+<div class="notebook-washi-mnemonic custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; margin-top: 14px;">
+  <span class="washi-title" style="color: ${textColor}; font-weight: 800;">📌 ${escapeHtml(title)}</span>
+  <div class="washi-text" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>
 </div>`;
         break;
 
       case 'comic-arcade-light':
       case 'comic-arcade-dark':
         blockHtml = `
-<div class="arcade-powerup-box custom-card-block" style="border-color: ${accentColor}; box-shadow: 0 0 12px ${accentColor}40; margin-top: 14px;">
-  <div class="quest-terminal-header" style="color: ${accentColor}; font-weight: 800;">★ ${escapeHtml(title)}</div>
-  <div class="arcade-custom-content" dir="${dir}">${contentHtml}</div>
+<div class="arcade-powerup-box custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; border-color: ${textColor}; box-shadow: 0 0 10px rgba(0,255,204,0.25); margin-top: 14px;">
+  <div class="quest-terminal-header" style="color: ${textColor}; font-weight: 800;">★ ${escapeHtml(title)}</div>
+  <div class="arcade-custom-content" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>
 </div>`;
         break;
 
@@ -206,9 +220,9 @@ export function renderCustomBlocksHtml(
       case 'comic-minimal-dark':
       default:
         blockHtml = `
-<div class="minimal-mnemonic-block custom-card-block" style="border-left: 4px solid ${accentColor}; margin-top: 14px;">
-  <div class="minimal-mnemonic-label" style="color: ${accentColor}; font-weight: 700;">${escapeHtml(title)}</div>
-  <div class="minimal-custom-content" dir="${dir}">${contentHtml}</div>
+<div class="minimal-mnemonic-block custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; margin-top: 14px;">
+  <div class="minimal-mnemonic-label" style="color: ${textColor}; font-weight: 700; opacity: 0.9;">${escapeHtml(title)}</div>
+  <div class="minimal-custom-content" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>
 </div>`;
         break;
     }
@@ -357,6 +371,7 @@ export const SHARED_CARD_CSS = `
   box-sizing: border-box !important;
   position: relative !important;
   transition: all 0.2s ease !important;
+  padding: 12px 14px !important;
 }
 
 .custom-block-header {

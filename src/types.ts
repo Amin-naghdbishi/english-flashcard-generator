@@ -295,6 +295,7 @@ export interface BatchItem {
   noteId?: number;
   isDuplicate?: boolean;
   retryCount?: number;
+  isEdited?: boolean;
 }
 
 export interface TaggedNoteFieldInspection {
@@ -318,6 +319,7 @@ export interface TaggedNoteItem {
   updatedCardData?: CardData;
   generatedFieldsSummary?: string[];
   retryCount?: number;
+  isEdited?: boolean;
 }
 
 export interface StepLog {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AppSettings, AppTheme, TaggedNoteItem, CardData } from '../types';
-import { getAnkiTags, findNotesByTag, completeAnkiNote, checkAnki } from '../services/api';
+import { getAnkiTags, findNotesByTag, completeAnkiNote, checkAnki, updateAnkiNote } from '../services/api';
 import { CardPreview } from './CardPreview';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
@@ -22,6 +22,8 @@ import {
   Layers,
   List,
   PauseCircle,
+  Save,
+  Edit3,
 } from 'lucide-react';
 
 interface CompleteCardsByTagViewProps {
@@ -95,6 +97,11 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
   const [previewCard, setPreviewCard] = useState<CardData | null>(null);
   const [selectedNoteForPreview, setSelectedNoteForPreview] = useState<TaggedNoteItem | null>(null);
 
+  // Anki Update sync state (Requirement 2 & 4)
+  const [isSavingCardToAnki, setIsSavingCardToAnki] = useState<boolean>(false);
+  const [isSavingAllEdited, setIsSavingAllEdited] = useState<boolean>(false);
+  const [saveActionMessage, setSaveActionMessage] = useState<string | null>(null);
+
   const abortControllerRef = useRef<boolean>(false);
 
   // Fetch tags on mount or when anki url changes
@@ -137,6 +144,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
     setFailedCount(0);
     setSkippedCount(0);
     setCurrentIndex(-1);
+    setSaveActionMessage(null);
 
     try {
       const ankiCheck = await checkAnki(settings.anki.url);
@@ -163,37 +171,32 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
     }
   };
 
-  // Process a single card with automatic retries
+  // Process a single card with up to MAX_AUTO_RETRIES retries
   const processCardWithRetries = async (
     item: TaggedNoteItem,
     index: number,
     tag: string
   ): Promise<{ success: boolean; cardData?: CardData; generatedFields?: string[]; error?: string }> => {
-    let attempts = 0;
-    let lastError = 'Unknown error';
+    let lastError = '';
 
-    while (attempts <= MAX_AUTO_RETRIES) {
+    for (let attempt = 0; attempt <= MAX_AUTO_RETRIES; attempt++) {
       if (abortControllerRef.current) {
         return { success: false, error: 'Cancelled by user' };
       }
 
-      attempts++;
-
-      // Update UI status to retrying if this is retry attempt
-      if (attempts > 1) {
+      if (attempt > 0) {
         setNotes((prev) =>
           prev.map((it, idx) =>
             idx === index
               ? {
                   ...it,
                   status: 'retrying' as const,
-                  retryCount: attempts - 1,
-                  error: `Attempt ${attempts}/${MAX_AUTO_RETRIES + 1}: Retrying...`,
+                  retryCount: attempt,
+                  error: `Retrying (attempt ${attempt}/${MAX_AUTO_RETRIES}): ${lastError}`,
                 }
               : it
           )
         );
-        // Small delay between retries
         await new Promise((resolve) => setTimeout(resolve, 600));
       } else {
         setNotes((prev) =>
@@ -238,6 +241,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
     setIsProcessing(true);
     setIsCancelled(false);
     setIsFinished(false);
+    setSaveActionMessage(null);
 
     const tagToProcess = selectedTag.trim();
 
@@ -266,12 +270,10 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
 
       const item = notes[i];
 
-      // If retryOnlyFailed mode is active, skip items that didn't fail
       if (retryOnlyFailed && item.status !== 'error' && item.status !== 'waiting') {
         continue;
       }
 
-      // If already complete or doesn't need completion
       if (!item.needsCompletion && item.status !== 'success') {
         skip++;
         setSkippedCount(skip);
@@ -281,7 +283,6 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
         continue;
       }
 
-      // If already successfully completed previously
       if (item.status === 'success') {
         continue;
       }
@@ -296,6 +297,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
         break;
       }
 
+      // REQUIREMENT 4: Cards immediately available as soon as generated!
       if (result.success && result.cardData) {
         comp++;
         setCompletedCount(comp);
@@ -316,17 +318,29 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
               : it
           )
         );
+
+        setSelectedNoteForPreview((prev) =>
+          prev && prev.noteId === item.noteId
+            ? {
+                ...prev,
+                status: 'success' as const,
+                updatedCardData: result.cardData,
+                generatedFieldsSummary: result.generatedFields,
+                missingFields: [],
+                needsCompletion: false,
+              }
+            : prev
+        );
       } else {
         fail++;
         setFailedCount(fail);
-
         setNotes((prev) =>
           prev.map((it, idx) =>
             idx === i
               ? {
                   ...it,
                   status: 'error' as const,
-                  error: result.error || 'Error completing card after retries',
+                  error: result.error || 'Failed after auto-retries',
                 }
               : it
           )
@@ -334,36 +348,38 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
       }
     }
 
-    // Reset remaining 'waiting' items back to idle if cancelled
-    setNotes((prev) =>
-      prev.map((it) => (it.status === 'waiting' ? { ...it, status: 'idle' as const } : it))
-    );
-
     setIsProcessing(false);
     setCurrentIndex(-1);
+
     if (!abortControllerRef.current) {
       setIsFinished(true);
     }
   };
 
-  // Cancel processing
+  // Cancel in-progress run safely
   const handleCancelProcessing = () => {
     abortControllerRef.current = true;
-    setIsProcessing(false);
     setIsCancelled(true);
+    setIsProcessing(false);
   };
 
-  // Retry a single card
+  // Retry a single card manually
   const handleRetrySingle = async (index: number) => {
-    const itemToRetry = notes[index];
-    if (!itemToRetry || isProcessing) return;
+    if (isProcessing) return;
+    const item = notes[index];
+    if (!item) return;
 
+    abortControllerRef.current = false;
+    setIsProcessing(true);
     setCurrentIndex(index);
-    setSelectedNoteForPreview(itemToRetry);
+    setSelectedNoteForPreview(item);
 
-    const result = await processCardWithRetries(itemToRetry, index, selectedTag.trim());
+    const tagToProcess = selectedTag.trim();
+    const result = await processCardWithRetries(item, index, tagToProcess);
 
     if (result.success && result.cardData) {
+      setCompletedCount((c) => c + 1);
+      setFailedCount((f) => Math.max(0, f - 1));
       setPreviewCard(result.cardData);
       setNotes((prev) =>
         prev.map((it, idx) =>
@@ -380,8 +396,6 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
             : it
         )
       );
-      setCompletedCount((c) => c + 1);
-      setFailedCount((f) => Math.max(0, f - 1));
     } else {
       setNotes((prev) =>
         prev.map((it, idx) =>
@@ -389,61 +403,158 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
             ? {
                 ...it,
                 status: 'error' as const,
-                error: result.error || 'Error occurred during retry',
+                error: result.error || 'Retry failed',
               }
             : it
         )
       );
     }
 
+    setIsProcessing(false);
     setCurrentIndex(-1);
   };
 
-  const handleSelectForPreview = (note: TaggedNoteItem) => {
-    setSelectedNoteForPreview(note);
-    setPreviewCard(noteItemToCardData(note));
+  // Select note from queue to view preview/editor
+  const handleSelectNote = (item: TaggedNoteItem) => {
+    setSelectedNoteForPreview(item);
+    setPreviewCard(noteItemToCardData(item));
+    setSaveActionMessage(null);
   };
 
-  const missingFieldsCount = notes.filter((n) => n.needsCompletion && n.status !== 'success').length;
-  const currentProcessingNote = currentIndex >= 0 && currentIndex < notes.length ? notes[currentIndex] : null;
-  const progressPercent = notes.length > 0 ? Math.round(((completedCount + failedCount + skippedCount) / notes.length) * 100) : 0;
+  // REQUIREMENT 2: EDIT CARD AND SAVE IN ANKI (IN-PLACE WITHOUT DUPLICATES)
+  const handleCardChange = (updatedCard: CardData) => {
+    setPreviewCard(updatedCard);
+    if (!selectedNoteForPreview) return;
+
+    setNotes((prev) =>
+      prev.map((n) =>
+        n.noteId === selectedNoteForPreview.noteId
+          ? {
+              ...n,
+              updatedCardData: updatedCard,
+              isEdited: true,
+            }
+          : n
+      )
+    );
+
+    setSelectedNoteForPreview((prev) =>
+      prev ? { ...prev, updatedCardData: updatedCard, isEdited: true } : prev
+    );
+  };
+
+  const handleSaveSingleNoteToAnki = async () => {
+    if (!selectedNoteForPreview || !selectedNoteForPreview.noteId || !previewCard) return;
+    setIsSavingCardToAnki(true);
+    setSaveActionMessage(null);
+
+    try {
+      const res = await updateAnkiNote(
+        selectedNoteForPreview.noteId,
+        previewCard,
+        settings.theme
+      );
+
+      if (res.success) {
+        setNotes((prev) =>
+          prev.map((n) =>
+            n.noteId === selectedNoteForPreview.noteId
+              ? { ...n, isEdited: false }
+              : n
+          )
+        );
+        setSelectedNoteForPreview((prev) => (prev ? { ...prev, isEdited: false } : prev));
+        setSaveActionMessage(`✓ Note #${selectedNoteForPreview.noteId} successfully updated in Anki!`);
+      } else {
+        setSaveActionMessage(`✕ Failed to update in Anki: ${res.error || 'Unknown error'}`);
+      }
+    } catch (e: any) {
+      setSaveActionMessage(`✕ Error: ${e?.message}`);
+    } finally {
+      setIsSavingCardToAnki(false);
+    }
+  };
+
+  const handleSaveAllEditedNotes = async () => {
+    const editedNotes = notes.filter((n) => n.isEdited && n.noteId && n.updatedCardData);
+    if (editedNotes.length === 0) return;
+
+    setIsSavingAllEdited(true);
+    setSaveActionMessage(null);
+
+    let savedCount = 0;
+    for (const n of editedNotes) {
+      try {
+        const res = await updateAnkiNote(n.noteId, n.updatedCardData!, settings.theme);
+        if (res.success) {
+          savedCount++;
+          setNotes((prev) =>
+            prev.map((item) => (item.noteId === n.noteId ? { ...item, isEdited: false } : item))
+          );
+        }
+      } catch (err) {
+        console.error(`Failed to update note #${n.noteId}:`, err);
+      }
+    }
+
+    setIsSavingAllEdited(false);
+    setSaveActionMessage(
+      t('completeByTag.allEditedSaved') || `✓ Successfully updated ${savedCount} edited notes in Anki!`
+    );
+  };
+
+  // Stats calculation
+  const totalNotesCount = notes.length;
+  const needingCount = notes.filter((n) => n.needsCompletion).length;
+  const alreadyCompleteCount = totalNotesCount - needingCount;
+  const progressPercent =
+    totalNotesCount > 0 ? Math.round(((completedCount + failedCount + skippedCount) / totalNotesCount) * 100) : 0;
+  const currentProcessingNote = currentIndex >= 0 ? notes[currentIndex] : null;
+  const editedCount = notes.filter((n) => n.isEdited && n.noteId).length;
 
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 p-4 sm:p-6 min-w-0">
-      {/* Left Control & Queue Column */}
-      <section className="w-full lg:w-[480px] flex flex-col gap-5 shrink-0 min-w-0">
-        {/* Top Control Box */}
+      {/* LEFT COLUMN: Controls, Tag Scanner, Batch Queue */}
+      <section className="w-full lg:w-[480px] flex flex-col gap-6 shrink-0 min-w-0">
         <div
           className={`p-4 sm:p-5 border rounded-lg shadow-xs ${
             isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
           }`}
         >
-          <div className={`flex items-center justify-between border-b pb-3 mb-4 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+          {/* Header */}
+          <div className={`border-b pb-3 mb-4 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
             <h2 className="text-base sm:text-lg font-bold tracking-tight flex items-center gap-2">
-              <Tags className="w-5 h-5 text-blue-500" />
-              <span>{t('completeByTag.title')}</span>
+              {t('completeByTag.title')}
             </h2>
-            <button
-              type="button"
-              onClick={loadTags}
-              disabled={isFetchingTags || isProcessing}
-              title={t('completeByTag.refreshTagsTooltip')}
-              className={`p-1.5 rounded-md border cursor-pointer transition-colors ${
-                isDark ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700' : 'bg-zinc-100 border-zinc-200 text-zinc-700 hover:bg-zinc-200'
-              }`}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isFetchingTags ? 'animate-spin' : ''}`} />
-            </button>
+            <p className={`text-xs mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+              {t('completeByTag.subtitle')}
+            </p>
           </div>
 
-          {/* Tag Selection & Input */}
-          <div className="mb-3">
-            <label className={`block text-xs font-semibold uppercase mb-1.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-              {t('completeByTag.tagLabel')}:
-            </label>
+          {/* Tag Selector & Scanner */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-blue-500" />
+                <span>{t('completeByTag.tagLabel')}</span>
+              </label>
+              <button
+                type="button"
+                onClick={loadTags}
+                disabled={isFetchingTags}
+                className="text-[11px] text-blue-500 hover:text-blue-400 font-medium flex items-center gap-1 cursor-pointer"
+                title={t('completeByTag.refreshTagsTooltip')}
+              >
+                <RefreshCw className={`w-3 h-3 ${isFetchingTags ? 'animate-spin' : ''}`} />
+                <span>{t('common.refresh')}</span>
+              </button>
+            </div>
+
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Tag className={`w-4 h-4 text-zinc-400 absolute ${isRTL ? 'right-2.5' : 'left-2.5'} top-2.5`} />
+                <span className={`absolute ${isRTL ? 'right-2.5' : 'left-2.5'} top-2.5 text-zinc-400 text-xs`}>
+                  #
+                </span>
                 <input
                   type="text"
                   value={selectedTag}
@@ -478,7 +589,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
               </button>
             </div>
 
-            {/* Quick Tag Pills from Anki collection */}
+            {/* Quick Tag Pills */}
             {availableTags.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5 max-h-24 overflow-y-auto py-1">
                 {availableTags.map((tTag) => (
@@ -518,102 +629,74 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                   </div>
                 </div>
               </div>
-
-              {/* [ Yes ] [ No ] Toggle */}
-              <div className={`inline-flex border p-0.5 rounded-md shadow-xs ${isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'}`}>
-                <button
-                  type="button"
-                  onClick={() => setIncludeImage(true)}
-                  disabled={isProcessing}
-                  className={`px-2.5 py-1 text-xs font-medium rounded transition-colors cursor-pointer ${
-                    includeImage
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : isDark
-                      ? 'text-zinc-400 hover:text-white'
-                      : 'text-zinc-600 hover:text-zinc-900'
-                  }`}
-                >
-                  {t('common.yes')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIncludeImage(false)}
-                  disabled={isProcessing}
-                  className={`px-2.5 py-1 text-xs font-medium rounded transition-colors cursor-pointer ${
-                    !includeImage
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : isDark
-                      ? 'text-zinc-400 hover:text-white'
-                      : 'text-zinc-600 hover:text-zinc-900'
-                  }`}
-                >
-                  {t('common.no')}
-                </button>
-              </div>
+              <input
+                type="checkbox"
+                checked={includeImage}
+                onChange={(e) => setIncludeImage(e.target.checked)}
+                disabled={isProcessing}
+                className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+              />
             </div>
           </div>
 
-          {/* Scan Error Message */}
+          {/* Error Message Display */}
           {scanError && (
-            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-md text-red-500 text-xs flex items-start gap-2 mb-3">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="mb-3 p-3 bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800 text-xs flex items-center gap-2 font-medium shadow-xs rounded-md">
+              <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
               <span>{scanError}</span>
             </div>
           )}
 
-          {/* Pre-flight Inspection Summary Box */}
+          {/* Scanned Summary & Start Button */}
           {hasScanned && (
-            <div
-              className={`p-3.5 border rounded-lg mb-3 space-y-2 ${
-                isDark ? 'bg-zinc-900 border-zinc-700 text-zinc-200' : 'bg-blue-50/50 border-blue-200 text-zinc-900'
-              }`}
-            >
-              <div className="text-xs font-bold uppercase tracking-wider text-blue-500 flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5" />
+            <div className="space-y-3 mb-2">
+              <div
+                className={`p-3 border rounded-md text-xs space-y-1.5 shadow-xs ${
+                  isDark ? 'bg-zinc-900/80 border-zinc-700' : 'bg-zinc-50 border-zinc-200'
+                }`}
+              >
+                <div className="font-semibold flex items-center justify-between">
                   <span>{t('completeByTag.inspectionTitle')}</span>
+                  <span className="font-mono text-[11px] text-zinc-400">#{selectedTag}</span>
                 </div>
-                <span className="font-mono text-[11px] text-zinc-400">#{selectedTag}</span>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500">{t('completeByTag.wordsFound')}</span>
+                    <span className="font-bold">{totalNotesCount}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500">{t('completeByTag.needingCompletion')}</span>
+                    <span className="font-bold text-amber-500">{needingCount}</span>
+                  </div>
+                </div>
+                <p className={`text-[11px] pt-1 border-t ${isDark ? 'border-zinc-800 text-zinc-400' : 'border-zinc-200 text-zinc-500'}`}>
+                  {t('completeByTag.preservationNotice')}
+                </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
-                <div className="flex flex-col">
-                  <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{t('completeByTag.wordsFound')}</span>
-                  <span className="font-bold text-sm">{notes.length}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{t('completeByTag.needingCompletion')}</span>
-                  <span className="font-bold text-sm text-amber-500">{missingFieldsCount}</span>
-                </div>
-              </div>
-
-              <div className={`text-[11px] pt-1 border-t ${isDark ? 'border-zinc-800 text-zinc-400' : 'border-zinc-200 text-zinc-500'}`}>
-                {t('completeByTag.preservationNotice')}
-              </div>
-            </div>
-          )}
-
-          {/* Action Buttons: [ Complete Cards ] & [ Cancel ] */}
-          {hasScanned && notes.length > 0 && (
-            <div className="space-y-2">
+              {/* Start / Cancel / Retry Actions */}
               {!isProcessing ? (
                 <div className="flex flex-col sm:flex-row gap-2">
                   <button
                     type="button"
                     onClick={() => handleStartCompletion(false)}
-                    disabled={missingFieldsCount === 0}
-                    className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                    disabled={needingCount === 0 && failedCount === 0}
+                    className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors"
                   >
-                    <Play className="w-4 h-4" />
-                    <span>{t('completeByTag.completeCardsBtn', { count: missingFieldsCount > 0 ? missingFieldsCount : 0 })}</span>
+                    <Play className="w-4 h-4 fill-current" />
+                    <span>
+                      {needingCount > 0
+                        ? t('completeByTag.completeCardsBtn', { count: needingCount })
+                        : t('completeByTag.allDone')}
+                    </span>
                   </button>
 
                   {failedCount > 0 && (
                     <button
                       type="button"
                       onClick={() => handleStartCompletion(true)}
-                      className="py-2.5 px-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                      title="Retry only the failed cards"
+                      className="py-2.5 px-3 bg-red-600 hover:bg-red-700 text-white font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                      title="Retry failed cards"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
                       <span>{t('completeByTag.retryFailedBtn', { count: failedCount })}</span>
@@ -621,7 +704,6 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                   )}
                 </div>
               ) : (
-                /* While Processing: BLUE/NEUTRAL in-progress button + CANCEL button */
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -647,6 +729,40 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                     <Square className="w-3.5 h-3.5 text-zinc-300" />
                     <span>{t('completeByTag.cancelBtn')}</span>
                   </button>
+                </div>
+              )}
+
+              {/* SAVE ALL EDITED NOTES BUTTON */}
+              {editedCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleSaveAllEditedNotes}
+                  disabled={isSavingAllEdited}
+                  className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors"
+                >
+                  {isSavingAllEdited ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  <span>
+                    {isSavingAllEdited
+                      ? t('completeByTag.savingEdited')
+                      : t('completeByTag.saveAllEditedBtn', { count: editedCount })}
+                  </span>
+                </button>
+              )}
+
+              {/* Feedback Message */}
+              {saveActionMessage && (
+                <div
+                  className={`p-2 rounded text-xs font-semibold flex items-center gap-1.5 ${
+                    saveActionMessage.startsWith('✓')
+                      ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-500/30'
+                      : 'bg-rose-50 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-500/30'
+                  }`}
+                >
+                  <span>{saveActionMessage}</span>
                 </div>
               )}
             </div>
@@ -678,168 +794,97 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                 <div className={`text-xs mt-2 font-medium flex items-center gap-1.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                   <span className="text-zinc-500">{t('batch.currentlyProcessing')}</span>
                   <span className="font-bold text-blue-500">{currentProcessingNote.word}</span>
-                  {currentProcessingNote.retryCount !== undefined && currentProcessingNote.retryCount > 0 && (
-                    <span className="text-[10px] text-amber-500 font-semibold px-1.5 py-0.2 rounded bg-amber-500/10">
-                      {t('batch.retryAttemptBadge', { current: currentProcessingNote.retryCount, max: MAX_AUTO_RETRIES })}
-                    </span>
-                  )}
                 </div>
               )}
-
-              <div className="flex justify-between text-[11px] mt-2 font-medium">
-                <span className="text-emerald-500">✓ {t('common.completed')}: {completedCount}</span>
-                <span className="text-red-500">✕ {t('common.failed')}: {failedCount}</span>
-                <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  {t('common.skipped')}: {skippedCount}
-                </span>
-              </div>
             </div>
           )}
 
-          {/* Cancellation Notification Banner */}
-          {isCancelled && !isProcessing && (
-            <div
-              className={`mt-4 p-3.5 border rounded-lg text-xs ${
-                isDark
-                  ? 'bg-amber-950/40 border-amber-800 text-amber-300'
-                  : 'bg-amber-50 border-amber-300 text-amber-900'
-              }`}
-            >
-              <div className="font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                <PauseCircle className="w-4 h-4 text-amber-500" />
-                <span>{t('completeByTag.cancelledTitle')}</span>
-              </div>
-              <p className="text-xs mb-2">
-                {t('completeByTag.cancelledDesc', { completed: completedCount, total: notes.length })}
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleStartCompletion(false)}
-                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs rounded shadow-xs flex items-center gap-1 cursor-pointer transition-colors"
-                >
-                  <Play className="w-3 h-3" />
-                  <span>{t('completeByTag.resumeBtn')}</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Final Completion Summary Banner */}
+          {/* Finished or Cancelled Banner */}
           {isFinished && !isProcessing && (
-            <div
-              className={`mt-4 p-3.5 border rounded-lg text-xs ${
-                failedCount === 0
-                  ? isDark
-                    ? 'bg-emerald-950/40 border-emerald-800 text-emerald-300'
-                    : 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                  : isDark
-                  ? 'bg-amber-950/40 border-amber-800 text-amber-300'
-                  : 'bg-amber-50 border-amber-300 text-amber-900'
-              }`}
-            >
-              <div className="font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+            <div className="mt-4 p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800 text-xs rounded-md shadow-xs space-y-1">
+              <div className="flex items-center gap-1.5 font-semibold">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                 <span>{t('completeByTag.summaryTitle')}</span>
               </div>
-              <div className="grid grid-cols-3 gap-2 py-1 text-center font-semibold">
-                <div className="p-1 rounded bg-emerald-500/20 text-emerald-400">
-                  {t('common.completed')}: {completedCount}
-                </div>
-                <div className="p-1 rounded bg-red-500/20 text-red-400">
-                  {t('common.failed')}: {failedCount}
-                </div>
-                <div className="p-1 rounded bg-zinc-500/20 text-zinc-400">
-                  {t('common.skipped')}: {skippedCount}
-                </div>
+              <p className="text-[11px]">
+                {completedCount} completed, {failedCount} failed, {skippedCount} already complete.
+                {failedCount > 0 && ` ${t('completeByTag.tagRetainedNotice', { tag: selectedTag })}`}
+              </p>
+            </div>
+          )}
+
+          {isCancelled && !isProcessing && (
+            <div className="mt-4 p-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 text-xs rounded-md shadow-xs space-y-1">
+              <div className="flex items-center gap-1.5 font-semibold">
+                <PauseCircle className="w-4 h-4 text-amber-500" />
+                <span>{t('completeByTag.cancelledTitle')}</span>
               </div>
-              {failedCount > 0 && (
-                <div className="mt-2 text-[11px] flex items-center justify-between">
-                  <span>{t('completeByTag.tagRetainedNotice', { tag: selectedTag })}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleStartCompletion(true)}
-                    className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-medium text-[11px] rounded flex items-center gap-1 cursor-pointer"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>{t('completeByTag.retryFailedBtn', { count: failedCount })}</span>
-                  </button>
-                </div>
-              )}
+              <p className="text-[11px]">
+                {t('completeByTag.cancelledDesc', { completed: completedCount, total: totalNotesCount })}
+              </p>
             </div>
           )}
         </div>
 
-        {/* Scanned Words Queue Card (`Words found: X`) */}
+        {/* Tagged Notes List / Queue (Available immediately as they complete!) */}
         {hasScanned && (
           <div
-            className={`p-4 border rounded-lg shadow-xs flex-1 flex flex-col min-h-[340px] max-h-[520px] overflow-hidden ${
+            className={`border rounded-lg p-4 shadow-xs flex-1 flex flex-col min-h-[300px] ${
               isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
             }`}
           >
-            <div className={`flex items-center justify-between border-b pb-2.5 mb-3 shrink-0 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
-              <div className="flex items-center gap-2">
-                <List className="w-4 h-4 text-blue-500" />
-                <span className="text-xs font-bold uppercase tracking-wider">
-                  {t('completeByTag.queueTitle', { count: notes.length })}
+            <div className={`flex items-center justify-between pb-2 mb-2 border-b text-xs ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+              <h3 className="font-bold flex items-center gap-2">
+                <List className="w-4 h-4 text-zinc-400" />
+                <span>{t('completeByTag.queueTitle', { count: notes.length })}</span>
+              </h3>
+              {editedCount > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700">
+                  {editedCount} {t('completeByTag.editedBadge') || 'Edited'}
                 </span>
-              </div>
-              <div className="flex items-center gap-2 text-xs font-semibold">
-                {completedCount > 0 && <span className="text-emerald-600 dark:text-emerald-400">{completedCount} ✓</span>}
-                {failedCount > 0 && <span className="text-red-600 dark:text-red-400">{failedCount} ✕</span>}
-              </div>
+              )}
             </div>
 
-            {/* List of word items */}
-            <div className="overflow-y-auto flex-1 space-y-1.5 pr-1">
+            <div className="flex-1 overflow-y-auto max-h-[420px] space-y-1.5 pr-1 text-xs">
               {notes.map((n, idx) => {
                 const isSelected = selectedNoteForPreview?.noteId === n.noteId;
                 const isCurrentProcessing = currentIndex === idx;
                 const isSuccess = n.status === 'success';
                 const isFailed = n.status === 'error';
-                const isWaiting = n.status === 'waiting';
-                const isGenerating = n.status === 'generating_ai' || n.status === 'generating_audio' || n.status === 'updating_anki';
+                const isGenerating = n.status === 'generating_ai' || n.status === 'generating_audio';
                 const isRetrying = n.status === 'retrying';
+                const isWaiting = n.status === 'waiting';
 
                 return (
                   <div
                     key={n.noteId}
-                    onClick={() => handleSelectForPreview(n)}
-                    className={`p-2.5 border rounded-md transition-all cursor-pointer flex items-center justify-between gap-2.5 text-xs ${
+                    onClick={() => handleSelectNote(n)}
+                    className={`p-2.5 rounded-md border flex items-center justify-between gap-2 cursor-pointer transition-colors ${
                       isSelected
                         ? isDark
-                          ? 'border-blue-500 bg-blue-950/40 ring-1 ring-blue-500'
-                          : 'border-blue-600 bg-blue-50/70 ring-1 ring-blue-600'
-                        : isSuccess
-                        ? isDark
-                          ? 'bg-emerald-950/20 border-emerald-900/60 text-emerald-200'
-                          : 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
-                        : isFailed
-                        ? isDark
-                          ? 'bg-red-950/20 border-red-900/60 text-red-200'
-                          : 'bg-red-50/70 border-red-200 text-red-950'
-                        : isGenerating || isRetrying
-                        ? isDark
-                          ? 'bg-blue-950/30 border-blue-800 text-blue-200 animate-pulse'
-                          : 'bg-blue-50 border-blue-300 text-blue-950 animate-pulse'
+                          ? 'bg-blue-950/40 border-blue-600'
+                          : 'bg-blue-50 border-blue-300'
                         : isDark
-                        ? 'border-zinc-800 bg-zinc-900 hover:bg-zinc-850 text-zinc-200'
-                        : 'border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800'
+                        ? 'bg-zinc-850 hover:bg-zinc-800 border-zinc-750'
+                        : 'bg-white hover:bg-zinc-50 border-zinc-200'
                     }`}
                   >
-                    {/* Word info */}
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className="font-mono text-xs text-zinc-500 w-5 text-right shrink-0">
-                        {idx + 1}.
-                      </span>
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-semibold text-sm truncate">{n.word}</span>
-                          <span className={`text-[10px] font-mono font-medium px-1.5 py-0.2 rounded ${
-                            isDark ? 'bg-zinc-800 text-zinc-400' : 'bg-zinc-100 text-zinc-600'
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`font-semibold truncate ${isSelected ? 'text-blue-500 dark:text-blue-400 font-bold' : ''}`}>
+                            {n.word}
+                          </span>
+                          <span className={`text-[10px] font-mono px-1 rounded ${
+                            isDark ? 'bg-zinc-800 text-zinc-400' : 'bg-zinc-100 text-zinc-500'
                           }`}>
                             #{n.noteId}
                           </span>
+                          {n.isEdited && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
+                              {t('completeByTag.editedBadge') || 'Edited'}
+                            </span>
+                          )}
                           {n.missingFields.length > 0 && !isSuccess && (
                             <span className={`text-[10px] px-1.5 py-0.2 rounded border ${
                               isDark ? 'bg-amber-950/50 text-amber-400 border-amber-800/80' : 'bg-amber-50 text-amber-700 border-amber-300'
@@ -901,30 +946,6 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                           </button>
                         </div>
                       )}
-                      {n.status === 'skipped' && (
-                        <span className="text-[11px] text-zinc-500 px-1.5 py-0.5 rounded bg-zinc-700/20">
-                          {t('common.skipped')}
-                        </span>
-                      )}
-
-                      {/* Eye / Preview Button (👁) */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectForPreview(n);
-                        }}
-                        className={`p-1.5 rounded-md border transition-colors cursor-pointer ${
-                          isSelected
-                            ? 'bg-blue-600 text-white border-blue-600'
-                            : isDark
-                            ? 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700'
-                            : 'bg-zinc-100 border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200'
-                        }`}
-                        title={t('common.preview')}
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                      </button>
                     </div>
                   </div>
                 );
@@ -934,10 +955,10 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
         )}
       </section>
 
-      {/* Right Column: Live Card Preview Panel */}
-      <section className="flex-1 flex flex-col min-h-[560px] min-w-0">
+      {/* RIGHT COLUMN: EXPANDED CARD PREVIEW & EDITOR PANEL (Requirement 2 & 7) */}
+      <section className="flex-1 flex flex-col min-h-[580px] min-w-0">
         <div
-          className={`flex-1 border rounded-lg p-4 sm:p-6 relative overflow-hidden shadow-xs flex flex-col ${
+          className={`flex-1 border rounded-lg p-4 sm:p-5 relative overflow-hidden shadow-xs flex flex-col ${
             isDark ? 'bg-[#1F1F23] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
           }`}
         >
@@ -958,7 +979,13 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
             </div>
 
             {selectedNoteForPreview && (
-              <div className="text-xs">
+              <div className="text-xs flex items-center gap-2">
+                {selectedNoteForPreview.isEdited && (
+                  <span className="text-amber-500 font-bold flex items-center gap-1 text-[11px]">
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Unsaved Changes</span>
+                  </span>
+                )}
                 {selectedNoteForPreview.status === 'success' ? (
                   <span className="text-emerald-500 font-semibold flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" />
@@ -975,12 +1002,17 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
             )}
           </div>
 
-          <div className="relative z-10 w-full flex-1 flex flex-col justify-center min-w-0">
+          <div className="relative z-10 w-full flex-1 flex flex-col min-w-0">
             <CardPreview
               cardData={previewCard}
               themeId={settings.theme}
               emptyWordPlaceholder={selectedNoteForPreview?.word || 'tag card'}
               appTheme={isDark ? 'anki-dark' : 'anki-light'}
+              editable={true}
+              canSaveToAnki={Boolean(selectedNoteForPreview?.noteId)}
+              isSavingToAnki={isSavingCardToAnki}
+              onCardChange={handleCardChange}
+              onSaveToAnki={handleSaveSingleNoteToAnki}
             />
           </div>
         </div>
