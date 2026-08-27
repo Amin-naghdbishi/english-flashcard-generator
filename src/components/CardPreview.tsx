@@ -229,8 +229,19 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
   const [activeSide, setActiveSide] = useState<'front' | 'back' | 'both'>('back');
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
   const [previewCardType, setPreviewCardType] = useState<CardType>(cardType);
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
+
+  // Close drawer on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isSidebarOpen) {
+        setIsSidebarOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSidebarOpen]);
 
   // Local editable draft card data (initialized with cardData or rich placeholder)
   const [internalCard, setInternalCard] = useState<CardData>(() => {
@@ -472,7 +483,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
   }, [internalCard.customBlocks, selectedBoxId]);
 
   return (
-    <div className="w-full flex-1 flex flex-col min-h-0 text-left" onKeyDown={handleEditorKeyDown}>
+    <div className="w-full flex-1 flex flex-col min-h-0 text-left relative" onKeyDown={handleEditorKeyDown}>
       {/* Inject Selected Card Theme CSS & Shared Custom Block CSS */}
       <style>{`${theme.css}\n${SHARED_CARD_CSS}`}</style>
 
@@ -507,7 +518,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
       />
 
       {/* TOP BAR: Mode Switch, Theme Badge & View Toggles */}
-      <div className={`flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b text-xs ${
+      <div className={`flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b text-xs shrink-0 ${
         isDark ? 'border-zinc-700' : 'border-zinc-200'
       }`}>
         {/* Left: Mode (Edit vs Preview) & Theme Badge */}
@@ -556,7 +567,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
           </span>
         </div>
 
-        {/* Right: View & Side Toggles + Sidebar Toggle */}
+        {/* Right: View & Side Toggles + Slide-out Toolbar Toggle Button */}
         <div className="flex flex-wrap items-center gap-1.5">
           {/* Card Type (Normal / Spelling) */}
           <div className={`inline-flex border p-0.5 rounded-md shadow-xs ${isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'}`}>
@@ -695,7 +706,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             </button>
           )}
 
-          {/* Toggle Right-Side Editor Toolbar Button (Requirement 2) */}
+          {/* Toggle Slide-out Editor Toolbar Button */}
           {editable && mode === 'edit' && (
             <button
               type="button"
@@ -709,549 +720,590 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                   ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700'
                   : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-100'
               }`}
-              title={isSidebarOpen ? 'Collapse Editor Toolbar' : 'Open Right-Side Editor Toolbar'}
+              title={isSidebarOpen ? 'Close Toolbar Drawer' : 'Open Slide-out Toolbar Drawer'}
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{isSidebarOpen ? 'Toolbar' : 'Open Toolbar'}</span>
+              <span className="hidden sm:inline">{isSidebarOpen ? 'Close Toolbar' : 'Toolbar'}</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* MAIN CONTAINER: [ Card Preview (Inline Editor) ] [ Right-side Editor Toolbar ] */}
-      <div className="w-full flex-1 flex flex-row min-h-0 gap-3 relative overflow-hidden">
-        {/* LEFT / CENTER: THE CARD PREVIEW & INLINE EDITOR (Main focus, comfortable size) */}
-        <div
-          onClick={handleCardClick}
-          className="flex-1 overflow-y-auto flex flex-col items-center justify-start py-2 px-1 sm:px-2 min-w-0 transition-all"
-        >
-          {/* PREVIEW MODE: EXACT ANKI RENDERING */}
-          {mode === 'preview' && (
-            <>
-              {(activeSide === 'front' || activeSide === 'both') && (
-                <div className="w-full flex flex-col items-center">
-                  {activeSide === 'both' && (
-                    <div
-                      className={`mb-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border shadow-xs ${
-                        isDark ? 'bg-zinc-800 text-zinc-300 border-zinc-700' : 'bg-zinc-100 text-zinc-700 border-zinc-200'
-                      }`}
-                    >
-                      — {t('preview.frontCardBanner', { type: previewCardType.toUpperCase() })} —
-                    </div>
-                  )}
+      {/* MAIN CARD CANVAS: 100% Full Width, Undivided & Unaltered (Never shrunk or rearranged!) */}
+      <div
+        onClick={handleCardClick}
+        className="w-full flex-1 overflow-y-auto flex flex-col items-center justify-start py-2 px-1 sm:px-2 min-w-0"
+      >
+        {/* PREVIEW MODE: EXACT ANKI RENDERING */}
+        {mode === 'preview' && (
+          <>
+            {(activeSide === 'front' || activeSide === 'both') && (
+              <div className="w-full flex flex-col items-center">
+                {activeSide === 'both' && (
                   <div
-                    className={`w-full transition-all duration-200 ${
-                      viewMode === 'mobile'
-                        ? `max-w-[360px] border-x-2 border-dashed ${isDark ? 'border-zinc-700' : 'border-zinc-300'} p-1`
-                        : 'w-full max-w-3xl'
+                    className={`mb-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border shadow-xs ${
+                      isDark ? 'bg-zinc-800 text-zinc-300 border-zinc-700' : 'bg-zinc-100 text-zinc-700 border-zinc-200'
                     }`}
-                    dangerouslySetInnerHTML={{ __html: frontRendered }}
-                  />
-                </div>
-              )}
+                  >
+                    — {t('preview.frontCardBanner', { type: previewCardType.toUpperCase() })} —
+                  </div>
+                )}
+                <div
+                  className={`w-full transition-all duration-200 ${
+                    viewMode === 'mobile'
+                      ? `max-w-[360px] border-x-2 border-dashed ${isDark ? 'border-zinc-700' : 'border-zinc-300'} p-1`
+                      : 'w-full max-w-3xl'
+                  }`}
+                  dangerouslySetInnerHTML={{ __html: frontRendered }}
+                />
+              </div>
+            )}
 
-              {(activeSide === 'back' || activeSide === 'both') && (
-                <div className="w-full flex flex-col items-center">
-                  {activeSide === 'both' && (
-                    <div
-                      className={`mb-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border shadow-xs ${
-                        isDark ? 'bg-zinc-800 text-zinc-300 border-zinc-700' : 'bg-zinc-100 text-zinc-700 border-zinc-200'
-                      }`}
-                    >
-                      — {t('preview.backCardBanner')} —
-                    </div>
-                  )}
+            {(activeSide === 'back' || activeSide === 'both') && (
+              <div className="w-full flex flex-col items-center">
+                {activeSide === 'both' && (
                   <div
-                    className={`w-full transition-all duration-200 ${
-                      viewMode === 'mobile'
-                        ? `max-w-[360px] border-x-2 border-dashed ${isDark ? 'border-zinc-700' : 'border-zinc-300'} p-1`
-                        : 'w-full max-w-3xl'
+                    className={`mb-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border shadow-xs ${
+                      isDark ? 'bg-zinc-800 text-zinc-300 border-zinc-700' : 'bg-zinc-100 text-zinc-700 border-zinc-200'
                     }`}
-                    dangerouslySetInnerHTML={{ __html: backRendered }}
-                  />
-                </div>
-              )}
-            </>
-          )}
+                  >
+                    — {t('preview.backCardBanner')} —
+                  </div>
+                )}
+                <div
+                  className={`w-full transition-all duration-200 ${
+                    viewMode === 'mobile'
+                      ? `max-w-[360px] border-x-2 border-dashed ${isDark ? 'border-zinc-700' : 'border-zinc-300'} p-1`
+                      : 'w-full max-w-3xl'
+                  }`}
+                  dangerouslySetInnerHTML={{ __html: backRendered }}
+                />
+              </div>
+            )}
+          </>
+        )}
 
-          {/* EDIT MODE: DIRECT THEME-AWARE INTERACTIVE CARD INLINE EDITOR (Requirement 1) */}
-          {mode === 'edit' && (
-            <div
-              className={`w-full transition-all duration-200 ${
-                viewMode === 'mobile'
-                  ? `max-w-[380px] border-x-2 border-dashed ${isDark ? 'border-zinc-700' : 'border-zinc-300'} p-1`
-                  : 'w-full max-w-3xl'
-              }`}
-            >
-              {/* Themed Card Wrapper matching selected Theme CSS */}
-              <div className={themeClasses.wrapper}>
-                <div className={`${themeClasses.card} p-4 sm:p-6`}>
-                  
-                  {/* 1. Header with Badges & Editable Part of Speech */}
-                  <div className="card-hero-header quest-top-bar flex items-center justify-between gap-2 mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="hero-badge badge-pos quest-level-pill px-2 py-0.5 text-[11px] font-bold">
-                        {previewCardType === 'spelling' ? '🎯 SPELLING' : '💥 VOCABULARY'}
-                      </span>
-                      <input
-                        type="text"
-                        value={internalCard.partOfSpeech || ''}
-                        onChange={(e) => updateSimpleField('partOfSpeech', e.target.value)}
-                        onFocus={(e) => {
-                          activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' };
-                        }}
-                        placeholder="pos (e.g. noun)"
-                        className="comic-badge badge-pos text-[11px] font-bold px-2 py-0.5 rounded border focus:ring-1 focus:ring-blue-500"
-                        title="Part of speech"
-                      />
-                    </div>
-
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                      {theme.name}
+        {/* EDIT MODE: DIRECT THEME-AWARE INTERACTIVE CARD INLINE EDITOR */}
+        {mode === 'edit' && (
+          <div
+            className={`w-full transition-all duration-200 ${
+              viewMode === 'mobile'
+                ? `max-w-[380px] border-x-2 border-dashed ${isDark ? 'border-zinc-700' : 'border-zinc-300'} p-1`
+                : 'w-full max-w-3xl'
+            }`}
+          >
+            {/* Themed Card Wrapper matching selected Theme CSS */}
+            <div className={themeClasses.wrapper}>
+              <div className={`${themeClasses.card} p-4 sm:p-6`}>
+                
+                {/* 1. Header with Badges & Editable Part of Speech */}
+                <div className="card-hero-header quest-top-bar flex items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="hero-badge badge-pos quest-level-pill px-2 py-0.5 text-[11px] font-bold">
+                      {previewCardType === 'spelling' ? '🎯 SPELLING' : '💥 VOCABULARY'}
                     </span>
+                    <input
+                      type="text"
+                      value={internalCard.partOfSpeech || ''}
+                      onChange={(e) => updateSimpleField('partOfSpeech', e.target.value)}
+                      onFocus={(e) => {
+                        activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' };
+                      }}
+                      placeholder="pos (e.g. noun)"
+                      className="comic-badge badge-pos text-[11px] font-bold px-2 py-0.5 rounded border focus:ring-1 focus:ring-blue-500"
+                      title="Part of speech"
+                    />
                   </div>
 
-                  {/* 2. Photo / Image Area with in-place controls */}
-                  <div className="mb-4">
-                    {internalCard.imageBase64 ? (
-                      <div className="relative group rounded overflow-hidden border-2 border-black/40 shadow-sm">
-                        <img
-                          src={
-                            internalCard.imageBase64.startsWith('data:')
-                              ? internalCard.imageBase64
-                              : `data:image/jpeg;base64,${internalCard.imageBase64}`
-                          }
-                          alt={internalCard.word}
-                          className="card-illustration w-full max-h-[220px] object-cover block"
-                        />
-                        {/* Hover Overlay Controls */}
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
-                          <button
-                            type="button"
-                            onClick={onOpenImageSearch}
-                            className="px-2.5 py-1 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded shadow-xs flex items-center gap-1 cursor-pointer"
-                            title="Search online images"
-                          >
-                            <Search className="w-3.5 h-3.5" />
-                            <span>Search Online</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="px-2.5 py-1 text-xs font-semibold bg-zinc-700 hover:bg-zinc-600 text-white rounded shadow-xs flex items-center gap-1 cursor-pointer"
-                            title="Upload local image"
-                          >
-                            <Upload className="w-3.5 h-3.5" />
-                            <span>Upload</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              updateSimpleField('imageBase64', undefined);
-                              updateSimpleField('imageFileName', undefined);
-                              if (onRemoveImage) onRemoveImage();
-                            }}
-                            className="px-2.5 py-1 text-xs font-semibold bg-red-600 hover:bg-red-500 text-white rounded shadow-xs flex items-center gap-1 cursor-pointer"
-                            title="Remove image"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Remove</span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="w-full border-2 border-dashed border-zinc-400 dark:border-zinc-600 rounded-lg p-3 flex items-center justify-between gap-2 bg-zinc-500/5">
-                        <div className="flex items-center gap-2 text-xs text-zinc-500">
-                          <ImageIcon className="w-4 h-4" />
-                          <span>Card Illustration (Optional)</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={onOpenImageSearch}
-                            className="px-2 py-1 text-xs font-medium rounded border cursor-pointer flex items-center gap-1 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100"
-                          >
-                            <Search className="w-3 h-3 text-blue-500" />
-                            <span>Search</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="px-2 py-1 text-xs font-medium rounded border cursor-pointer flex items-center gap-1 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100"
-                          >
-                            <Upload className="w-3 h-3 text-emerald-500" />
-                            <span>Upload</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    {theme.name}
+                  </span>
+                </div>
 
-                  {/* 3. Word Title Section & Phonetic IPA (Editable directly on card) */}
-                  <div className={`${themeClasses.wordSection} p-3 rounded mb-4`}>
-                    <div className="mb-2">
-                      <label className="text-[10px] font-bold uppercase tracking-wider block opacity-70 mb-0.5">
-                        Word / Expression:
-                      </label>
-                      <input
-                        type="text"
-                        value={internalCard.word}
-                        onChange={(e) => updateSimpleField('word', e.target.value)}
-                        onFocus={(e) => {
-                          activeInputRef.current = { element: e.target, fieldName: 'word' };
-                        }}
-                        placeholder="Word"
-                        className={`${themeClasses.wordTitle} w-full bg-transparent border-b border-dashed border-zinc-400 focus:border-blue-500 focus:outline-none font-black text-2xl sm:text-3xl`}
+                {/* 2. Photo / Image Area with in-place controls */}
+                <div className="mb-4">
+                  {internalCard.imageBase64 ? (
+                    <div className="relative group rounded overflow-hidden border-2 border-black/40 shadow-sm">
+                      <img
+                        src={
+                          internalCard.imageBase64.startsWith('data:')
+                            ? internalCard.imageBase64
+                            : `data:image/jpeg;base64,${internalCard.imageBase64}`
+                        }
+                        alt={internalCard.word}
+                        className="card-illustration w-full max-h-[220px] object-cover block"
                       />
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold opacity-70">IPA:</span>
-                      <input
-                        type="text"
-                        value={internalCard.phonetic || ''}
-                        onChange={(e) => updateSimpleField('phonetic', e.target.value)}
-                        onFocus={(e) => {
-                          activeInputRef.current = { element: e.target, fieldName: 'phonetic' };
-                        }}
-                        placeholder="/.../"
-                        className={`${themeClasses.ipaBadge} text-xs px-2 py-0.5 rounded border focus:outline-none focus:ring-1 focus:ring-blue-500`}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 4. Audio Pronunciation Section */}
-                  <div className={`${themeClasses.pronunciationBox} p-2.5 rounded mb-4 text-xs`}>
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold flex items-center gap-1">
-                          <Volume2 className="w-3.5 h-3.5 text-blue-400" />
-                          <span>US:</span>
-                        </span>
+                      {/* Hover Overlay Controls */}
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
                         <button
                           type="button"
-                          data-audio-target="word_us_normal"
-                          className="comic-audio-btn preview-play-btn px-2 py-0.5 rounded border text-xs font-semibold cursor-pointer hover:opacity-90"
+                          onClick={onOpenImageSearch}
+                          className="px-2.5 py-1 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded shadow-xs flex items-center gap-1 cursor-pointer"
+                          title="Search online images"
                         >
-                          ▶ Normal
+                          <Search className="w-3.5 h-3.5" />
+                          <span>Search Online</span>
                         </button>
                         <button
                           type="button"
-                          data-audio-target="word_us_slow"
-                          className="comic-audio-btn preview-play-btn px-2 py-0.5 rounded border text-xs font-semibold cursor-pointer hover:opacity-90"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-2.5 py-1 text-xs font-semibold bg-zinc-700 hover:bg-zinc-600 text-white rounded shadow-xs flex items-center gap-1 cursor-pointer"
+                          title="Upload local image"
                         >
-                          ▶ Slow
-                        </button>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold flex items-center gap-1">
-                          <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>UK:</span>
-                        </span>
-                        <button
-                          type="button"
-                          data-audio-target="word_uk_normal"
-                          className="comic-audio-btn preview-play-btn px-2 py-0.5 rounded border text-xs font-semibold cursor-pointer hover:opacity-90"
-                        >
-                          ▶ Normal
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Upload</span>
                         </button>
                         <button
                           type="button"
-                          data-audio-target="word_uk_slow"
-                          className="comic-audio-btn preview-play-btn px-2 py-0.5 rounded border text-xs font-semibold cursor-pointer hover:opacity-90"
+                          onClick={() => {
+                            updateSimpleField('imageBase64', undefined);
+                            updateSimpleField('imageFileName', undefined);
+                            if (onRemoveImage) onRemoveImage();
+                          }}
+                          className="px-2.5 py-1 text-xs font-semibold bg-red-600 hover:bg-red-500 text-white rounded shadow-xs flex items-center gap-1 cursor-pointer"
+                          title="Remove image"
                         >
-                          ▶ Slow
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Remove</span>
                         </button>
                       </div>
                     </div>
+                  ) : (
+                    <div className="w-full border-2 border-dashed border-zinc-400 dark:border-zinc-600 rounded-lg p-3 flex items-center justify-between gap-2 bg-zinc-500/5">
+                      <div className="flex items-center gap-2 text-xs text-zinc-500">
+                        <ImageIcon className="w-4 h-4" />
+                        <span>Card Illustration (Optional)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={onOpenImageSearch}
+                          className="px-2 py-1 text-xs font-medium rounded border cursor-pointer flex items-center gap-1 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100"
+                        >
+                          <Search className="w-3.5 h-3.5 text-blue-500" />
+                          <span>Search</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-2 py-1 text-xs font-medium rounded border cursor-pointer flex items-center gap-1 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>Upload</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Word Title Section & Phonetic IPA (Editable directly on card) */}
+                <div className={`${themeClasses.wordSection} p-3 rounded mb-4`}>
+                  <div className="mb-2">
+                    <label className="text-[10px] font-bold uppercase tracking-wider block opacity-70 mb-0.5">
+                      Word / Expression:
+                    </label>
+                    <input
+                      type="text"
+                      value={internalCard.word}
+                      onChange={(e) => updateSimpleField('word', e.target.value)}
+                      onFocus={(e) => {
+                        activeInputRef.current = { element: e.target, fieldName: 'word' };
+                      }}
+                      placeholder="Word"
+                      className={`${themeClasses.wordTitle} w-full bg-transparent border-b border-dashed border-zinc-400 focus:border-blue-500 focus:outline-none font-black text-2xl sm:text-3xl`}
+                    />
                   </div>
 
-                  {/* 5. Meaning Box (Persian Meaning) */}
-                  <div className={`${themeClasses.meaningBox} p-3 rounded mb-4`}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className={`${themeClasses.meaningLabel} text-[11px] font-bold uppercase tracking-wider`}>
-                        📖 PERSIAN MEANING / معنی فارسی
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold opacity-70">IPA:</span>
+                    <input
+                      type="text"
+                      value={internalCard.phonetic || ''}
+                      onChange={(e) => updateSimpleField('phonetic', e.target.value)}
+                      onFocus={(e) => {
+                        activeInputRef.current = { element: e.target, fieldName: 'phonetic' };
+                      }}
+                      placeholder="/.../"
+                      className={`${themeClasses.ipaBadge} text-xs px-2 py-0.5 rounded border focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                    />
+                  </div>
+                </div>
+
+                {/* 4. Audio Pronunciation Section */}
+                <div className={`${themeClasses.pronunciationBox} p-2.5 rounded mb-4 text-xs`}>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold flex items-center gap-1">
+                        <Volume2 className="w-3.5 h-3.5 text-blue-400" />
+                        <span>US:</span>
                       </span>
-                      <span className="text-[10px] opacity-60">Direct Editing & Markdown</span>
+                      <button
+                        type="button"
+                        data-audio-target="word_us_normal"
+                        className="comic-audio-btn preview-play-btn px-2 py-0.5 rounded border text-xs font-semibold cursor-pointer hover:opacity-90"
+                      >
+                        ▶ Normal
+                      </button>
+                      <button
+                        type="button"
+                        data-audio-target="word_us_slow"
+                        className="comic-audio-btn preview-play-btn px-2 py-0.5 rounded border text-xs font-semibold cursor-pointer hover:opacity-90"
+                      >
+                        ▶ Slow
+                      </button>
                     </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold flex items-center gap-1">
+                        <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>UK:</span>
+                      </span>
+                      <button
+                        type="button"
+                        data-audio-target="word_uk_normal"
+                        className="comic-audio-btn preview-play-btn px-2 py-0.5 rounded border text-xs font-semibold cursor-pointer hover:opacity-90"
+                      >
+                        ▶ Normal
+                      </button>
+                      <button
+                        type="button"
+                        data-audio-target="word_uk_slow"
+                        className="comic-audio-btn preview-play-btn px-2 py-0.5 rounded border text-xs font-semibold cursor-pointer hover:opacity-90"
+                      >
+                        ▶ Slow
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. Meaning Box (Persian Meaning) */}
+                <div className={`${themeClasses.meaningBox} p-3 rounded mb-4`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className={`${themeClasses.meaningLabel} text-[11px] font-bold uppercase tracking-wider`}>
+                      📖 PERSIAN MEANING / معنی فارسی
+                    </span>
+                    <span className="text-[10px] opacity-60">Direct Editing & Markdown</span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    dir="rtl"
+                    value={internalCard.meaningFa || ''}
+                    onChange={(e) => updateSimpleField('meaningFa', e.target.value)}
+                    onFocus={(e) => {
+                      activeInputRef.current = { element: e.target, fieldName: 'meaningFa' };
+                    }}
+                    placeholder="معنی دقیق و روان کلمه..."
+                    className="w-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm sm:text-base font-semibold leading-relaxed resize-y"
+                  />
+                </div>
+
+                {/* 6. Example & Translation Box */}
+                <div className={`${themeClasses.exampleBox} p-3 rounded mb-4`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`${themeClasses.exampleLabel} text-[11px] font-bold uppercase tracking-wider`}>
+                      💬 EXAMPLE & TRANSLATION / مثال و ترجمه
+                    </span>
+                    <div className="flex items-center gap-1 text-[11px]">
+                      <button
+                        type="button"
+                        data-audio-target="example_us_normal"
+                        className="preview-play-btn px-1.5 py-0.5 rounded border cursor-pointer"
+                        title="Play example audio"
+                      >
+                        ▶ Sentence Audio
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* English Example */}
+                  <div className="mb-2">
+                    <label className="text-[10px] font-bold uppercase tracking-wider block opacity-70 mb-0.5">
+                      English Sentence:
+                    </label>
+                    <textarea
+                      rows={2}
+                      dir="ltr"
+                      value={internalCard.example || ''}
+                      onChange={(e) => updateSimpleField('example', e.target.value)}
+                      onFocus={(e) => {
+                        activeInputRef.current = { element: e.target, fieldName: 'example' };
+                      }}
+                      placeholder="Natural English example sentence..."
+                      className="example-en quest-sentence w-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm font-medium leading-relaxed resize-y"
+                    />
+                  </div>
+
+                  {/* Persian Translation */}
+                  <div className="pt-2 border-t border-dashed border-current/20">
+                    <label className="text-[10px] font-bold uppercase tracking-wider block opacity-70 mb-0.5">
+                      ترجمه فارسی مثال:
+                    </label>
                     <textarea
                       rows={2}
                       dir="rtl"
-                      value={internalCard.meaningFa || ''}
-                      onChange={(e) => updateSimpleField('meaningFa', e.target.value)}
+                      value={internalCard.translationFa || ''}
+                      onChange={(e) => updateSimpleField('translationFa', e.target.value)}
                       onFocus={(e) => {
-                        activeInputRef.current = { element: e.target, fieldName: 'meaningFa' };
+                        activeInputRef.current = { element: e.target, fieldName: 'translationFa' };
                       }}
-                      placeholder="معنی دقیق و روان کلمه..."
-                      className="w-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm sm:text-base font-semibold leading-relaxed resize-y"
+                      placeholder="ترجمه فارسی جمله مثال..."
+                      className="example-fa quest-translation-fa w-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm font-normal leading-relaxed resize-y"
                     />
                   </div>
+                </div>
 
-                  {/* 6. Example & Translation Box */}
-                  <div className={`${themeClasses.exampleBox} p-3 rounded mb-4`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={`${themeClasses.exampleLabel} text-[11px] font-bold uppercase tracking-wider`}>
-                        💬 EXAMPLE & TRANSLATION / مثال و ترجمه
-                      </span>
-                      <div className="flex items-center gap-1 text-[11px]">
-                        <button
-                          type="button"
-                          data-audio-target="example_us_normal"
-                          className="preview-play-btn px-1.5 py-0.5 rounded border cursor-pointer"
-                          title="Play example audio"
+                {/* 7. Memory Hook Box (Root Decomposition) */}
+                <div className={`${themeClasses.mnemonicBox} p-3 rounded mb-4`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className={`${themeClasses.mnemonicLabel} text-[11px] font-bold uppercase tracking-wider`}>
+                      🧠 MEMORY HOOK / کد یادسپاری و ریشه‌شناسی
+                    </span>
+                    <span className="text-[10px] opacity-60">**bold roots**</span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    dir={isRTLText(internalCard.mnemonic) ? 'rtl' : 'ltr'}
+                    value={internalCard.mnemonic || ''}
+                    onChange={(e) => updateSimpleField('mnemonic', e.target.value)}
+                    onFocus={(e) => {
+                      activeInputRef.current = { element: e.target, fieldName: 'mnemonic' };
+                    }}
+                    placeholder="e.g. read (خواندن) + ability (توانایی) = قابلیت خوانده‌شدن"
+                    className="mnemonic-text quest-mnemonic w-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm font-medium leading-relaxed resize-y"
+                  />
+                </div>
+
+                {/* 8. Theme-Aware Custom Boxes / Blocks */}
+                {internalCard.customBlocks && internalCard.customBlocks.length > 0 && (
+                  <div className="space-y-4 mb-4">
+                    {internalCard.customBlocks.map((block, idx) => {
+                      const bgColor = block.color || '#1E293B';
+                      const textColor = getContrastTextColor(bgColor);
+                      const badgeBg = textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.2)';
+                      const badgeBorder = textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.3)';
+                      const isRTLBlock = block.dir === 'rtl' || isRTLText(block.content);
+                      const isSelected = selectedBoxId === block.id;
+
+                      return (
+                        <div
+                          key={block.id}
+                          onClick={() => setSelectedBoxId(block.id)}
+                          className={`${themeClasses.customBox} p-3.5 rounded-lg border-2 shadow-xs transition-all ${
+                            isSelected ? 'ring-2 ring-blue-500/80 shadow-md' : ''
+                          }`}
+                          style={{
+                            backgroundColor: bgColor,
+                            color: textColor,
+                            borderColor: textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.25)',
+                            marginTop: '14px',
+                          }}
                         >
-                          ▶ Sentence Audio
-                        </button>
-                      </div>
-                    </div>
+                          {/* Box Header Toolbar */}
+                          <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                            {/* Editable Title Badge */}
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                value={block.title}
+                                onChange={(e) => handleUpdateCustomBlock(block.id, { title: e.target.value })}
+                                onFocus={() => {
+                                  setSelectedBoxId(block.id);
+                                }}
+                                className={`${themeClasses.customLabel} font-black text-xs px-2.5 py-1 rounded border focus:outline-none focus:ring-2 focus:ring-blue-400`}
+                                style={{
+                                  backgroundColor: badgeBg,
+                                  color: textColor,
+                                  border: `2px solid ${badgeBorder}`,
+                                }}
+                                placeholder="BOX TITLE"
+                              />
+                            </div>
 
-                    {/* English Example */}
-                    <div className="mb-2">
-                      <label className="text-[10px] font-bold uppercase tracking-wider block opacity-70 mb-0.5">
-                        English Sentence:
-                      </label>
-                      <textarea
-                        rows={2}
-                        dir="ltr"
-                        value={internalCard.example || ''}
-                        onChange={(e) => updateSimpleField('example', e.target.value)}
-                        onFocus={(e) => {
-                          activeInputRef.current = { element: e.target, fieldName: 'example' };
-                        }}
-                        placeholder="Natural English example sentence..."
-                        className="example-en quest-sentence w-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm font-medium leading-relaxed resize-y"
-                      />
-                    </div>
-
-                    {/* Persian Translation */}
-                    <div className="pt-2 border-t border-dashed border-current/20">
-                      <label className="text-[10px] font-bold uppercase tracking-wider block opacity-70 mb-0.5">
-                        ترجمه فارسی مثال:
-                      </label>
-                      <textarea
-                        rows={2}
-                        dir="rtl"
-                        value={internalCard.translationFa || ''}
-                        onChange={(e) => updateSimpleField('translationFa', e.target.value)}
-                        onFocus={(e) => {
-                          activeInputRef.current = { element: e.target, fieldName: 'translationFa' };
-                        }}
-                        placeholder="ترجمه فارسی جمله مثال..."
-                        className="example-fa quest-translation-fa w-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm font-normal leading-relaxed resize-y"
-                      />
-                    </div>
-                  </div>
-
-                  {/* 7. Memory Hook Box (Root Decomposition) */}
-                  <div className={`${themeClasses.mnemonicBox} p-3 rounded mb-4`}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className={`${themeClasses.mnemonicLabel} text-[11px] font-bold uppercase tracking-wider`}>
-                        🧠 MEMORY HOOK / کد یادسپاری و ریشه‌شناسی
-                      </span>
-                      <span className="text-[10px] opacity-60">**bold roots**</span>
-                    </div>
-                    <textarea
-                      rows={2}
-                      dir={isRTLText(internalCard.mnemonic) ? 'rtl' : 'ltr'}
-                      value={internalCard.mnemonic || ''}
-                      onChange={(e) => updateSimpleField('mnemonic', e.target.value)}
-                      onFocus={(e) => {
-                        activeInputRef.current = { element: e.target, fieldName: 'mnemonic' };
-                      }}
-                      placeholder="e.g. read (خواندن) + ability (توانایی) = قابلیت خوانده‌شدن"
-                      className="mnemonic-text quest-mnemonic w-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm font-medium leading-relaxed resize-y"
-                    />
-                  </div>
-
-                  {/* 8. Theme-Aware Custom Boxes / Blocks (Requirements 3 & 4) */}
-                  {internalCard.customBlocks && internalCard.customBlocks.length > 0 && (
-                    <div className="space-y-4 mb-4">
-                      {internalCard.customBlocks.map((block, idx) => {
-                        const bgColor = block.color || '#1E293B';
-                        const textColor = getContrastTextColor(bgColor);
-                        const badgeBg = textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.2)';
-                        const badgeBorder = textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.3)';
-                        const isRTLBlock = block.dir === 'rtl' || isRTLText(block.content);
-                        const isSelected = selectedBoxId === block.id;
-
-                        return (
-                          <div
-                            key={block.id}
-                            onClick={() => setSelectedBoxId(block.id)}
-                            className={`${themeClasses.customBox} p-3.5 rounded-lg border-2 shadow-xs transition-all ${
-                              isSelected ? 'ring-2 ring-blue-500/80 shadow-md' : ''
-                            }`}
-                            style={{
-                              backgroundColor: bgColor,
-                              color: textColor,
-                              borderColor: textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.25)',
-                              marginTop: '14px',
-                            }}
-                          >
-                            {/* Box Header Toolbar */}
-                            <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                              {/* Editable Title Badge */}
-                              <div className="flex items-center gap-1.5">
+                            {/* Box Controls & Background Color Palette */}
+                            <div className="flex items-center gap-1">
+                              {/* Background Color Presets */}
+                              <div className="flex items-center gap-1">
+                                {BOX_BG_PRESETS.slice(0, 5).map((preset) => (
+                                  <button
+                                    key={preset.hex}
+                                    type="button"
+                                    onClick={() => handleUpdateCustomBlock(block.id, { color: preset.hex })}
+                                    className={`w-4 h-4 rounded-full border cursor-pointer transition-transform ${
+                                      bgColor.toLowerCase() === preset.hex.toLowerCase()
+                                        ? 'scale-125 ring-2 ring-blue-400 shadow-xs'
+                                        : 'hover:scale-110 opacity-80 hover:opacity-100'
+                                    }`}
+                                    style={{ backgroundColor: preset.hex }}
+                                    title={`Box Background: ${preset.name}`}
+                                  />
+                                ))}
                                 <input
-                                  type="text"
-                                  value={block.title}
-                                  onChange={(e) => handleUpdateCustomBlock(block.id, { title: e.target.value })}
-                                  onFocus={() => {
-                                    setSelectedBoxId(block.id);
-                                  }}
-                                  className={`${themeClasses.customLabel} font-black text-xs px-2.5 py-1 rounded border focus:outline-none focus:ring-2 focus:ring-blue-400`}
-                                  style={{
-                                    backgroundColor: badgeBg,
-                                    color: textColor,
-                                    border: `2px solid ${badgeBorder}`,
-                                  }}
-                                  placeholder="BOX TITLE"
+                                  type="color"
+                                  value={bgColor}
+                                  onChange={(e) => handleUpdateCustomBlock(block.id, { color: e.target.value })}
+                                  className="w-4 h-4 p-0 border-0 rounded cursor-pointer"
+                                  title="Choose Box Background Color"
                                 />
                               </div>
 
-                              {/* Box Controls & Background Color Palette */}
-                              <div className="flex items-center gap-1">
-                                {/* Background Color Presets */}
-                                <div className="flex items-center gap-1">
-                                  {BOX_BG_PRESETS.slice(0, 5).map((preset) => (
-                                    <button
-                                      key={preset.hex}
-                                      type="button"
-                                      onClick={() => handleUpdateCustomBlock(block.id, { color: preset.hex })}
-                                      className={`w-4 h-4 rounded-full border cursor-pointer transition-transform ${
-                                        bgColor.toLowerCase() === preset.hex.toLowerCase()
-                                          ? 'scale-125 ring-2 ring-blue-400 shadow-xs'
-                                          : 'hover:scale-110 opacity-80 hover:opacity-100'
-                                      }`}
-                                      style={{ backgroundColor: preset.hex }}
-                                      title={`Box Background: ${preset.name}`}
-                                    />
-                                  ))}
-                                  <input
-                                    type="color"
-                                    value={bgColor}
-                                    onChange={(e) => handleUpdateCustomBlock(block.id, { color: e.target.value })}
-                                    className="w-4 h-4 p-0 border-0 rounded cursor-pointer"
-                                    title="Choose Box Background Color"
-                                  />
-                                </div>
+                              {/* Direction Toggle */}
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateCustomBlock(block.id, { dir: isRTLBlock ? 'ltr' : 'rtl' })}
+                                className="p-1 border rounded text-[10px] font-bold cursor-pointer hover:bg-current/10"
+                                title="Toggle Text Direction"
+                                style={{ borderColor: badgeBorder, color: textColor }}
+                              >
+                                {isRTLBlock ? <AlignRight className="w-3 h-3" /> : <AlignLeft className="w-3 h-3" />}
+                              </button>
 
-                                {/* Direction Toggle */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateCustomBlock(block.id, { dir: isRTLBlock ? 'ltr' : 'rtl' })}
-                                  className="p-1 border rounded text-[10px] font-bold cursor-pointer hover:bg-current/10"
-                                  title="Toggle Text Direction"
-                                  style={{ borderColor: badgeBorder, color: textColor }}
-                                >
-                                  {isRTLBlock ? <AlignRight className="w-3 h-3" /> : <AlignLeft className="w-3 h-3" />}
-                                </button>
+                              {/* Reorder Up */}
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => handleMoveCustomBlock(idx, 'up')}
+                                className="p-1 border rounded cursor-pointer disabled:opacity-30 hover:bg-current/10"
+                                title="Move Box Up"
+                                style={{ borderColor: badgeBorder, color: textColor }}
+                              >
+                                <ArrowUp className="w-3 h-3" />
+                              </button>
 
-                                {/* Reorder Up */}
-                                <button
-                                  type="button"
-                                  disabled={idx === 0}
-                                  onClick={() => handleMoveCustomBlock(idx, 'up')}
-                                  className="p-1 border rounded cursor-pointer disabled:opacity-30 hover:bg-current/10"
-                                  title="Move Box Up"
-                                  style={{ borderColor: badgeBorder, color: textColor }}
-                                >
-                                  <ArrowUp className="w-3 h-3" />
-                                </button>
+                              {/* Reorder Down */}
+                              <button
+                                type="button"
+                                disabled={idx === (internalCard.customBlocks?.length || 0) - 1}
+                                onClick={() => handleMoveCustomBlock(idx, 'down')}
+                                className="p-1 border rounded cursor-pointer disabled:opacity-30 hover:bg-current/10"
+                                title="Move Box Down"
+                                style={{ borderColor: badgeBorder, color: textColor }}
+                              >
+                                <ArrowDown className="w-3 h-3" />
+                              </button>
 
-                                {/* Reorder Down */}
-                                <button
-                                  type="button"
-                                  disabled={idx === (internalCard.customBlocks?.length || 0) - 1}
-                                  onClick={() => handleMoveCustomBlock(idx, 'down')}
-                                  className="p-1 border rounded cursor-pointer disabled:opacity-30 hover:bg-current/10"
-                                  title="Move Box Down"
-                                  style={{ borderColor: badgeBorder, color: textColor }}
-                                >
-                                  <ArrowDown className="w-3 h-3" />
-                                </button>
-
-                                {/* Delete Box */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteCustomBlock(block.id)}
-                                  className="p-1 text-rose-400 hover:text-rose-300 border border-rose-400/40 rounded cursor-pointer hover:bg-rose-500/20"
-                                  title="Delete this Box"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </div>
+                              {/* Delete Box */}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCustomBlock(block.id)}
+                                className="p-1 text-rose-400 hover:text-rose-300 border border-rose-400/40 rounded cursor-pointer hover:bg-rose-500/20"
+                                title="Delete this Box"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
                             </div>
-
-                            {/* Editable Box Content */}
-                            <textarea
-                              rows={3}
-                              dir={isRTLBlock ? 'rtl' : 'ltr'}
-                              value={block.content}
-                              onChange={(e) => handleUpdateCustomBlock(block.id, { content: e.target.value })}
-                              onFocus={(e) => {
-                                activeInputRef.current = { element: e.target, fieldName: 'customBlock', blockId: block.id };
-                                setSelectedBoxId(block.id);
-                              }}
-                              placeholder="Write box content or markdown (e.g. - item 1, **bold**, `code`)..."
-                              className="custom-block-content w-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm font-medium leading-relaxed resize-y mt-1"
-                              style={{ color: textColor }}
-                            />
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
 
-                  {/* 9. Bottom "+ Add Custom Box" Trigger (Requirement 1 & 3) */}
-                  <div className="pt-2">
-                    <button
-                      type="button"
-                      onClick={() => handleAddCustomBlock()}
-                      className="w-full py-2.5 border-2 border-dashed border-blue-500/40 hover:border-blue-500 rounded-lg text-xs font-bold text-blue-500 hover:text-blue-400 flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-blue-500/5 hover:bg-blue-500/10"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>{t('preview.addBox') || '+ Add Custom Box matching this Theme'}</span>
-                    </button>
+                          {/* Editable Box Content */}
+                          <textarea
+                            rows={3}
+                            dir={isRTLBlock ? 'rtl' : 'ltr'}
+                            value={block.content}
+                            onChange={(e) => handleUpdateCustomBlock(block.id, { content: e.target.value })}
+                            onFocus={(e) => {
+                              activeInputRef.current = { element: e.target, fieldName: 'customBlock', blockId: block.id };
+                              setSelectedBoxId(block.id);
+                            }}
+                            placeholder="Write box content or markdown (e.g. - item 1, **bold**, `code`)..."
+                            className="custom-block-content w-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm font-medium leading-relaxed resize-y mt-1"
+                            style={{ color: textColor }}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
+                )}
+
+                {/* 9. Bottom "+ Add Custom Box" Trigger */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleAddCustomBlock()}
+                    className="w-full py-2.5 border-2 border-dashed border-blue-500/40 hover:border-blue-500 rounded-lg text-xs font-bold text-blue-500 hover:text-blue-400 flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-blue-500/5 hover:bg-blue-500/10"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>{t('preview.addBox') || '+ Add Custom Box matching this Theme'}</span>
+                  </button>
                 </div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
 
-        {/* RIGHT-SIDE EDITOR TOOLBAR / SIDEBAR (Requirement 2 & 5) */}
-        {editable && mode === 'edit' && isSidebarOpen && (
+      {/* FLOATING HANDLE ATTACHED TO FAR-RIGHT EDGE OF APPLICATION SCREEN (when drawer is closed) */}
+      {editable && mode === 'edit' && !isSidebarOpen && (
+        <button
+          type="button"
+          onClick={() => setIsSidebarOpen(true)}
+          className={`fixed right-0 top-1/2 -translate-y-1/2 z-40 py-3.5 px-1.5 sm:px-2 rounded-l-xl shadow-2xl border-y border-l flex flex-col items-center gap-1.5 cursor-pointer transition-all duration-200 hover:px-2.5 group ${
+            isDark
+              ? 'bg-zinc-800/95 hover:bg-zinc-700 text-blue-400 border-zinc-700 shadow-black/50'
+              : 'bg-white/95 hover:bg-blue-50 text-blue-600 border-zinc-300 shadow-zinc-400/50'
+          }`}
+          title="Open Slide-out Toolbar Drawer"
+        >
+          <SlidersHorizontal className="w-4 h-4 transition-transform group-hover:scale-110" />
+          <span className="text-[10px] font-black uppercase tracking-wider [writing-mode:vertical-lr] rotate-180">
+            Toolbar
+          </span>
+        </button>
+      )}
+
+      {/* SLIDE-OUT OVERLAY DRAWER ATTACHED TO FAR-RIGHT EDGE OF APPLICATION SCREEN */}
+      {editable && mode === 'edit' && (
+        <>
+          {/* Backdrop when drawer is open */}
+          {isSidebarOpen && (
+            <div
+              className="fixed inset-0 bg-black/25 backdrop-blur-[0.5px] z-40 transition-opacity duration-200 cursor-pointer"
+              onClick={() => setIsSidebarOpen(false)}
+              aria-label="Close Toolbar Drawer"
+            />
+          )}
+
+          {/* Fixed Drawer Panel (Slides smoothly in from the far right screen edge over the UI) */}
           <aside
-            className={`w-72 sm:w-80 shrink-0 flex flex-col border rounded-xl shadow-xs overflow-hidden transition-all text-xs ${
-              isDark ? 'bg-zinc-900/95 border-zinc-700/80 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-800'
+            className={`fixed top-0 right-0 h-full w-80 sm:w-88 max-w-[85vw] z-50 flex flex-col shadow-2xl border-l transition-transform duration-300 ease-in-out text-xs ${
+              isSidebarOpen ? 'translate-x-0' : 'translate-x-full'
+            } ${
+              isDark
+                ? 'bg-[#18181B] border-zinc-700 text-zinc-100 shadow-black/80'
+                : 'bg-white border-zinc-200 text-zinc-800 shadow-zinc-400/60'
             }`}
           >
             {/* Toolbar Sidebar Header */}
-            <div className={`p-3 border-b flex items-center justify-between gap-2 ${
-              isDark ? 'border-zinc-700/80 bg-zinc-850' : 'border-zinc-200 bg-zinc-50'
+            <div className={`p-3.5 border-b flex items-center justify-between gap-2 shrink-0 ${
+              isDark ? 'border-zinc-700/80 bg-zinc-900' : 'border-zinc-200 bg-zinc-50'
             }`}>
-              <div className="flex items-center gap-1.5">
-                <SlidersHorizontal className="w-4 h-4 text-blue-500" />
-                <span className="font-bold text-xs uppercase tracking-wider">
-                  Editor Toolbar
-                </span>
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500">
+                  <SlidersHorizontal className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-xs uppercase tracking-wider">
+                    Editor Toolbar
+                  </h3>
+                  <p className="text-[10px] text-zinc-500">Slide-out tools drawer</p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsSidebarOpen(false)}
-                className="p-1 rounded hover:bg-zinc-500/10 text-zinc-400 hover:text-zinc-200 cursor-pointer"
-                title="Collapse toolbar"
+                className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                  isDark
+                    ? 'border-zinc-700 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+                    : 'border-zinc-300 hover:bg-zinc-100 text-zinc-600 hover:text-zinc-900'
+                }`}
+                title="Close Toolbar (Esc)"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Toolbar Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-4">
+            <div className="flex-1 overflow-y-auto p-3.5 space-y-4">
               
-              {/* SECTION 1: Text Formatting Tools (Requirement 2) */}
+              {/* SECTION 1: Text Formatting Tools */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
@@ -1350,7 +1402,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                   </button>
                 </div>
 
-                {/* Text Color Selector (Requirement 2) */}
+                {/* Text Color Selector */}
                 <div className="mb-3">
                   <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1.5">
                     Text Color:
@@ -1378,7 +1430,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                   </div>
                 </div>
 
-                {/* Text Highlighter / Background formatting (Requirement 2) */}
+                {/* Text Highlighter / Background formatting */}
                 <div>
                   <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1.5">
                     Highlight / Text Background:
@@ -1400,7 +1452,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                 </div>
               </div>
 
-              {/* SECTION 2: Custom Boxes Management (Requirement 2 & 3) */}
+              {/* SECTION 2: Custom Boxes Management */}
               <div className={`pt-3 border-t ${isDark ? 'border-zinc-800' : 'border-zinc-200'}`}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-1">
@@ -1445,7 +1497,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                       />
                     </div>
 
-                    {/* Box Background Color (Requirement 3: The color requested means Box BACKGROUND color) */}
+                    {/* Box Background Color */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
@@ -1556,7 +1608,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
 
             {/* Toolbar Footer Actions */}
             {canSaveToAnki && onSaveToAnki && (
-              <div className={`p-3 border-t ${isDark ? 'border-zinc-700/80 bg-zinc-850' : 'border-zinc-200 bg-zinc-50'}`}>
+              <div className={`p-3.5 border-t shrink-0 ${isDark ? 'border-zinc-700/80 bg-zinc-900' : 'border-zinc-200 bg-zinc-50'}`}>
                 <button
                   type="button"
                   onClick={onSaveToAnki}
@@ -1569,8 +1621,8 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               </div>
             )}
           </aside>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 };
