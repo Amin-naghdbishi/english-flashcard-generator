@@ -1,4 +1,5 @@
-import { CustomAIProviderConfig, CardData, ManualOverrides } from '../src/types';
+import { CustomAIProviderConfig, CardData, ManualOverrides, AIPromptsConfig } from '../src/types';
+import { buildFlashcardPrompt, DEFAULT_AI_PROMPTS } from './prompts';
 
 export interface CustomAIResponse {
   success: boolean;
@@ -149,7 +150,8 @@ export async function generateWithCustomAI(
   config: CustomAIProviderConfig,
   word: string,
   manualOverrides: ManualOverrides = {},
-  temperature: number = 0.2
+  temperature: number = 0.2,
+  promptsConfig?: Partial<AIPromptsConfig>
 ): Promise<CustomAIResponse> {
   const cleanWord = (word || '').trim();
   if (!cleanWord) {
@@ -160,71 +162,14 @@ export async function generateWithCustomAI(
   const endpoint = cleanUrl.endsWith('/chat/completions') ? cleanUrl : `${cleanUrl}/chat/completions`;
   const headers = buildAuthHeaders(config);
 
-  const systemPrompt = `You are an expert lexicographer and English-Persian vocabulary flashcard generator.
-Return ONLY valid JSON matching this exact schema:
-{
-  "word": "${cleanWord}",
-  "phonetic": "/.../",
-  "partOfSpeech": "noun | verb | adjective | adverb | idiom",
-  "meaningFa": "fluent, precise Persian translation",
-  "example": "A clear, natural, high-quality English sentence demonstrating the word",
-  "translationFa": "Fluent Persian translation of the example sentence",
-  "mnemonic": "A short, clever memory aid / coding / association technique"
-}`;
-
-  const providedContext: string[] = [];
-  if (manualOverrides.meaningFa?.trim()) {
-    providedContext.push(`- User-Specified Persian Meaning: "${manualOverrides.meaningFa.trim()}"`);
-  }
-  if (manualOverrides.example?.trim()) {
-    providedContext.push(`- User-Specified English Example: "${manualOverrides.example.trim()}"`);
-  }
-  if (manualOverrides.translationFa?.trim()) {
-    providedContext.push(`- User-Specified Example Translation (Persian): "${manualOverrides.translationFa.trim()}"`);
-  }
-  if (manualOverrides.partOfSpeech?.trim()) {
-    providedContext.push(`- User-Specified Part of Speech: "${manualOverrides.partOfSpeech.trim()}"`);
-  }
-  if (manualOverrides.phonetic?.trim()) {
-    providedContext.push(`- User-Specified Phonetic IPA: "${manualOverrides.phonetic.trim()}"`);
-  }
-  if (manualOverrides.mnemonic?.trim()) {
-    providedContext.push(`- User-Specified Mnemonic: "${manualOverrides.mnemonic.trim()}"`);
-  }
-
-  const contextBlock = providedContext.length > 0
-    ? `\nAuthoritative User-Provided Context (Must be preserved without contradiction):\n${providedContext.join('\n')}\n`
-    : '';
-
-  const relationshipRules: string[] = [];
-  if (manualOverrides.meaningFa?.trim()) {
-    relationshipRules.push(
-      `* CRITICAL SENSE MATCHING: The user specified the exact meaning "${manualOverrides.meaningFa.trim()}". The generated English example sentence, part of speech, and mnemonic MUST strictly illustrate THIS specific meaning/sense, NOT any alternate or unrelated definitions of "${cleanWord}".`
-    );
-  }
-  if (manualOverrides.example?.trim()) {
-    relationshipRules.push(
-      `* CRITICAL EXAMPLE TRANSLATION: The user specified the English example sentence: "${manualOverrides.example.trim()}". The "translationFa" field MUST be the direct, natural Persian translation of THIS specific example sentence.`
-    );
-  } else if (manualOverrides.translationFa?.trim()) {
-    relationshipRules.push(
-      `* CRITICAL TRANSLATION TO EXAMPLE: The user provided the Persian sentence translation: "${manualOverrides.translationFa.trim()}". Generate an English example sentence that precisely translates to this and contains "${cleanWord}".`
-    );
-  }
-
-  const rulesBlock = relationshipRules.length > 0
-    ? `\nMandatory Rules:\n${relationshipRules.join('\n')}\n`
-    : '';
-
-  const userPrompt = `Generate the vocabulary flashcard JSON for the English word: "${cleanWord}".
-${contextBlock}${rulesBlock}
-Output ONLY the JSON object. Do not include markdown code blocks (\`\`\`json), explanations, or surrounding text.`;
+  const fullPrompt = buildFlashcardPrompt(cleanWord, manualOverrides, promptsConfig);
+  const systemRole = promptsConfig?.systemRole || DEFAULT_AI_PROMPTS.systemRole;
 
   const payload: Record<string, any> = {
     model: config.model || 'gpt-4o-mini',
     messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
+      { role: 'system', content: systemRole },
+      { role: 'user', content: fullPrompt },
     ],
     temperature: typeof config.temperature === 'number' ? config.temperature : temperature,
     response_format: { type: 'json_object' },

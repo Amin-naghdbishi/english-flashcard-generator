@@ -236,6 +236,17 @@ export interface AnkiConfig {
 export type AppLanguage = 'en' | 'fa';
 export type AppDirection = 'ltr' | 'rtl';
 
+export interface AIPromptsConfig {
+  systemRole: string;
+  meaningGeneration: string;
+  exampleGeneration: string;
+  exampleTranslation: string;
+  memoryHook: string;
+  missingFieldCompletion: string;
+  phoneticAndPos: string;
+  smartImageDecision: string;
+}
+
 export interface AppSettings {
   ai: AIConfig;
   tts: TTSConfig;
@@ -247,6 +258,7 @@ export interface AppSettings {
   appTheme?: AppTheme;
   language?: AppLanguage;
   direction?: AppDirection;
+  aiPrompts?: AIPromptsConfig;
 }
 
 export interface BatchFieldConfig {

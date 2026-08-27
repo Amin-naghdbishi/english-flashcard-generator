@@ -10,6 +10,7 @@ import {
   CustomAIProviderConfig,
   CustomTTSProviderConfig,
   SmartImagesConfig,
+  AIPromptsConfig,
 } from '../types';
 import { OllamaModelTag } from '../../server/ollama';
 import { PiperVoice, PiperDiagnosticResult } from '../../server/piper';
@@ -30,6 +31,22 @@ export async function saveConfig(settings: Partial<AppSettings>): Promise<AppSet
   if (!res.ok) throw new Error('Failed to save configuration');
   const data = await res.json();
   return data.settings;
+}
+
+export async function fetchDefaultPrompts(): Promise<AIPromptsConfig> {
+  const res = await fetch('/api/prompts/defaults');
+  if (!res.ok) throw new Error('Failed to load default AI prompts');
+  const data = await res.json();
+  return data.prompts;
+}
+
+export async function restoreDefaultPrompts(): Promise<{ settings: AppSettings; prompts: AIPromptsConfig }> {
+  const res = await fetch('/api/prompts/restore', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) throw new Error('Failed to restore default AI prompts');
+  return res.json();
 }
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = 3500): Promise<Response> {

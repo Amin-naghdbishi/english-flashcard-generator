@@ -1,4 +1,5 @@
-import { CardData, ManualOverrides } from '../src/types';
+import { CardData, ManualOverrides, AIPromptsConfig } from '../src/types';
+import { buildFlashcardPrompt } from './prompts';
 
 export interface OllamaModelTag {
   name: string;
@@ -30,80 +31,12 @@ export const OLLAMA_JSON_SCHEMA = {
   ]
 };
 
-export function buildPrompt(word: string, manualOverrides: ManualOverrides = {}): string {
-  const cleanWord = word.trim();
-  const providedContext: string[] = [];
-
-  if (manualOverrides.meaningFa?.trim()) {
-    providedContext.push(`- User-Specified Persian Meaning: "${manualOverrides.meaningFa.trim()}"`);
-  }
-  if (manualOverrides.example?.trim()) {
-    providedContext.push(`- User-Specified English Example: "${manualOverrides.example.trim()}"`);
-  }
-  if (manualOverrides.translationFa?.trim()) {
-    providedContext.push(`- User-Specified Example Translation (Persian): "${manualOverrides.translationFa.trim()}"`);
-  }
-  if (manualOverrides.partOfSpeech?.trim()) {
-    providedContext.push(`- User-Specified Part of Speech: "${manualOverrides.partOfSpeech.trim()}"`);
-  }
-  if (manualOverrides.phonetic?.trim()) {
-    providedContext.push(`- User-Specified Phonetic IPA: "${manualOverrides.phonetic.trim()}"`);
-  }
-  if (manualOverrides.mnemonic?.trim()) {
-    providedContext.push(`- User-Specified Mnemonic: "${manualOverrides.mnemonic.trim()}"`);
-  }
-
-  const contextBlock = providedContext.length > 0
-    ? `\n### AUTHORITATIVE USER CONTEXT (Do NOT alter or contradict any of these):\n${providedContext.join('\n')}\n`
-    : '';
-
-  const relationshipRules: string[] = [];
-
-  if (manualOverrides.meaningFa?.trim()) {
-    relationshipRules.push(
-      `* CRITICAL SENSE MATCHING: The user has specified the exact meaning "${manualOverrides.meaningFa.trim()}". All generated content (especially the English example sentence, part of speech, and mnemonic) MUST strictly match and demonstrate THIS specific meaning/sense, NOT any alternate or unrelated definitions of the word. (For example, if the word is "extension" and the meaning is "پسوند فایل", the example sentence MUST be about a computer file extension like .txt, NOT a browser extension, hair extension, or deadline extension).`
-    );
-  }
-
-  if (manualOverrides.example?.trim()) {
-    relationshipRules.push(
-      `* CRITICAL EXAMPLE & TRANSLATION RELATIONSHIP: The user has provided the exact English example sentence: "${manualOverrides.example.trim()}". You MUST preserve this sentence in the "example" field. The "translationFa" field MUST be the direct, natural Persian translation of THIS specific example sentence.`
-    );
-  } else if (manualOverrides.translationFa?.trim()) {
-    relationshipRules.push(
-      `* CRITICAL TRANSLATION TO EXAMPLE: The user provided the Persian sentence translation: "${manualOverrides.translationFa.trim()}". Generate an English example sentence that precisely translates to this and contains the word "${cleanWord}".`
-    );
-  }
-
-  if (manualOverrides.partOfSpeech?.trim()) {
-    relationshipRules.push(
-      `* PART OF SPEECH: Use "${cleanWord}" strictly as a "${manualOverrides.partOfSpeech.trim()}" in the example sentence.`
-    );
-  }
-
-  const rulesBlock = relationshipRules.length > 0
-    ? `\n### MANDATORY RELATIONSHIP RULES:\n${relationshipRules.join('\n')}\n`
-    : '';
-
-  return `You are an expert English-Persian lexicographer and vocabulary flashcard teacher.
-Complete the flashcard information for this English word:
-"${cleanWord}"
-${contextBlock}${rulesBlock}
-Return a structured JSON object with these exact keys:
-- word: The target English word (preserve exactly).
-- phonetic: Accurate IPA pronunciation between slashes (e.g. /.../).
-- partOfSpeech: Most common grammatical part of speech (noun, verb, adjective, etc.).
-- meaningFa: Concise, natural, and accurate Persian meaning.
-- example: Exactly one short, clear, natural English sentence illustrating the target word "${cleanWord}".
-- translationFa: Fluent and natural Persian translation of the example sentence.
-- mnemonic: A short, clever memory aid (یادافزا) to remember the word.
-
-Strict Completion Rules:
-1. Complete all missing fields using the user-provided context as authoritative anchor.
-2. If the user provided a meaning, the example MUST demonstrate that exact meaning.
-3. If the user provided an example, translationFa MUST translate that exact example sentence.
-4. Generated fields must remain semantically consistent with all user-provided fields.
-5. Return strictly valid JSON matching the schema without markdown or additional text.`;
+export function buildPrompt(
+  word: string,
+  manualOverrides: ManualOverrides = {},
+  promptsConfig?: Partial<AIPromptsConfig>
+): string {
+  return buildFlashcardPrompt(word, manualOverrides, promptsConfig);
 }
 
 export async function checkOllamaConnection(baseUrl: string = 'http://127.0.0.1:11434'): Promise<{
@@ -198,14 +131,15 @@ export async function generateWithOllama(
   word: string,
   manualOverrides: ManualOverrides = {},
   temperature: number = 0.2,
-  contextLength: number = 2048
+  contextLength: number = 2048,
+  promptsConfig?: Partial<AIPromptsConfig>
 ): Promise<{
   success: boolean;
   data?: CardData;
   error?: string;
   rawResponse?: string;
 }> {
-  const prompt = buildPrompt(word, manualOverrides);
+  const prompt = buildPrompt(word, manualOverrides, promptsConfig);
   const cleanUrl = baseUrl.replace(/\/+$/, '');
 
   try {

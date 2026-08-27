@@ -5,6 +5,7 @@ import { SmartImagesConfig, AppSettings } from '../src/types';
 import { generateWithOllama } from './ollama';
 import { generateWithGemini } from './gemini';
 import { generateWithCustomAI } from './customAi';
+import { buildSmartImagePrompt } from './prompts';
 
 export interface SmartImageDecision {
   needsImage: boolean;
@@ -145,10 +146,7 @@ export async function evaluateWordNeedsImageAI(
   decisionProvider: string,
   settings: AppSettings
 ): Promise<SmartImageDecision> {
-  const prompt = `Determine if the vocabulary word "${word}" (Part of speech: "${partOfSpeech}", Meaning: "${meaningFa}") represents a concrete physical object, animal, person/profession, place, or visual concept that strongly benefits from an illustration on an Anki flashcard.
-Abstract concepts (e.g. freedom, justice), verbs/actions (e.g. abandon, hesitate), adjectives (e.g. ambiguous), and grammar words must return false.
-Output ONLY JSON in this format:
-{"needsImage": boolean, "searchTerm": "${word}", "reason": "brief explanation"}`;
+  const prompt = buildSmartImagePrompt(word, partOfSpeech, meaningFa, settings.aiPrompts);
 
   try {
     let rawContent = '';

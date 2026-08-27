@@ -8,6 +8,7 @@ import {
   CardType,
   CustomAIProviderConfig,
   CustomTTSProviderConfig,
+  AIPromptsConfig,
 } from '../types';
 import { CardPreview } from './CardPreview';
 import {
@@ -35,7 +36,10 @@ import {
   testSmartImage,
   lookupAbadisDict,
   lookupFreeDict,
+  fetchDefaultPrompts,
+  restoreDefaultPrompts,
 } from '../services/api';
+import { DEFAULT_AI_PROMPTS } from '../../server/prompts';
 import { OllamaModelTag } from '../../server/ollama';
 import { PiperVoice, PiperDiagnosticResult } from '../../server/piper';
 import { OnlineTTSDiagnosticResult } from '../../server/onlineTts';
@@ -76,6 +80,10 @@ import {
   HelpCircle,
   Languages,
   ArrowLeftRight,
+  RotateCcw,
+  Lightbulb,
+  BrainCircuit,
+  FileText,
 } from 'lucide-react';
 
 interface SettingsViewProps {
@@ -89,9 +97,99 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const { t, language, setLanguage, direction, setDirection, isRTL } = useTranslation();
   const [form, setForm] = useState<AppSettings>(settings);
   const [activeSubTab, setActiveSubTab] = useState<
-    'ai' | 'tts' | 'dictionary' | 'smartImages' | 'defaultCard' | 'appearance' | 'anki' | 'diagnostics' | 'guide'
+    'ai' | 'prompts' | 'tts' | 'dictionary' | 'smartImages' | 'defaultCard' | 'appearance' | 'anki' | 'diagnostics' | 'guide'
   >('ai');
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  // Prompt configuration states
+  const [defaultPrompts, setDefaultPrompts] = useState<AIPromptsConfig>(DEFAULT_AI_PROMPTS);
+  const [showRestoreModal, setShowRestoreModal] = useState<boolean>(false);
+  const [promptSaveStatus, setPromptSaveStatus] = useState<string | null>(null);
+  const [isRestoringPrompts, setIsRestoringPrompts] = useState<boolean>(false);
+  const [isSavingPrompts, setIsSavingPrompts] = useState<boolean>(false);
+
+  useEffect(() => {
+    fetchDefaultPrompts()
+      .then((res) => {
+        if (res) setDefaultPrompts(res);
+      })
+      .catch(() => {});
+  }, []);
+
+  const currentPrompts: AIPromptsConfig = {
+    ...defaultPrompts,
+    ...(form.aiPrompts || {}),
+  };
+
+  const handlePromptChange = (field: keyof AIPromptsConfig, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      aiPrompts: {
+        ...defaultPrompts,
+        ...(prev.aiPrompts || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleResetSinglePrompt = (field: keyof AIPromptsConfig) => {
+    setForm((prev) => ({
+      ...prev,
+      aiPrompts: {
+        ...(prev.aiPrompts || defaultPrompts),
+        [field]: defaultPrompts[field],
+      },
+    }));
+    setPromptSaveStatus(`${t('settings.prompts.revertPromptBtn')}`);
+    setTimeout(() => setPromptSaveStatus(null), 3000);
+  };
+
+  const handleRestoreAllPrompts = async () => {
+    setIsRestoringPrompts(true);
+    try {
+      const res = await restoreDefaultPrompts();
+      const newPrompts = res.prompts || DEFAULT_AI_PROMPTS;
+      const updatedForm = { ...form, aiPrompts: newPrompts };
+      setForm(updatedForm);
+      onUpdateSettings(updatedForm);
+      setShowRestoreModal(false);
+      setPromptSaveStatus(t('settings.prompts.restoredSuccess'));
+      setTimeout(() => setPromptSaveStatus(null), 4000);
+    } catch {
+      const updatedForm = { ...form, aiPrompts: { ...defaultPrompts } };
+      setForm(updatedForm);
+      onUpdateSettings(updatedForm);
+      saveConfig(updatedForm).catch(() => {});
+      setShowRestoreModal(false);
+      setPromptSaveStatus(t('settings.prompts.restoredSuccess'));
+      setTimeout(() => setPromptSaveStatus(null), 4000);
+    } finally {
+      setIsRestoringPrompts(false);
+    }
+  };
+
+  const handleSaveCustomPrompts = async () => {
+    setIsSavingPrompts(true);
+    try {
+      const updated = {
+        ...form,
+        aiPrompts: currentPrompts,
+      };
+      await saveConfig(updated);
+      onUpdateSettings(updated);
+      setPromptSaveStatus(t('settings.prompts.savedSuccess'));
+      setTimeout(() => setPromptSaveStatus(null), 3000);
+    } catch (err: any) {
+      setPromptSaveStatus(`Error saving prompts: ${err.message}`);
+    } finally {
+      setIsSavingPrompts(false);
+    }
+  };
+
+  const isPromptModified = (field: keyof AIPromptsConfig) => {
+    if (!form.aiPrompts?.[field]) return false;
+    return form.aiPrompts[field].trim() !== (defaultPrompts[field] || '').trim();
+  };
 
   const isDark = themeContext.isDark;
 
@@ -450,6 +548,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       <div className={`flex flex-wrap gap-1.5 border-b pb-2 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
         {[
           { id: 'ai', label: t('settings.tabs.ai'), icon: Cpu },
+          { id: 'prompts', label: t('settings.tabs.prompts'), icon: Sparkles },
           { id: 'tts', label: t('settings.tabs.tts'), icon: Volume2 },
           { id: 'dictionary', label: t('settings.tabs.dictionary'), icon: BookOpen },
           { id: 'smartImages', label: t('settings.tabs.smartImages'), icon: ImageIcon },
@@ -484,6 +583,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       {/* SUBTAB 1: AI PROVIDERS */}
       {activeSubTab === 'ai' && (
         <div className="space-y-6">
+          {/* AI Prompts Jump Notice */}
+          <div
+            className={`p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+              isDark ? 'bg-blue-950/20 border-blue-800/50 text-blue-200' : 'bg-blue-50/80 border-blue-200 text-blue-900'
+            }`}
+          >
+            <div className="flex items-center gap-2 text-xs">
+              <Sparkles className="w-4 h-4 text-blue-500 shrink-0" />
+              <span>
+                {t('settings.prompts.jumpFromAiNotice')}{' '}
+                <strong className="underline decoration-blue-400/50 cursor-pointer" onClick={() => setActiveSubTab('prompts')}>
+                  {t('settings.prompts.title')}
+                </strong>
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveSubTab('prompts')}
+              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded cursor-pointer shrink-0 transition-colors"
+            >
+              {t('settings.prompts.jumpFromAiBtn')}
+            </button>
+          </div>
+
           {/* Provider Selection Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Ollama Option */}
@@ -1049,6 +1172,650 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   )}
                 </div>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SUBTAB 2: AI DEFAULT PROMPTS */}
+      {activeSubTab === 'prompts' && (
+        <div className="space-y-6">
+          {/* Header Bar */}
+          <div
+            className={`p-4 border rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`p-2.5 rounded-lg shrink-0 ${
+                  isDark
+                    ? 'bg-purple-950/60 text-purple-400 border border-purple-800/40'
+                    : 'bg-purple-50 text-purple-600 border border-purple-200'
+                }`}
+              >
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className={`text-base font-bold flex items-center gap-2 ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                  <span>{t('settings.prompts.title')}</span>
+                </h3>
+                <p className={`text-xs mt-1 max-w-2xl ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  {t('settings.prompts.subtitle')}
+                </p>
+              </div>
+            </div>
+
+            {/* Top Action Buttons */}
+            <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+              <button
+                type="button"
+                onClick={() => setShowRestoreModal(true)}
+                disabled={isRestoringPrompts}
+                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs rounded-md shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
+                title={t('settings.prompts.restoreConfirmMsg')}
+              >
+                <RotateCcw className={`w-3.5 h-3.5 ${isRestoringPrompts ? 'animate-spin' : ''}`} />
+                <span>{isRestoringPrompts ? t('settings.prompts.restoringDefaults') : t('settings.prompts.restoreDefaultsBtn')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCustomPrompts}
+                disabled={isSavingPrompts}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-md shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
+              >
+                <Save className={`w-3.5 h-3.5 ${isSavingPrompts ? 'animate-spin' : ''}`} />
+                <span>{isSavingPrompts ? t('settings.prompts.saving') : t('settings.prompts.saveBtn')}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Feedback Status */}
+          {promptSaveStatus && (
+            <div
+              className={`p-3 rounded-lg border text-xs font-medium flex items-center gap-2 transition-all ${
+                promptSaveStatus.toLowerCase().includes('error')
+                  ? isDark
+                    ? 'bg-rose-950/40 text-rose-200 border-rose-800'
+                    : 'bg-rose-50 text-rose-800 border-rose-200'
+                  : isDark
+                  ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
+                  : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+              <span>{promptSaveStatus}</span>
+            </div>
+          )}
+
+          {/* Centralized Architecture Info Notice */}
+          <div
+            className={`p-4 rounded-lg border text-xs ${
+              isDark ? 'bg-zinc-850/60 border-zinc-700/80 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+            }`}
+          >
+            <div className="flex items-center gap-2 font-semibold mb-1 text-blue-600 dark:text-blue-400">
+              <BrainCircuit className="w-4 h-4" />
+              <span>{t('settings.prompts.howItWorksTitle')}</span>
+            </div>
+            <p className="leading-relaxed opacity-90">
+              {t('settings.prompts.howItWorksDesc')}
+            </p>
+          </div>
+
+          {/* Prompt 1: Meaning Generation */}
+          <div
+            className={`p-5 border rounded-xl space-y-3 transition-all ${
+              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-1.5 rounded-md ${isDark ? 'bg-zinc-800 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
+                  <Languages className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                    {t('settings.prompts.meaningTitle')}
+                  </h4>
+                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                    {t('settings.prompts.meaningDesc')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                {isPromptModified('meaningGeneration') ? (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                    {t('settings.prompts.customizedBadge')}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                    {t('settings.prompts.defaultBadge')}
+                  </span>
+                )}
+                {isPromptModified('meaningGeneration') && (
+                  <button
+                    type="button"
+                    onClick={() => handleResetSinglePrompt('meaningGeneration')}
+                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                    }`}
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>{t('settings.prompts.revertPromptBtn')}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <textarea
+              rows={4}
+              value={currentPrompts.meaningGeneration}
+              onChange={(e) => handlePromptChange('meaningGeneration', e.target.value)}
+              className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
+                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+              }`}
+            />
+          </div>
+
+          {/* Prompt 2: Example Generation */}
+          <div
+            className={`p-5 border rounded-xl space-y-3 transition-all ${
+              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-1.5 rounded-md ${isDark ? 'bg-zinc-800 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                    {t('settings.prompts.exampleTitle')}
+                  </h4>
+                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                    {t('settings.prompts.exampleDesc')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                {isPromptModified('exampleGeneration') ? (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                    {t('settings.prompts.customizedBadge')}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                    {t('settings.prompts.defaultBadge')}
+                  </span>
+                )}
+                {isPromptModified('exampleGeneration') && (
+                  <button
+                    type="button"
+                    onClick={() => handleResetSinglePrompt('exampleGeneration')}
+                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                    }`}
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>{t('settings.prompts.revertPromptBtn')}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <textarea
+              rows={4}
+              value={currentPrompts.exampleGeneration}
+              onChange={(e) => handlePromptChange('exampleGeneration', e.target.value)}
+              className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
+                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+              }`}
+            />
+          </div>
+
+          {/* Prompt 3: Example Translation */}
+          <div
+            className={`p-5 border rounded-xl space-y-3 transition-all ${
+              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-1.5 rounded-md ${isDark ? 'bg-zinc-800 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
+                  <ArrowLeftRight className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                    {t('settings.prompts.translationTitle')}
+                  </h4>
+                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                    {t('settings.prompts.translationDesc')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                {isPromptModified('exampleTranslation') ? (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                    {t('settings.prompts.customizedBadge')}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                    {t('settings.prompts.defaultBadge')}
+                  </span>
+                )}
+                {isPromptModified('exampleTranslation') && (
+                  <button
+                    type="button"
+                    onClick={() => handleResetSinglePrompt('exampleTranslation')}
+                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                    }`}
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>{t('settings.prompts.revertPromptBtn')}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <textarea
+              rows={4}
+              value={currentPrompts.exampleTranslation}
+              onChange={(e) => handlePromptChange('exampleTranslation', e.target.value)}
+              className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
+                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+              }`}
+            />
+          </div>
+
+          {/* Prompt 4: Memory Hook (Highlighted Card with Root Decomposition) */}
+          <div
+            className={`p-5 border-2 rounded-xl space-y-3 transition-all ${
+              isDark
+                ? 'bg-[#27272A] border-blue-500/60 shadow-lg shadow-blue-950/20'
+                : 'bg-white border-blue-400 shadow-md shadow-blue-100/50'
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-1.5 rounded-md ${isDark ? 'bg-blue-950/80 text-blue-400' : 'bg-blue-100 text-blue-700'}`}>
+                  <Lightbulb className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                      {t('settings.prompts.memoryHookTitle')}
+                    </h4>
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-500/20 text-blue-500 border border-blue-500/30">
+                      Root & Decomposition
+                    </span>
+                  </div>
+                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                    {t('settings.prompts.memoryHookDesc')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                {isPromptModified('memoryHook') ? (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                    {t('settings.prompts.customizedBadge')}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                    {t('settings.prompts.defaultBadge')}
+                  </span>
+                )}
+                {isPromptModified('memoryHook') && (
+                  <button
+                    type="button"
+                    onClick={() => handleResetSinglePrompt('memoryHook')}
+                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                    }`}
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>{t('settings.prompts.revertPromptBtn')}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Memory Hook Decomposition Guideline Hint Box */}
+            <div
+              className={`p-3 rounded-lg border text-[11px] leading-relaxed ${
+                isDark ? 'bg-blue-950/20 border-blue-800/40 text-blue-200' : 'bg-blue-50/70 border-blue-200 text-blue-900'
+              }`}
+            >
+              <div className="font-semibold mb-0.5">💡 Decomposition Example:</div>
+              <div>
+                <strong>readability → read + ability:</strong> Explain that <code>read</code> = خواندن, <code>ability</code> = توانایی, and <code>readability</code> = قابلیت خوانده‌شدن.
+              </div>
+              <div className="mt-1 opacity-90 text-[10px]">
+                Intelligent adaptation: Words with natural morphemes are decomposed into familiar parts. Base words without natural components (e.g. apple, chair) receive natural memorable associations without artificial splitting.
+              </div>
+            </div>
+
+            <textarea
+              rows={9}
+              value={currentPrompts.memoryHook}
+              onChange={(e) => handlePromptChange('memoryHook', e.target.value)}
+              className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed resize-y ${
+                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+              }`}
+            />
+          </div>
+
+          {/* Prompt 5: Missing-Field Completion */}
+          <div
+            className={`p-5 border rounded-xl space-y-3 transition-all ${
+              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-1.5 rounded-md ${isDark ? 'bg-zinc-800 text-amber-400' : 'bg-amber-50 text-amber-600'}`}>
+                  <CheckSquare className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                    {t('settings.prompts.completionTitle')}
+                  </h4>
+                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                    {t('settings.prompts.completionDesc')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                {isPromptModified('missingFieldCompletion') ? (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                    {t('settings.prompts.customizedBadge')}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                    {t('settings.prompts.defaultBadge')}
+                  </span>
+                )}
+                {isPromptModified('missingFieldCompletion') && (
+                  <button
+                    type="button"
+                    onClick={() => handleResetSinglePrompt('missingFieldCompletion')}
+                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                    }`}
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>{t('settings.prompts.revertPromptBtn')}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <textarea
+              rows={6}
+              value={currentPrompts.missingFieldCompletion}
+              onChange={(e) => handlePromptChange('missingFieldCompletion', e.target.value)}
+              className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
+                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+              }`}
+            />
+          </div>
+
+          {/* Section: Other AI-Generated Content */}
+          <div className="pt-2">
+            <h4 className={`text-sm font-bold mb-1 ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>
+              {t('settings.prompts.otherTitle')}
+            </h4>
+            <p className={`text-xs mb-4 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+              {t('settings.prompts.otherDesc')}
+            </p>
+
+            <div className="space-y-4">
+              {/* Prompt 6: System Role & Persona */}
+              <div
+                className={`p-5 border rounded-xl space-y-3 transition-all ${
+                  isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`p-1.5 rounded-md ${isDark ? 'bg-zinc-800 text-purple-400' : 'bg-purple-50 text-purple-600'}`}>
+                      <Cpu className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h5 className={`text-xs font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                        {t('settings.prompts.systemRoleTitle')}
+                      </h5>
+                      <p className={`text-[11px] mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        {t('settings.prompts.systemRoleDesc')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    {isPromptModified('systemRole') ? (
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                        {t('settings.prompts.customizedBadge')}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                        {t('settings.prompts.defaultBadge')}
+                      </span>
+                    )}
+                    {isPromptModified('systemRole') && (
+                      <button
+                        type="button"
+                        onClick={() => handleResetSinglePrompt('systemRole')}
+                        className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                          isDark
+                            ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                        }`}
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>{t('settings.prompts.revertPromptBtn')}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <textarea
+                  rows={3}
+                  value={currentPrompts.systemRole}
+                  onChange={(e) => handlePromptChange('systemRole', e.target.value)}
+                  className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
+                    isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+                  }`}
+                />
+              </div>
+
+              {/* Prompt 7: Phonetic & POS */}
+              <div
+                className={`p-5 border rounded-xl space-y-3 transition-all ${
+                  isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`p-1.5 rounded-md ${isDark ? 'bg-zinc-800 text-teal-400' : 'bg-teal-50 text-teal-600'}`}>
+                      <Volume2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h5 className={`text-xs font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                        {t('settings.prompts.phoneticAndPosTitle')}
+                      </h5>
+                      <p className={`text-[11px] mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        {t('settings.prompts.phoneticAndPosDesc')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    {isPromptModified('phoneticAndPos') ? (
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                        {t('settings.prompts.customizedBadge')}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                        {t('settings.prompts.defaultBadge')}
+                      </span>
+                    )}
+                    {isPromptModified('phoneticAndPos') && (
+                      <button
+                        type="button"
+                        onClick={() => handleResetSinglePrompt('phoneticAndPos')}
+                        className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                          isDark
+                            ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                        }`}
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>{t('settings.prompts.revertPromptBtn')}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <textarea
+                  rows={3}
+                  value={currentPrompts.phoneticAndPos}
+                  onChange={(e) => handlePromptChange('phoneticAndPos', e.target.value)}
+                  className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
+                    isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+                  }`}
+                />
+              </div>
+
+              {/* Prompt 8: Smart Image Decision */}
+              <div
+                className={`p-5 border rounded-xl space-y-3 transition-all ${
+                  isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`p-1.5 rounded-md ${isDark ? 'bg-zinc-800 text-amber-400' : 'bg-amber-50 text-amber-600'}`}>
+                      <ImageIcon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h5 className={`text-xs font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                        {t('settings.prompts.smartImageTitle')}
+                      </h5>
+                      <p className={`text-[11px] mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        {t('settings.prompts.smartImageDesc')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    {isPromptModified('smartImageDecision') ? (
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                        {t('settings.prompts.customizedBadge')}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                        {t('settings.prompts.defaultBadge')}
+                      </span>
+                    )}
+                    {isPromptModified('smartImageDecision') && (
+                      <button
+                        type="button"
+                        onClick={() => handleResetSinglePrompt('smartImageDecision')}
+                        className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                          isDark
+                            ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                        }`}
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>{t('settings.prompts.revertPromptBtn')}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <textarea
+                  rows={4}
+                  value={currentPrompts.smartImageDecision}
+                  onChange={(e) => handlePromptChange('smartImageDecision', e.target.value)}
+                  className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
+                    isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+                  }`}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Action Buttons */}
+          <div className="flex items-center justify-between pt-4 border-t border-zinc-200 dark:border-zinc-700">
+            <button
+              type="button"
+              onClick={() => setShowRestoreModal(true)}
+              disabled={isRestoringPrompts}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs rounded-md shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 ${isRestoringPrompts ? 'animate-spin' : ''}`} />
+              <span>{isRestoringPrompts ? t('settings.prompts.restoringDefaults') : t('settings.prompts.restoreDefaultsBtn')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSaveCustomPrompts}
+              disabled={isSavingPrompts}
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-md shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <Save className={`w-3.5 h-3.5 ${isSavingPrompts ? 'animate-spin' : ''}`} />
+              <span>{isSavingPrompts ? t('settings.prompts.saving') : t('settings.prompts.saveBtn')}</span>
+            </button>
+          </div>
+
+          {/* Restore Defaults Confirmation Modal */}
+          {showRestoreModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+              <div
+                className={`max-w-md w-full p-6 rounded-xl border shadow-xl ${
+                  isDark ? 'bg-zinc-900 border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+                }`}
+              >
+                <div className="flex items-center gap-3 text-amber-500 mb-3">
+                  <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-base font-bold">{t('settings.prompts.restoreConfirmTitle')}</h3>
+                </div>
+                <p className={`text-xs leading-relaxed mb-6 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                  {t('settings.prompts.restoreConfirmMsg')}
+                </p>
+                <div className="flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowRestoreModal(false)}
+                    className={`px-4 py-2 rounded-md text-xs font-semibold border cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-zinc-800 hover:bg-zinc-750 border-zinc-700 text-zinc-300'
+                        : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-300 text-zinc-700'
+                    }`}
+                  >
+                    {t('settings.prompts.cancelBtn')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRestoreAllPrompts}
+                    disabled={isRestoringPrompts}
+                    className="px-4 py-2 rounded-md text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isRestoringPrompts ? 'animate-spin' : ''}`} />
+                    <span>{isRestoringPrompts ? t('settings.prompts.restoringDefaults') : t('settings.prompts.confirmRestoreBtn')}</span>
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

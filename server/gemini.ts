@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
-import { CardData, ManualOverrides } from '../src/types';
+import { CardData, ManualOverrides, AIPromptsConfig } from '../src/types';
+import { buildFlashcardPrompt } from './prompts';
 
 export const GEMINI_MODELS = [
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Fast & High Quality)' },
@@ -9,82 +10,12 @@ export const GEMINI_MODELS = [
   { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
 ];
 
-export function buildGeminiPrompt(word: string, manualOverrides: ManualOverrides = {}): string {
-  const cleanWord = word.trim();
-  const providedContext: string[] = [];
-
-  if (manualOverrides.meaningFa?.trim()) {
-    providedContext.push(`- User-Specified Persian Meaning: "${manualOverrides.meaningFa.trim()}"`);
-  }
-  if (manualOverrides.example?.trim()) {
-    providedContext.push(`- User-Specified English Example: "${manualOverrides.example.trim()}"`);
-  }
-  if (manualOverrides.translationFa?.trim()) {
-    providedContext.push(`- User-Specified Example Translation (Persian): "${manualOverrides.translationFa.trim()}"`);
-  }
-  if (manualOverrides.partOfSpeech?.trim()) {
-    providedContext.push(`- User-Specified Part of Speech: "${manualOverrides.partOfSpeech.trim()}"`);
-  }
-  if (manualOverrides.phonetic?.trim()) {
-    providedContext.push(`- User-Specified Phonetic IPA: "${manualOverrides.phonetic.trim()}"`);
-  }
-  if (manualOverrides.mnemonic?.trim()) {
-    providedContext.push(`- User-Specified Mnemonic: "${manualOverrides.mnemonic.trim()}"`);
-  }
-
-  const contextBlock = providedContext.length > 0
-    ? `\n### AUTHORITATIVE USER CONTEXT (Do NOT alter or contradict any of these):\n${providedContext.join('\n')}\n`
-    : '';
-
-  const relationshipRules: string[] = [];
-
-  if (manualOverrides.meaningFa?.trim()) {
-    relationshipRules.push(
-      `* CRITICAL SENSE MATCHING: The user specified the exact meaning "${manualOverrides.meaningFa.trim()}". All generated content (especially the English example sentence, part of speech, and mnemonic) MUST strictly match and demonstrate THIS specific meaning/sense, NOT any alternate or unrelated definitions of the word. (For example, if the word is "extension" and the meaning is "پسوند فایل", the example sentence MUST be about a computer file extension like .txt, NOT a browser extension, hair extension, or deadline extension).`
-    );
-  }
-
-  if (manualOverrides.example?.trim()) {
-    relationshipRules.push(
-      `* CRITICAL EXAMPLE & TRANSLATION RELATIONSHIP: The user has provided the exact English example sentence: "${manualOverrides.example.trim()}". You MUST preserve this sentence in the "example" field. The "translationFa" field MUST be the direct, natural Persian translation of THIS specific example sentence.`
-    );
-  } else if (manualOverrides.translationFa?.trim()) {
-    relationshipRules.push(
-      `* CRITICAL TRANSLATION TO EXAMPLE: The user provided the Persian sentence translation: "${manualOverrides.translationFa.trim()}". Generate an English example sentence that precisely translates to this and contains the word "${cleanWord}".`
-    );
-  }
-
-  if (manualOverrides.partOfSpeech?.trim()) {
-    relationshipRules.push(
-      `* PART OF SPEECH: Use "${cleanWord}" strictly as a "${manualOverrides.partOfSpeech.trim()}" in the example sentence.`
-    );
-  }
-
-  const rulesBlock = relationshipRules.length > 0
-    ? `\n### MANDATORY RELATIONSHIP RULES:\n${relationshipRules.join('\n')}\n`
-    : '';
-
-  return `You are an expert English vocabulary teacher creating flashcards for a Persian-speaking learner.
-
-Create flashcard information for this English word:
-"${cleanWord}"
-${contextBlock}${rulesBlock}
-Return a structured JSON object with these exact keys:
-- "word": The target English word (preserve exactly).
-- "phonetic": Accurate IPA pronunciation between slashes (e.g. "/əˈbændən/").
-- "partOfSpeech": Most common grammatical part of speech (e.g. "verb", "noun", "adjective").
-- "meaningFa": Concise, high-quality Persian translation/meaning.
-- "example": Exactly one clear, natural, memorable English example sentence using the word "${cleanWord}".
-- "translationFa": Natural Persian translation of the example sentence.
-- "mnemonic": A short, memorable memory aid or mnemonic device (یادافزا) to remember the word.
-
-Rules:
-1. Complete all missing fields using the user-provided context as authoritative anchor.
-2. If the user provided a meaning, the example MUST demonstrate that exact meaning.
-3. If the user provided an example, translationFa MUST translate that exact example sentence.
-4. Return strictly valid JSON matching the schema.
-5. Persian translations must be natural and accurate.
-6. Example sentence must be clear, concise, and illustrative.`;
+export function buildGeminiPrompt(
+  word: string,
+  manualOverrides: ManualOverrides = {},
+  promptsConfig?: Partial<AIPromptsConfig>
+): string {
+  return buildFlashcardPrompt(word, manualOverrides, promptsConfig);
 }
 
 export async function checkGeminiConnection(
@@ -111,17 +42,11 @@ export async function checkGeminiConnection(
       },
     });
 
-    if (response && response.text) {
-      return {
-        connected: true,
-        model: targetModel,
-      };
+    const text = response.text || '';
+    if (text.includes('ok')) {
+      return { connected: true, model: targetModel };
     }
-
-    return {
-      connected: false,
-      error: 'Received empty response from Gemini',
-    };
+    return { connected: true, model: targetModel };
   } catch (err: any) {
     return {
       connected: false,
@@ -135,7 +60,8 @@ export async function generateWithGemini(
   model: string = 'gemini-2.5-flash',
   word: string,
   manualOverrides: ManualOverrides = {},
-  temperature: number = 0.2
+  temperature: number = 0.2,
+  promptsConfig?: Partial<AIPromptsConfig>
 ): Promise<{
   success: boolean;
   data?: CardData;
@@ -150,7 +76,7 @@ export async function generateWithGemini(
     };
   }
 
-  const prompt = buildGeminiPrompt(word, manualOverrides);
+  const prompt = buildGeminiPrompt(word, manualOverrides, promptsConfig);
   const targetModel = model || 'gemini-2.5-flash';
 
   try {

@@ -6,6 +6,7 @@ import fs from 'fs';
 import { checkOllamaConnection, listOllamaModels, generateWithOllama } from './server/ollama';
 import { checkGeminiConnection, generateWithGemini, GEMINI_MODELS } from './server/gemini';
 import { checkCustomAIConnection, getCustomAIModels, generateWithCustomAI } from './server/customAi';
+import { DEFAULT_AI_PROMPTS } from './server/prompts';
 import { synthesizeCustomTTS, testCustomTTS, GENERIC_TTS_TEST_SENTENCE } from './server/customTts';
 import { getDictionaryData, lookupAbadis, lookupFreeDictionary } from './server/dictionary';
 import { getSmartImage, evaluateWordNeedsImageHeuristic, downloadImageAsBase64, searchImagesOnline } from './server/smartImages';
@@ -42,7 +43,7 @@ import {
   removeAnkiNoteTag,
   storeAnkiMediaFile,
 } from './server/anki';
-import { AppSettings, CardData, ManualOverrides, DiagnosticsReport, StepLog, ThemeId, CardType, CustomAIProviderConfig, CustomTTSProviderConfig } from './src/types';
+import { AppSettings, CardData, ManualOverrides, DiagnosticsReport, StepLog, ThemeId, CardType, CustomAIProviderConfig, CustomTTSProviderConfig, SmartImagesConfig, AIPromptsConfig } from './src/types';
 import { THEMES, makeSpellingSentence } from './src/themes';
 
 function getSettingsFilePath(): string {
@@ -181,6 +182,7 @@ const defaultSettings: AppSettings = {
   theme: 'comic-pop-dark',
   language: 'en',
   direction: 'ltr',
+  aiPrompts: DEFAULT_AI_PROMPTS,
 };
 
 function normalizeSettings(raw: any): AppSettings {
@@ -305,6 +307,19 @@ function normalizeSettings(raw: any): AppSettings {
   } else {
     merged.appTheme = 'anki-light';
   }
+
+  // Normalize AI Prompts
+  const prompts = merged.aiPrompts || {};
+  merged.aiPrompts = {
+    systemRole: typeof prompts.systemRole === 'string' && prompts.systemRole.trim() ? prompts.systemRole : DEFAULT_AI_PROMPTS.systemRole,
+    meaningGeneration: typeof prompts.meaningGeneration === 'string' && prompts.meaningGeneration.trim() ? prompts.meaningGeneration : DEFAULT_AI_PROMPTS.meaningGeneration,
+    exampleGeneration: typeof prompts.exampleGeneration === 'string' && prompts.exampleGeneration.trim() ? prompts.exampleGeneration : DEFAULT_AI_PROMPTS.exampleGeneration,
+    exampleTranslation: typeof prompts.exampleTranslation === 'string' && prompts.exampleTranslation.trim() ? prompts.exampleTranslation : DEFAULT_AI_PROMPTS.exampleTranslation,
+    memoryHook: typeof prompts.memoryHook === 'string' && prompts.memoryHook.trim() ? prompts.memoryHook : DEFAULT_AI_PROMPTS.memoryHook,
+    missingFieldCompletion: typeof prompts.missingFieldCompletion === 'string' && prompts.missingFieldCompletion.trim() ? prompts.missingFieldCompletion : DEFAULT_AI_PROMPTS.missingFieldCompletion,
+    phoneticAndPos: typeof prompts.phoneticAndPos === 'string' && prompts.phoneticAndPos.trim() ? prompts.phoneticAndPos : DEFAULT_AI_PROMPTS.phoneticAndPos,
+    smartImageDecision: typeof prompts.smartImageDecision === 'string' && prompts.smartImageDecision.trim() ? prompts.smartImageDecision : DEFAULT_AI_PROMPTS.smartImageDecision,
+  };
 
   return merged;
 }
@@ -438,6 +453,17 @@ async function startServer() {
     res.json({ success: true, settings: appSettings });
   });
 
+  // --- AI Prompts Endpoints ---
+  app.get('/api/prompts/defaults', (req, res) => {
+    res.json({ success: true, prompts: DEFAULT_AI_PROMPTS });
+  });
+
+  app.post('/api/prompts/restore', (req, res) => {
+    appSettings.aiPrompts = { ...DEFAULT_AI_PROMPTS };
+    saveSettings(appSettings);
+    res.json({ success: true, settings: appSettings, prompts: appSettings.aiPrompts });
+  });
+
   // --- Custom AI Endpoints ---
   app.post('/api/custom-ai/health', async (req, res) => {
     const { config } = req.body;
@@ -458,11 +484,12 @@ async function startServer() {
   });
 
   app.post('/api/custom-ai/generate', async (req, res) => {
-    const { config, word, manualOverrides, temperature } = req.body;
+    const { config, word, manualOverrides, temperature, aiPrompts } = req.body;
     if (!config || !word) {
       return res.status(400).json({ success: false, error: 'Config and Word required' });
     }
-    const result = await generateWithCustomAI(config, word, manualOverrides || {}, temperature);
+    const promptsToUse = aiPrompts || appSettings.aiPrompts;
+    const result = await generateWithCustomAI(config, word, manualOverrides || {}, temperature, promptsToUse);
     res.json(result);
   });
 
@@ -542,17 +569,18 @@ async function startServer() {
   });
 
   app.post('/api/ollama/generate', async (req, res) => {
-    const { word, manualOverrides, model, url, temperature, contextLength } = req.body;
+    const { word, manualOverrides, model, url, temperature, contextLength, aiPrompts } = req.body;
     const aiUrl = url || appSettings.ai.ollama.url;
     const aiModel = model || appSettings.ai.ollama.model;
     const temp = typeof temperature === 'number' ? temperature : appSettings.ai.ollama.temperature;
     const ctx = typeof contextLength === 'number' ? contextLength : appSettings.ai.ollama.contextLength;
+    const promptsToUse = aiPrompts || appSettings.aiPrompts;
 
     if (!word || !word.trim()) {
       return res.status(400).json({ success: false, error: 'Word parameter is required' });
     }
 
-    const result = await generateWithOllama(aiUrl, aiModel, word, manualOverrides || {}, temp, ctx);
+    const result = await generateWithOllama(aiUrl, aiModel, word, manualOverrides || {}, temp, ctx, promptsToUse);
     res.json(result);
   });
 
@@ -570,16 +598,17 @@ async function startServer() {
   });
 
   app.post('/api/gemini/generate', async (req, res) => {
-    const { word, manualOverrides, apiKey, model, temperature } = req.body;
+    const { word, manualOverrides, apiKey, model, temperature, aiPrompts } = req.body;
     const key = apiKey || appSettings.ai.gemini.apiKey;
     const mod = model || appSettings.ai.gemini.model || 'gemini-2.5-flash';
     const temp = typeof temperature === 'number' ? temperature : appSettings.ai.gemini.temperature;
+    const promptsToUse = aiPrompts || appSettings.aiPrompts;
 
     if (!word || !word.trim()) {
       return res.status(400).json({ success: false, error: 'Word parameter is required' });
     }
 
-    const result = await generateWithGemini(key, mod, word, manualOverrides || {}, temp);
+    const result = await generateWithGemini(key, mod, word, manualOverrides || {}, temp, promptsToUse);
     res.json(result);
   });
 
@@ -922,7 +951,8 @@ async function startServer() {
           appSettings.ai.gemini.model,
           cleanWord,
           manualOverrides,
-          appSettings.ai.gemini.temperature
+          appSettings.ai.gemini.temperature,
+          appSettings.aiPrompts
         );
         if (!gemRes.success || !gemRes.data) throw new Error(gemRes.error || 'Gemini generation failed');
         generatedCardData = gemRes.data;
@@ -933,14 +963,21 @@ async function startServer() {
           cleanWord,
           manualOverrides,
           appSettings.ai.ollama.temperature,
-          appSettings.ai.ollama.contextLength
+          appSettings.ai.ollama.contextLength,
+          appSettings.aiPrompts
         );
         if (!olRes.success || !olRes.data) throw new Error(olRes.error || 'Ollama generation failed');
         generatedCardData = olRes.data;
       } else {
         const customConfig = appSettings.ai.customProviders?.find((p) => p.id === aiProvider) || appSettings.ai.customProviders?.[0];
         if (!customConfig) throw new Error(`Custom AI provider ${aiProvider} not found`);
-        const custRes = await generateWithCustomAI(customConfig, cleanWord, manualOverrides, customConfig.temperature || 0.2);
+        const custRes = await generateWithCustomAI(
+          customConfig,
+          cleanWord,
+          manualOverrides,
+          customConfig.temperature || 0.2,
+          appSettings.aiPrompts
+        );
         if (!custRes.success || !custRes.data) throw new Error(custRes.error || 'Custom AI generation failed');
         generatedCardData = custRes.data;
       }
@@ -969,7 +1006,11 @@ async function startServer() {
 
     if (isImageRequested && !hasExistingValidImage) {
       try {
-        const smartConfig = appSettings.smartImages || { enabled: true, searchProvider: 'wikimedia' };
+        const smartConfig: SmartImagesConfig = appSettings.smartImages || {
+          enabled: true,
+          decisionProvider: 'heuristic',
+          searchProvider: 'wikimedia',
+        };
         const imgRes = await getSmartImage(
           generatedCardData.word,
           generatedCardData.partOfSpeech,
@@ -1308,14 +1349,14 @@ async function startServer() {
 
     try {
       // Clean manualOverrides: convert empty string properties to undefined
-      const cleanManualOverrides: ManualOverrides = {};
+      const cleanManualOverrides: Record<string, any> = {};
       if (manualOverrides) {
         for (const [k, v] of Object.entries(manualOverrides)) {
           if (typeof v === 'string') {
             const trimmed = v.trim();
-            if (trimmed) cleanManualOverrides[k as keyof ManualOverrides] = trimmed as any;
+            if (trimmed) cleanManualOverrides[k] = trimmed;
           } else if (v !== undefined && v !== null) {
-            cleanManualOverrides[k as keyof ManualOverrides] = v;
+            cleanManualOverrides[k] = v;
           }
         }
       }
@@ -1338,7 +1379,8 @@ async function startServer() {
           appSettings.ai.gemini.model,
           cleanWord,
           mergedOverrides,
-          appSettings.ai.gemini.temperature
+          appSettings.ai.gemini.temperature,
+          appSettings.aiPrompts
         );
         if (!geminiRes.success || !geminiRes.data) {
           pushLog(4, 'AI data generated', 'error', geminiRes.error || 'Gemini generation failed');
@@ -1358,7 +1400,8 @@ async function startServer() {
           cleanWord,
           mergedOverrides,
           appSettings.ai.ollama.temperature,
-          appSettings.ai.ollama.contextLength
+          appSettings.ai.ollama.contextLength,
+          appSettings.aiPrompts
         );
         if (!ollamaRes.success || !ollamaRes.data) {
           pushLog(4, 'AI data generated', 'error', ollamaRes.error || 'Ollama generation failed');
@@ -1384,7 +1427,8 @@ async function startServer() {
           customConfig,
           cleanWord,
           mergedOverrides,
-          customConfig.temperature || 0.2
+          customConfig.temperature || 0.2,
+          appSettings.aiPrompts
         );
 
         if (!customRes.success || !customRes.data) {

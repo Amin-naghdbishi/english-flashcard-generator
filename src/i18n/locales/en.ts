@@ -202,6 +202,7 @@ export const en = {
     saveBtn: 'Save Settings',
     tabs: {
       ai: 'AI Providers',
+      prompts: 'AI Default Prompts',
       tts: 'TTS',
       dictionary: 'Dictionaries',
       smartImages: 'Smart Images',
@@ -260,6 +261,56 @@ export const en = {
       testingConnection: 'Testing connection...',
       connectionSuccess: 'AI service connected successfully!',
       connectionFailed: 'Connection failed',
+    },
+
+    // AI Default Prompts
+    prompts: {
+      title: 'AI Default Prompts',
+      subtitle: 'View, edit, and fine-tune all default prompts and instructions sent to AI models for card generation.',
+      restoreDefaultsBtn: 'Restore Defaults',
+      restoringDefaults: 'Restoring Defaults...',
+      restoreConfirmTitle: 'Restore Default Prompts',
+      restoreConfirmMsg: 'Are you sure you want to restore all AI prompts to their original defaults? All customized changes will be replaced with original default instructions.',
+      cancelBtn: 'Cancel',
+      confirmRestoreBtn: 'Yes, Restore Defaults',
+      restoredSuccess: 'All default AI prompts have been restored successfully.',
+      saveBtn: 'Save Customized Prompts',
+      saving: 'Saving...',
+      customizedBadge: 'Customized',
+      defaultBadge: 'Default',
+      revertPromptBtn: 'Reset to Default',
+      jumpFromAiNotice: 'Want to customize or view prompt instructions sent to LLMs? Go to the',
+      jumpFromAiBtn: 'AI Default Prompts Section',
+      howItWorksTitle: 'Centralized AI Prompt Architecture',
+      howItWorksDesc: 'The flashcard generator dynamically composes these modular instructions with target vocabulary, authoritative user context, and relationship rules. Any edits saved here immediately take effect across all AI providers (Ollama, Gemini, Custom AI).',
+      
+      // Purposes
+      meaningTitle: 'Meaning Generation (معنی فارسی)',
+      meaningDesc: 'Directs the AI to generate accurate, natural, and concise Persian meaning translations.',
+      
+      exampleTitle: 'Example Generation (جمله مثال انگلیسی)',
+      exampleDesc: 'Instructs the AI to produce natural, contextual, and illustrative English example sentences.',
+      
+      translationTitle: 'Example Translation (ترجمه فارسی مثال)',
+      translationDesc: 'Directs the AI to translate the English example into fluent, natural modern Persian.',
+      
+      memoryHookTitle: 'Memory Hook (یادافزا / ریشه‌شناسی و بخش‌بندی کلمه)',
+      memoryHookDesc: 'Guides morphological decomposition (e.g. readability → read + ability), root recognition, and memorable associations without forced artificial splitting.',
+      
+      completionTitle: 'Missing-Field Completion & Context Rules',
+      completionDesc: 'Enforces strict preservation of user-provided fields, semantic sense matching, and cohesive missing-field generation.',
+      
+      otherTitle: 'Other AI-Generated Flashcard Content',
+      otherDesc: 'System persona, IPA phonetics, grammatical parts of speech, and smart illustration decisions.',
+      
+      systemRoleTitle: 'System Role & Persona',
+      systemRoleDesc: 'Defines the overarching persona and educator role of the AI model.',
+      
+      phoneticAndPosTitle: 'Phonetic IPA & Part of Speech',
+      phoneticAndPosDesc: 'Instructions for accurate International Phonetic Alphabet transcriptions and grammatical tags.',
+      
+      smartImageTitle: 'Smart Image Illustration Decision',
+      smartImageDesc: 'Prompt used by LLMs to determine whether a word represents a concrete, visual entity suitable for illustration.',
     },
 
     // TTS & Audio
