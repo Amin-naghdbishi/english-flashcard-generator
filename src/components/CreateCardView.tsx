@@ -4,6 +4,7 @@ import { CardPreview } from './CardPreview';
 import { AudioPlayer } from './AudioPlayer';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
+import { makeSpellingSentence } from '../themes';
 import {
   runFullPipeline,
   getAnkiDecks,
@@ -28,6 +29,7 @@ import {
   ExternalLink,
   Image as ImageIcon,
   Globe,
+  RotateCcw,
 } from 'lucide-react';
 
 interface CreateCardViewProps {
@@ -35,6 +37,10 @@ interface CreateCardViewProps {
   onCardCreated?: (cardData: CardData, noteId?: number) => void;
   appTheme?: AppTheme;
 }
+
+const STORAGE_DECK_KEY = 'flashcard_generator_selected_deck';
+const STORAGE_CARD_TYPE_KEY = 'flashcard_generator_selected_card_type';
+const STORAGE_PHOTO_CHOICE_KEY = 'flashcard_generator_selected_photo_choice';
 
 const DEFAULT_STEPS: Array<{ step: number; name: string }> = [
   { step: 1, name: 'Word received' },
@@ -58,13 +64,77 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
   const { t, isRTL } = useTranslation();
   const isDark = themeContext.isDark;
 
-  const [word, setWord] = useState('abandon');
-  const [deck, setDeck] = useState(settings.anki.defaultDeck || 'English::B1');
-  const [cardType, setCardType] = useState<CardType>(settings.defaultCard?.cardType || 'normal');
-  const [photoChoice, setPhotoChoice] = useState<'yes' | 'no'>('no');
+  // Editable form starts completely empty
+  const [word, setWord] = useState('');
+
+  // Persist creation configuration (deck, cardType, photoChoice) across refreshes
+  const [deck, setDeck] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_DECK_KEY);
+      if (saved && saved.trim()) return saved.trim();
+    } catch {}
+    return settings.anki?.defaultDeck || 'English::B1';
+  });
+
+  const [cardType, setCardType] = useState<CardType>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_CARD_TYPE_KEY) as CardType;
+      if (saved === 'normal' || saved === 'spelling') return saved;
+    } catch {}
+    return settings.defaultCard?.cardType || 'normal';
+  });
+
+  const [photoChoice, setPhotoChoice] = useState<'yes' | 'no'>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_PHOTO_CHOICE_KEY);
+      if (saved === 'yes' || saved === 'no') return saved as 'yes' | 'no';
+    } catch {}
+    return settings.smartImages?.enabled ? 'yes' : 'no';
+  });
+
   const [availableDecks, setAvailableDecks] = useState<string[]>(['English::B1', 'English::B2', 'IELTS']);
   const [isCustomDeck, setIsCustomDeck] = useState(false);
   const [loadingDecks, setLoadingDecks] = useState(false);
+
+  // Sync state to localStorage whenever changed
+  useEffect(() => {
+    if (deck) {
+      try {
+        localStorage.setItem(STORAGE_DECK_KEY, deck);
+      } catch {}
+    }
+  }, [deck]);
+
+  useEffect(() => {
+    if (cardType) {
+      try {
+        localStorage.setItem(STORAGE_CARD_TYPE_KEY, cardType);
+      } catch {}
+    }
+  }, [cardType]);
+
+  useEffect(() => {
+    if (photoChoice) {
+      try {
+        localStorage.setItem(STORAGE_PHOTO_CHOICE_KEY, photoChoice);
+      } catch {}
+    }
+  }, [photoChoice]);
+
+  // Sync if settings load later and nothing in localStorage
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(STORAGE_DECK_KEY) && settings.anki?.defaultDeck) {
+        setDeck(settings.anki.defaultDeck);
+      }
+      if (!localStorage.getItem(STORAGE_CARD_TYPE_KEY) && settings.defaultCard?.cardType) {
+        setCardType(settings.defaultCard.cardType);
+      }
+      if (!localStorage.getItem(STORAGE_PHOTO_CHOICE_KEY) && settings.smartImages?.enabled !== undefined) {
+        setPhotoChoice(settings.smartImages.enabled ? 'yes' : 'no');
+      }
+    } catch {}
+  }, [settings.anki?.defaultDeck, settings.defaultCard?.cardType, settings.smartImages?.enabled]);
 
   // Advanced Overrides (strictly prioritized over AI)
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -127,7 +197,16 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
       const res = await getAnkiDecks(settings.anki.url);
       if (res.success && res.decks.length > 0) {
         setAvailableDecks(res.decks);
-        if (!res.decks.includes(deck)) {
+        let savedDeck = '';
+        try {
+          savedDeck = localStorage.getItem(STORAGE_DECK_KEY) || '';
+        } catch {}
+
+        if (savedDeck && res.decks.includes(savedDeck)) {
+          setDeck(savedDeck);
+        } else if (deck && res.decks.includes(deck)) {
+          // keep current
+        } else if (!isCustomDeck) {
           setDeck(res.decks[0]);
         }
       }
@@ -247,6 +326,30 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
     }
   };
 
+  // Clear all editable form input fields
+  const handleClearForm = () => {
+    setWord('');
+    setOverrides({
+      phonetic: '',
+      partOfSpeech: '',
+      meaningFa: '',
+      example: '',
+      translationFa: '',
+      mnemonic: '',
+      imageBase64: undefined,
+      imageFileName: undefined,
+    });
+    setDuplicateWarning(null);
+    setErrorMessage(null);
+    setFailedStage(null);
+    setInternetUrlInput('');
+    setOnlineSearchResults([]);
+    setShowInternetPanel(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   // Handle Form Submit
   const handleCreate = async (forceAdd = false) => {
     const trimmedWord = word.trim();
@@ -317,6 +420,9 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
       if (onCardCreated) {
         onCardCreated(pipelineRes.cardData, pipelineRes.noteId);
       }
+
+      // Automatically reset all editable input fields so user is ready for next card
+      handleClearForm();
     } catch (err: any) {
       setErrorMessage(err.message || 'An unexpected error occurred during card generation');
       setActiveStepNumber(-1); // Error state
@@ -398,22 +504,26 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
   };
 
   const previewDisplayCard = useMemo(() => {
-    return (
-      generatedCard || {
-        word: word.trim() || 'abandon',
-        phonetic: overrides.phonetic || '/əˈbændən/',
-        partOfSpeech: overrides.partOfSpeech || 'verb',
-        meaningFa: overrides.meaningFa || 'رها کردن، ترک کردن',
-        example: overrides.example || 'He abandoned his car on the highway.',
-        translationFa: overrides.translationFa || 'او ماشین خود را در بزرگراه رها کرد.',
-        mnemonic: overrides.mnemonic || 'A-BAND-ON: Imagine a band left behind on the stage.',
+    if (word.trim()) {
+      return {
+        word: word.trim(),
+        phonetic: overrides.phonetic || '',
+        partOfSpeech: overrides.partOfSpeech || '',
+        meaningFa: overrides.meaningFa || '',
+        example: overrides.example || '',
+        translationFa: overrides.translationFa || '',
+        mnemonic: overrides.mnemonic || '',
         cardType: cardType,
-        spellingSentence: 'He ______ his car on the highway.',
+        spellingSentence: overrides.example ? makeSpellingSentence(overrides.example, word.trim()) : '',
         imageBase64: overrides.imageBase64,
         imageFileName: overrides.imageFileName,
         needsImage: !!overrides.imageBase64 || photoChoice === 'yes',
-      }
-    );
+      };
+    }
+    if (generatedCard) {
+      return generatedCard;
+    }
+    return null;
   }, [generatedCard, word, overrides, cardType, photoChoice]);
 
   return (
@@ -960,24 +1070,41 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
               </div>
             )}
 
-            {/* Action Submit Button */}
-            <button
-              type="submit"
-              disabled={isGenerating || testingAnkiOnly || !word.trim()}
-              className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  <span>{t('create.generating')}</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  <span>{t('create.generateCardBtn')}</span>
-                </>
-              )}
-            </button>
+            {/* Action Submit and Clear Buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                type="submit"
+                disabled={isGenerating || testingAnkiOnly || !word.trim()}
+                className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>{t('create.generating')}</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    <span>{t('create.generateCardBtn')}</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleClearForm}
+                disabled={isGenerating || testingAnkiOnly || (!word.trim() && !Object.values(overrides).some(Boolean))}
+                className={`py-2.5 px-3.5 border rounded-md font-medium text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0 ${
+                  isDark
+                    ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-300'
+                    : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-300 text-zinc-700'
+                }`}
+                title={t('create.clearTooltip')}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>{t('create.clearBtn')}</span>
+              </button>
+            </div>
 
             {/* Standalone Test Card in Anki Button (No AI/TTS) */}
             <button
@@ -1318,7 +1445,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({ settings, onCard
             <CardPreview
               cardData={previewDisplayCard}
               themeId={settings.theme}
-              emptyWordPlaceholder={word || 'abandon'}
+              emptyWordPlaceholder={word.trim() || 'Word'}
               appTheme={isDark ? 'anki-dark' : 'anki-light'}
             />
         </div>

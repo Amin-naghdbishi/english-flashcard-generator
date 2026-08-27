@@ -172,9 +172,52 @@ Return ONLY valid JSON matching this exact schema:
   "mnemonic": "A short, clever memory aid / coding / association technique"
 }`;
 
+  const providedContext: string[] = [];
+  if (manualOverrides.meaningFa?.trim()) {
+    providedContext.push(`- User-Specified Persian Meaning: "${manualOverrides.meaningFa.trim()}"`);
+  }
+  if (manualOverrides.example?.trim()) {
+    providedContext.push(`- User-Specified English Example: "${manualOverrides.example.trim()}"`);
+  }
+  if (manualOverrides.translationFa?.trim()) {
+    providedContext.push(`- User-Specified Example Translation (Persian): "${manualOverrides.translationFa.trim()}"`);
+  }
+  if (manualOverrides.partOfSpeech?.trim()) {
+    providedContext.push(`- User-Specified Part of Speech: "${manualOverrides.partOfSpeech.trim()}"`);
+  }
+  if (manualOverrides.phonetic?.trim()) {
+    providedContext.push(`- User-Specified Phonetic IPA: "${manualOverrides.phonetic.trim()}"`);
+  }
+  if (manualOverrides.mnemonic?.trim()) {
+    providedContext.push(`- User-Specified Mnemonic: "${manualOverrides.mnemonic.trim()}"`);
+  }
+
+  const contextBlock = providedContext.length > 0
+    ? `\nAuthoritative User-Provided Context (Must be preserved without contradiction):\n${providedContext.join('\n')}\n`
+    : '';
+
+  const relationshipRules: string[] = [];
+  if (manualOverrides.meaningFa?.trim()) {
+    relationshipRules.push(
+      `* CRITICAL SENSE MATCHING: The user specified the exact meaning "${manualOverrides.meaningFa.trim()}". The generated English example sentence, part of speech, and mnemonic MUST strictly illustrate THIS specific meaning/sense, NOT any alternate or unrelated definitions of "${cleanWord}".`
+    );
+  }
+  if (manualOverrides.example?.trim()) {
+    relationshipRules.push(
+      `* CRITICAL EXAMPLE TRANSLATION: The user specified the English example sentence: "${manualOverrides.example.trim()}". The "translationFa" field MUST be the direct, natural Persian translation of THIS specific example sentence.`
+    );
+  } else if (manualOverrides.translationFa?.trim()) {
+    relationshipRules.push(
+      `* CRITICAL TRANSLATION TO EXAMPLE: The user provided the Persian sentence translation: "${manualOverrides.translationFa.trim()}". Generate an English example sentence that precisely translates to this and contains "${cleanWord}".`
+    );
+  }
+
+  const rulesBlock = relationshipRules.length > 0
+    ? `\nMandatory Rules:\n${relationshipRules.join('\n')}\n`
+    : '';
+
   const userPrompt = `Generate the vocabulary flashcard JSON for the English word: "${cleanWord}".
-${manualOverrides.meaningFa ? `User specified Persian meaning: "${manualOverrides.meaningFa}". Use this.` : ''}
-${manualOverrides.example ? `User specified Example sentence: "${manualOverrides.example}". Use this.` : ''}
+${contextBlock}${rulesBlock}
 Output ONLY the JSON object. Do not include markdown code blocks (\`\`\`json), explanations, or surrounding text.`;
 
   const payload: Record<string, any> = {

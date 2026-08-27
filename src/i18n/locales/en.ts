@@ -73,6 +73,7 @@ export const en = {
     optional: 'optional',
     actions: 'Actions',
     status: 'Status',
+    clear: 'Clear',
   },
 
   // Create Card Section
@@ -111,6 +112,8 @@ export const en = {
     searching: 'Searching...',
     downloading: 'Downloading...',
     generateCardBtn: 'Generate Flashcard to Anki',
+    clearBtn: 'Clear',
+    clearTooltip: 'Clear form and reset all inputs for next card',
     generating: 'Generating Card & Audio...',
     duplicateWarning: 'Word already exists in deck {deck} (Note #{noteId}). Creating anyway.',
     cardCreatedSuccess: 'Flashcard successfully created in Anki!',

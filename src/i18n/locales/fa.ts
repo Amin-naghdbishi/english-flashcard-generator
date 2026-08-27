@@ -73,6 +73,7 @@ export const fa = {
     optional: 'اختیاری',
     actions: 'عملیات',
     status: 'وضعیت',
+    clear: 'پاک کردن',
   },
 
   // Create Card Section
@@ -111,6 +112,8 @@ export const fa = {
     searching: 'در حال جستجو...',
     downloading: 'در حال دریافت تصویر...',
     generateCardBtn: 'تولید فلش‌کارت و ارسال به آنکی',
+    clearBtn: 'پاک‌سازی',
+    clearTooltip: 'پاک‌سازی فرم و آماده‌سازی برای کارت جدید',
     generating: 'در حال تولید کارت و صوت با هوش مصنوعی...',
     duplicateWarning: 'این کلمه قبلاً در دسته {deck} وجود دارد (یادداشت #{noteId}). در صورت نیاز کارت اضافه می‌شود.',
     cardCreatedSuccess: 'فلش‌کارت با موفقیت در آنکی ایجاد شد!',

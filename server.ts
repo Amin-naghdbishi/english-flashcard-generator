@@ -1307,13 +1307,29 @@ async function startServer() {
     pushLog(4, 'AI data generated', 'pending', `Generating vocabulary with ${aiProvider.toUpperCase()}...`);
 
     try {
+      // Clean manualOverrides: convert empty string properties to undefined
+      const cleanManualOverrides: ManualOverrides = {};
+      if (manualOverrides) {
+        for (const [k, v] of Object.entries(manualOverrides)) {
+          if (typeof v === 'string') {
+            const trimmed = v.trim();
+            if (trimmed) cleanManualOverrides[k as keyof ManualOverrides] = trimmed as any;
+          } else if (v !== undefined && v !== null) {
+            cleanManualOverrides[k as keyof ManualOverrides] = v;
+          }
+        }
+      }
+
+      // If user provided a specific meaning, avoid injecting an unrelated dictionary example.
+      const userHasCustomMeaning = !!cleanManualOverrides.meaningFa;
+
       // Merge overrides with dictionary data
-      const mergedOverrides = {
-        ...manualOverrides,
-        phonetic: manualOverrides?.phonetic || dictData.phonetic,
-        partOfSpeech: manualOverrides?.partOfSpeech || dictData.partOfSpeech,
-        meaningFa: manualOverrides?.meaningFa || dictData.meaningFa,
-        example: manualOverrides?.example || dictData.example,
+      const mergedOverrides: ManualOverrides = {
+        ...cleanManualOverrides,
+        phonetic: cleanManualOverrides.phonetic || dictData.phonetic,
+        partOfSpeech: cleanManualOverrides.partOfSpeech || dictData.partOfSpeech,
+        meaningFa: cleanManualOverrides.meaningFa || dictData.meaningFa,
+        example: cleanManualOverrides.example || (userHasCustomMeaning ? undefined : dictData.example),
       };
 
       if (aiProvider === 'gemini') {
