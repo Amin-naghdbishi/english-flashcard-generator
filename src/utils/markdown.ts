@@ -24,10 +24,14 @@ export function renderMarkdown(markdownText: string | undefined | null): string 
   // First escape everything safely:
   let escaped = escapeHtml(text);
 
-  // Allow safe tags back: &lt;u&gt; -> <u>, &lt;/u&gt; -> </u>, etc.
+  // Allow safe tags back: <u>, <b>, <i>, <strong>, <em>, <code>, <br>, <span>, <mark>
   escaped = escaped
-    .replace(/&lt;(\/)?(u|b|i|strong|em|code|br|span)&gt;/gi, '<$1$2>')
+    .replace(/&lt;(\/)?(u|b|i|strong|em|code|br|span|mark)&gt;/gi, '<$1$2>')
     .replace(/&lt;span class=&quot;([^&"]+)&quot;&gt;/gi, '<span class="$1">')
+    .replace(/&lt;span style=&quot;([^&"]+)&quot;&gt;/gi, '<span style="$1">')
+    .replace(/&lt;mark style=&quot;([^&"]+)&quot;&gt;/gi, '<mark style="$1">')
+    .replace(/&lt;mark&gt;/gi, '<mark>')
+    .replace(/&lt;\/mark&gt;/gi, '</mark>')
     .replace(/&lt;a href=&quot;([^&"]+)&quot;( target=&quot;_blank&quot;)?&gt;/gi, '<a href="$1" target="_blank" rel="noopener noreferrer">')
     .replace(/&lt;\/a&gt;/gi, '</a>');
 
@@ -131,7 +135,9 @@ export type MarkdownAction =
   | 'link'
   | 'bulletList'
   | 'numberedList'
-  | 'code';
+  | 'code'
+  | 'color'
+  | 'highlight';
 
 /**
  * Helper for textarea toolbars to insert or wrap markdown formatting around current selection
@@ -140,7 +146,8 @@ export function applyMarkdownToText(
   fullText: string,
   start: number,
   end: number,
-  action: MarkdownAction
+  action: MarkdownAction,
+  extraValue?: string
 ): { newText: string; newStart: number; newEnd: number } {
   const selected = fullText.slice(start, end);
   const before = fullText.slice(0, start);
@@ -168,6 +175,22 @@ export function applyMarkdownToText(
       suffix = '</u>';
       if (!selected) replacement = 'underlined text';
       break;
+
+    case 'color': {
+      const colorHex = extraValue || '#38BDF8';
+      prefix = `<span style="color: ${colorHex}">`;
+      suffix = '</span>';
+      if (!selected) replacement = 'colored text';
+      break;
+    }
+
+    case 'highlight': {
+      const bgHex = extraValue || '#FEF08A';
+      prefix = `<mark style="background-color: ${bgHex}; color: #0f172a; padding: 1px 4px; border-radius: 3px;">`;
+      suffix = '</mark>';
+      if (!selected) replacement = 'highlighted text';
+      break;
+    }
 
     case 'code':
       prefix = '`';
