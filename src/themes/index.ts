@@ -1,4 +1,5 @@
-import { ThemeDefinition, CardData, ThemeId } from '../types';
+import { ThemeDefinition, CardData, ThemeId, CustomCardBlock } from '../types';
+import { renderMarkdown, escapeHtml } from '../utils/markdown';
 import { comicPopLightTheme } from './comic-pop-light';
 import { comicPopDarkTheme } from './comic-pop-dark';
 import { comicStripLightTheme } from './comic-strip-light';
@@ -123,12 +124,108 @@ export function makeSpellingSentence(sentence: string, targetWord: string): stri
   return `${sentence} [ ______ ]`;
 }
 
+export function isRTLText(text?: string): boolean {
+  if (!text) return false;
+  return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
+}
+
+export function renderCustomBlocksHtml(
+  customBlocks: CustomCardBlock[] | undefined | null,
+  themeId: ThemeId = 'comic-pop-dark'
+): string {
+  if (!customBlocks || !Array.isArray(customBlocks) || customBlocks.length === 0) {
+    return '';
+  }
+
+  const renderedBlocks: string[] = [];
+
+  for (const block of customBlocks) {
+    const title = (block.title || '').trim();
+    const content = (block.content || '').trim();
+    if (!title && !content) continue;
+
+    const accentColor = block.color || '#38BDF8';
+    const dir = block.dir || (isRTLText(content) ? 'rtl' : 'ltr');
+    const contentHtml = renderMarkdown(content);
+
+    let blockHtml = '';
+
+    switch (themeId) {
+      case 'comic-pop-light':
+      case 'comic-pop-dark':
+      case 'comic-light':
+      case 'comic-dark':
+        blockHtml = `
+<div class="comic-mnemonic-box custom-card-block" style="border-left: 6px solid ${accentColor}; margin-top: 14px;">
+  <span class="box-label" style="background-color: ${accentColor}; color: #000000; font-weight: 900;">${escapeHtml(title)}</span>
+  <div class="custom-block-content" dir="${dir}">${contentHtml}</div>
+</div>`;
+        break;
+
+      case 'comic-strip-light':
+      case 'comic-strip-dark':
+        blockHtml = `
+<div class="strip-panel panel-custom custom-card-block" style="border-top: 5px solid ${accentColor}; margin-top: 14px;">
+  <div class="panel-tag" style="background-color: ${accentColor}; color: #ffffff; font-weight: 900;">${escapeHtml(title)}</div>
+  <div class="custom-block-content" dir="${dir}">${contentHtml}</div>
+</div>`;
+        break;
+
+      case 'comic-quest-light':
+      case 'comic-quest-dark':
+      case 'comic-manga-light':
+      case 'comic-manga-dark':
+        blockHtml = `
+<div class="quest-mnemonic-card custom-card-block" style="border-left: 6px solid ${accentColor}; margin-top: 14px;">
+  <span class="quest-tag-purple" style="background-color: ${accentColor}; color: #ffffff; font-weight: 800;">${escapeHtml(title)}</span>
+  <div class="quest-custom-content" dir="${dir}">${contentHtml}</div>
+</div>`;
+        break;
+
+      case 'comic-notebook-light':
+      case 'comic-notebook-dark':
+        blockHtml = `
+<div class="notebook-washi-mnemonic custom-card-block" style="border-left: 5px solid ${accentColor}; margin-top: 14px;">
+  <span class="washi-title" style="color: ${accentColor}; font-weight: 800;">📌 ${escapeHtml(title)}</span>
+  <div class="washi-text" dir="${dir}">${contentHtml}</div>
+</div>`;
+        break;
+
+      case 'comic-arcade-light':
+      case 'comic-arcade-dark':
+        blockHtml = `
+<div class="arcade-powerup-box custom-card-block" style="border-color: ${accentColor}; box-shadow: 0 0 12px ${accentColor}40; margin-top: 14px;">
+  <div class="quest-terminal-header" style="color: ${accentColor}; font-weight: 800;">★ ${escapeHtml(title)}</div>
+  <div class="arcade-custom-content" dir="${dir}">${contentHtml}</div>
+</div>`;
+        break;
+
+      case 'minimal-light':
+      case 'minimal-dark':
+      case 'comic-minimal-light':
+      case 'comic-minimal-dark':
+      default:
+        blockHtml = `
+<div class="minimal-mnemonic-block custom-card-block" style="border-left: 4px solid ${accentColor}; margin-top: 14px;">
+  <div class="minimal-mnemonic-label" style="color: ${accentColor}; font-weight: 700;">${escapeHtml(title)}</div>
+  <div class="minimal-custom-content" dir="${dir}">${contentHtml}</div>
+</div>`;
+        break;
+    }
+
+    renderedBlocks.push(blockHtml);
+  }
+
+  return renderedBlocks.join('\n');
+}
+
 export function renderThemeHtml(
   templateHtml: string,
   data: CardData,
   options?: {
     isPreview?: boolean;
     cardType?: 'normal' | 'spelling';
+    themeId?: ThemeId;
   }
 ): string {
   let html = templateHtml;
@@ -210,14 +307,18 @@ export function renderThemeHtml(
   // 3. Spelling sentence
   const spellingSentence = data.spellingSentence || makeSpellingSentence(data.example || '', data.word || '');
 
+  // 4. Custom Sections / Blocks
+  const activeThemeId = options?.themeId || 'comic-pop-dark';
+  const customSectionsHtml = renderCustomBlocksHtml(data.customBlocks, activeThemeId);
+
   const replacements: Record<string, string> = {
     '{{Word}}': escapeHtml(data.word || ''),
     '{{Phonetic}}': escapeHtml(data.phonetic || '/.../'),
     '{{PartOfSpeech}}': escapeHtml(data.partOfSpeech || 'word'),
-    '{{Meaning}}': escapeHtml(data.meaningFa || ''),
-    '{{Example}}': escapeHtml(data.example || ''),
-    '{{Translation}}': escapeHtml(data.translationFa || ''),
-    '{{Mnemonic}}': escapeHtml(data.mnemonic || ''),
+    '{{Meaning}}': renderMarkdown(data.meaningFa || ''),
+    '{{Example}}': renderMarkdown(data.example || ''),
+    '{{Translation}}': renderMarkdown(data.translationFa || ''),
+    '{{Mnemonic}}': renderMarkdown(data.mnemonic || ''),
     '{{CardImage}}': cardImageHtml,
     '{{SpellingSentence}}': escapeHtml(spellingSentence),
     '{{WordAudio}}': wordAudio,
@@ -236,14 +337,63 @@ export function renderThemeHtml(
     html = html.replaceAll(key, value);
   }
 
+  // Handle CustomSections conditional tags
+  if (customSectionsHtml) {
+    html = html.replace(/\{\{#CustomSections\}\}/g, '');
+    html = html.replace(/\{\{\/CustomSections\}\}/g, '');
+    html = html.replaceAll('{{CustomSections}}', customSectionsHtml);
+  } else {
+    html = html.replace(/\{\{#CustomSections\}\}[\s\S]*?\{\{\/CustomSections\}\}/g, '');
+    html = html.replaceAll('{{CustomSections}}', '');
+  }
+
   return html;
 }
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+export const SHARED_CARD_CSS = `
+/* Shared Markdown & Custom Blocks CSS */
+.custom-card-block {
+  margin-top: 14px !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  transition: all 0.2s ease !important;
 }
+
+.custom-block-header {
+  margin-bottom: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.custom-block-content, .quest-custom-content, .notebook-custom-content, .arcade-custom-content, .minimal-custom-content {
+  font-size: 14px !important;
+  line-height: 1.65 !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+.card-inline-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 0.9em !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  background-color: rgba(128, 128, 128, 0.2) !important;
+  border: 1px solid rgba(128, 128, 128, 0.3) !important;
+}
+
+.card-bullet-list, .card-number-list {
+  margin: 6px 0 !important;
+  padding-inline-start: 24px !important;
+}
+
+.card-bullet-list li, .card-number-list li {
+  margin-bottom: 4px !important;
+  line-height: 1.5 !important;
+}
+
+.card-link {
+  color: #38bdf8 !important;
+  text-decoration: underline !important;
+}
+`;

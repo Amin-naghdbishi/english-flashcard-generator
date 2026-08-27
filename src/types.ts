@@ -59,6 +59,17 @@ export interface CardData {
 
   // Array of all generated audio clips
   audioFiles?: CardAudioFile[];
+
+  // Custom Theme-Aware Blocks/Boxes
+  customBlocks?: CustomCardBlock[];
+}
+
+export interface CustomCardBlock {
+  id: string;
+  title: string;
+  content: string;
+  color?: string; // Hex or theme color preset
+  dir?: 'rtl' | 'ltr' | 'auto';
 }
 
 export interface ManualOverrides {
@@ -72,6 +83,7 @@ export interface ManualOverrides {
   imageBase64?: string;
   imageFileName?: string;
   needsPhoto?: boolean;
+  customBlocks?: CustomCardBlock[];
 }
 
 export type AppTheme = 'anki-light' | 'anki-dark';

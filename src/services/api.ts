@@ -49,6 +49,23 @@ export async function restoreDefaultPrompts(): Promise<{ settings: AppSettings; 
   return res.json();
 }
 
+export async function updateAnkiNote(
+  noteId: number,
+  cardData: CardData,
+  themeId?: ThemeId
+): Promise<{ success: boolean; noteId: number; error?: string }> {
+  const res = await fetch('/api/anki/update-note', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ noteId, cardData, themeId }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to update note in Anki');
+  }
+  return res.json();
+}
+
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = 3500): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);

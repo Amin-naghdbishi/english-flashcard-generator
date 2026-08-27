@@ -1,5 +1,6 @@
-import { THEMES, getSpellingFrontHtml } from '../src/themes';
+import { THEMES, getSpellingFrontHtml, renderCustomBlocksHtml, SHARED_CARD_CSS } from '../src/themes';
 import { CardData, ThemeId, CardType } from '../src/types';
+import { renderMarkdown } from '../src/utils/markdown';
 
 export const ANKI_NOTE_TYPE_NAME = 'AI Vocabulary';
 export const ANKI_MODEL_FIELDS = [
@@ -23,6 +24,7 @@ export const ANKI_MODEL_FIELDS = [
   'ExampleAudioUsSlow',
   'ExampleAudioUkNormal',
   'ExampleAudioUkSlow',
+  'CustomSections',
 ];
 
 export async function callAnkiConnect(
@@ -139,8 +141,8 @@ export async function ensureAnkiModel(
   const backHtml = theme.backHtml;
 
   // Embed full custom CSS directly into template HTML to guarantee exact visual theme rendering in Anki & AnkiDroid
-  const fullFrontHtml = `<style>\n${theme.css}\n</style>\n${frontHtml}`;
-  const fullBackHtml = `<style>\n${theme.css}\n</style>\n${backHtml}`;
+  const fullFrontHtml = `<style>\n${theme.css}\n${SHARED_CARD_CSS}\n</style>\n${frontHtml}`;
+  const fullBackHtml = `<style>\n${theme.css}\n${SHARED_CARD_CSS}\n</style>\n${backHtml}`;
 
   const targetModel = specificModelName || getThemedModelName(themeId, cardType);
   const cardTemplateName = cardType === 'spelling' ? 'Spelling Card' : 'Vocabulary Card';
@@ -164,7 +166,7 @@ export async function ensureAnkiModel(
     const createRes = await callAnkiConnect(baseUrl, 'createModel', {
       modelName: targetModel,
       inOrderFields: ANKI_MODEL_FIELDS,
-      css: theme.css,
+      css: `${theme.css}\n${SHARED_CARD_CSS}`,
       cardTemplates: [
         {
           Name: cardTemplateName,
@@ -209,7 +211,7 @@ export async function ensureAnkiModel(
     await callAnkiConnect(baseUrl, 'updateModelStyling', {
       model: {
         name: targetModel,
-        css: theme.css,
+        css: `${theme.css}\n${SHARED_CARD_CSS}`,
       },
     });
 
@@ -489,10 +491,10 @@ export async function createAnkiNote(
     Word: (cardData.word || '').trim(),
     Phonetic: (cardData.phonetic || '').trim(),
     PartOfSpeech: (cardData.partOfSpeech || '').trim(),
-    Meaning: (cardData.meaningFa || '').trim(),
-    Example: (cardData.example || '').trim(),
-    Translation: (cardData.translationFa || '').trim(),
-    Mnemonic: (cardData.mnemonic || '').trim(),
+    Meaning: renderMarkdown((cardData.meaningFa || '').trim()),
+    Example: renderMarkdown((cardData.example || '').trim()),
+    Translation: renderMarkdown((cardData.translationFa || '').trim()),
+    Mnemonic: renderMarkdown((cardData.mnemonic || '').trim()),
     CardImage: imageTag,
     SpellingSentence: (cardData.spellingSentence || '').trim(),
     CardType: effectiveCardType,
@@ -506,6 +508,7 @@ export async function createAnkiNote(
     ExampleAudioUsSlow: cardData.exampleAudioUsSlowFileName ? `[sound:${cardData.exampleAudioUsSlowFileName}]` : '',
     ExampleAudioUkNormal: cardData.exampleAudioUkNormalFileName ? `[sound:${cardData.exampleAudioUkNormalFileName}]` : '',
     ExampleAudioUkSlow: cardData.exampleAudioUkSlowFileName ? `[sound:${cardData.exampleAudioUkSlowFileName}]` : '',
+    CustomSections: renderCustomBlocksHtml(cardData.customBlocks, themeId),
   };
 
   // 6. Add Note (IMPORTANT: allowDuplicate: true so user can create multiple cards for the same word with different meanings)

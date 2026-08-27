@@ -239,6 +239,10 @@ export const heroPopBackHtml = `
       <span class="box-label label-memory">🧠 MEMORY AID / MNEMONIC</span>
       <p class="mnemonic-text">{{Mnemonic}}</p>
     </div>
+
+    {{#CustomSections}}
+    {{CustomSections}}
+    {{/CustomSections}}
   </div>
 </div>
 `;
@@ -376,6 +380,10 @@ export const storyStripBackHtml = `
         <span class="mnem-star">★</span> {{Mnemonic}}
       </div>
     </div>
+
+    {{#CustomSections}}
+    {{CustomSections}}
+    {{/CustomSections}}
   </div>
 </div>
 `;
@@ -508,6 +516,10 @@ export const duoQuestBackHtml = `
       <span class="quest-tag-purple">💡 MEMORY HOOK</span>
       <p class="quest-mnemonic">{{Mnemonic}}</p>
     </div>
+
+    {{#CustomSections}}
+    {{CustomSections}}
+    {{/CustomSections}}
   </div>
 </div>
 `;
@@ -630,6 +642,10 @@ export const indexNotebookBackHtml = `
       <span class="washi-title">Memory Hook:</span>
       <p class="washi-text">{{Mnemonic}}</p>
     </div>
+
+    {{#CustomSections}}
+    {{CustomSections}}
+    {{/CustomSections}}
   </div>
 </div>
 `;
@@ -763,6 +779,10 @@ export const arcadeRetroBackHtml = `
       <div class="quest-terminal-header">★ MEMORY POWERUP</div>
       <p class="powerup-text">{{Mnemonic}}</p>
     </div>
+
+    {{#CustomSections}}
+    {{CustomSections}}
+    {{/CustomSections}}
   </div>
 </div>
 `;
@@ -888,6 +908,10 @@ export const minimalBackHtml = `
       <div class="minimal-mnemonic-label">Memory Aid</div>
       <p class="minimal-mnemonic">{{Mnemonic}}</p>
     </div>
+
+    {{#CustomSections}}
+    {{CustomSections}}
+    {{/CustomSections}}
   </div>
 </div>
 `;

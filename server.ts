@@ -44,7 +44,8 @@ import {
   storeAnkiMediaFile,
 } from './server/anki';
 import { AppSettings, CardData, ManualOverrides, DiagnosticsReport, StepLog, ThemeId, CardType, CustomAIProviderConfig, CustomTTSProviderConfig, SmartImagesConfig, AIPromptsConfig } from './src/types';
-import { THEMES, makeSpellingSentence } from './src/themes';
+import { THEMES, makeSpellingSentence, renderCustomBlocksHtml } from './src/themes';
+import { renderMarkdown } from './src/utils/markdown';
 
 function getSettingsFilePath(): string {
   if (process.env.FLASHCARD_GENERATOR_CONFIG_FILE) {
@@ -1208,6 +1209,50 @@ async function startServer() {
     });
   });
 
+  // --- Update Existing Note in Anki ---
+  app.post('/api/anki/update-note', async (req, res) => {
+    const { noteId, cardData, themeId } = req.body;
+    if (!noteId || !cardData) {
+      return res.status(400).json({ success: false, error: 'noteId and cardData are required.' });
+    }
+    const ankiUrl = appSettings.anki.url || 'http://127.0.0.1:8765';
+    const effectiveTheme: ThemeId = themeId || appSettings.theme || 'comic-pop-dark';
+
+    try {
+      const fields: Record<string, string> = {
+        Word: (cardData.word || '').trim(),
+        Phonetic: (cardData.phonetic || '').trim(),
+        PartOfSpeech: (cardData.partOfSpeech || '').trim(),
+        Meaning: renderMarkdown((cardData.meaningFa || '').trim()),
+        Example: renderMarkdown((cardData.example || '').trim()),
+        Translation: renderMarkdown((cardData.translationFa || '').trim()),
+        Mnemonic: renderMarkdown((cardData.mnemonic || '').trim()),
+        CustomSections: renderCustomBlocksHtml(cardData.customBlocks, effectiveTheme),
+      };
+
+      if (cardData.spellingSentence) {
+        fields.SpellingSentence = cardData.spellingSentence.trim();
+      }
+      if (cardData.cardType) {
+        fields.CardType = cardData.cardType;
+      }
+
+      // If there is a manual image uploaded, store it
+      if (cardData.imageBase64 && cardData.imageFileName) {
+        await storeAnkiMediaFile(ankiUrl, cardData.imageFileName, cardData.imageBase64);
+        fields.CardImage = `<img src="${cardData.imageFileName}" class="card-illustration" alt="${cardData.word}" />`;
+      }
+
+      const updateRes = await updateAnkiNoteFields(ankiUrl, Number(noteId), fields);
+      if (!updateRes.success) {
+        return res.status(500).json({ success: false, error: updateRes.error });
+      }
+      return res.json({ success: true, noteId: Number(noteId), updatedFields: Object.keys(fields) });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || 'Failed to update note' });
+    }
+  });
+
   // --- Diagnostics All-In-One ---
   app.get('/api/diagnostics', async (req, res) => {
     const ankiUrl = appSettings.anki.url || 'http://127.0.0.1:8765';
@@ -1453,6 +1498,17 @@ async function startServer() {
       }
       if (dictData.phonetic && dictConfig.definitionEnSource === 'freedict') {
         cardData.phonetic = dictData.phonetic;
+      }
+
+      // Preserve all manual user overrides strictly
+      if (cleanManualOverrides.meaningFa) cardData.meaningFa = cleanManualOverrides.meaningFa;
+      if (cleanManualOverrides.example) cardData.example = cleanManualOverrides.example;
+      if (cleanManualOverrides.translationFa) cardData.translationFa = cleanManualOverrides.translationFa;
+      if (cleanManualOverrides.mnemonic) cardData.mnemonic = cleanManualOverrides.mnemonic;
+      if (cleanManualOverrides.phonetic) cardData.phonetic = cleanManualOverrides.phonetic;
+      if (cleanManualOverrides.partOfSpeech) cardData.partOfSpeech = cleanManualOverrides.partOfSpeech;
+      if (cleanManualOverrides.customBlocks && Array.isArray(cleanManualOverrides.customBlocks)) {
+        cardData.customBlocks = cleanManualOverrides.customBlocks;
       }
 
       // Attach Card Type and Spelling sentence
