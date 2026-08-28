@@ -9,7 +9,7 @@ import {
   isRTLText,
   getContrastTextColor,
 } from '../themes';
-import { renderMarkdown, applyMarkdownToText, MarkdownAction } from '../utils/markdown';
+import { formatCardFieldHtml, applyHtmlFormattingToText, HtmlToolbarAction } from '../utils/markdown';
 import {
   Smartphone,
   Monitor,
@@ -344,8 +344,8 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
     }
   };
 
-  // Markdown Toolbar Action
-  const handleMarkdownToolbarAction = (action: MarkdownAction, extraValue?: string) => {
+  // HTML/CSS Toolbar Action
+  const handleHtmlToolbarAction = (action: HtmlToolbarAction, extraValue?: string) => {
     const active = activeInputRef.current;
     if (!active || !active.element) return;
 
@@ -354,7 +354,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
     const end = el.selectionEnd || 0;
     const fullText = el.value || '';
 
-    const { newText, newStart, newEnd } = applyMarkdownToText(fullText, start, end, action, extraValue);
+    const { newText, newStart, newEnd } = applyHtmlFormattingToText(fullText, start, end, action, extraValue);
 
     if (active.fieldName === 'customBlock' && active.blockId) {
       handleUpdate((prev) => {
@@ -376,6 +376,22 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
       el.focus();
       el.setSelectionRange(newStart, newEnd);
     }, 0);
+  };
+
+  const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+    if (e.ctrlKey || e.metaKey) {
+      const key = e.key.toLowerCase();
+      if (key === 'b') {
+        e.preventDefault();
+        handleHtmlToolbarAction('bold');
+      } else if (key === 'i') {
+        e.preventDefault();
+        handleHtmlToolbarAction('italic');
+      } else if (key === 'u') {
+        e.preventDefault();
+        handleHtmlToolbarAction('underline');
+      }
+    }
   };
 
   // Custom Blocks Management
@@ -602,11 +618,12 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                     dir={blk.dir || 'auto'}
                     value={blk.content}
                     onChange={(e) => handleUpdateCustomBlock(blk.id, { content: e.target.value })}
+                    onKeyDown={handleEditorKeyDown}
                     onFocus={(e) => {
                       activeInputRef.current = { element: e.target, fieldName: 'customBlock', blockId: blk.id };
                       setSelectedBoxId(blk.id);
                     }}
-                    placeholder="Content (Markdown supported: **bold**, *italic*, - bullets, `code`)..."
+                    placeholder="Content (HTML supported: <strong>bold</strong>, <em>italic</em>, <u>underline</u>, lists, etc.)..."
                     className="w-full p-2 text-xs rounded bg-black/35 text-white border border-white/15 focus:outline-none focus:ring-1 focus:ring-white/50 leading-relaxed font-sans placeholder-white/40"
                   />
 
@@ -884,6 +901,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             dir="rtl"
             value={internalCard.meaningFa || ''}
             onChange={(e) => updateSimpleField('meaningFa', e.target.value)}
+            onKeyDown={handleEditorKeyDown}
             onFocus={(e) => {
               activeInputRef.current = { element: e.target, fieldName: 'meaningFa' };
             }}
@@ -913,6 +931,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             rows={2}
             value={internalCard.example || ''}
             onChange={(e) => updateSimpleField('example', e.target.value)}
+            onKeyDown={handleEditorKeyDown}
             onFocus={(e) => {
               activeInputRef.current = { element: e.target, fieldName: 'example' };
             }}
@@ -924,6 +943,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             dir="rtl"
             value={internalCard.translationFa || ''}
             onChange={(e) => updateSimpleField('translationFa', e.target.value)}
+            onKeyDown={handleEditorKeyDown}
             onFocus={(e) => {
               activeInputRef.current = { element: e.target, fieldName: 'translationFa' };
             }}
@@ -941,6 +961,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             rows={2}
             value={internalCard.mnemonic || ''}
             onChange={(e) => updateSimpleField('mnemonic', e.target.value)}
+            onKeyDown={handleEditorKeyDown}
             onFocus={(e) => {
               activeInputRef.current = { element: e.target, fieldName: 'mnemonic' };
             }}
@@ -1177,6 +1198,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             rows={2}
             value={internalCard.example || ''}
             onChange={(e) => updateSimpleField('example', e.target.value)}
+            onKeyDown={handleEditorKeyDown}
             onFocus={(e) => {
               activeInputRef.current = { element: e.target, fieldName: 'example' };
             }}
@@ -1188,6 +1210,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             dir="rtl"
             value={internalCard.translationFa || ''}
             onChange={(e) => updateSimpleField('translationFa', e.target.value)}
+            onKeyDown={handleEditorKeyDown}
             onFocus={(e) => {
               activeInputRef.current = { element: e.target, fieldName: 'translationFa' };
             }}
@@ -1206,6 +1229,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             dir="rtl"
             value={internalCard.meaningFa || ''}
             onChange={(e) => updateSimpleField('meaningFa', e.target.value)}
+            onKeyDown={handleEditorKeyDown}
             onFocus={(e) => {
               activeInputRef.current = { element: e.target, fieldName: 'meaningFa' };
             }}
@@ -1223,6 +1247,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             rows={2}
             value={internalCard.mnemonic || ''}
             onChange={(e) => updateSimpleField('mnemonic', e.target.value)}
+            onKeyDown={handleEditorKeyDown}
             onFocus={(e) => {
               activeInputRef.current = { element: e.target, fieldName: 'mnemonic' };
             }}
@@ -1661,19 +1686,19 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                 </span>
               </div>
 
-              {/* SECTION 1: Markdown Formatting */}
+              {/* SECTION 1: Text Formatting (HTML/CSS) */}
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">
-                  Markdown Formatting
+                  Text Formatting (HTML/CSS)
                 </span>
                 <div className="grid grid-cols-3 gap-1.5 mb-2.5">
                   <button
                     type="button"
-                    onClick={() => handleMarkdownToolbarAction('bold')}
+                    onClick={() => handleHtmlToolbarAction('bold')}
                     className={`py-1.5 px-2 rounded border flex items-center justify-center gap-1 cursor-pointer transition-colors ${
                       isDark ? 'bg-zinc-850 hover:bg-zinc-800 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
                     }`}
-                    title="Bold (**text**)"
+                    title="Bold (<strong>text</strong>, Ctrl+B)"
                   >
                     <Bold className="w-3.5 h-3.5 text-blue-400" />
                     <span className="text-[10px] font-semibold">Bold</span>
@@ -1681,11 +1706,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => handleMarkdownToolbarAction('italic')}
+                    onClick={() => handleHtmlToolbarAction('italic')}
                     className={`py-1.5 px-2 rounded border flex items-center justify-center gap-1 cursor-pointer transition-colors ${
                       isDark ? 'bg-zinc-850 hover:bg-zinc-800 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
                     }`}
-                    title="Italic (*text*)"
+                    title="Italic (<em>text</em>, Ctrl+I)"
                   >
                     <Italic className="w-3.5 h-3.5 text-purple-400" />
                     <span className="text-[10px] font-semibold">Italic</span>
@@ -1693,11 +1718,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => handleMarkdownToolbarAction('underline')}
+                    onClick={() => handleHtmlToolbarAction('underline')}
                     className={`py-1.5 px-2 rounded border flex items-center justify-center gap-1 cursor-pointer transition-colors ${
                       isDark ? 'bg-zinc-850 hover:bg-zinc-800 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
                     }`}
-                    title="Underline (<u>text</u>)"
+                    title="Underline (<u>text</u>, Ctrl+U)"
                   >
                     <Underline className="w-3.5 h-3.5 text-emerald-400" />
                     <span className="text-[10px] font-semibold">Underline</span>
@@ -1705,11 +1730,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => handleMarkdownToolbarAction('code')}
+                    onClick={() => handleHtmlToolbarAction('code')}
                     className={`py-1.5 px-2 rounded border flex items-center justify-center gap-1 cursor-pointer transition-colors ${
                       isDark ? 'bg-zinc-850 hover:bg-zinc-800 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
                     }`}
-                    title="Inline Code (`code`)"
+                    title="Inline Code (<code>code</code>)"
                   >
                     <Code className="w-3.5 h-3.5 text-amber-400" />
                     <span className="text-[10px] font-semibold">Code</span>
@@ -1717,11 +1742,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => handleMarkdownToolbarAction('bulletList')}
+                    onClick={() => handleHtmlToolbarAction('bulletList')}
                     className={`py-1.5 px-2 rounded border flex items-center justify-center gap-1 cursor-pointer transition-colors ${
                       isDark ? 'bg-zinc-850 hover:bg-zinc-800 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
                     }`}
-                    title="Bullet List (- item)"
+                    title="Bullet List (<ul><li>...</li></ul>)"
                   >
                     <List className="w-3.5 h-3.5 text-sky-400" />
                     <span className="text-[10px] font-semibold">Bullets</span>
@@ -1729,11 +1754,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => handleMarkdownToolbarAction('numberedList')}
+                    onClick={() => handleHtmlToolbarAction('numberedList')}
                     className={`py-1.5 px-2 rounded border flex items-center justify-center gap-1 cursor-pointer transition-colors ${
                       isDark ? 'bg-zinc-850 hover:bg-zinc-800 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
                     }`}
-                    title="Numbered List (1. item)"
+                    title="Numbered List (<ol><li>...</li></ol>)"
                   >
                     <ListOrdered className="w-3.5 h-3.5 text-indigo-400" />
                     <span className="text-[10px] font-semibold">Numbers</span>
@@ -1750,7 +1775,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                       <button
                         key={preset.hex}
                         type="button"
-                        onClick={() => handleMarkdownToolbarAction('color', preset.hex)}
+                        onClick={() => handleHtmlToolbarAction('color', preset.hex)}
                         className="w-5 h-5 rounded-full border border-black/20 hover:scale-115 transition-transform cursor-pointer shadow-2xs"
                         style={{ backgroundColor: preset.hex }}
                         title={`Color: ${preset.name}`}
@@ -1769,7 +1794,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                       <button
                         key={preset.hex}
                         type="button"
-                        onClick={() => handleMarkdownToolbarAction('highlight', preset.hex)}
+                        onClick={() => handleHtmlToolbarAction('highlight', preset.hex)}
                         className="px-2 py-0.5 rounded text-[10px] font-bold text-zinc-900 border border-black/10 hover:scale-105 transition-transform cursor-pointer shadow-2xs"
                         style={{ backgroundColor: preset.hex }}
                         title={`Highlight with ${preset.name}`}

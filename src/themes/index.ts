@@ -350,23 +350,21 @@ export function renderThemeHtml(
 
   // Handle CustomBackSections conditional tags
   if (customBackSectionsHtml) {
+    // 1. Strip inverted fallback block FIRST before removing any closing tags
+    html = html.replace(/\{\{\^CustomBackSections\}\}[\s\S]*?\{\{\/CustomBackSections\}\}/g, '');
+    // 2. Unwrap normal section and insert content
     html = html.replace(/\{\{#CustomBackSections\}\}/g, '');
     html = html.replace(/\{\{\/CustomBackSections\}\}/g, '');
     html = html.replaceAll('{{CustomBackSections}}', customBackSectionsHtml);
-    html = html.replace(/\{\{\^CustomBackSections\}\}[\s\S]*?\{\{\/CustomBackSections\}\}/g, '');
+    // 3. Clear any remnant CustomSections tag
+    html = html.replace(/\{\{#CustomSections\}\}[\s\S]*?\{\{\/CustomSections\}\}/g, '');
+    html = html.replaceAll('{{CustomSections}}', '');
   } else {
     html = html.replace(/\{\{#CustomBackSections\}\}[\s\S]*?\{\{\/CustomBackSections\}\}/g, '');
     html = html.replaceAll('{{CustomBackSections}}', '');
     html = html.replace(/\{\{\^CustomBackSections\}\}/g, '');
     html = html.replace(/\{\{\/CustomBackSections\}\}/g, '');
-  }
-
-  // Handle CustomSections conditional tags (legacy/universal)
-  if (customSectionsHtml) {
-    html = html.replace(/\{\{#CustomSections\}\}/g, '');
-    html = html.replace(/\{\{\/CustomSections\}\}/g, '');
-    html = html.replaceAll('{{CustomSections}}', customSectionsHtml);
-  } else {
+    // Handle fallback CustomSections if older card uses it
     html = html.replace(/\{\{#CustomSections\}\}[\s\S]*?\{\{\/CustomSections\}\}/g, '');
     html = html.replaceAll('{{CustomSections}}', '');
   }
@@ -375,7 +373,7 @@ export function renderThemeHtml(
 }
 
 export const SHARED_CARD_CSS = `
-/* Shared Markdown & Custom Blocks CSS */
+/* Shared HTML & Custom Blocks CSS */
 .custom-card-block {
   margin-top: 14px !important;
   box-sizing: border-box !important;
@@ -407,12 +405,15 @@ export const SHARED_CARD_CSS = `
   border: 1px solid rgba(128, 128, 128, 0.3) !important;
 }
 
-.card-bullet-list, .card-number-list {
+.card-bullet-list, .card-number-list,
+.custom-block-content ul, .quest-custom-content ul, .notebook-custom-content ul, .minimal-custom-content ul,
+.custom-block-content ol, .quest-custom-content ol, .notebook-custom-content ol, .minimal-custom-content ol {
   margin: 6px 0 !important;
   padding-inline-start: 24px !important;
 }
 
-.card-bullet-list li, .card-number-list li {
+.card-bullet-list li, .card-number-list li,
+.custom-block-content li, .quest-custom-content li, .notebook-custom-content li, .minimal-custom-content li {
   margin-bottom: 4px !important;
   line-height: 1.5 !important;
 }
