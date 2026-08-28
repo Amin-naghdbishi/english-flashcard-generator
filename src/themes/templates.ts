@@ -1,6 +1,12 @@
 /**
  * Shared HTML templates for Anki Cards & Live Preview
  * Supports both Normal Flashcards and Interactive Spelling Cards
+ * 
+ * 8 Fully Supported Themes:
+ * - Hero Pop (Light & Dark)
+ * - Duo Quest (Light & Dark)
+ * - Index Notebook (Light & Dark)
+ * - Minimal (Light & Dark)
  */
 
 export const spellingScript = `
@@ -81,7 +87,7 @@ function checkSpelling() {
 `;
 
 /**
- * 1. HERO POP TEMPLATES (Theme 1)
+ * 1. HERO POP TEMPLATES (Theme 1 - Comic Hero Cards)
  */
 export const heroPopFrontNormalHtml = `
 <div class="comic-card-wrapper theme-pop">
@@ -123,6 +129,10 @@ export const heroPopFrontNormalHtml = `
       <span class="hint-label">💡 CONTEXT / EXAMPLE</span>
       <p class="comic-example-en">{{Example}}</p>
     </div>
+
+    {{#CustomFrontSections}}
+    {{CustomFrontSections}}
+    {{/CustomFrontSections}}
   </div>
 </div>
 `;
@@ -175,6 +185,10 @@ export const heroPopFrontSpellingHtml = `
     </div>
 
     <div id="spelling-result" class="spelling-result"></div>
+
+    {{#CustomFrontSections}}
+    {{CustomFrontSections}}
+    {{/CustomFrontSections}}
   </div>
 </div>
 ${spellingScript}
@@ -240,156 +254,15 @@ export const heroPopBackHtml = `
       <p class="mnemonic-text">{{Mnemonic}}</p>
     </div>
 
-    {{#CustomSections}}
-    {{CustomSections}}
-    {{/CustomSections}}
+    {{#CustomBackSections}}
+    {{CustomBackSections}}
+    {{/CustomBackSections}}
   </div>
 </div>
 `;
 
 /**
- * 2. STORY STRIP TEMPLATES (Theme 2)
- */
-export const storyStripFrontNormalHtml = `
-<div class="comic-card-wrapper theme-strip">
-  <div class="strip-container">
-    <div class="strip-panel panel-header">
-      <div class="panel-tag">PANEL 1 • THE WORD</div>
-      {{CardImage}}
-      <div class="strip-word-header">
-        <h1 class="strip-title">{{Word}}</h1>
-        <div class="strip-meta">
-          <span class="strip-pos">{{PartOfSpeech}}</span>
-          <span class="strip-ipa">{{Phonetic}}</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="strip-panel panel-audio">
-      <div class="panel-tag">PANEL 2 • PRONUNCIATION</div>
-      <div class="strip-audio-grid">
-        <div class="strip-audio-box us-box">
-          <span class="flag-label">🇺🇸 American:</span>
-          <div class="btn-cluster">{{WordAudioUsNormal}} {{WordAudioUsSlow}}</div>
-        </div>
-        <div class="strip-audio-box uk-box">
-          <span class="flag-label">🇬🇧 British:</span>
-          <div class="btn-cluster">{{WordAudioUkNormal}} {{WordAudioUkSlow}}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="strip-panel panel-dialogue">
-      <div class="panel-tag">PANEL 3 • CONTEXT DIALOGUE</div>
-      <div class="speech-bubble">
-        <div class="bubble-tail"></div>
-        <p class="bubble-en">"{{Example}}"</p>
-      </div>
-    </div>
-  </div>
-</div>
-`;
-
-export const storyStripFrontSpellingHtml = `
-<div class="comic-card-wrapper theme-strip">
-  <div class="strip-container spelling-strip">
-    <div class="strip-panel panel-header">
-      <div class="panel-tag tag-spelling">SPELLING MISSION • PANEL 1</div>
-      {{CardImage}}
-      <div id="spelling-target-word" style="display: none;">{{Word}}</div>
-      <div class="spelling-prompt-banner">
-        <span class="prompt-icon">✍️</span>
-        <span class="prompt-text">Can you spell this English word correctly?</span>
-      </div>
-    </div>
-
-    <div class="strip-panel panel-dialogue">
-      <div class="panel-tag">PANEL 2 • MISSING DIALOGUE</div>
-      <div class="speech-bubble">
-        <div class="bubble-tail"></div>
-        <p class="bubble-en">{{SpellingSentence}}</p>
-      </div>
-      <div class="strip-audio-inline">
-        <span class="audio-caption">Listen carefully:</span>
-        {{WordAudioUsNormal}} {{WordAudioUsSlow}} {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}
-      </div>
-    </div>
-
-    <div class="strip-panel panel-interactive">
-      <div class="panel-tag">PANEL 3 • YOUR SPELLING</div>
-      <div class="spelling-interactive-area tappable">
-        <input
-          type="text"
-          id="spelling-input"
-          name="spelling_answer"
-          class="spelling-input tappable"
-          placeholder="Spell the missing word..."
-          autocomplete="off"
-          autocorrect="off"
-          autocapitalize="none"
-          spellcheck="false"
-          inputmode="text"
-          enterkeyhint="done"
-        />
-        <button type="button" class="spelling-check-btn tappable" onclick="checkSpelling()">SUBMIT</button>
-      </div>
-      <div id="spelling-result" class="spelling-result"></div>
-    </div>
-  </div>
-</div>
-${spellingScript}
-`;
-
-export const storyStripBackHtml = `
-<div class="comic-card-wrapper theme-strip">
-  <div class="strip-container">
-    <div class="strip-panel panel-header">
-      <div class="panel-tag">PANEL 1 • WORD & SOUND</div>
-      {{CardImage}}
-      <div class="strip-word-header">
-        <h1 class="strip-title">{{Word}}</h1>
-        <div class="strip-meta">
-          <span class="strip-pos">{{PartOfSpeech}}</span>
-          <span class="strip-ipa">{{Phonetic}}</span>
-        </div>
-      </div>
-      <div class="strip-audio-grid">
-        <div class="strip-audio-box us-box"><span class="flag-label">🇺🇸 US:</span> {{WordAudioUsNormal}} {{WordAudioUsSlow}}</div>
-        <div class="strip-audio-box uk-box"><span class="flag-label">🇬🇧 UK:</span> {{WordAudioUkNormal}} {{WordAudioUkSlow}}</div>
-      </div>
-    </div>
-
-    <div class="strip-panel panel-dialogue">
-      <div class="panel-tag">PANEL 2 • DIALOGUE & TRANSLATION</div>
-      <div class="speech-bubble">
-        <div class="bubble-tail"></div>
-        <p class="bubble-en">"{{Example}}"</p>
-        <p class="bubble-fa" dir="rtl">{{Translation}}</p>
-      </div>
-      <div class="dialogue-audio-bar">
-        <span>Audio:</span> {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}} {{ExampleAudioUkNormal}} {{ExampleAudioUkSlow}}
-      </div>
-    </div>
-
-    <div class="strip-panel panel-meaning">
-      <div class="panel-tag">PANEL 3 • MEANING & MNEMONIC</div>
-      <div class="strip-meaning-callout" dir="rtl">
-        {{Meaning}}
-      </div>
-      <div class="strip-mnemonic-footer">
-        <span class="mnem-star">★</span> {{Mnemonic}}
-      </div>
-    </div>
-
-    {{#CustomSections}}
-    {{CustomSections}}
-    {{/CustomSections}}
-  </div>
-</div>
-`;
-
-/**
- * 3. DUO QUEST TEMPLATES (Theme 3 - Playful Educational UX)
+ * 2. DUO QUEST TEMPLATES (Theme 2 - Playful Educational Gamified UX)
  */
 export const duoQuestFrontNormalHtml = `
 <div class="comic-card-wrapper theme-quest">
@@ -423,6 +296,10 @@ export const duoQuestFrontNormalHtml = `
       </div>
       <p class="quest-sentence">{{Example}}</p>
     </div>
+
+    {{#CustomFrontSections}}
+    {{CustomFrontSections}}
+    {{/CustomFrontSections}}
   </div>
 </div>
 `;
@@ -467,6 +344,10 @@ export const duoQuestFrontSpellingHtml = `
     </div>
 
     <div id="spelling-result" class="spelling-result"></div>
+
+    {{#CustomFrontSections}}
+    {{CustomFrontSections}}
+    {{/CustomFrontSections}}
   </div>
 </div>
 ${spellingScript}
@@ -517,15 +398,15 @@ export const duoQuestBackHtml = `
       <p class="quest-mnemonic">{{Mnemonic}}</p>
     </div>
 
-    {{#CustomSections}}
-    {{CustomSections}}
-    {{/CustomSections}}
+    {{#CustomBackSections}}
+    {{CustomBackSections}}
+    {{/CustomBackSections}}
   </div>
 </div>
 `;
 
 /**
- * 4. INDEX NOTEBOOK TEMPLATES (Theme 4 - Ruled Paper & Sticky Tabs)
+ * 3. INDEX NOTEBOOK TEMPLATES (Theme 3 - Ruled Paper & Sticky Notes)
  */
 export const indexNotebookFrontNormalHtml = `
 <div class="comic-card-wrapper theme-notebook">
@@ -554,6 +435,10 @@ export const indexNotebookFrontNormalHtml = `
       <span class="sticky-title">Usage Example:</span>
       <p class="sticky-text">{{Example}}</p>
     </div>
+
+    {{#CustomFrontSections}}
+    {{CustomFrontSections}}
+    {{/CustomFrontSections}}
   </div>
 </div>
 `;
@@ -597,6 +482,10 @@ export const indexNotebookFrontSpellingHtml = `
     </div>
 
     <div id="spelling-result" class="spelling-result"></div>
+
+    {{#CustomFrontSections}}
+    {{CustomFrontSections}}
+    {{/CustomFrontSections}}
   </div>
 </div>
 ${spellingScript}
@@ -616,6 +505,8 @@ export const indexNotebookBackHtml = `
       <h1 class="notebook-word">{{Word}}</h1>
       <span class="notebook-tape-ipa">{{Phonetic}}</span>
     </div>
+
+    <div class="notebook-margin-line"></div>
 
     <div class="notebook-audio-strip">
       <div class="tape-clip us-tape">🇺🇸 US: {{WordAudioUsNormal}} {{WordAudioUsSlow}}</div>
@@ -643,152 +534,15 @@ export const indexNotebookBackHtml = `
       <p class="washi-text">{{Mnemonic}}</p>
     </div>
 
-    {{#CustomSections}}
-    {{CustomSections}}
-    {{/CustomSections}}
+    {{#CustomBackSections}}
+    {{CustomBackSections}}
+    {{/CustomBackSections}}
   </div>
 </div>
 `;
 
 /**
- * 5. ARCADE RETRO TEMPLATES (Theme 5 - 90s Pixel Arcade Game)
- */
-export const arcadeRetroFrontNormalHtml = `
-<div class="comic-card-wrapper theme-arcade">
-  <div class="arcade-cabinet">
-    <div class="arcade-hud">
-      <span class="hud-item hud-stage">STAGE 1</span>
-      <span class="hud-item hud-type">CLASS: {{PartOfSpeech}}</span>
-      <span class="hud-item hud-hp">HP: ■■■■■</span>
-    </div>
-
-    {{CardImage}}
-
-    <div class="arcade-title-box">
-      <h1 class="arcade-word">{{Word}}</h1>
-      <div class="arcade-ipa-chip">{{Phonetic}}</div>
-    </div>
-
-    <div class="arcade-sound-controls">
-      <div class="arcade-btn-deck us-deck">
-        <span class="deck-title">US VOICE:</span>
-        <div class="deck-btns">{{WordAudioUsNormal}} {{WordAudioUsSlow}}</div>
-      </div>
-      <div class="arcade-btn-deck uk-deck">
-        <span class="deck-title">UK VOICE:</span>
-        <div class="deck-btns">{{WordAudioUkNormal}} {{WordAudioUkSlow}}</div>
-      </div>
-    </div>
-
-    <div class="arcade-quest-box">
-      <div class="quest-terminal-header">► MISSION BRIEF</div>
-      <p class="quest-log-en">{{Example}}</p>
-    </div>
-  </div>
-</div>
-`;
-
-export const arcadeRetroFrontSpellingHtml = `
-<div class="comic-card-wrapper theme-arcade">
-  <div class="arcade-cabinet spelling-arcade">
-    <div class="arcade-hud">
-      <span class="hud-item hud-stage">SPELLING BOSS</span>
-      <span class="hud-item hud-type">{{PartOfSpeech}}</span>
-      <span class="hud-item hud-score">100 PTS</span>
-    </div>
-
-    {{CardImage}}
-
-    <div id="spelling-target-word" style="display: none;">{{Word}}</div>
-
-    <div class="arcade-quest-box arcade-spelling-prompt">
-      <div class="quest-terminal-header">► DECODE THE HIDDEN WORD:</div>
-      <div class="arcade-blank-screen">{{SpellingSentence}}</div>
-    </div>
-
-    <div class="arcade-sound-controls arcade-single-sound">
-      <span class="deck-title">AUDIO RADAR:</span>
-      {{WordAudioUsNormal}} {{WordAudioUsSlow}} {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}
-    </div>
-
-    <div class="spelling-interactive-area arcade-interactive tappable">
-      <input
-        type="text"
-        id="spelling-input"
-        name="spelling_answer"
-        class="spelling-input arcade-input tappable"
-        placeholder="ENTER SPELLING..."
-        autocomplete="off"
-        autocorrect="off"
-        autocapitalize="none"
-        spellcheck="false"
-        inputmode="text"
-        enterkeyhint="done"
-      />
-      <button type="button" class="spelling-check-btn arcade-check tappable" onclick="checkSpelling()">EXECUTE</button>
-    </div>
-
-    <div id="spelling-result" class="spelling-result arcade-result-screen"></div>
-  </div>
-</div>
-${spellingScript}
-`;
-
-export const arcadeRetroBackHtml = `
-<div class="comic-card-wrapper theme-arcade">
-  <div class="arcade-cabinet">
-    <div class="arcade-hud">
-      <span class="hud-item hud-stage">STAGE 1</span>
-      <span class="hud-item hud-type">CLASS: {{PartOfSpeech}}</span>
-      <span class="hud-item hud-hp">HP: ■■■■■</span>
-    </div>
-
-    {{CardImage}}
-
-    <div class="arcade-title-box">
-      <h1 class="arcade-word">{{Word}}</h1>
-      <div class="arcade-ipa-chip">{{Phonetic}}</div>
-    </div>
-
-    <div class="arcade-sound-controls">
-      <div class="arcade-btn-deck us-deck">
-        <span class="deck-title">US VOICE:</span>
-        <div class="deck-btns">{{WordAudioUsNormal}} {{WordAudioUsSlow}}</div>
-      </div>
-      <div class="arcade-btn-deck uk-deck">
-        <span class="deck-title">UK VOICE:</span>
-        <div class="deck-btns">{{WordAudioUkNormal}} {{WordAudioUkSlow}}</div>
-      </div>
-    </div>
-
-    <div class="arcade-terminal-meaning">
-      <div class="quest-terminal-header">► PERSIAN TRANSLATION</div>
-      <p class="arcade-meaning-fa" dir="rtl">{{Meaning}}</p>
-    </div>
-
-    <div class="arcade-quest-box">
-      <div class="quest-terminal-header">
-        <span>► MISSION LOG & AUDIO</span>
-        <div class="arcade-example-audio">{{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}} {{ExampleAudioUkNormal}} {{ExampleAudioUkSlow}}</div>
-      </div>
-      <p class="quest-log-en">{{Example}}</p>
-      <p class="quest-log-fa" dir="rtl">{{Translation}}</p>
-    </div>
-
-    <div class="arcade-powerup-box">
-      <div class="quest-terminal-header">★ MEMORY POWERUP</div>
-      <p class="powerup-text">{{Mnemonic}}</p>
-    </div>
-
-    {{#CustomSections}}
-    {{CustomSections}}
-    {{/CustomSections}}
-  </div>
-</div>
-`;
-
-/**
- * 6. MINIMAL TEMPLATES (Theme 6 - Clean, Distraction-Free Anki Style)
+ * 4. MINIMAL TEMPLATES (Theme 4 - Clean, Distraction-Free Anki Style)
  */
 export const minimalFrontNormalHtml = `
 <div class="minimal-card-wrapper theme-minimal">
@@ -816,6 +570,10 @@ export const minimalFrontNormalHtml = `
     <div class="minimal-example-block">
       <p class="minimal-example">{{Example}}</p>
     </div>
+
+    {{#CustomFrontSections}}
+    {{CustomFrontSections}}
+    {{/CustomFrontSections}}
   </div>
 </div>
 `;
@@ -860,6 +618,10 @@ export const minimalFrontSpellingHtml = `
     </div>
 
     <div id="spelling-result" class="spelling-result minimal-result"></div>
+
+    {{#CustomFrontSections}}
+    {{CustomFrontSections}}
+    {{/CustomFrontSections}}
   </div>
 </div>
 ${spellingScript}
@@ -909,9 +671,9 @@ export const minimalBackHtml = `
       <p class="minimal-mnemonic">{{Mnemonic}}</p>
     </div>
 
-    {{#CustomSections}}
-    {{CustomSections}}
-    {{/CustomSections}}
+    {{#CustomBackSections}}
+    {{CustomBackSections}}
+    {{/CustomBackSections}}
   </div>
 </div>
 `;

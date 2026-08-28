@@ -69,32 +69,39 @@ CACHE_DIR="$SCRIPT_DIR/cache"
 mkdir -p "$CACHE_DIR"
 
 if [ "$TARGET_ARCH" = "x86_64" ]; then
-  NODE_TARBALL="node-${NODE_VERSION}-linux-x64.tar.xz"
-  NODE_URL="https://nodejs.org/dist/${NODE_VERSION}/${NODE_TARBALL}"
-  
-  if [ ! -f "$CACHE_DIR/$NODE_TARBALL" ]; then
-    echo "Downloading Node.js x64 runtime from $NODE_URL..."
-    curl -sSL "$NODE_URL" -o "$CACHE_DIR/$NODE_TARBALL"
+  if [ "$HOST_ARCH" = "x86_64" ] && command -v node >/dev/null 2>&1; then
+    echo "Using system Node binary for host x86_64..."
+    cp "$(command -v node)" "$APPDIR/usr/bin/node"
+    chmod +x "$APPDIR/usr/bin/node"
+  else
+    NODE_TARBALL="node-${NODE_VERSION}-linux-x64.tar.gz"
+    NODE_URL="https://nodejs.org/dist/${NODE_VERSION}/${NODE_TARBALL}"
+    
+    if [ ! -f "$CACHE_DIR/$NODE_TARBALL" ]; then
+      echo "Downloading Node.js x64 runtime from $NODE_URL..."
+      curl -sSL "$NODE_URL" -o "$CACHE_DIR/$NODE_TARBALL"
+    fi
+    
+    echo "Extracting x86_64 Node.js binary..."
+    tar -xzf "$CACHE_DIR/$NODE_TARBALL" -C "$CACHE_DIR" --strip-components=2 "node-${NODE_VERSION}-linux-x64/bin/node"
+    cp "$CACHE_DIR/node" "$APPDIR/usr/bin/node"
+    chmod +x "$APPDIR/usr/bin/node"
   fi
-  
-  echo "Extracting x86_64 Node.js binary..."
-  tar -xJf "$CACHE_DIR/$NODE_TARBALL" -C "$CACHE_DIR" --strip-components=2 "node-${NODE_VERSION}-linux-x64/bin/node"
-  cp "$CACHE_DIR/node" "$APPDIR/usr/bin/node"
-  chmod +x "$APPDIR/usr/bin/node"
 elif [ "$TARGET_ARCH" = "aarch64" ] || [ "$TARGET_ARCH" = "arm64" ]; then
   if [ "$HOST_ARCH" = "aarch64" ] && command -v node >/dev/null 2>&1; then
     cp "$(command -v node)" "$APPDIR/usr/bin/node"
+    chmod +x "$APPDIR/usr/bin/node"
   else
-    NODE_TARBALL="node-${NODE_VERSION}-linux-arm64.tar.xz"
+    NODE_TARBALL="node-${NODE_VERSION}-linux-arm64.tar.gz"
     NODE_URL="https://nodejs.org/dist/${NODE_VERSION}/${NODE_TARBALL}"
     if [ ! -f "$CACHE_DIR/$NODE_TARBALL" ]; then
       echo "Downloading Node.js arm64 runtime..."
       curl -sSL "$NODE_URL" -o "$CACHE_DIR/$NODE_TARBALL"
     fi
-    tar -xJf "$CACHE_DIR/$NODE_TARBALL" -C "$CACHE_DIR" --strip-components=2 "node-${NODE_VERSION}-linux-arm64/bin/node"
+    tar -xzf "$CACHE_DIR/$NODE_TARBALL" -C "$CACHE_DIR" --strip-components=2 "node-${NODE_VERSION}-linux-arm64/bin/node"
     cp "$CACHE_DIR/node" "$APPDIR/usr/bin/node"
+    chmod +x "$APPDIR/usr/bin/node"
   fi
-  chmod +x "$APPDIR/usr/bin/node"
 fi
 
 # 9. Obtain appimagetool

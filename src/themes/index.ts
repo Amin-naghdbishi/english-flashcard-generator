@@ -2,66 +2,56 @@ import { ThemeDefinition, CardData, ThemeId, CustomCardBlock } from '../types';
 import { renderMarkdown, escapeHtml } from '../utils/markdown';
 import { comicPopLightTheme } from './comic-pop-light';
 import { comicPopDarkTheme } from './comic-pop-dark';
-import { comicStripLightTheme } from './comic-strip-light';
-import { comicStripDarkTheme } from './comic-strip-dark';
 import { comicQuestLightTheme } from './comic-quest-light';
 import { comicQuestDarkTheme } from './comic-quest-dark';
 import { comicNotebookLightTheme } from './comic-notebook-light';
 import { comicNotebookDarkTheme } from './comic-notebook-dark';
-import { comicArcadeLightTheme } from './comic-arcade-light';
-import { comicArcadeDarkTheme } from './comic-arcade-dark';
 import { minimalLightTheme } from './minimal-light';
 import { minimalDarkTheme } from './minimal-dark';
 import {
   heroPopFrontSpellingHtml,
-  storyStripFrontSpellingHtml,
   duoQuestFrontSpellingHtml,
   indexNotebookFrontSpellingHtml,
-  arcadeRetroFrontSpellingHtml,
   minimalFrontSpellingHtml,
 } from './templates';
 
 export const THEMES: Record<string, ThemeDefinition> = {
-  // Light Themes
+  // Light Themes (4)
   'comic-pop-light': comicPopLightTheme,
-  'comic-strip-light': comicStripLightTheme,
   'comic-quest-light': comicQuestLightTheme,
   'comic-notebook-light': comicNotebookLightTheme,
-  'comic-arcade-light': comicArcadeLightTheme,
   'minimal-light': minimalLightTheme,
 
-  // Dark Themes
+  // Dark Themes (4)
   'comic-pop-dark': comicPopDarkTheme,
-  'comic-strip-dark': comicStripDarkTheme,
   'comic-quest-dark': comicQuestDarkTheme,
   'comic-notebook-dark': comicNotebookDarkTheme,
-  'comic-arcade-dark': comicArcadeDarkTheme,
   'minimal-dark': minimalDarkTheme,
 
-  // Legacy Aliases
+  // Legacy Aliases for backwards compatibility
   'comic-manga-light': comicQuestLightTheme,
   'comic-manga-dark': comicQuestDarkTheme,
   'comic-minimal-light': minimalLightTheme,
   'comic-minimal-dark': minimalDarkTheme,
+  'comic-strip-light': comicPopLightTheme,
+  'comic-strip-dark': comicPopDarkTheme,
+  'comic-arcade-light': comicQuestLightTheme,
+  'comic-arcade-dark': comicQuestDarkTheme,
   'comic-light': comicPopLightTheme,
   'comic-dark': comicPopDarkTheme,
 };
 
 export const THEME_GROUPS = {
   light: [
-    { id: 'comic-pop-light', name: 'Hero Pop (Light)', desc: 'Bold comic hero cards with halftone badges and speech balloons.' },
-    { id: 'comic-strip-light', name: 'Story Strip (Light)', desc: '3-panel Sunday newspaper comic layout with dialogue panels.' },
+    { id: 'comic-pop-light', name: 'Hero Pop (Light)', desc: 'Bold comic hero cards with halftone badges and action balloons.' },
     { id: 'comic-quest-light', name: 'Duo Quest (Light)', desc: 'Playful Duolingo-inspired learning UX with chunky 3D buttons.' },
     { id: 'comic-notebook-light', name: 'Index Notebook (Light)', desc: 'Ruled paper notebook with sticky index tabs and washi tape.' },
-    { id: 'comic-arcade-light', name: 'Arcade Retro (Light)', desc: '90s pixel arcade cabinet style with HUD bars and coin buttons.' },
     { id: 'minimal-light', name: 'Minimal (Light)', desc: 'Clean, distraction-free classic Anki design with subtle borders.' },
   ],
   dark: [
     { id: 'comic-pop-dark', name: 'Hero Pop (Dark)', desc: 'Midnight comic hero panels with bright amber and cyan action badges.' },
-    { id: 'comic-strip-dark', name: 'Story Strip (Dark)', desc: 'Deep navy comic strip panels with speech bubbles and dialogue frames.' },
     { id: 'comic-quest-dark', name: 'Duo Quest (Dark)', desc: 'Midnight gamified educational card with glowing XP accents.' },
     { id: 'comic-notebook-dark', name: 'Index Notebook (Dark)', desc: 'Chalkboard study notebook with neon highlighters and sticky notes.' },
-    { id: 'comic-arcade-dark', name: 'Arcade Retro (Dark)', desc: 'Vibrant neon 90s arcade cyberpunk interface with glowing terminals.' },
     { id: 'minimal-dark', name: 'Minimal (Dark)', desc: 'Distraction-free dark Anki card with restrained colors and subtle borders.' },
   ],
 };
@@ -73,9 +63,6 @@ export function getSpellingFrontHtml(themeId: ThemeId): string {
     case 'comic-light':
     case 'comic-dark':
       return heroPopFrontSpellingHtml;
-    case 'comic-strip-light':
-    case 'comic-strip-dark':
-      return storyStripFrontSpellingHtml;
     case 'comic-quest-light':
     case 'comic-quest-dark':
     case 'comic-manga-light':
@@ -84,16 +71,12 @@ export function getSpellingFrontHtml(themeId: ThemeId): string {
     case 'comic-notebook-light':
     case 'comic-notebook-dark':
       return indexNotebookFrontSpellingHtml;
-    case 'comic-arcade-light':
-    case 'comic-arcade-dark':
-      return arcadeRetroFrontSpellingHtml;
     case 'minimal-light':
     case 'minimal-dark':
     case 'comic-minimal-light':
     case 'comic-minimal-dark':
-      return minimalFrontSpellingHtml;
     default:
-      return heroPopFrontSpellingHtml;
+      return minimalFrontSpellingHtml;
   }
 }
 
@@ -132,7 +115,7 @@ export function isRTLText(text?: string): boolean {
 export function getContrastTextColor(hexColor?: string): string {
   if (!hexColor) return '#ffffff';
   let c = hexColor.replace('#', '');
-  if (c.length === 3) c = c.split('').map(x => x + x).join('');
+  if (c.length === 3) c = c.split('').map((x) => x + x).join('');
   const r = parseInt(c.substring(0, 2), 16) || 0;
   const g = parseInt(c.substring(2, 4), 16) || 0;
   const b = parseInt(c.substring(4, 6), 16) || 0;
@@ -176,15 +159,6 @@ export function renderCustomBlocksHtml(
 </div>`;
         break;
 
-      case 'comic-strip-light':
-      case 'comic-strip-dark':
-        blockHtml = `
-<div class="strip-panel panel-custom custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; margin-top: 14px;">
-  <div class="panel-tag" style="background-color: ${badgeBg}; color: ${textColor}; font-weight: 900;">${escapeHtml(title)}</div>
-  <div class="custom-block-content" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>
-</div>`;
-        break;
-
       case 'comic-quest-light':
       case 'comic-quest-dark':
       case 'comic-manga-light':
@@ -202,15 +176,6 @@ export function renderCustomBlocksHtml(
 <div class="notebook-washi-mnemonic custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; margin-top: 14px;">
   <span class="washi-title" style="color: ${textColor}; font-weight: 800;">📌 ${escapeHtml(title)}</span>
   <div class="washi-text" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>
-</div>`;
-        break;
-
-      case 'comic-arcade-light':
-      case 'comic-arcade-dark':
-        blockHtml = `
-<div class="arcade-powerup-box custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; border-color: ${textColor}; box-shadow: 0 0 10px rgba(0,255,204,0.25); margin-top: 14px;">
-  <div class="quest-terminal-header" style="color: ${textColor}; font-weight: 800;">★ ${escapeHtml(title)}</div>
-  <div class="arcade-custom-content" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>
 </div>`;
         break;
 
@@ -321,9 +286,15 @@ export function renderThemeHtml(
   // 3. Spelling sentence
   const spellingSentence = data.spellingSentence || makeSpellingSentence(data.example || '', data.word || '');
 
-  // 4. Custom Sections / Blocks
+  // 4. Custom Sections / Blocks strictly filtered by side
   const activeThemeId = options?.themeId || 'comic-pop-dark';
-  const customSectionsHtml = renderCustomBlocksHtml(data.customBlocks, activeThemeId);
+  const allBlocks = Array.isArray(data.customBlocks) ? data.customBlocks : [];
+  const frontBlocks = allBlocks.filter((b) => b.side === 'front');
+  const backBlocks = allBlocks.filter((b) => b.side === 'back' || !b.side);
+
+  const customFrontSectionsHtml = renderCustomBlocksHtml(frontBlocks, activeThemeId);
+  const customBackSectionsHtml = renderCustomBlocksHtml(backBlocks, activeThemeId);
+  const customSectionsHtml = renderCustomBlocksHtml(backBlocks, activeThemeId);
 
   const replacements: Record<string, string> = {
     '{{Word}}': escapeHtml(data.word || ''),
@@ -351,7 +322,27 @@ export function renderThemeHtml(
     html = html.replaceAll(key, value);
   }
 
-  // Handle CustomSections conditional tags
+  // Handle CustomFrontSections conditional tags
+  if (customFrontSectionsHtml) {
+    html = html.replace(/\{\{#CustomFrontSections\}\}/g, '');
+    html = html.replace(/\{\{\/CustomFrontSections\}\}/g, '');
+    html = html.replaceAll('{{CustomFrontSections}}', customFrontSectionsHtml);
+  } else {
+    html = html.replace(/\{\{#CustomFrontSections\}\}[\s\S]*?\{\{\/CustomFrontSections\}\}/g, '');
+    html = html.replaceAll('{{CustomFrontSections}}', '');
+  }
+
+  // Handle CustomBackSections conditional tags
+  if (customBackSectionsHtml) {
+    html = html.replace(/\{\{#CustomBackSections\}\}/g, '');
+    html = html.replace(/\{\{\/CustomBackSections\}\}/g, '');
+    html = html.replaceAll('{{CustomBackSections}}', customBackSectionsHtml);
+  } else {
+    html = html.replace(/\{\{#CustomBackSections\}\}[\s\S]*?\{\{\/CustomBackSections\}\}/g, '');
+    html = html.replaceAll('{{CustomBackSections}}', '');
+  }
+
+  // Handle CustomSections conditional tags (legacy/universal)
   if (customSectionsHtml) {
     html = html.replace(/\{\{#CustomSections\}\}/g, '');
     html = html.replace(/\{\{\/CustomSections\}\}/g, '');
@@ -381,7 +372,7 @@ export const SHARED_CARD_CSS = `
   gap: 8px !important;
 }
 
-.custom-block-content, .quest-custom-content, .notebook-custom-content, .arcade-custom-content, .minimal-custom-content {
+.custom-block-content, .quest-custom-content, .notebook-custom-content, .minimal-custom-content {
   font-size: 14px !important;
   line-height: 1.65 !important;
   word-break: break-word !important;

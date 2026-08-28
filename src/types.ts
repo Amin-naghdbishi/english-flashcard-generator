@@ -60,7 +60,9 @@ export interface CardData {
   // Array of all generated audio clips
   audioFiles?: CardAudioFile[];
 
-  // Custom Theme-Aware Blocks/Boxes
+  // Custom Theme-Aware Blocks/Boxes: Separate Collections for Front and Back
+  frontCustomBlocks?: CustomCardBlock[];
+  backCustomBlocks?: CustomCardBlock[];
   customBlocks?: CustomCardBlock[];
 }
 
@@ -70,6 +72,36 @@ export interface CustomCardBlock {
   content: string;
   color?: string; // Hex or theme color preset
   dir?: 'rtl' | 'ltr' | 'auto';
+  side: 'front' | 'back'; // Which side of the card this box appears on ('front' or 'back')
+}
+
+export function getFrontCustomBlocks(card?: Partial<CardData> | null): CustomCardBlock[] {
+  if (!card) return [];
+  if (Array.isArray(card.frontCustomBlocks) && card.frontCustomBlocks.length > 0) {
+    return card.frontCustomBlocks.map((b) => ({ ...b, side: 'front' as const }));
+  }
+  if (Array.isArray(card.customBlocks) && card.customBlocks.length > 0) {
+    return card.customBlocks.filter((b) => b.side === 'front').map((b) => ({ ...b, side: 'front' as const }));
+  }
+  return [];
+}
+
+export function getBackCustomBlocks(card?: Partial<CardData> | null): CustomCardBlock[] {
+  if (!card) return [];
+  if (Array.isArray(card.backCustomBlocks) && card.backCustomBlocks.length > 0) {
+    return card.backCustomBlocks.map((b) => ({ ...b, side: 'back' as const }));
+  }
+  if (Array.isArray(card.customBlocks) && card.customBlocks.length > 0) {
+    return card.customBlocks.filter((b) => b.side === 'back' || !b.side).map((b) => ({ ...b, side: 'back' as const }));
+  }
+  return [];
+}
+
+export function getAllCustomBlocks(card?: Partial<CardData> | null): CustomCardBlock[] {
+  if (!card) return [];
+  const front = getFrontCustomBlocks(card);
+  const back = getBackCustomBlocks(card);
+  return [...front, ...back];
 }
 
 export interface ManualOverrides {
@@ -83,6 +115,8 @@ export interface ManualOverrides {
   imageBase64?: string;
   imageFileName?: string;
   needsPhoto?: boolean;
+  frontCustomBlocks?: CustomCardBlock[];
+  backCustomBlocks?: CustomCardBlock[];
   customBlocks?: CustomCardBlock[];
 }
 
@@ -94,14 +128,10 @@ export type TTSProvider = 'piper' | 'online' | 'custom' | string;
 export type ThemeId =
   | 'comic-pop-light'
   | 'comic-pop-dark'
-  | 'comic-strip-light'
-  | 'comic-strip-dark'
   | 'comic-quest-light'
   | 'comic-quest-dark'
   | 'comic-notebook-light'
   | 'comic-notebook-dark'
-  | 'comic-arcade-light'
-  | 'comic-arcade-dark'
   | 'minimal-light'
   | 'minimal-dark'
   // Legacy aliases

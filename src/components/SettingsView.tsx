@@ -3064,7 +3064,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             </div>
           </div>
 
-          {/* 4. FLASHCARD NOTE THEMES (All 12 Note Themes preserved) */}
+          {/* 4. FLASHCARD NOTE THEMES (8 Themes) */}
           <div
             className={`p-5 border rounded-lg shadow-xs ${
               isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
@@ -3195,6 +3195,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   themeId={form.theme}
                   emptyWordPlaceholder="wanderlust"
                   appTheme={isDark ? 'anki-dark' : 'anki-light'}
+                  editable={false}
                 />
               </div>
             </div>

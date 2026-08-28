@@ -22,6 +22,9 @@ export const en = {
     ankiChecking: 'AnkiConnect: Checking status...',
     pipeline: 'Pipeline:',
     footerTagline: 'English Flashcard Generator • 12 Note Designs',
+    pinToolbar: 'Pin Toolbar (Keep permanently visible)',
+    unpinToolbar: 'Unpin Toolbar (Auto-hide on mouse leave)',
+    toolbarHoverHint: 'Move mouse to top edge to show navigation toolbar',
   },
 
   // Common UI words & actions

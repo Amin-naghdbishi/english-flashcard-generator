@@ -22,11 +22,11 @@ export async function checkGeminiConnection(
   apiKey: string,
   model: string = 'gemini-2.5-flash'
 ): Promise<{ connected: boolean; model?: string; error?: string }> {
-  const cleanKey = (apiKey || '').trim();
+  const cleanKey = (apiKey || process.env.GEMINI_API_KEY || '').trim();
   if (!cleanKey) {
     return {
       connected: false,
-      error: 'Gemini API key is required. Please set your API key in Settings.',
+      error: 'Gemini API key is required. Please set your API key in Settings or environment variable.',
     };
   }
 
@@ -68,11 +68,11 @@ export async function generateWithGemini(
   error?: string;
   rawResponse?: string;
 }> {
-  const cleanKey = (apiKey || '').trim();
+  const cleanKey = (apiKey || process.env.GEMINI_API_KEY || '').trim();
   if (!cleanKey) {
     return {
       success: false,
-      error: 'Gemini API key is missing. Please configure your API key in Settings.',
+      error: 'Gemini API key is missing. Please configure your API key in Settings or set GEMINI_API_KEY environment variable.',
     };
   }
 

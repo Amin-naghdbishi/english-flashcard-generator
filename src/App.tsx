@@ -94,8 +94,47 @@ function AppShell({
   refreshStatuses: (isManual?: boolean) => Promise<void>;
 }) {
   const [currentTab, setCurrentTab] = useState<NavTab>('create');
+  const [isNavPinned, setIsNavPinned] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('anki_toolbar_pinned') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isNavHovered, setIsNavHovered] = useState<boolean>(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const { t } = useTranslation();
   const isDark = activeAppTheme === 'anki-dark';
+
+  const handleTogglePin = useCallback(() => {
+    setIsNavPinned((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('anki_toolbar_pinned', String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  const handleMouseEnter = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setIsNavHovered(true);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsNavHovered(false);
+    }, 200);
+  }, []);
+
+  const isNavVisible = isNavPinned || isNavHovered;
 
   return (
     <AppThemeProvider
@@ -103,23 +142,45 @@ function AppShell({
       setAppTheme={handleSetAppTheme}
     >
       <div
-        className={`min-h-screen flex flex-col font-sans transition-colors duration-150 ${
+        className={`min-h-screen flex flex-col font-sans transition-colors duration-150 relative ${
           isDark
             ? 'bg-[#18181B] text-zinc-100 dark selection:bg-blue-600 selection:text-white'
             : 'bg-[#F4F4F5] text-zinc-900 selection:bg-blue-500 selection:text-white'
         }`}
       >
-        {/* Top Navigation Header */}
+        {/* Invisible Top Edge Hover Trigger for Auto-Hiding Toolbar */}
+        <div
+          onMouseEnter={handleMouseEnter}
+          className="fixed top-0 left-0 right-0 h-3 z-40 cursor-default"
+          aria-hidden="true"
+        />
+
+        {/* Subtle Indicator when Toolbar is Auto-Hidden */}
+        {!isNavVisible && (
+          <div
+            onClick={handleMouseEnter}
+            onMouseEnter={handleMouseEnter}
+            className="fixed top-0 left-1/2 -translate-x-1/2 h-1 hover:h-2 w-28 bg-blue-500/40 hover:bg-blue-500/80 rounded-b-full transition-all duration-200 z-30 cursor-pointer shadow-xs"
+            title={t('nav.toolbarHoverHint')}
+          />
+        )}
+
+        {/* Top Navigation Header with Auto-Hide & Pin Support */}
         <NavigationStrip
           currentTab={currentTab}
           onSelectTab={setCurrentTab}
           status={status}
           onRefreshStatus={() => refreshStatuses(true)}
           appTheme={activeAppTheme}
+          isPinned={isNavPinned}
+          onTogglePin={handleTogglePin}
+          isVisible={isNavVisible}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         />
 
-        {/* Main Content Body - Persistent tabs for instant switching & state preservation */}
-        <main className="flex-1 w-full min-w-0">
+        {/* Main Content Body - Consistent top spacing ensures ZERO layout jumps/resizing */}
+        <main className={`flex-1 w-full min-w-0 ${isNavPinned ? 'pt-14' : 'pt-4 sm:pt-6'}`}>
           <div className={currentTab === 'create' ? 'block' : 'hidden'}>
             <CreateCardView
               settings={settings}

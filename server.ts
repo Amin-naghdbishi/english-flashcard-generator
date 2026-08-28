@@ -1227,7 +1227,9 @@ async function startServer() {
         Example: renderMarkdown((cardData.example || '').trim()),
         Translation: renderMarkdown((cardData.translationFa || '').trim()),
         Mnemonic: renderMarkdown((cardData.mnemonic || '').trim()),
-        CustomSections: renderCustomBlocksHtml(cardData.customBlocks, effectiveTheme),
+        CustomFrontSections: renderCustomBlocksHtml((cardData.customBlocks || []).filter((b: any) => b.side === 'front'), effectiveTheme),
+        CustomBackSections: renderCustomBlocksHtml((cardData.customBlocks || []).filter((b: any) => b.side === 'back' || !b.side), effectiveTheme),
+        CustomSections: renderCustomBlocksHtml((cardData.customBlocks || []).filter((b: any) => b.side === 'back' || !b.side), effectiveTheme),
       };
 
       if (cardData.spellingSentence) {

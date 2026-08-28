@@ -649,9 +649,9 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
   }, 0);
 
   return (
-    <div className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 p-4 sm:p-6 min-w-0">
+    <div className="w-full max-w-[1920px] mx-auto flex flex-col lg:flex-row gap-4 xl:gap-5 p-3 sm:p-5 min-w-0">
       {/* LEFT COLUMN: Controls, Upload TXT, Grouping, Queue */}
-      <section className="w-full lg:w-[480px] flex flex-col gap-6 shrink-0 min-w-0">
+      <section className="w-full lg:w-[420px] xl:w-[440px] flex flex-col gap-4 shrink-0 min-w-0">
         <div
           className={`p-4 sm:p-5 border rounded-lg shadow-xs ${
             isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'

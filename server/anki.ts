@@ -24,6 +24,8 @@ export const ANKI_MODEL_FIELDS = [
   'ExampleAudioUsSlow',
   'ExampleAudioUkNormal',
   'ExampleAudioUkSlow',
+  'CustomFrontSections',
+  'CustomBackSections',
   'CustomSections',
 ];
 
@@ -508,7 +510,9 @@ export async function createAnkiNote(
     ExampleAudioUsSlow: cardData.exampleAudioUsSlowFileName ? `[sound:${cardData.exampleAudioUsSlowFileName}]` : '',
     ExampleAudioUkNormal: cardData.exampleAudioUkNormalFileName ? `[sound:${cardData.exampleAudioUkNormalFileName}]` : '',
     ExampleAudioUkSlow: cardData.exampleAudioUkSlowFileName ? `[sound:${cardData.exampleAudioUkSlowFileName}]` : '',
-    CustomSections: renderCustomBlocksHtml(cardData.customBlocks, themeId),
+    CustomFrontSections: renderCustomBlocksHtml((cardData.customBlocks || []).filter((b) => b.side === 'front'), themeId),
+    CustomBackSections: renderCustomBlocksHtml((cardData.customBlocks || []).filter((b) => b.side === 'back' || !b.side), themeId),
+    CustomSections: renderCustomBlocksHtml((cardData.customBlocks || []).filter((b) => b.side === 'back' || !b.side), themeId),
   };
 
   // 6. Add Note (IMPORTANT: allowDuplicate: true so user can create multiple cards for the same word with different meanings)

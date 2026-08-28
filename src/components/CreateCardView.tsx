@@ -205,6 +205,9 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
       if (updated.word && updated.word.trim() !== word) {
         setWord(updated.word.trim());
       }
+      if (updated.cardType && (updated.cardType === 'normal' || updated.cardType === 'spelling')) {
+        setCardType(updated.cardType);
+      }
     },
     [word]
   );
@@ -538,9 +541,9 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
   }, [editableCard, generatedCard, word, cardType, photoChoice]);
 
   return (
-    <div className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 lg:gap-8 p-4 sm:p-6 min-w-0">
+    <div className="w-full max-w-[1920px] mx-auto flex flex-col lg:flex-row gap-4 xl:gap-5 p-3 sm:p-5 min-w-0">
       {/* LEFT COLUMN: Creation Parameters & Pipeline Status */}
-      <section className="w-full lg:w-[420px] flex flex-col gap-6 shrink-0 min-w-0">
+      <section className="w-full lg:w-[350px] xl:w-[375px] flex flex-col gap-4 shrink-0 min-w-0">
         {/* Box 1: Build Flashcard Form */}
         <div
           className={`p-4 sm:p-5 border rounded-lg shadow-xs ${
@@ -1041,7 +1044,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
       {/* RIGHT COLUMN: Live Card Preview & Card Editor */}
       <section className="flex-1 flex flex-col min-h-[580px] min-w-0">
         <div
-          className={`flex-1 border rounded-lg p-4 sm:p-6 relative overflow-hidden shadow-xs flex flex-col ${
+          className={`flex-1 border rounded-lg p-2.5 sm:p-3.5 relative overflow-hidden shadow-xs flex flex-col ${
             isDark ? 'bg-[#1F1F23] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
           }`}
         >

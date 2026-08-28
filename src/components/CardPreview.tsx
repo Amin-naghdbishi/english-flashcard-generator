@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { CardData, ThemeDefinition, ThemeId, CardType, AppTheme, CustomCardBlock } from '../types';
-import { THEMES, renderThemeHtml, getSpellingFrontHtml, SHARED_CARD_CSS, isRTLText, getContrastTextColor } from '../themes';
+import {
+  THEMES,
+  renderThemeHtml,
+  getSpellingFrontHtml,
+  makeSpellingSentence,
+  SHARED_CARD_CSS,
+  isRTLText,
+  getContrastTextColor,
+} from '../themes';
 import { renderMarkdown, applyMarkdownToText, MarkdownAction } from '../utils/markdown';
 import {
   Smartphone,
@@ -16,26 +24,18 @@ import {
   Code,
   Plus,
   Trash2,
-  ArrowUp,
-  ArrowDown,
   Volume2,
-  Image as ImageIcon,
   Search,
   Upload,
   Sparkles,
   Save,
   CheckCircle2,
-  RotateCcw,
   SlidersHorizontal,
-  Palette,
-  Highlighter,
   AlignLeft,
   AlignRight,
-  ChevronRight,
-  ChevronLeft,
-  Layers,
   HelpCircle,
   X,
+  Zap,
 } from 'lucide-react';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
@@ -91,7 +91,7 @@ export const HIGHLIGHT_PRESETS = [
 ];
 
 function getThemeCardClasses(themeId: ThemeId) {
-  if (themeId.includes('pop') || themeId === 'comic-light' || themeId === 'comic-dark') {
+  if (themeId.includes('pop') || themeId === 'comic-light' || themeId === 'comic-dark' || themeId.includes('strip')) {
     return {
       wrapper: 'comic-card-wrapper theme-pop',
       card: 'comic-card',
@@ -110,26 +110,7 @@ function getThemeCardClasses(themeId: ThemeId) {
       customLabel: 'box-label',
     };
   }
-  if (themeId.includes('strip')) {
-    return {
-      wrapper: 'comic-card-wrapper theme-strip',
-      card: 'comic-card strip-container',
-      wordSection: 'strip-panel panel-header',
-      wordTitle: 'strip-title',
-      ipaBadge: 'strip-ipa',
-      posBadge: 'strip-pos',
-      pronunciationBox: 'strip-audio-grid',
-      meaningBox: 'strip-panel panel-meaning',
-      meaningLabel: 'panel-tag',
-      exampleBox: 'strip-panel panel-dialogue',
-      exampleLabel: 'panel-tag',
-      mnemonicBox: 'strip-mnemonic-footer',
-      mnemonicLabel: 'mnem-star',
-      customBox: 'strip-panel panel-custom custom-card-block',
-      customLabel: 'panel-tag',
-    };
-  }
-  if (themeId.includes('quest') || themeId.includes('manga')) {
+  if (themeId.includes('quest') || themeId.includes('manga') || themeId.includes('arcade')) {
     return {
       wrapper: 'comic-card-wrapper theme-quest',
       card: 'comic-card quest-card',
@@ -167,26 +148,6 @@ function getThemeCardClasses(themeId: ThemeId) {
       customLabel: 'washi-title',
     };
   }
-  if (themeId.includes('arcade')) {
-    return {
-      wrapper: 'comic-card-wrapper theme-arcade',
-      card: 'comic-card arcade-cabinet',
-      wordSection: 'arcade-header',
-      wordTitle: 'arcade-word',
-      ipaBadge: 'arcade-ipa',
-      posBadge: 'arcade-badge',
-      pronunciationBox: 'comic-pronunciation-box',
-      meaningBox: 'arcade-item-stats',
-      meaningLabel: 'item-stat-header',
-      exampleBox: 'arcade-dialog-box',
-      exampleLabel: 'arcade-terminal-header',
-      mnemonicBox: 'arcade-powerup-box',
-      mnemonicLabel: 'quest-terminal-header',
-      customBox: 'arcade-powerup-box custom-card-block',
-      customLabel: 'quest-terminal-header',
-    };
-  }
-  // Minimal theme
   return {
     wrapper: 'minimal-card-wrapper theme-minimal',
     card: 'comic-card minimal-card',
@@ -225,44 +186,39 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
   const { t, isRTL } = useTranslation();
   const isDark = (propTheme || themeContext.appTheme) === 'anki-dark';
 
-  const [mode, setMode] = useState<'edit' | 'preview'>('edit');
+  const [mode, setMode] = useState<'edit' | 'preview'>(editable ? 'edit' : 'preview');
   const [activeSide, setActiveSide] = useState<'front' | 'back' | 'both'>('back');
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
   const [previewCardType, setPreviewCardType] = useState<CardType>(cardType);
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
 
-  // Close drawer on Escape key press
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isSidebarOpen) {
-        setIsSidebarOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSidebarOpen]);
+  // Spelling in-editor tester state
+  const [testSpellingInput, setTestSpellingInput] = useState<string>('');
+  const [testSpellingResult, setTestSpellingResult] = useState<'correct' | 'incorrect' | null>(null);
 
-  // Local editable draft card data (initialized with cardData or rich placeholder)
+  // Local editable draft card data
   const [internalCard, setInternalCard] = useState<CardData>(() => {
+    const initialWord = cardData?.word || emptyWordPlaceholder;
+    const initialExample = cardData?.example || 'I made a pencil mistake and need an eraser.';
     return (
       cardData || {
-        word: emptyWordPlaceholder,
+        word: initialWord,
         phonetic: '/ɪˈreɪzər/',
         partOfSpeech: 'noun',
-        meaningFa: 'پاک‌کن، ابزار پاک کردن',
-        example: 'I made a pencil mistake and need an eraser.',
+        meaningFa: 'پاک‌کن، ابزار پاک کردن اشتباهات نوشتاری',
+        example: initialExample,
         translationFa: 'من با مداد اشتباه نوشتم و به یک پاک‌کن نیاز دارم.',
         mnemonic: '**ERASE-ER**: It **erases** errors easily on paper.',
         cardType: previewCardType,
-        spellingSentence: 'I made a pencil mistake and need an ______.',
+        spellingSentence: makeSpellingSentence(initialExample, initialWord),
         imageBase64: undefined,
         customBlocks: [],
       }
     );
   });
 
-  // Track the currently focused field / textarea for toolbar formatting actions
+  // Track focused field for formatting actions
   const activeInputRef = useRef<{
     element: HTMLInputElement | HTMLTextAreaElement | null;
     fieldName: string;
@@ -271,18 +227,48 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Callback ref
+  const onCardChangeRef = useRef(onCardChange);
+  useEffect(() => {
+    onCardChangeRef.current = onCardChange;
+  }, [onCardChange]);
+
+  const internalCardRef = useRef<CardData>(internalCard);
+  useEffect(() => {
+    internalCardRef.current = internalCard;
+  }, [internalCard]);
+
+  // Sync mode when editable prop changes
+  useEffect(() => {
+    if (!editable && mode !== 'preview') {
+      setMode('preview');
+    }
+  }, [editable, mode]);
+
   // Sync with prop updates
   useEffect(() => {
     if (cardData) {
-      setInternalCard((prev) => ({
-        ...prev,
-        ...cardData,
-        customBlocks: cardData.customBlocks !== undefined ? cardData.customBlocks : prev.customBlocks || [],
-      }));
+      setInternalCard((prev) => {
+        const next = {
+          ...prev,
+          ...cardData,
+          customBlocks: cardData.customBlocks !== undefined ? cardData.customBlocks : prev.customBlocks || [],
+        };
+        internalCardRef.current = next;
+        return next;
+      });
     }
   }, [cardData]);
 
-  // Keep selectedBoxId in sync
+  useEffect(() => {
+    if (cardData?.cardType) {
+      setPreviewCardType(cardData.cardType);
+    } else if (cardType) {
+      setPreviewCardType(cardType);
+    }
+  }, [cardData?.cardType, cardType]);
+
+  // Sync selectedBoxId
   useEffect(() => {
     if (internalCard.customBlocks && internalCard.customBlocks.length > 0) {
       if (!selectedBoxId || !internalCard.customBlocks.some((b) => b.id === selectedBoxId)) {
@@ -293,26 +279,22 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
     }
   }, [internalCard.customBlocks, selectedBoxId]);
 
-  useEffect(() => {
-    if (cardData?.cardType) {
-      setPreviewCardType(cardData.cardType);
-    } else if (cardType) {
-      setPreviewCardType(cardType);
-    }
-  }, [cardData?.cardType, cardType]);
-
-  // Notify parent of card edits
+  // Notify parent of card edits outside the render cycle
   const handleUpdate = useCallback(
     (updater: (prev: CardData) => CardData) => {
       setInternalCard((prev) => {
         const next = updater(prev);
-        if (onCardChange) {
-          onCardChange(next);
-        }
+        internalCardRef.current = next;
         return next;
       });
+
+      queueMicrotask(() => {
+        if (onCardChangeRef.current) {
+          onCardChangeRef.current(internalCardRef.current);
+        }
+      });
     },
-    [onCardChange]
+    []
   );
 
   const updateSimpleField = (field: keyof CardData, value: any) => {
@@ -322,7 +304,40 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
     }));
   };
 
-  // --- Toolbar Markdown & Color Formatting Action ---
+  // Switch card type (normal <-> spelling) and ensure proper fields
+  const handleToggleCardType = (newType: CardType) => {
+    setPreviewCardType(newType);
+    handleUpdate((prev) => {
+      let spellingSentence = prev.spellingSentence;
+      if (newType === 'spelling' && (!spellingSentence || !spellingSentence.includes('______'))) {
+        spellingSentence = makeSpellingSentence(prev.example || '', prev.word || '');
+      }
+      return {
+        ...prev,
+        cardType: newType,
+        spellingSentence,
+      };
+    });
+  };
+
+  // Helper to re-generate blank sentence
+  const handleAutoBlankSentence = () => {
+    const blanked = makeSpellingSentence(internalCard.example || '', internalCard.word || '');
+    updateSimpleField('spellingSentence', blanked);
+  };
+
+  // Check spelling tester in editor
+  const handleTestSpelling = () => {
+    const target = (internalCard.word || '').trim().toLowerCase();
+    const typed = testSpellingInput.trim().toLowerCase();
+    if (typed === target) {
+      setTestSpellingResult('correct');
+    } else {
+      setTestSpellingResult('incorrect');
+    }
+  };
+
+  // Markdown Toolbar Action
   const handleMarkdownToolbarAction = (action: MarkdownAction, extraValue?: string) => {
     const active = activeInputRef.current;
     if (!active || !active.element) return;
@@ -351,12 +366,13 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
     }, 0);
   };
 
-  // --- Custom Blocks Management ---
-  const handleAddCustomBlock = (titleOverride?: string) => {
+  // Custom Blocks Management
+  const handleAddCustomBlock = (side: 'front' | 'back' = 'back', titleOverride?: string) => {
     const newId = `block_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const newBlock: CustomCardBlock = {
       id: newId,
-      title: titleOverride || 'EXTRA NOTE / SYNONYMS',
+      side,
+      title: titleOverride || (side === 'front' ? 'FRONT NOTE / HINT' : 'EXTRA NOTE / SYNONYMS'),
       content: '- Key point 1\n- Key point 2',
       color: BOX_BG_PRESETS[Math.floor(Math.random() * BOX_BG_PRESETS.length)].hex,
       dir: 'auto',
@@ -368,10 +384,6 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
     }));
 
     setSelectedBoxId(newId);
-
-    if (mode === 'preview') {
-      setMode('edit');
-    }
   };
 
   const handleUpdateCustomBlock = (id: string, updates: Partial<CustomCardBlock>) => {
@@ -379,20 +391,6 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
       ...prev,
       customBlocks: (prev.customBlocks || []).map((b) => (b.id === id ? { ...b, ...updates } : b)),
     }));
-  };
-
-  const handleMoveCustomBlock = (index: number, direction: 'up' | 'down') => {
-    handleUpdate((prev) => {
-      const blocks = [...(prev.customBlocks || [])];
-      const targetIndex = direction === 'up' ? index - 1 : index + 1;
-      if (targetIndex < 0 || targetIndex >= blocks.length) return prev;
-
-      const temp = blocks[index];
-      blocks[index] = blocks[targetIndex];
-      blocks[targetIndex] = temp;
-
-      return { ...prev, customBlocks: blocks };
-    });
   };
 
   const handleDeleteCustomBlock = (id: string) => {
@@ -405,23 +403,16 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
     }
   };
 
-  // Keyboard shortcut listener for formatting (Ctrl+B, Ctrl+I, Ctrl+U)
-  const handleEditorKeyDown = (e: React.KeyboardEvent) => {
-    if (e.ctrlKey || e.metaKey) {
-      if (e.key === 'b' || e.key === 'B') {
-        e.preventDefault();
-        handleMarkdownToolbarAction('bold');
-      } else if (e.key === 'i' || e.key === 'I') {
-        e.preventDefault();
-        handleMarkdownToolbarAction('italic');
-      } else if (e.key === 'u' || e.key === 'U') {
-        e.preventDefault();
-        handleMarkdownToolbarAction('underline');
-      }
+  // Audio preview playback
+  const playAudio = (b64: string) => {
+    try {
+      const audio = new Audio(`data:audio/wav;base64,${b64}`);
+      audio.play().catch((err) => console.error('Preview audio play error:', err));
+    } catch (err) {
+      console.error('Audio playback error:', err);
     }
   };
 
-  // Play audio when clicking preview audio buttons
   const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = (e.target as HTMLElement).closest('[data-audio-target]');
     if (!target) return;
@@ -439,23 +430,10 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
       playAudio(internalCard.exampleAudioUsNormalBase64 || internalCard.exampleAudioBase64!);
     } else if (audioType === 'example_us_slow' && internalCard.exampleAudioUsSlowBase64) {
       playAudio(internalCard.exampleAudioUsSlowBase64);
-    } else if (audioType === 'example_uk_normal' && internalCard.exampleAudioUkNormalBase64) {
-      playAudio(internalCard.exampleAudioUkNormalBase64);
-    } else if (audioType === 'example_uk_slow' && internalCard.exampleAudioUkSlowBase64) {
-      playAudio(internalCard.exampleAudioUkSlowBase64);
     } else if (audioType === 'word' && internalCard.wordAudioBase64) {
       playAudio(internalCard.wordAudioBase64);
     } else if (audioType === 'example' && internalCard.exampleAudioBase64) {
       playAudio(internalCard.exampleAudioBase64);
-    }
-  };
-
-  const playAudio = (b64: string) => {
-    try {
-      const audio = new Audio(`data:audio/wav;base64,${b64}`);
-      audio.play().catch((err) => console.error('Preview audio play error:', err));
-    } catch (err) {
-      console.error('Audio playback error:', err);
     }
   };
 
@@ -466,7 +444,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
   const frontRendered = useMemo(() => {
     const activeData = { ...internalCard, cardType: previewCardType };
     if (previewCardType === 'spelling') {
-      return getSpellingFrontHtml(theme.id);
+      return renderThemeHtml(getSpellingFrontHtml(theme.id), activeData, { isPreview: true, cardType: previewCardType, themeId: theme.id });
     }
     return renderThemeHtml(theme.frontHtml, activeData, { isPreview: true, cardType: previewCardType, themeId: theme.id });
   }, [internalCard, theme, previewCardType]);
@@ -482,8 +460,758 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
     return internalCard.customBlocks.find((b) => b.id === selectedBoxId) || internalCard.customBlocks[0];
   }, [internalCard.customBlocks, selectedBoxId]);
 
+  // ----------------------------------------------------
+  // SUB-RENDERERS FOR EDITABLE CARDS
+  // ----------------------------------------------------
+
+  // Reusable Custom Boxes Editor for Any Side (Front / Back)
+  const renderCustomBoxesEditor = (side: 'front' | 'back') => {
+    const blocks = (internalCard.customBlocks || []).filter((b) =>
+      side === 'front' ? b.side === 'front' : (b.side === 'back' || !b.side)
+    );
+    const sideLabel = side === 'front' ? 'Front' : 'Back';
+
+    return (
+      <div className="space-y-2.5 pt-3 border-t border-zinc-700/40">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+            <span>📦 Custom Boxes ({sideLabel}):</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-black/30 font-mono text-zinc-300">
+              {blocks.length}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => handleAddCustomBlock(side)}
+            className={`px-2.5 py-1 text-[11px] font-bold rounded flex items-center gap-1 cursor-pointer transition-colors shadow-xs ${
+              side === 'front'
+                ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+            }`}
+          >
+            <Plus className="w-3 h-3" />
+            <span>+ Add Box ({sideLabel})</span>
+          </button>
+        </div>
+
+        {blocks.length > 0 && (
+          <div className="space-y-2.5">
+            {blocks.map((blk) => {
+              const bgColor = blk.color || '#1E293B';
+              const isSelected = selectedBoxId === blk.id;
+              return (
+                <div
+                  key={blk.id}
+                  style={{ backgroundColor: bgColor }}
+                  onClick={() => setSelectedBoxId(blk.id)}
+                  className={`p-3 rounded-lg border transition-all duration-150 shadow-xs space-y-2 relative group ${
+                    isSelected ? 'ring-2 ring-blue-400 border-white/40' : 'border-black/30 hover:border-white/20'
+                  }`}
+                >
+                  {/* Box Header Controls */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                      <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-black/40 text-white shrink-0 tracking-wider">
+                        {blk.side === 'front' ? 'FRONT' : 'BACK'}
+                      </span>
+                      <input
+                        type="text"
+                        value={blk.title}
+                        onChange={(e) => handleUpdateCustomBlock(blk.id, { title: e.target.value })}
+                        placeholder="Box Title / Label..."
+                        className="font-bold text-xs bg-black/20 px-2 py-1 rounded border border-white/20 focus:border-white focus:outline-none text-white flex-1 min-w-0"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* Move Side */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUpdateCustomBlock(blk.id, {
+                            side: blk.side === 'front' ? 'back' : 'front',
+                          });
+                        }}
+                        className="px-2 py-0.5 text-[10px] font-semibold bg-black/40 hover:bg-black/60 text-zinc-200 rounded border border-white/20 cursor-pointer"
+                        title={`Move this box to ${blk.side === 'front' ? 'Back' : 'Front'}`}
+                      >
+                        Move to {blk.side === 'front' ? 'Back' : 'Front'}
+                      </button>
+
+                      {/* Direction */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUpdateCustomBlock(blk.id, {
+                            dir: blk.dir === 'rtl' ? 'ltr' : blk.dir === 'ltr' ? 'auto' : 'rtl',
+                          });
+                        }}
+                        className="px-1.5 py-0.5 text-[10px] font-mono bg-black/40 hover:bg-black/60 text-zinc-200 rounded border border-white/20 cursor-pointer uppercase"
+                        title="Toggle Text Direction (auto / ltr / rtl)"
+                      >
+                        {blk.dir || 'auto'}
+                      </button>
+
+                      {/* Delete */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCustomBlock(blk.id);
+                        }}
+                        className="p-1 text-rose-300 hover:text-white hover:bg-rose-600/60 rounded cursor-pointer transition-colors"
+                        title="Delete this box"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Box Content */}
+                  <textarea
+                    rows={2}
+                    dir={blk.dir || 'auto'}
+                    value={blk.content}
+                    onChange={(e) => handleUpdateCustomBlock(blk.id, { content: e.target.value })}
+                    onFocus={(e) => {
+                      activeInputRef.current = { element: e.target, fieldName: 'customBlock', blockId: blk.id };
+                      setSelectedBoxId(blk.id);
+                    }}
+                    placeholder="Content (Markdown supported: **bold**, *italic*, - bullets, `code`)..."
+                    className="w-full p-2 text-xs rounded bg-black/35 text-white border border-white/15 focus:outline-none focus:ring-1 focus:ring-white/50 leading-relaxed font-sans placeholder-white/40"
+                  />
+
+                  {/* Color Palette Chips */}
+                  <div className="flex items-center justify-between gap-1 pt-1 border-t border-black/20">
+                    <span className="text-[10px] text-white/70 font-semibold">Color:</span>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {BOX_BG_PRESETS.map((preset) => (
+                        <button
+                          key={preset.hex}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUpdateCustomBlock(blk.id, { color: preset.hex });
+                          }}
+                          className={`w-4 h-4 rounded-full border border-black/30 cursor-pointer transition-transform ${
+                            (blk.color || '#1E293B').toLowerCase() === preset.hex.toLowerCase()
+                              ? 'scale-125 ring-2 ring-white shadow-xs'
+                              : 'opacity-80 hover:opacity-100 hover:scale-110'
+                          }`}
+                          style={{ backgroundColor: preset.hex }}
+                          title={preset.name}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Shared Image Box for Editors
+  const renderImageEditor = () => (
+    <div className="mb-4">
+      {internalCard.imageBase64 ? (
+        <div className="relative group rounded-lg overflow-hidden border border-black/30 shadow-xs">
+          <img
+            src={
+              internalCard.imageBase64.startsWith('data:')
+                ? internalCard.imageBase64
+                : `data:image/jpeg;base64,${internalCard.imageBase64}`
+            }
+            alt={internalCard.word}
+            className="w-full max-h-[220px] object-cover block"
+          />
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+            <button
+              type="button"
+              onClick={onOpenImageSearch}
+              className="px-2.5 py-1 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded shadow-xs flex items-center gap-1 cursor-pointer"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span>Search Online</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="px-2.5 py-1 text-xs font-semibold bg-zinc-700 hover:bg-zinc-600 text-white rounded shadow-xs flex items-center gap-1 cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Upload Local</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (onRemoveImage) onRemoveImage();
+                handleUpdate((prev) => ({
+                  ...prev,
+                  imageBase64: undefined,
+                  imageUrl: undefined,
+                  imageFileName: undefined,
+                  needsPhoto: false,
+                }));
+              }}
+              className="px-2.5 py-1 text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white rounded shadow-xs flex items-center gap-1 cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Remove</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="border border-dashed border-zinc-700/60 rounded-lg p-3 text-center bg-black/5 hover:bg-black/10 transition-colors flex items-center justify-between gap-2">
+          <span className="text-xs text-zinc-400 font-medium">No image attached</span>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onOpenImageSearch}
+              className="px-2 py-1 text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white rounded flex items-center gap-1 cursor-pointer"
+            >
+              <Search className="w-3 h-3" />
+              <span>Search Online</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="px-2 py-1 text-xs font-medium bg-zinc-700 hover:bg-zinc-600 text-white rounded flex items-center gap-1 cursor-pointer"
+            >
+              <Upload className="w-3 h-3" />
+              <span>Upload</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // 1. Normal Front Editor
+  const renderNormalFrontEditor = () => (
+    <div className={themeClasses.wrapper}>
+      <div className={`${themeClasses.card} p-4 sm:p-6`}>
+        {/* Header Badges */}
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-blue-600 text-white uppercase tracking-wider">
+              💥 VOCABULARY (FRONT)
+            </span>
+            <input
+              type="text"
+              value={internalCard.partOfSpeech || ''}
+              onChange={(e) => updateSimpleField('partOfSpeech', e.target.value)}
+              onFocus={(e) => {
+                activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' };
+              }}
+              placeholder="pos (e.g. noun)"
+              className="text-[11px] font-bold px-2 py-0.5 rounded border border-zinc-700/50 bg-black/20 text-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              title="Part of speech"
+            />
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+            {theme.name}
+          </span>
+        </div>
+
+        {/* Image */}
+        {renderImageEditor()}
+
+        {/* Word Title & IPA */}
+        <div className="mb-4 text-center">
+          <input
+            type="text"
+            value={internalCard.word || ''}
+            onChange={(e) => updateSimpleField('word', e.target.value)}
+            onFocus={(e) => {
+              activeInputRef.current = { element: e.target, fieldName: 'word' };
+            }}
+            placeholder="Target Word..."
+            className="w-full text-center text-2xl sm:text-3xl font-extrabold tracking-wide bg-transparent border-b-2 border-dashed border-blue-500/40 focus:border-blue-500 focus:outline-none py-1 mb-2"
+          />
+          <input
+            type="text"
+            value={internalCard.phonetic || ''}
+            onChange={(e) => updateSimpleField('phonetic', e.target.value)}
+            onFocus={(e) => {
+              activeInputRef.current = { element: e.target, fieldName: 'phonetic' };
+            }}
+            placeholder="/ipa/"
+            className="text-center font-mono text-sm px-3 py-1 rounded bg-black/20 border border-zinc-700/50 text-sky-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Audio Clues Dock */}
+        <div className="mb-4 p-2.5 rounded-lg border border-zinc-700/50 bg-black/10 flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs font-semibold text-zinc-400 flex items-center gap-1.5">
+            <Volume2 className="w-3.5 h-3.5 text-blue-400" />
+            <span>Pronunciation Clues:</span>
+          </span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {internalCard.wordAudioUsNormalBase64 && (
+              <button
+                type="button"
+                onClick={() => playAudio(internalCard.wordAudioUsNormalBase64!)}
+                className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-600/30 text-blue-300 border border-blue-500/40 hover:bg-blue-600/50 cursor-pointer"
+              >
+                US Normal
+              </button>
+            )}
+            {internalCard.wordAudioUsSlowBase64 && (
+              <button
+                type="button"
+                onClick={() => playAudio(internalCard.wordAudioUsSlowBase64!)}
+                className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-600/20 text-blue-300 border border-blue-500/30 hover:bg-blue-600/40 cursor-pointer"
+              >
+                US Slow
+              </button>
+            )}
+            {internalCard.wordAudioUkNormalBase64 && (
+              <button
+                type="button"
+                onClick={() => playAudio(internalCard.wordAudioUkNormalBase64!)}
+                className="px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-600/30 text-purple-300 border border-purple-500/40 hover:bg-purple-600/50 cursor-pointer"
+              >
+                UK Normal
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Front Context / Example */}
+        <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/10">
+          <label className="text-[11px] font-bold text-amber-400 uppercase tracking-wider block mb-1.5">
+            💡 Front Context / Example Prompt:
+          </label>
+          <textarea
+            rows={2}
+            value={internalCard.example || ''}
+            onChange={(e) => updateSimpleField('example', e.target.value)}
+            onFocus={(e) => {
+              activeInputRef.current = { element: e.target, fieldName: 'example' };
+            }}
+            placeholder="Context sentence..."
+            className="w-full p-2 text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Front Custom Boxes */}
+        {renderCustomBoxesEditor('front')}
+      </div>
+    </div>
+  );
+
+  // 2. Normal Back Editor
+  const renderNormalBackEditor = (showCompactHeader = false) => (
+    <div className={themeClasses.wrapper}>
+      <div className={`${themeClasses.card} p-4 sm:p-6 space-y-4`}>
+        {/* Header */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-emerald-600 text-white uppercase tracking-wider">
+              💥 VOCABULARY (BACK)
+            </span>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-black/20 text-zinc-300 border border-zinc-700/50">
+              {internalCard.partOfSpeech || 'noun'}
+            </span>
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+            {theme.name}
+          </span>
+        </div>
+
+        {/* Word Reference (if only Back is shown) */}
+        {showCompactHeader && (
+          <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/15 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-lg font-extrabold text-blue-400">{internalCard.word}</div>
+              <div className="text-xs font-mono text-zinc-400">{internalCard.phonetic}</div>
+            </div>
+            {internalCard.wordAudioUsNormalBase64 && (
+              <button
+                type="button"
+                onClick={() => playAudio(internalCard.wordAudioUsNormalBase64!)}
+                className="p-2 rounded bg-blue-600 hover:bg-blue-500 text-white cursor-pointer"
+                title="Play US pronunciation"
+              >
+                <Volume2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Persian Meaning */}
+        <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/10">
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
+              📖 Persian Meaning / معنی فارسی
+            </label>
+            <span className="text-[10px] text-zinc-400 font-mono">RTL</span>
+          </div>
+          <textarea
+            rows={2}
+            dir="rtl"
+            value={internalCard.meaningFa || ''}
+            onChange={(e) => updateSimpleField('meaningFa', e.target.value)}
+            onFocus={(e) => {
+              activeInputRef.current = { element: e.target, fieldName: 'meaningFa' };
+            }}
+            placeholder="معنی دقیق و روان به فارسی..."
+            className="w-full p-2.5 text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+          />
+        </div>
+
+        {/* Example & Persian Translation */}
+        <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/10 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-[11px] font-bold text-sky-400 uppercase tracking-wider">
+              💬 Example & Translation / مثال و ترجمه
+            </label>
+            {internalCard.exampleAudioUsNormalBase64 && (
+              <button
+                type="button"
+                onClick={() => playAudio(internalCard.exampleAudioUsNormalBase64!)}
+                className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer"
+              >
+                <Volume2 className="w-3 h-3" />
+                <span>Play Sentence Audio</span>
+              </button>
+            )}
+          </div>
+          <textarea
+            rows={2}
+            value={internalCard.example || ''}
+            onChange={(e) => updateSimpleField('example', e.target.value)}
+            onFocus={(e) => {
+              activeInputRef.current = { element: e.target, fieldName: 'example' };
+            }}
+            placeholder="English example sentence..."
+            className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <textarea
+            rows={2}
+            dir="rtl"
+            value={internalCard.translationFa || ''}
+            onChange={(e) => updateSimpleField('translationFa', e.target.value)}
+            onFocus={(e) => {
+              activeInputRef.current = { element: e.target, fieldName: 'translationFa' };
+            }}
+            placeholder="ترجمه فارسی مثال..."
+            className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Memory Hook (Mnemonic) */}
+        <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/10">
+          <label className="text-[11px] font-bold text-purple-400 uppercase tracking-wider block mb-1.5">
+            🧠 Memory Hook & Etymology / کد یادسپاری و ریشه‌شناسی
+          </label>
+          <textarea
+            rows={2}
+            value={internalCard.mnemonic || ''}
+            onChange={(e) => updateSimpleField('mnemonic', e.target.value)}
+            onFocus={(e) => {
+              activeInputRef.current = { element: e.target, fieldName: 'mnemonic' };
+            }}
+            placeholder="کد صوتی، ریشه‌شناسی یا داستان تصویرسازی ذهنی..."
+            className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+          />
+        </div>
+
+        {/* Back Custom Boxes */}
+        {renderCustomBoxesEditor('back')}
+      </div>
+    </div>
+  );
+
+  // 3. Spelling Front Editor
+  const renderSpellingFrontEditor = () => (
+    <div className={themeClasses.wrapper}>
+      <div className={`${themeClasses.card} p-4 sm:p-6 space-y-4`}>
+        {/* Header */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-purple-600 text-white uppercase tracking-wider">
+              🎯 SPELLING CHALLENGE (FRONT)
+            </span>
+            <input
+              type="text"
+              value={internalCard.partOfSpeech || ''}
+              onChange={(e) => updateSimpleField('partOfSpeech', e.target.value)}
+              onFocus={(e) => {
+                activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' };
+              }}
+              placeholder="pos (e.g. noun)"
+              className="text-[11px] font-bold px-2 py-0.5 rounded border border-zinc-700/50 bg-black/20 text-purple-300 focus:outline-none focus:ring-1 focus:ring-purple-500"
+            />
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+            {theme.name}
+          </span>
+        </div>
+
+        {/* Image */}
+        {renderImageEditor()}
+
+        {/* Target Word Reference */}
+        <div className="p-3 rounded-lg border border-purple-500/30 bg-purple-950/20">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400">
+              Target Word (Concealed on Anki Front):
+            </span>
+            <span className="text-[10px] text-zinc-400 font-mono">Hidden during test</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              value={internalCard.word || ''}
+              onChange={(e) => updateSimpleField('word', e.target.value)}
+              onFocus={(e) => {
+                activeInputRef.current = { element: e.target, fieldName: 'word' };
+              }}
+              placeholder="Target Word..."
+              className="p-1.5 text-sm font-bold bg-black/30 rounded border border-zinc-700 text-white"
+            />
+            <input
+              type="text"
+              value={internalCard.phonetic || ''}
+              onChange={(e) => updateSimpleField('phonetic', e.target.value)}
+              onFocus={(e) => {
+                activeInputRef.current = { element: e.target, fieldName: 'phonetic' };
+              }}
+              placeholder="/ipa/"
+              className="p-1.5 text-xs font-mono bg-black/30 rounded border border-zinc-700 text-sky-400"
+            />
+          </div>
+        </div>
+
+        {/* Spelling Gap Sentence */}
+        <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/10">
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">
+              ✍️ Missing Word Gap Sentence:
+            </label>
+            <button
+              type="button"
+              onClick={handleAutoBlankSentence}
+              className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer"
+              title="Automatically replace target word in example with [ ______ ]"
+            >
+              <Zap className="w-3 h-3 text-amber-400" />
+              <span>Auto-Blank Word</span>
+            </button>
+          </div>
+          <textarea
+            rows={2}
+            value={internalCard.spellingSentence || ''}
+            onChange={(e) => updateSimpleField('spellingSentence', e.target.value)}
+            onFocus={(e) => {
+              activeInputRef.current = { element: e.target, fieldName: 'spellingSentence' };
+            }}
+            placeholder="Sentence with ______ blank..."
+            className="w-full p-2 text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+          />
+        </div>
+
+        {/* Audio Clues Dock */}
+        <div className="p-2.5 rounded-lg border border-zinc-700/50 bg-black/10 flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs font-semibold text-zinc-400 flex items-center gap-1.5">
+            <Volume2 className="w-3.5 h-3.5 text-purple-400" />
+            <span>Audio Clues:</span>
+          </span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {internalCard.wordAudioUsNormalBase64 && (
+              <button
+                type="button"
+                onClick={() => playAudio(internalCard.wordAudioUsNormalBase64!)}
+                className="px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-600/30 text-purple-300 border border-purple-500/40 hover:bg-purple-600/50 cursor-pointer"
+              >
+                Word Audio
+              </button>
+            )}
+            {internalCard.exampleAudioUsNormalBase64 && (
+              <button
+                type="button"
+                onClick={() => playAudio(internalCard.exampleAudioUsNormalBase64!)}
+                className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-600/30 text-blue-300 border border-blue-500/40 hover:bg-blue-600/50 cursor-pointer"
+              >
+                Sentence Audio
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Interactive In-Editor Spelling Practice Tester */}
+        <div className="p-3 rounded-lg border border-purple-500/40 bg-purple-950/25 space-y-2">
+          <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider block">
+            🎮 Interactive In-Editor Spelling Practice
+          </span>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={testSpellingInput}
+              onChange={(e) => {
+                setTestSpellingInput(e.target.value);
+                setTestSpellingResult(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleTestSpelling();
+                }
+              }}
+              placeholder="Type word to test spelling..."
+              className="flex-1 p-2 text-sm bg-black/40 rounded border border-purple-500/50 text-white focus:outline-none focus:ring-1 focus:ring-purple-400 font-bold"
+            />
+            <button
+              type="button"
+              onClick={handleTestSpelling}
+              className="py-2 px-3 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded shadow-xs cursor-pointer transition-colors"
+            >
+              Check
+            </button>
+          </div>
+          {testSpellingResult === 'correct' && (
+            <div className="p-2 rounded bg-emerald-950/50 border border-emerald-500/60 text-emerald-300 text-xs font-bold flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span>Correct! Perfect spelling match for "{internalCard.word}".</span>
+            </div>
+          )}
+          {testSpellingResult === 'incorrect' && (
+            <div className="p-2 rounded bg-rose-950/50 border border-rose-500/60 text-rose-300 text-xs font-medium flex items-center justify-between">
+              <span>Incorrect spelling. Target word is "{internalCard.word}".</span>
+              <button
+                type="button"
+                onClick={() => setTestSpellingInput(internalCard.word || '')}
+                className="text-[10px] underline hover:text-white"
+              >
+                Auto-fill
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Front Custom Boxes for Spelling */}
+        {renderCustomBoxesEditor('front')}
+      </div>
+    </div>
+  );
+
+  // 4. Spelling Back Editor
+  const renderSpellingBackEditor = () => (
+    <div className={themeClasses.wrapper}>
+      <div className={`${themeClasses.card} p-4 sm:p-6 space-y-4`}>
+        {/* Header */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-emerald-600 text-white uppercase tracking-wider">
+              🎯 SPELLING SOLUTION (BACK)
+            </span>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-black/20 text-zinc-300 border border-zinc-700/50">
+              {internalCard.partOfSpeech || 'noun'}
+            </span>
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+            {theme.name}
+          </span>
+        </div>
+
+        {/* Revealed Word Solution */}
+        <div className="p-3.5 rounded-lg border border-emerald-500/40 bg-emerald-950/20 text-center space-y-1.5">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+            Revealed Word Solution:
+          </div>
+          <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-wide">
+            {internalCard.word}
+          </div>
+          <div className="text-xs font-mono text-emerald-300">{internalCard.phonetic}</div>
+          {internalCard.wordAudioUsNormalBase64 && (
+            <button
+              type="button"
+              onClick={() => playAudio(internalCard.wordAudioUsNormalBase64!)}
+              className="mt-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+              <span>Play Word Audio</span>
+            </button>
+          )}
+        </div>
+
+        {/* Full Context Sentence & Translation */}
+        <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/10 space-y-2">
+          <label className="text-[11px] font-bold text-sky-400 uppercase tracking-wider block">
+            💬 Full Context Example & Persian Translation:
+          </label>
+          <textarea
+            rows={2}
+            value={internalCard.example || ''}
+            onChange={(e) => updateSimpleField('example', e.target.value)}
+            onFocus={(e) => {
+              activeInputRef.current = { element: e.target, fieldName: 'example' };
+            }}
+            placeholder="Full English example sentence with word..."
+            className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <textarea
+            rows={2}
+            dir="rtl"
+            value={internalCard.translationFa || ''}
+            onChange={(e) => updateSimpleField('translationFa', e.target.value)}
+            onFocus={(e) => {
+              activeInputRef.current = { element: e.target, fieldName: 'translationFa' };
+            }}
+            placeholder="ترجمه فارسی مثال..."
+            className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Persian Meaning */}
+        <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/10">
+          <label className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider block mb-1.5">
+            📖 Persian Meaning / معنی فارسی:
+          </label>
+          <textarea
+            rows={2}
+            dir="rtl"
+            value={internalCard.meaningFa || ''}
+            onChange={(e) => updateSimpleField('meaningFa', e.target.value)}
+            onFocus={(e) => {
+              activeInputRef.current = { element: e.target, fieldName: 'meaningFa' };
+            }}
+            placeholder="معنی دقیق فارسی..."
+            className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Memory Hook */}
+        <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/10">
+          <label className="text-[11px] font-bold text-purple-400 uppercase tracking-wider block mb-1.5">
+            🧠 Memory Hook & Etymology:
+          </label>
+          <textarea
+            rows={2}
+            value={internalCard.mnemonic || ''}
+            onChange={(e) => updateSimpleField('mnemonic', e.target.value)}
+            onFocus={(e) => {
+              activeInputRef.current = { element: e.target, fieldName: 'mnemonic' };
+            }}
+            placeholder="کد یادسپاری..."
+            className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Back Custom Boxes for Spelling */}
+        {renderCustomBoxesEditor('back')}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="w-full flex-1 flex flex-col min-h-0 text-left relative" onKeyDown={handleEditorKeyDown}>
+    <div className="w-full flex-1 flex flex-col min-h-0 text-left relative">
       {/* Inject Selected Card Theme CSS & Shared Custom Block CSS */}
       <style>{`${theme.css}\n${SHARED_CARD_CSS}`}</style>
 
@@ -518,13 +1246,19 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
       />
 
       {/* TOP BAR: Mode Switch, Theme Badge & View Toggles */}
-      <div className={`flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b text-xs shrink-0 ${
-        isDark ? 'border-zinc-700' : 'border-zinc-200'
-      }`}>
+      <div
+        className={`flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b text-xs shrink-0 ${
+          isDark ? 'border-zinc-700' : 'border-zinc-200'
+        }`}
+      >
         {/* Left: Mode (Edit vs Preview) & Theme Badge */}
         <div className="flex items-center gap-2 flex-wrap">
           {editable && (
-            <div className={`inline-flex border p-0.5 rounded-md shadow-xs ${isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'}`}>
+            <div
+              className={`inline-flex border p-0.5 rounded-md shadow-xs ${
+                isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'
+              }`}
+            >
               <button
                 type="button"
                 onClick={() => setMode('edit')}
@@ -535,7 +1269,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                     ? 'text-zinc-400 hover:text-white'
                     : 'text-zinc-600 hover:text-zinc-900'
                 }`}
-                title="Direct in-place card editor (edit directly on the card)"
+                title="Direct in-place card editor (edit fields directly)"
               >
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>{t('preview.modeEdit') || 'Card Editor'}</span>
@@ -570,13 +1304,14 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
         {/* Right: View & Side Toggles + Slide-out Toolbar Toggle Button */}
         <div className="flex flex-wrap items-center gap-1.5">
           {/* Card Type (Normal / Spelling) */}
-          <div className={`inline-flex border p-0.5 rounded-md shadow-xs ${isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'}`}>
+          <div
+            className={`inline-flex border p-0.5 rounded-md shadow-xs ${
+              isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'
+            }`}
+          >
             <button
               type="button"
-              onClick={() => {
-                setPreviewCardType('normal');
-                updateSimpleField('cardType', 'normal');
-              }}
+              onClick={() => handleToggleCardType('normal')}
               className={`px-2.5 py-1 text-xs font-medium rounded transition-colors cursor-pointer ${
                 previewCardType === 'normal'
                   ? 'bg-blue-600 text-white shadow-xs'
@@ -589,13 +1324,10 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => {
-                setPreviewCardType('spelling');
-                updateSimpleField('cardType', 'spelling');
-              }}
+              onClick={() => handleToggleCardType('spelling')}
               className={`px-2.5 py-1 text-xs font-medium rounded transition-colors cursor-pointer ${
                 previewCardType === 'spelling'
-                  ? 'bg-blue-600 text-white shadow-xs'
+                  ? 'bg-purple-600 text-white shadow-xs'
                   : isDark
                   ? 'text-zinc-400 hover:text-white'
                   : 'text-zinc-600 hover:text-zinc-900'
@@ -606,7 +1338,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
           </div>
 
           {/* Desktop / Mobile Toggle */}
-          <div className={`inline-flex border p-0.5 rounded-md shadow-xs ${isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'}`}>
+          <div
+            className={`inline-flex border p-0.5 rounded-md shadow-xs ${
+              isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'
+            }`}
+          >
             <button
               type="button"
               onClick={() => setViewMode('desktop')}
@@ -644,7 +1380,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
           </div>
 
           {/* Front / Back / Both Toggle */}
-          <div className={`inline-flex border p-0.5 gap-0.5 rounded-md shadow-xs ${isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'}`}>
+          <div
+            className={`inline-flex border p-0.5 gap-0.5 rounded-md shadow-xs ${
+              isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'
+            }`}
+          >
             <button
               type="button"
               onClick={() => setActiveSide('front')}
@@ -729,647 +1469,230 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
         </div>
       </div>
 
-      {/* MAIN CARD CANVAS: 100% Full Width, Undivided & Unaltered (Never shrunk or rearranged!) */}
-      <div
-        onClick={handleCardClick}
-        className="w-full flex-1 overflow-y-auto flex flex-col items-center justify-start py-2 px-1 sm:px-2 min-w-0"
-      >
-        {/* PREVIEW MODE: EXACT ANKI RENDERING */}
-        {mode === 'preview' && (
-          <>
-            {(activeSide === 'front' || activeSide === 'both') && (
-              <div className="w-full flex flex-col items-center">
-                {activeSide === 'both' && (
-                  <div
-                    className={`mb-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border shadow-xs ${
-                      isDark ? 'bg-zinc-800 text-zinc-300 border-zinc-700' : 'bg-zinc-100 text-zinc-700 border-zinc-200'
-                    }`}
-                  >
-                    — {t('preview.frontCardBanner', { type: previewCardType.toUpperCase() })} —
-                  </div>
-                )}
+      {/* MAIN CONTENT CANVAS & RIGHT TOOLBAR */}
+      <div className="w-full flex-1 flex flex-col xl:flex-row gap-3.5 xl:gap-4 min-h-0 min-w-0">
+        {/* CARD CANVAS */}
+        <div
+          onClick={handleCardClick}
+          className="flex-1 overflow-y-auto flex flex-col items-center justify-start py-2 px-1 sm:px-2 min-w-0"
+        >
+          {/* PREVIEW MODE: EXACT ANKI HTML RENDERING */}
+          {mode === 'preview' && (
+            <>
+              {/* Front Preview */}
+              {(activeSide === 'front' || activeSide === 'both') && (
                 <div
-                  className={`w-full transition-all duration-200 ${
+                  className={`w-full transition-all duration-200 mb-6 ${
                     viewMode === 'mobile'
-                      ? `max-w-[360px] border-x-2 border-dashed ${isDark ? 'border-zinc-700' : 'border-zinc-300'} p-1`
+                      ? `max-w-[380px] border-x-2 border-dashed ${
+                          isDark ? 'border-zinc-700' : 'border-zinc-300'
+                        } p-1`
                       : 'w-full max-w-3xl'
                   }`}
-                  dangerouslySetInnerHTML={{ __html: frontRendered }}
-                />
-              </div>
-            )}
-
-            {(activeSide === 'back' || activeSide === 'both') && (
-              <div className="w-full flex flex-col items-center">
-                {activeSide === 'both' && (
-                  <div
-                    className={`mb-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border shadow-xs ${
-                      isDark ? 'bg-zinc-800 text-zinc-300 border-zinc-700' : 'bg-zinc-100 text-zinc-700 border-zinc-200'
-                    }`}
-                  >
-                    — {t('preview.backCardBanner')} —
-                  </div>
-                )}
-                <div
-                  className={`w-full transition-all duration-200 ${
-                    viewMode === 'mobile'
-                      ? `max-w-[360px] border-x-2 border-dashed ${isDark ? 'border-zinc-700' : 'border-zinc-300'} p-1`
-                      : 'w-full max-w-3xl'
-                  }`}
-                  dangerouslySetInnerHTML={{ __html: backRendered }}
-                />
-              </div>
-            )}
-          </>
-        )}
-
-        {/* EDIT MODE: DIRECT THEME-AWARE INTERACTIVE CARD INLINE EDITOR */}
-        {mode === 'edit' && (
-          <div
-            className={`w-full transition-all duration-200 ${
-              viewMode === 'mobile'
-                ? `max-w-[380px] border-x-2 border-dashed ${isDark ? 'border-zinc-700' : 'border-zinc-300'} p-1`
-                : 'w-full max-w-3xl'
-            }`}
-          >
-            {/* Themed Card Wrapper matching selected Theme CSS */}
-            <div className={themeClasses.wrapper}>
-              <div className={`${themeClasses.card} p-4 sm:p-6`}>
-                
-                {/* 1. Header with Badges & Editable Part of Speech */}
-                <div className="card-hero-header quest-top-bar flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="hero-badge badge-pos quest-level-pill px-2 py-0.5 text-[11px] font-bold">
-                      {previewCardType === 'spelling' ? '🎯 SPELLING' : '💥 VOCABULARY'}
-                    </span>
-                    <input
-                      type="text"
-                      value={internalCard.partOfSpeech || ''}
-                      onChange={(e) => updateSimpleField('partOfSpeech', e.target.value)}
-                      onFocus={(e) => {
-                        activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' };
-                      }}
-                      placeholder="pos (e.g. noun)"
-                      className="comic-badge badge-pos text-[11px] font-bold px-2 py-0.5 rounded border focus:ring-1 focus:ring-blue-500"
-                      title="Part of speech"
-                    />
-                  </div>
-
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                    {theme.name}
-                  </span>
-                </div>
-
-                {/* 2. Photo / Image Area with in-place controls */}
-                <div className="mb-4">
-                  {internalCard.imageBase64 ? (
-                    <div className="relative group rounded overflow-hidden border-2 border-black/40 shadow-sm">
-                      <img
-                        src={
-                          internalCard.imageBase64.startsWith('data:')
-                            ? internalCard.imageBase64
-                            : `data:image/jpeg;base64,${internalCard.imageBase64}`
-                        }
-                        alt={internalCard.word}
-                        className="card-illustration w-full max-h-[220px] object-cover block"
-                      />
-                      {/* Hover Overlay Controls */}
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
-                        <button
-                          type="button"
-                          onClick={onOpenImageSearch}
-                          className="px-2.5 py-1 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded shadow-xs flex items-center gap-1 cursor-pointer"
-                          title="Search online images"
-                        >
-                          <Search className="w-3.5 h-3.5" />
-                          <span>Search Online</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="px-2.5 py-1 text-xs font-semibold bg-zinc-700 hover:bg-zinc-600 text-white rounded shadow-xs flex items-center gap-1 cursor-pointer"
-                          title="Upload local image"
-                        >
-                          <Upload className="w-3.5 h-3.5" />
-                          <span>Upload</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            updateSimpleField('imageBase64', undefined);
-                            updateSimpleField('imageFileName', undefined);
-                            if (onRemoveImage) onRemoveImage();
-                          }}
-                          className="px-2.5 py-1 text-xs font-semibold bg-red-600 hover:bg-red-500 text-white rounded shadow-xs flex items-center gap-1 cursor-pointer"
-                          title="Remove image"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Remove</span>
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="w-full border-2 border-dashed border-zinc-400 dark:border-zinc-600 rounded-lg p-3 flex items-center justify-between gap-2 bg-zinc-500/5">
-                      <div className="flex items-center gap-2 text-xs text-zinc-500">
-                        <ImageIcon className="w-4 h-4" />
-                        <span>Card Illustration (Optional)</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={onOpenImageSearch}
-                          className="px-2 py-1 text-xs font-medium rounded border cursor-pointer flex items-center gap-1 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100"
-                        >
-                          <Search className="w-3.5 h-3.5 text-blue-500" />
-                          <span>Search</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="px-2 py-1 text-xs font-medium rounded border cursor-pointer flex items-center gap-1 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100"
-                        >
-                          <Upload className="w-3.5 h-3.5 text-emerald-500" />
-                          <span>Upload</span>
-                        </button>
-                      </div>
+                >
+                  {activeSide === 'both' && (
+                    <div className="flex items-center gap-2 mb-2 pb-1 border-b border-blue-500/30 text-xs font-bold text-blue-400">
+                      <span>— {t('preview.frontCardBanner', { type: previewCardType.toUpperCase() }) || `FRONT CARD (${previewCardType.toUpperCase()})`} —</span>
                     </div>
                   )}
-                </div>
-
-                {/* 3. Word Title Section & Phonetic IPA (Editable directly on card) */}
-                <div className={`${themeClasses.wordSection} p-3 rounded mb-4`}>
-                  <div className="mb-2">
-                    <label className="text-[10px] font-bold uppercase tracking-wider block opacity-70 mb-0.5">
-                      Word / Expression:
-                    </label>
-                    <input
-                      type="text"
-                      value={internalCard.word}
-                      onChange={(e) => updateSimpleField('word', e.target.value)}
-                      onFocus={(e) => {
-                        activeInputRef.current = { element: e.target, fieldName: 'word' };
-                      }}
-                      placeholder="Word"
-                      className={`${themeClasses.wordTitle} w-full bg-transparent border-b border-dashed border-zinc-400 focus:border-blue-500 focus:outline-none font-black text-2xl sm:text-3xl`}
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold opacity-70">IPA:</span>
-                    <input
-                      type="text"
-                      value={internalCard.phonetic || ''}
-                      onChange={(e) => updateSimpleField('phonetic', e.target.value)}
-                      onFocus={(e) => {
-                        activeInputRef.current = { element: e.target, fieldName: 'phonetic' };
-                      }}
-                      placeholder="/.../"
-                      className={`${themeClasses.ipaBadge} text-xs px-2 py-0.5 rounded border focus:outline-none focus:ring-1 focus:ring-blue-500`}
-                    />
-                  </div>
-                </div>
-
-                {/* 4. Audio Pronunciation Section */}
-                <div className={`${themeClasses.pronunciationBox} p-2.5 rounded mb-4 text-xs`}>
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold flex items-center gap-1">
-                        <Volume2 className="w-3.5 h-3.5 text-blue-400" />
-                        <span>US:</span>
-                      </span>
-                      <button
-                        type="button"
-                        data-audio-target="word_us_normal"
-                        className="comic-audio-btn preview-play-btn px-2 py-0.5 rounded border text-xs font-semibold cursor-pointer hover:opacity-90"
-                      >
-                        ▶ Normal
-                      </button>
-                      <button
-                        type="button"
-                        data-audio-target="word_us_slow"
-                        className="comic-audio-btn preview-play-btn px-2 py-0.5 rounded border text-xs font-semibold cursor-pointer hover:opacity-90"
-                      >
-                        ▶ Slow
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold flex items-center gap-1">
-                        <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>UK:</span>
-                      </span>
-                      <button
-                        type="button"
-                        data-audio-target="word_uk_normal"
-                        className="comic-audio-btn preview-play-btn px-2 py-0.5 rounded border text-xs font-semibold cursor-pointer hover:opacity-90"
-                      >
-                        ▶ Normal
-                      </button>
-                      <button
-                        type="button"
-                        data-audio-target="word_uk_slow"
-                        className="comic-audio-btn preview-play-btn px-2 py-0.5 rounded border text-xs font-semibold cursor-pointer hover:opacity-90"
-                      >
-                        ▶ Slow
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 5. Meaning Box (Persian Meaning) */}
-                <div className={`${themeClasses.meaningBox} p-3 rounded mb-4`}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className={`${themeClasses.meaningLabel} text-[11px] font-bold uppercase tracking-wider`}>
-                      📖 PERSIAN MEANING / معنی فارسی
-                    </span>
-                    <span className="text-[10px] opacity-60">Direct Editing & Markdown</span>
-                  </div>
-                  <textarea
-                    rows={2}
-                    dir="rtl"
-                    value={internalCard.meaningFa || ''}
-                    onChange={(e) => updateSimpleField('meaningFa', e.target.value)}
-                    onFocus={(e) => {
-                      activeInputRef.current = { element: e.target, fieldName: 'meaningFa' };
-                    }}
-                    placeholder="معنی دقیق و روان کلمه..."
-                    className="w-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm sm:text-base font-semibold leading-relaxed resize-y"
+                  <div
+                    className="w-full overflow-hidden select-text"
+                    dangerouslySetInnerHTML={{ __html: frontRendered }}
                   />
                 </div>
+              )}
 
-                {/* 6. Example & Translation Box */}
-                <div className={`${themeClasses.exampleBox} p-3 rounded mb-4`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={`${themeClasses.exampleLabel} text-[11px] font-bold uppercase tracking-wider`}>
-                      💬 EXAMPLE & TRANSLATION / مثال و ترجمه
-                    </span>
-                    <div className="flex items-center gap-1 text-[11px]">
-                      <button
-                        type="button"
-                        data-audio-target="example_us_normal"
-                        className="preview-play-btn px-1.5 py-0.5 rounded border cursor-pointer"
-                        title="Play example audio"
-                      >
-                        ▶ Sentence Audio
-                      </button>
+              {/* Back Preview */}
+              {(activeSide === 'back' || activeSide === 'both') && (
+                <div
+                  className={`w-full transition-all duration-200 ${
+                    viewMode === 'mobile'
+                      ? `max-w-[380px] border-x-2 border-dashed ${
+                          isDark ? 'border-zinc-700' : 'border-zinc-300'
+                        } p-1`
+                      : 'w-full max-w-3xl'
+                  }`}
+                >
+                  {activeSide === 'both' && (
+                    <div className="flex items-center gap-2 mb-2 pb-1 border-b border-emerald-500/30 text-xs font-bold text-emerald-400">
+                      <span>— {t('preview.backCardBanner') || 'BACK CARD (FULL ANSWER)'} —</span>
                     </div>
-                  </div>
-
-                  {/* English Example */}
-                  <div className="mb-2">
-                    <label className="text-[10px] font-bold uppercase tracking-wider block opacity-70 mb-0.5">
-                      English Sentence:
-                    </label>
-                    <textarea
-                      rows={2}
-                      dir="ltr"
-                      value={internalCard.example || ''}
-                      onChange={(e) => updateSimpleField('example', e.target.value)}
-                      onFocus={(e) => {
-                        activeInputRef.current = { element: e.target, fieldName: 'example' };
-                      }}
-                      placeholder="Natural English example sentence..."
-                      className="example-en quest-sentence w-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm font-medium leading-relaxed resize-y"
-                    />
-                  </div>
-
-                  {/* Persian Translation */}
-                  <div className="pt-2 border-t border-dashed border-current/20">
-                    <label className="text-[10px] font-bold uppercase tracking-wider block opacity-70 mb-0.5">
-                      ترجمه فارسی مثال:
-                    </label>
-                    <textarea
-                      rows={2}
-                      dir="rtl"
-                      value={internalCard.translationFa || ''}
-                      onChange={(e) => updateSimpleField('translationFa', e.target.value)}
-                      onFocus={(e) => {
-                        activeInputRef.current = { element: e.target, fieldName: 'translationFa' };
-                      }}
-                      placeholder="ترجمه فارسی جمله مثال..."
-                      className="example-fa quest-translation-fa w-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm font-normal leading-relaxed resize-y"
-                    />
-                  </div>
-                </div>
-
-                {/* 7. Memory Hook Box (Root Decomposition) */}
-                <div className={`${themeClasses.mnemonicBox} p-3 rounded mb-4`}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className={`${themeClasses.mnemonicLabel} text-[11px] font-bold uppercase tracking-wider`}>
-                      🧠 MEMORY HOOK / کد یادسپاری و ریشه‌شناسی
-                    </span>
-                    <span className="text-[10px] opacity-60">**bold roots**</span>
-                  </div>
-                  <textarea
-                    rows={2}
-                    dir={isRTLText(internalCard.mnemonic) ? 'rtl' : 'ltr'}
-                    value={internalCard.mnemonic || ''}
-                    onChange={(e) => updateSimpleField('mnemonic', e.target.value)}
-                    onFocus={(e) => {
-                      activeInputRef.current = { element: e.target, fieldName: 'mnemonic' };
-                    }}
-                    placeholder="e.g. read (خواندن) + ability (توانایی) = قابلیت خوانده‌شدن"
-                    className="mnemonic-text quest-mnemonic w-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm font-medium leading-relaxed resize-y"
+                  )}
+                  <div
+                    className="w-full overflow-hidden select-text"
+                    dangerouslySetInnerHTML={{ __html: backRendered }}
                   />
                 </div>
-
-                {/* 8. Theme-Aware Custom Boxes / Blocks */}
-                {internalCard.customBlocks && internalCard.customBlocks.length > 0 && (
-                  <div className="space-y-4 mb-4">
-                    {internalCard.customBlocks.map((block, idx) => {
-                      const bgColor = block.color || '#1E293B';
-                      const textColor = getContrastTextColor(bgColor);
-                      const badgeBg = textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.2)';
-                      const badgeBorder = textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.3)';
-                      const isRTLBlock = block.dir === 'rtl' || isRTLText(block.content);
-                      const isSelected = selectedBoxId === block.id;
-
-                      return (
-                        <div
-                          key={block.id}
-                          onClick={() => setSelectedBoxId(block.id)}
-                          className={`${themeClasses.customBox} p-3.5 rounded-lg border-2 shadow-xs transition-all ${
-                            isSelected ? 'ring-2 ring-blue-500/80 shadow-md' : ''
-                          }`}
-                          style={{
-                            backgroundColor: bgColor,
-                            color: textColor,
-                            borderColor: textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.25)',
-                            marginTop: '14px',
-                          }}
-                        >
-                          {/* Box Header Toolbar */}
-                          <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                            {/* Editable Title Badge */}
-                            <div className="flex items-center gap-1.5">
-                              <input
-                                type="text"
-                                value={block.title}
-                                onChange={(e) => handleUpdateCustomBlock(block.id, { title: e.target.value })}
-                                onFocus={() => {
-                                  setSelectedBoxId(block.id);
-                                }}
-                                className={`${themeClasses.customLabel} font-black text-xs px-2.5 py-1 rounded border focus:outline-none focus:ring-2 focus:ring-blue-400`}
-                                style={{
-                                  backgroundColor: badgeBg,
-                                  color: textColor,
-                                  border: `2px solid ${badgeBorder}`,
-                                }}
-                                placeholder="BOX TITLE"
-                              />
-                            </div>
-
-                            {/* Box Controls & Background Color Palette */}
-                            <div className="flex items-center gap-1">
-                              {/* Background Color Presets */}
-                              <div className="flex items-center gap-1">
-                                {BOX_BG_PRESETS.slice(0, 5).map((preset) => (
-                                  <button
-                                    key={preset.hex}
-                                    type="button"
-                                    onClick={() => handleUpdateCustomBlock(block.id, { color: preset.hex })}
-                                    className={`w-4 h-4 rounded-full border cursor-pointer transition-transform ${
-                                      bgColor.toLowerCase() === preset.hex.toLowerCase()
-                                        ? 'scale-125 ring-2 ring-blue-400 shadow-xs'
-                                        : 'hover:scale-110 opacity-80 hover:opacity-100'
-                                    }`}
-                                    style={{ backgroundColor: preset.hex }}
-                                    title={`Box Background: ${preset.name}`}
-                                  />
-                                ))}
-                                <input
-                                  type="color"
-                                  value={bgColor}
-                                  onChange={(e) => handleUpdateCustomBlock(block.id, { color: e.target.value })}
-                                  className="w-4 h-4 p-0 border-0 rounded cursor-pointer"
-                                  title="Choose Box Background Color"
-                                />
-                              </div>
-
-                              {/* Direction Toggle */}
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateCustomBlock(block.id, { dir: isRTLBlock ? 'ltr' : 'rtl' })}
-                                className="p-1 border rounded text-[10px] font-bold cursor-pointer hover:bg-current/10"
-                                title="Toggle Text Direction"
-                                style={{ borderColor: badgeBorder, color: textColor }}
-                              >
-                                {isRTLBlock ? <AlignRight className="w-3 h-3" /> : <AlignLeft className="w-3 h-3" />}
-                              </button>
-
-                              {/* Reorder Up */}
-                              <button
-                                type="button"
-                                disabled={idx === 0}
-                                onClick={() => handleMoveCustomBlock(idx, 'up')}
-                                className="p-1 border rounded cursor-pointer disabled:opacity-30 hover:bg-current/10"
-                                title="Move Box Up"
-                                style={{ borderColor: badgeBorder, color: textColor }}
-                              >
-                                <ArrowUp className="w-3 h-3" />
-                              </button>
-
-                              {/* Reorder Down */}
-                              <button
-                                type="button"
-                                disabled={idx === (internalCard.customBlocks?.length || 0) - 1}
-                                onClick={() => handleMoveCustomBlock(idx, 'down')}
-                                className="p-1 border rounded cursor-pointer disabled:opacity-30 hover:bg-current/10"
-                                title="Move Box Down"
-                                style={{ borderColor: badgeBorder, color: textColor }}
-                              >
-                                <ArrowDown className="w-3 h-3" />
-                              </button>
-
-                              {/* Delete Box */}
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteCustomBlock(block.id)}
-                                className="p-1 text-rose-400 hover:text-rose-300 border border-rose-400/40 rounded cursor-pointer hover:bg-rose-500/20"
-                                title="Delete this Box"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Editable Box Content */}
-                          <textarea
-                            rows={3}
-                            dir={isRTLBlock ? 'rtl' : 'ltr'}
-                            value={block.content}
-                            onChange={(e) => handleUpdateCustomBlock(block.id, { content: e.target.value })}
-                            onFocus={(e) => {
-                              activeInputRef.current = { element: e.target, fieldName: 'customBlock', blockId: block.id };
-                              setSelectedBoxId(block.id);
-                            }}
-                            placeholder="Write box content or markdown (e.g. - item 1, **bold**, `code`)..."
-                            className="custom-block-content w-full bg-transparent border-0 focus:ring-0 focus:outline-none text-sm font-medium leading-relaxed resize-y mt-1"
-                            style={{ color: textColor }}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* 9. Bottom "+ Add Custom Box" Trigger */}
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={() => handleAddCustomBlock()}
-                    className="w-full py-2.5 border-2 border-dashed border-blue-500/40 hover:border-blue-500 rounded-lg text-xs font-bold text-blue-500 hover:text-blue-400 flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-blue-500/5 hover:bg-blue-500/10"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>{t('preview.addBox') || '+ Add Custom Box matching this Theme'}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* FLOATING HANDLE ATTACHED TO FAR-RIGHT EDGE OF APPLICATION SCREEN (when drawer is closed) */}
-      {editable && mode === 'edit' && !isSidebarOpen && (
-        <button
-          type="button"
-          onClick={() => setIsSidebarOpen(true)}
-          className={`fixed right-0 top-1/2 -translate-y-1/2 z-40 py-3.5 px-1.5 sm:px-2 rounded-l-xl shadow-2xl border-y border-l flex flex-col items-center gap-1.5 cursor-pointer transition-all duration-200 hover:px-2.5 group ${
-            isDark
-              ? 'bg-zinc-800/95 hover:bg-zinc-700 text-blue-400 border-zinc-700 shadow-black/50'
-              : 'bg-white/95 hover:bg-blue-50 text-blue-600 border-zinc-300 shadow-zinc-400/50'
-          }`}
-          title="Open Slide-out Toolbar Drawer"
-        >
-          <SlidersHorizontal className="w-4 h-4 transition-transform group-hover:scale-110" />
-          <span className="text-[10px] font-black uppercase tracking-wider [writing-mode:vertical-lr] rotate-180">
-            Toolbar
-          </span>
-        </button>
-      )}
-
-      {/* SLIDE-OUT OVERLAY DRAWER ATTACHED TO FAR-RIGHT EDGE OF APPLICATION SCREEN */}
-      {editable && mode === 'edit' && (
-        <>
-          {/* Backdrop when drawer is open */}
-          {isSidebarOpen && (
-            <div
-              className="fixed inset-0 bg-black/25 backdrop-blur-[0.5px] z-40 transition-opacity duration-200 cursor-pointer"
-              onClick={() => setIsSidebarOpen(false)}
-              aria-label="Close Toolbar Drawer"
-            />
+              )}
+            </>
           )}
 
-          {/* Fixed Drawer Panel (Slides smoothly in from the far right screen edge over the UI) */}
+          {/* EDIT MODE: DIRECT THEME-AWARE INTERACTIVE CARD INLINE EDITOR */}
+          {mode === 'edit' && (
+            <div
+              className={`w-full transition-all duration-200 space-y-6 ${
+                viewMode === 'mobile'
+                  ? `max-w-[380px] border-x-2 border-dashed ${
+                      isDark ? 'border-zinc-700' : 'border-zinc-300'
+                    } p-1`
+                  : 'w-full max-w-3xl'
+              }`}
+            >
+              {/* Normal Mode Combinations */}
+              {previewCardType === 'normal' && (
+                <>
+                  {(activeSide === 'front' || activeSide === 'both') && (
+                    <div>
+                      {activeSide === 'both' && (
+                        <div className="flex items-center gap-2 mb-2 pb-1 border-b border-blue-500/40 text-xs font-bold text-blue-400">
+                          <span>— FRONT CARD (VOCABULARY) —</span>
+                        </div>
+                      )}
+                      {renderNormalFrontEditor()}
+                    </div>
+                  )}
+
+                  {(activeSide === 'back' || activeSide === 'both') && (
+                    <div>
+                      {activeSide === 'both' && (
+                        <div className="flex items-center gap-2 mb-2 pb-1 border-b border-emerald-500/40 text-xs font-bold text-emerald-400">
+                          <span>— BACK CARD (MEANING & DETAILS) —</span>
+                        </div>
+                      )}
+                      {renderNormalBackEditor(activeSide === 'back')}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Spelling Mode Combinations */}
+              {previewCardType === 'spelling' && (
+                <>
+                  {(activeSide === 'front' || activeSide === 'both') && (
+                    <div>
+                      {activeSide === 'both' && (
+                        <div className="flex items-center gap-2 mb-2 pb-1 border-b border-purple-500/40 text-xs font-bold text-purple-400">
+                          <span>— FRONT CARD (SPELLING CHALLENGE) —</span>
+                        </div>
+                      )}
+                      {renderSpellingFrontEditor()}
+                    </div>
+                  )}
+
+                  {(activeSide === 'back' || activeSide === 'both') && (
+                    <div>
+                      {activeSide === 'both' && (
+                        <div className="flex items-center gap-2 mb-2 pb-1 border-b border-emerald-500/40 text-xs font-bold text-emerald-400">
+                          <span>— BACK CARD (SPELLING SOLUTION) —</span>
+                        </div>
+                      )}
+                      {renderSpellingBackEditor()}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT SLIDE-OUT FORMATTING & CUSTOM BOX TOOLBAR DRAWER */}
+        {editable && mode === 'edit' && isSidebarOpen && (
           <aside
-            className={`fixed top-0 right-0 h-full w-80 sm:w-88 max-w-[85vw] z-50 flex flex-col shadow-2xl border-l transition-transform duration-300 ease-in-out text-xs ${
-              isSidebarOpen ? 'translate-x-0' : 'translate-x-full'
-            } ${
-              isDark
-                ? 'bg-[#18181B] border-zinc-700 text-zinc-100 shadow-black/80'
-                : 'bg-white border-zinc-200 text-zinc-800 shadow-zinc-400/60'
+            className={`w-full xl:w-72 2xl:w-80 shrink-0 border rounded-xl shadow-md overflow-hidden flex flex-col transition-all duration-200 ${
+              isDark ? 'bg-[#1F1F23] border-zinc-700/80 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
             }`}
           >
-            {/* Toolbar Sidebar Header */}
-            <div className={`p-3.5 border-b flex items-center justify-between gap-2 shrink-0 ${
-              isDark ? 'border-zinc-700/80 bg-zinc-900' : 'border-zinc-200 bg-zinc-50'
-            }`}>
+            {/* Drawer Header */}
+            <div
+              className={`p-3 border-b flex items-center justify-between shrink-0 ${
+                isDark ? 'border-zinc-700/80 bg-zinc-900/60' : 'border-zinc-200 bg-zinc-50'
+              }`}
+            >
               <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500">
-                  <SlidersHorizontal className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-xs uppercase tracking-wider">
-                    Editor Toolbar
-                  </h3>
-                  <p className="text-[10px] text-zinc-500">Slide-out tools drawer</p>
-                </div>
+                <SlidersHorizontal className="w-4 h-4 text-blue-500" />
+                <h4 className="text-xs font-bold uppercase tracking-wider">Editor Toolbar</h4>
               </div>
               <button
                 type="button"
                 onClick={() => setIsSidebarOpen(false)}
-                className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                  isDark
-                    ? 'border-zinc-700 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200'
-                    : 'border-zinc-300 hover:bg-zinc-100 text-zinc-600 hover:text-zinc-900'
-                }`}
-                title="Close Toolbar (Esc)"
+                className="p-1 text-zinc-400 hover:text-zinc-200 rounded cursor-pointer"
+                title="Close Toolbar Drawer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Toolbar Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-3.5 space-y-4">
-              
-              {/* SECTION 1: Text Formatting Tools */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-                    Text Formatting
-                  </span>
-                  <span className="text-[10px] text-zinc-500">Applies to selection</span>
-                </div>
+            {/* Scrollable Toolbar Body */}
+            <div className="p-3.5 space-y-4 overflow-y-auto flex-1 text-xs">
+              {/* Active Focused Field Indicator */}
+              <div className={`p-2 rounded-lg border text-[11px] flex items-center justify-between ${
+                isDark ? 'bg-zinc-800/60 border-zinc-700' : 'bg-zinc-100 border-zinc-200'
+              }`}>
+                <span className="text-zinc-400">Active Field:</span>
+                <span className="font-semibold text-blue-400 capitalize">
+                  {activeInputRef.current.fieldName || 'Persian Meaning'}
+                </span>
+              </div>
 
-                {/* Primary Formatting Buttons */}
-                <div className="grid grid-cols-4 gap-1 mb-2">
+              {/* SECTION 1: Markdown Formatting */}
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">
+                  Markdown Formatting
+                </span>
+                <div className="grid grid-cols-3 gap-1.5 mb-2.5">
                   <button
                     type="button"
                     onClick={() => handleMarkdownToolbarAction('bold')}
-                    className={`py-1.5 px-2 rounded border flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors ${
-                      isDark ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
+                    className={`py-1.5 px-2 rounded border flex items-center justify-center gap-1 cursor-pointer transition-colors ${
+                      isDark ? 'bg-zinc-850 hover:bg-zinc-800 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
                     }`}
-                    title="Bold (**text**) - Ctrl+B"
+                    title="Bold (**text**)"
                   >
                     <Bold className="w-3.5 h-3.5 text-blue-400" />
-                    <span className="text-[9px] font-semibold">Bold</span>
+                    <span className="text-[10px] font-semibold">Bold</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleMarkdownToolbarAction('italic')}
-                    className={`py-1.5 px-2 rounded border flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors ${
-                      isDark ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
+                    className={`py-1.5 px-2 rounded border flex items-center justify-center gap-1 cursor-pointer transition-colors ${
+                      isDark ? 'bg-zinc-850 hover:bg-zinc-800 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
                     }`}
-                    title="Italic (*text*) - Ctrl+I"
+                    title="Italic (*text*)"
                   >
-                    <Italic className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-[9px] font-semibold">Italic</span>
+                    <Italic className="w-3.5 h-3.5 text-purple-400" />
+                    <span className="text-[10px] font-semibold">Italic</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleMarkdownToolbarAction('underline')}
-                    className={`py-1.5 px-2 rounded border flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors ${
-                      isDark ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
+                    className={`py-1.5 px-2 rounded border flex items-center justify-center gap-1 cursor-pointer transition-colors ${
+                      isDark ? 'bg-zinc-850 hover:bg-zinc-800 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
                     }`}
-                    title="Underline (<u>text</u>) - Ctrl+U"
+                    title="Underline (<u>text</u>)"
                   >
-                    <Underline className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="text-[9px] font-semibold">Underline</span>
+                    <Underline className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-[10px] font-semibold">Underline</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleMarkdownToolbarAction('code')}
-                    className={`py-1.5 px-2 rounded border flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors ${
-                      isDark ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
+                    className={`py-1.5 px-2 rounded border flex items-center justify-center gap-1 cursor-pointer transition-colors ${
+                      isDark ? 'bg-zinc-850 hover:bg-zinc-800 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
                     }`}
                     title="Inline Code (`code`)"
                   >
-                    <Code className="w-3.5 h-3.5 text-purple-400" />
-                    <span className="text-[9px] font-semibold">Code</span>
+                    <Code className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="text-[10px] font-semibold">Code</span>
                   </button>
-                </div>
 
-                {/* Secondary List & Link Buttons */}
-                <div className="grid grid-cols-3 gap-1 mb-3">
                   <button
                     type="button"
                     onClick={() => handleMarkdownToolbarAction('bulletList')}
                     className={`py-1.5 px-2 rounded border flex items-center justify-center gap-1 cursor-pointer transition-colors ${
-                      isDark ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
+                      isDark ? 'bg-zinc-850 hover:bg-zinc-800 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
                     }`}
                     title="Bullet List (- item)"
                   >
@@ -1381,29 +1704,17 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                     type="button"
                     onClick={() => handleMarkdownToolbarAction('numberedList')}
                     className={`py-1.5 px-2 rounded border flex items-center justify-center gap-1 cursor-pointer transition-colors ${
-                      isDark ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
+                      isDark ? 'bg-zinc-850 hover:bg-zinc-800 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
                     }`}
                     title="Numbered List (1. item)"
                   >
                     <ListOrdered className="w-3.5 h-3.5 text-indigo-400" />
-                    <span className="text-[10px] font-semibold">Numbered</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleMarkdownToolbarAction('link')}
-                    className={`py-1.5 px-2 rounded border flex items-center justify-center gap-1 cursor-pointer transition-colors ${
-                      isDark ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700' : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
-                    }`}
-                    title="Insert Link [text](url)"
-                  >
-                    <LinkIcon className="w-3.5 h-3.5 text-teal-400" />
-                    <span className="text-[10px] font-semibold">Link</span>
+                    <span className="text-[10px] font-semibold">Numbers</span>
                   </button>
                 </div>
 
                 {/* Text Color Selector */}
-                <div className="mb-3">
+                <div className="mb-2.5">
                   <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1.5">
                     Text Color:
                   </span>
@@ -1418,22 +1729,13 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                         title={`Color: ${preset.name}`}
                       />
                     ))}
-                    <div className="relative flex items-center">
-                      <input
-                        type="color"
-                        defaultValue="#38BDF8"
-                        onChange={(e) => handleMarkdownToolbarAction('color', e.target.value)}
-                        className="w-5 h-5 p-0 border-0 rounded cursor-pointer"
-                        title="Custom Text Color Picker"
-                      />
-                    </div>
                   </div>
                 </div>
 
-                {/* Text Highlighter / Background formatting */}
+                {/* Text Highlighter */}
                 <div>
                   <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1.5">
-                    Highlight / Text Background:
+                    Highlight Background:
                   </span>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {HIGHLIGHT_PRESETS.map((preset) => (
@@ -1454,175 +1756,185 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
 
               {/* SECTION 2: Custom Boxes Management */}
               <div className={`pt-3 border-t ${isDark ? 'border-zinc-800' : 'border-zinc-200'}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-1">
-                    <Layers className="w-3.5 h-3.5 text-blue-400" />
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-                      Custom Boxes
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400">
-                    {internalCard.customBlocks?.length || 0}
-                  </span>
-                </div>
+                {(() => {
+                  const allCustomBlocks = internalCard.customBlocks || [];
+                  const frontBoxes = allCustomBlocks.filter((b) => b.side === 'front');
+                  const backBoxes = allCustomBlocks.filter((b) => b.side === 'back' || !b.side);
+                  const isFrontSide = activeSide === 'front';
+                  const isBackSide = activeSide === 'back';
+                  const displayedBoxes = isFrontSide ? frontBoxes : isBackSide ? backBoxes : allCustomBlocks;
 
-                {/* Add Box Trigger */}
-                <button
-                  type="button"
-                  onClick={() => handleAddCustomBlock()}
-                  className="w-full py-1.5 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer mb-3 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Add Box</span>
-                </button>
+                  return (
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                          {isFrontSide
+                            ? `Front Boxes (${frontBoxes.length})`
+                            : isBackSide
+                            ? `Back Boxes (${backBoxes.length})`
+                            : `Boxes (F:${frontBoxes.length} / B:${backBoxes.length})`}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {(isFrontSide || activeSide === 'both') && (
+                            <button
+                              type="button"
+                              onClick={() => handleAddCustomBlock('front')}
+                              className="py-0.5 px-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-bold flex items-center gap-1 shadow-xs cursor-pointer transition-colors"
+                              title="Add Box to Front side"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>+ Add Box {activeSide === 'both' ? '(Front)' : ''}</span>
+                            </button>
+                          )}
+                          {(isBackSide || activeSide === 'both') && (
+                            <button
+                              type="button"
+                              onClick={() => handleAddCustomBlock('back')}
+                              className="py-0.5 px-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-bold flex items-center gap-1 shadow-xs cursor-pointer transition-colors"
+                              title="Add Box to Back side"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>+ Add Box {activeSide === 'both' ? '(Back)' : ''}</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
 
-                {/* Selected Box Configurator */}
-                {selectedBox ? (
-                  <div className={`p-2.5 rounded-lg border space-y-2.5 ${
-                    isDark ? 'bg-zinc-850 border-zinc-700/80' : 'bg-zinc-50 border-zinc-200'
-                  }`}>
-                    {/* Box Title */}
-                    <div>
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">
-                        Box Title:
-                      </label>
-                      <input
-                        type="text"
-                        value={selectedBox.title}
-                        onChange={(e) => handleUpdateCustomBlock(selectedBox.id, { title: e.target.value })}
-                        className={`w-full p-1.5 rounded border text-xs font-bold focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                          isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-white border-zinc-300 text-zinc-900'
-                        }`}
-                        placeholder="Box Title..."
-                      />
-                    </div>
+                      {/* Box Selector Pills */}
+                      {displayedBoxes.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {displayedBoxes.map((blk) => {
+                            const isSel = selectedBox?.id === blk.id;
+                            const isFront = blk.side === 'front';
+                            return (
+                              <button
+                                key={blk.id}
+                                type="button"
+                                onClick={() => setSelectedBoxId(blk.id)}
+                                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 border cursor-pointer transition-all ${
+                                  isSel
+                                    ? 'bg-blue-600 text-white border-blue-400 shadow-xs'
+                                    : isDark
+                                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700'
+                                    : 'bg-zinc-100 text-zinc-700 border-zinc-300 hover:bg-zinc-200'
+                                }`}
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${
+                                    isFront ? 'bg-sky-400' : 'bg-emerald-400'
+                                  }`}
+                                />
+                                <span className="truncate max-w-[90px]">{blk.title || 'Untitled'}</span>
+                                {activeSide === 'both' && (
+                                  <span className="text-[8px] opacity-75 uppercase font-mono">
+                                    ({isFront ? 'F' : 'B'})
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-zinc-500 italic p-2 rounded bg-black/10 border border-zinc-700/30 text-center">
+                          No {isFrontSide ? 'Front' : isBackSide ? 'Back' : 'Custom'} boxes yet. Click + Add Box above.
+                        </div>
+                      )}
 
-                    {/* Box Background Color */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                          Box Background Color:
-                        </label>
-                        <span
-                          className="text-[9px] font-bold px-1.5 py-0.2 rounded"
-                          style={{
-                            backgroundColor: selectedBox.color || '#1E293B',
-                            color: getContrastTextColor(selectedBox.color || '#1E293B'),
-                          }}
+                      {selectedBox && (
+                        <div
+                          className={`p-2.5 rounded-lg border space-y-2.5 ${
+                            isDark ? 'bg-zinc-850 border-zinc-700/80' : 'bg-zinc-50 border-zinc-200'
+                          }`}
                         >
-                          Contrast Text
-                        </span>
-                      </div>
-                      
-                      <div className="grid grid-cols-6 gap-1.5 mb-1.5">
-                        {BOX_BG_PRESETS.map((preset) => (
-                          <button
-                            key={preset.hex}
-                            type="button"
-                            onClick={() => handleUpdateCustomBlock(selectedBox.id, { color: preset.hex })}
-                            className={`h-5 rounded border cursor-pointer transition-transform ${
-                              (selectedBox.color || '#1E293B').toLowerCase() === preset.hex.toLowerCase()
-                                ? 'scale-110 ring-2 ring-blue-500 shadow-xs'
-                                : 'hover:scale-105 opacity-85 hover:opacity-100'
-                            }`}
-                            style={{ backgroundColor: preset.hex }}
-                            title={`${preset.name} (${preset.hex})`}
-                          />
-                        ))}
-                      </div>
+                          {/* Side selector */}
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                              Assigned Side:
+                            </label>
+                            <div className="flex rounded bg-black/20 p-0.5 border border-zinc-700">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateCustomBlock(selectedBox.id, { side: 'front' })}
+                                className={`px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer transition-colors ${
+                                  selectedBox.side === 'front'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'text-zinc-400 hover:text-white'
+                                }`}
+                              >
+                                Front Only
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateCustomBlock(selectedBox.id, { side: 'back' })}
+                                className={`px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer transition-colors ${
+                                  selectedBox.side === 'back' || !selectedBox.side
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'text-zinc-400 hover:text-white'
+                                }`}
+                              >
+                                Back Only
+                              </button>
+                            </div>
+                          </div>
 
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          value={selectedBox.color || '#1E293B'}
-                          onChange={(e) => handleUpdateCustomBlock(selectedBox.id, { color: e.target.value })}
-                          className="w-6 h-6 p-0 border-0 rounded cursor-pointer"
-                          title="Choose custom background color"
-                        />
-                        <span className="text-[10px] font-mono text-zinc-400">
-                          {selectedBox.color || '#1E293B'}
-                        </span>
-                      </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">
+                              Box Title:
+                            </label>
+                            <input
+                              type="text"
+                              value={selectedBox.title}
+                              onChange={(e) => handleUpdateCustomBlock(selectedBox.id, { title: e.target.value })}
+                              className={`w-full p-1.5 rounded border text-xs font-bold ${
+                                isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-white border-zinc-300 text-zinc-900'
+                              }`}
+                              placeholder="Box Title..."
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">
+                              Box Background Color:
+                            </label>
+                            <div className="grid grid-cols-6 gap-1 mb-1.5">
+                              {BOX_BG_PRESETS.map((preset) => (
+                                <button
+                                  key={preset.hex}
+                                  type="button"
+                                  onClick={() => handleUpdateCustomBlock(selectedBox.id, { color: preset.hex })}
+                                  className={`h-5 rounded border cursor-pointer transition-transform ${
+                                    (selectedBox.color || '#1E293B').toLowerCase() === preset.hex.toLowerCase()
+                                      ? 'scale-110 ring-2 ring-blue-500 shadow-xs'
+                                      : 'opacity-85 hover:opacity-100'
+                                  }`}
+                                  style={{ backgroundColor: preset.hex }}
+                                  title={`${preset.name} (${preset.hex})`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Delete selected box */}
+                          <div className="pt-1 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCustomBlock(selectedBox.id)}
+                              className="text-[10px] font-semibold text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Delete Box</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-
-                    {/* Box Actions: Direction & Delete */}
-                    <div className="flex items-center justify-between pt-1 border-t border-zinc-700/50">
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateCustomBlock(selectedBox.id, { dir: selectedBox.dir === 'rtl' ? 'ltr' : 'rtl' })}
-                        className={`px-2 py-1 rounded text-[10px] font-semibold border cursor-pointer flex items-center gap-1 ${
-                          isDark ? 'bg-zinc-800 border-zinc-700' : 'bg-white border-zinc-300'
-                        }`}
-                      >
-                        {selectedBox.dir === 'rtl' ? <AlignRight className="w-3 h-3 text-blue-400" /> : <AlignLeft className="w-3 h-3 text-blue-400" />}
-                        <span>{selectedBox.dir === 'rtl' ? 'RTL' : 'LTR'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteCustomBlock(selectedBox.id)}
-                        className="px-2 py-1 rounded text-[10px] font-semibold border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 cursor-pointer flex items-center gap-1"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                        <span>Delete Box</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-[11px] text-zinc-500 italic text-center py-2">
-                    No custom boxes added yet. Click "+ Add Box" to create one.
-                  </p>
-                )}
+                  );
+                })()}
               </div>
-
-              {/* SECTION 3: Card Illustration Controls */}
-              <div className={`pt-3 border-t ${isDark ? 'border-zinc-800' : 'border-zinc-200'}`}>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">
-                  Card Illustration
-                </span>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={onOpenImageSearch}
-                    className={`py-1.5 px-2 rounded border flex items-center justify-center gap-1.5 cursor-pointer ${
-                      isDark ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-200' : 'bg-white hover:bg-zinc-100 border-zinc-300 text-zinc-800'
-                    }`}
-                  >
-                    <Search className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Search Online</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`py-1.5 px-2 rounded border flex items-center justify-center gap-1.5 cursor-pointer ${
-                      isDark ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-200' : 'bg-white hover:bg-zinc-100 border-zinc-300 text-zinc-800'
-                    }`}
-                  >
-                    <Upload className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Upload Local</span>
-                  </button>
-                </div>
-              </div>
-
             </div>
-
-            {/* Toolbar Footer Actions */}
-            {canSaveToAnki && onSaveToAnki && (
-              <div className={`p-3.5 border-t shrink-0 ${isDark ? 'border-zinc-700/80 bg-zinc-900' : 'border-zinc-200 bg-zinc-50'}`}>
-                <button
-                  type="button"
-                  onClick={onSaveToAnki}
-                  disabled={isSavingToAnki}
-                  className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:opacity-50 transition-colors"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{isSavingToAnki ? 'Saving to Anki...' : 'Update Note in Anki'}</span>
-                </button>
-              </div>
-            )}
           </aside>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 };
