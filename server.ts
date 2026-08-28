@@ -43,7 +43,7 @@ import {
   removeAnkiNoteTag,
   storeAnkiMediaFile,
 } from './server/anki';
-import { AppSettings, CardData, ManualOverrides, DiagnosticsReport, StepLog, ThemeId, CardType, CustomAIProviderConfig, CustomTTSProviderConfig, SmartImagesConfig, AIPromptsConfig } from './src/types';
+import { AppSettings, CardData, ManualOverrides, DiagnosticsReport, StepLog, ThemeId, CardType, CustomAIProviderConfig, CustomTTSProviderConfig, SmartImagesConfig, AIPromptsConfig, getFrontCustomBlocks, getBackCustomBlocks, getAllCustomBlocks } from './src/types';
 import { THEMES, makeSpellingSentence, renderCustomBlocksHtml } from './src/themes';
 import { renderMarkdown } from './src/utils/markdown';
 
@@ -1209,16 +1209,36 @@ async function startServer() {
     });
   });
 
-  // --- Update Existing Note in Anki ---
   app.post('/api/anki/update-note', async (req, res) => {
-    const { noteId, cardData, themeId } = req.body;
+    const { noteId, cardData, themeId, url } = req.body;
     if (!noteId || !cardData) {
       return res.status(400).json({ success: false, error: 'noteId and cardData are required.' });
     }
-    const ankiUrl = appSettings.anki.url || 'http://127.0.0.1:8765';
+    const ankiUrl = url || appSettings.anki.url || 'http://127.0.0.1:8765';
     const effectiveTheme: ThemeId = themeId || appSettings.theme || 'comic-pop-dark';
+    const effectiveCardType: CardType = cardData.cardType || 'normal';
 
     try {
+      // 1. Inspect existing note in Anki to determine note model name and ensure model has all fields and latest templates
+      try {
+        const infoRes = await getNotesInfo(ankiUrl, [Number(noteId)]);
+        if (infoRes.success && infoRes.notes && infoRes.notes.length > 0) {
+          const existingModelName = infoRes.notes[0].modelName;
+          const detectedType: CardType = cardData.cardType || (existingModelName.includes('Spelling') ? 'spelling' : 'normal');
+          await ensureAnkiModel(ankiUrl, effectiveTheme, detectedType, existingModelName);
+        } else {
+          await ensureAnkiModel(ankiUrl, effectiveTheme, effectiveCardType);
+        }
+      } catch (mErr) {
+        console.warn(`[Anki] Could not pre-verify model for note #${noteId}:`, mErr);
+      }
+
+      // 2. Prepare fields with robust front/back custom blocks
+      const frontBlocks = getFrontCustomBlocks(cardData);
+      const backBlocks = getBackCustomBlocks(cardData);
+      const customFrontHtml = renderCustomBlocksHtml(frontBlocks, effectiveTheme);
+      const customBackHtml = renderCustomBlocksHtml(backBlocks, effectiveTheme);
+
       const fields: Record<string, string> = {
         Word: (cardData.word || '').trim(),
         Phonetic: (cardData.phonetic || '').trim(),
@@ -1227,9 +1247,9 @@ async function startServer() {
         Example: renderMarkdown((cardData.example || '').trim()),
         Translation: renderMarkdown((cardData.translationFa || '').trim()),
         Mnemonic: renderMarkdown((cardData.mnemonic || '').trim()),
-        CustomFrontSections: renderCustomBlocksHtml((cardData.customBlocks || []).filter((b: any) => b.side === 'front'), effectiveTheme),
-        CustomBackSections: renderCustomBlocksHtml((cardData.customBlocks || []).filter((b: any) => b.side === 'back' || !b.side), effectiveTheme),
-        CustomSections: renderCustomBlocksHtml((cardData.customBlocks || []).filter((b: any) => b.side === 'back' || !b.side), effectiveTheme),
+        CustomFrontSections: customFrontHtml,
+        CustomBackSections: customBackHtml,
+        CustomSections: customBackHtml,
       };
 
       if (cardData.spellingSentence) {
@@ -1335,11 +1355,12 @@ async function startServer() {
 
   // --- Full Generation Pipeline Route ---
   app.post('/api/pipeline', async (req, res) => {
-    const { word, deck, manualOverrides, createInAnki = true, cardType } = req.body;
+    const { word, deck, manualOverrides, createInAnki = true, cardType, theme, url } = req.body;
     const cleanWord = (word || '').trim();
     const targetDeck = deck || appSettings.anki.defaultDeck || 'English::B1';
     const effectiveCardType: CardType =
       manualOverrides?.cardType || cardType || appSettings.defaultCard?.cardType || 'normal';
+    const effectiveTheme: ThemeId = theme || appSettings.theme || 'comic-pop-dark';
 
     if (!cleanWord) {
       return res.status(400).json({
@@ -1509,8 +1530,17 @@ async function startServer() {
       if (cleanManualOverrides.mnemonic) cardData.mnemonic = cleanManualOverrides.mnemonic;
       if (cleanManualOverrides.phonetic) cardData.phonetic = cleanManualOverrides.phonetic;
       if (cleanManualOverrides.partOfSpeech) cardData.partOfSpeech = cleanManualOverrides.partOfSpeech;
-      if (cleanManualOverrides.customBlocks && Array.isArray(cleanManualOverrides.customBlocks)) {
+      // Preserve custom blocks on front and back
+      const frontBlocks = getFrontCustomBlocks(cleanManualOverrides);
+      const backBlocks = getBackCustomBlocks(cleanManualOverrides);
+      if (frontBlocks.length > 0 || backBlocks.length > 0) {
+        cardData.frontCustomBlocks = frontBlocks;
+        cardData.backCustomBlocks = backBlocks;
+        cardData.customBlocks = [...frontBlocks, ...backBlocks];
+      } else if (cleanManualOverrides.customBlocks && Array.isArray(cleanManualOverrides.customBlocks)) {
         cardData.customBlocks = cleanManualOverrides.customBlocks;
+        cardData.frontCustomBlocks = cleanManualOverrides.customBlocks.filter((b: any) => b.side === 'front');
+        cardData.backCustomBlocks = cleanManualOverrides.customBlocks.filter((b: any) => b.side === 'back' || !b.side);
       }
 
       // Attach Card Type and Spelling sentence
@@ -1887,7 +1917,7 @@ async function startServer() {
       ankiUrl,
       targetDeck,
       cardData,
-      appSettings.theme,
+      effectiveTheme,
       effectiveCardType
     );
 

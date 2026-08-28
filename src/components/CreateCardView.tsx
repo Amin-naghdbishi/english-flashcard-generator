@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { CardData, ManualOverrides, AppSettings, StepLog, AnkiCardVerificationDetails, CardType, AppTheme } from '../types';
+import { CardData, ManualOverrides, AppSettings, StepLog, AnkiCardVerificationDetails, CardType, AppTheme, getFrontCustomBlocks, getBackCustomBlocks, getAllCustomBlocks } from '../types';
 import { CardPreview } from './CardPreview';
 import { AudioPlayer } from './AudioPlayer';
 import { useAppTheme } from '../context/ThemeContext';
@@ -377,7 +377,9 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
         cardType,
         imageBase64: editableCard?.imageBase64 || undefined,
         imageFileName: editableCard?.imageFileName || undefined,
-        customBlocks: editableCard?.customBlocks || undefined,
+        frontCustomBlocks: getFrontCustomBlocks(editableCard),
+        backCustomBlocks: getBackCustomBlocks(editableCard),
+        customBlocks: getAllCustomBlocks(editableCard),
         needsPhoto: photoChoice === 'yes' || !!editableCard?.imageBase64,
       };
 
@@ -387,6 +389,8 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
         manualOverrides,
         cardType,
         createInAnki: true,
+        theme: settings.theme,
+        url: settings.anki.url,
       });
 
       if (pipelineRes.logs) {
@@ -431,7 +435,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
     setIsUpdatingAnki(true);
     setAnkiActionMessage(null);
     try {
-      const res = await updateAnkiNote(createdNoteId, editableCard, settings.theme);
+      const res = await updateAnkiNote(createdNoteId, editableCard, settings.theme, settings.anki.url);
       if (res.success) {
         setAnkiActionMessage(`✓ Note #${createdNoteId} successfully updated in Anki!`);
       } else {

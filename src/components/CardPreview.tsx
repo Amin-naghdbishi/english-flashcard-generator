@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { CardData, ThemeDefinition, ThemeId, CardType, AppTheme, CustomCardBlock } from '../types';
+import { CardData, ThemeDefinition, ThemeId, CardType, AppTheme, CustomCardBlock, getFrontCustomBlocks, getBackCustomBlocks, getAllCustomBlocks } from '../types';
 import {
   THEMES,
   renderThemeHtml,
@@ -249,10 +249,13 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
   useEffect(() => {
     if (cardData) {
       setInternalCard((prev) => {
-        const next = {
+        const allBlocks = getAllCustomBlocks(cardData);
+        const next: CardData = {
           ...prev,
           ...cardData,
-          customBlocks: cardData.customBlocks !== undefined ? cardData.customBlocks : prev.customBlocks || [],
+          customBlocks: allBlocks.length > 0 ? allBlocks : (cardData.customBlocks !== undefined ? cardData.customBlocks : prev.customBlocks || []),
+          frontCustomBlocks: getFrontCustomBlocks(cardData),
+          backCustomBlocks: getBackCustomBlocks(cardData),
         };
         internalCardRef.current = next;
         return next;
@@ -284,6 +287,10 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
     (updater: (prev: CardData) => CardData) => {
       setInternalCard((prev) => {
         const next = updater(prev);
+        if (next.customBlocks) {
+          next.frontCustomBlocks = next.customBlocks.filter((b) => b.side === 'front');
+          next.backCustomBlocks = next.customBlocks.filter((b) => b.side === 'back' || !b.side);
+        }
         internalCardRef.current = next;
         return next;
       });
@@ -350,12 +357,17 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
     const { newText, newStart, newEnd } = applyMarkdownToText(fullText, start, end, action, extraValue);
 
     if (active.fieldName === 'customBlock' && active.blockId) {
-      handleUpdate((prev) => ({
-        ...prev,
-        customBlocks: (prev.customBlocks || []).map((b) =>
+      handleUpdate((prev) => {
+        const allBlocks = (prev.customBlocks || []).map((b) =>
           b.id === active.blockId ? { ...b, content: newText } : b
-        ),
-      }));
+        );
+        return {
+          ...prev,
+          customBlocks: allBlocks,
+          frontCustomBlocks: allBlocks.filter((b) => b.side === 'front'),
+          backCustomBlocks: allBlocks.filter((b) => b.side === 'back' || !b.side),
+        };
+      });
     } else {
       updateSimpleField(active.fieldName as keyof CardData, newText);
     }
@@ -378,26 +390,41 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
       dir: 'auto',
     };
 
-    handleUpdate((prev) => ({
-      ...prev,
-      customBlocks: [...(prev.customBlocks || []), newBlock],
-    }));
+    handleUpdate((prev) => {
+      const allBlocks = [...(prev.customBlocks || []), newBlock];
+      return {
+        ...prev,
+        customBlocks: allBlocks,
+        frontCustomBlocks: allBlocks.filter((b) => b.side === 'front'),
+        backCustomBlocks: allBlocks.filter((b) => b.side === 'back' || !b.side),
+      };
+    });
 
     setSelectedBoxId(newId);
   };
 
   const handleUpdateCustomBlock = (id: string, updates: Partial<CustomCardBlock>) => {
-    handleUpdate((prev) => ({
-      ...prev,
-      customBlocks: (prev.customBlocks || []).map((b) => (b.id === id ? { ...b, ...updates } : b)),
-    }));
+    handleUpdate((prev) => {
+      const allBlocks = (prev.customBlocks || []).map((b) => (b.id === id ? { ...b, ...updates } : b));
+      return {
+        ...prev,
+        customBlocks: allBlocks,
+        frontCustomBlocks: allBlocks.filter((b) => b.side === 'front'),
+        backCustomBlocks: allBlocks.filter((b) => b.side === 'back' || !b.side),
+      };
+    });
   };
 
   const handleDeleteCustomBlock = (id: string) => {
-    handleUpdate((prev) => ({
-      ...prev,
-      customBlocks: (prev.customBlocks || []).filter((b) => b.id !== id),
-    }));
+    handleUpdate((prev) => {
+      const allBlocks = (prev.customBlocks || []).filter((b) => b.id !== id);
+      return {
+        ...prev,
+        customBlocks: allBlocks,
+        frontCustomBlocks: allBlocks.filter((b) => b.side === 'front'),
+        backCustomBlocks: allBlocks.filter((b) => b.side === 'back' || !b.side),
+      };
+    });
     if (selectedBoxId === id) {
       setSelectedBoxId(null);
     }

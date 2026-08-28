@@ -52,12 +52,13 @@ export async function restoreDefaultPrompts(): Promise<{ settings: AppSettings; 
 export async function updateAnkiNote(
   noteId: number,
   cardData: CardData,
-  themeId?: ThemeId
+  themeId?: ThemeId,
+  url?: string
 ): Promise<{ success: boolean; noteId: number; error?: string }> {
   const res = await fetch('/api/anki/update-note', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ noteId, cardData, themeId }),
+    body: JSON.stringify({ noteId, cardData, themeId, url }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -416,6 +417,8 @@ export async function runFullPipeline(params: {
   manualOverrides?: ManualOverrides;
   cardType?: CardType;
   createInAnki?: boolean;
+  theme?: ThemeId;
+  url?: string;
 }): Promise<{
   success: boolean;
   cardData?: CardData;

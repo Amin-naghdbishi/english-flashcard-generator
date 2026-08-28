@@ -257,6 +257,11 @@ export const heroPopBackHtml = `
     {{#CustomBackSections}}
     {{CustomBackSections}}
     {{/CustomBackSections}}
+    {{^CustomBackSections}}
+    {{#CustomSections}}
+    {{CustomSections}}
+    {{/CustomSections}}
+    {{/CustomBackSections}}
   </div>
 </div>
 `;
@@ -401,6 +406,11 @@ export const duoQuestBackHtml = `
     {{#CustomBackSections}}
     {{CustomBackSections}}
     {{/CustomBackSections}}
+    {{^CustomBackSections}}
+    {{#CustomSections}}
+    {{CustomSections}}
+    {{/CustomSections}}
+    {{/CustomBackSections}}
   </div>
 </div>
 `;
@@ -536,6 +546,11 @@ export const indexNotebookBackHtml = `
 
     {{#CustomBackSections}}
     {{CustomBackSections}}
+    {{/CustomBackSections}}
+    {{^CustomBackSections}}
+    {{#CustomSections}}
+    {{CustomSections}}
+    {{/CustomSections}}
     {{/CustomBackSections}}
   </div>
 </div>
@@ -673,6 +688,11 @@ export const minimalBackHtml = `
 
     {{#CustomBackSections}}
     {{CustomBackSections}}
+    {{/CustomBackSections}}
+    {{^CustomBackSections}}
+    {{#CustomSections}}
+    {{CustomSections}}
+    {{/CustomSections}}
     {{/CustomBackSections}}
   </div>
 </div>

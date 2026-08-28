@@ -388,6 +388,8 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
           },
           cardType: effectiveCardType,
           createInAnki: true,
+          theme: settings.theme,
+          url: settings.anki.url,
         });
 
         if (res.success && res.cardData) {
@@ -591,7 +593,8 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
       const res = await updateAnkiNote(
         selectedItemForPreview.noteId,
         previewCard,
-        settings.theme
+        settings.theme,
+        settings.anki.url
       );
 
       if (res.success) {
@@ -625,7 +628,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
     let savedCount = 0;
     for (const it of editedItems) {
       try {
-        const res = await updateAnkiNote(it.noteId!, it.cardData!, settings.theme);
+        const res = await updateAnkiNote(it.noteId!, it.cardData!, settings.theme, settings.anki.url);
         if (res.success) {
           savedCount++;
           setItems((prev) =>

@@ -452,7 +452,8 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
       const res = await updateAnkiNote(
         selectedNoteForPreview.noteId,
         previewCard,
-        settings.theme
+        settings.theme,
+        settings.anki.url
       );
 
       if (res.success) {
@@ -485,7 +486,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
     let savedCount = 0;
     for (const n of editedNotes) {
       try {
-        const res = await updateAnkiNote(n.noteId, n.updatedCardData!, settings.theme);
+        const res = await updateAnkiNote(n.noteId, n.updatedCardData!, settings.theme, settings.anki.url);
         if (res.success) {
           savedCount++;
           setNotes((prev) =>

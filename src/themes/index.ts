@@ -1,4 +1,11 @@
-import { ThemeDefinition, CardData, ThemeId, CustomCardBlock } from '../types';
+import {
+  ThemeDefinition,
+  CardData,
+  ThemeId,
+  CustomCardBlock,
+  getFrontCustomBlocks,
+  getBackCustomBlocks,
+} from '../types';
 import { renderMarkdown, escapeHtml } from '../utils/markdown';
 import { comicPopLightTheme } from './comic-pop-light';
 import { comicPopDarkTheme } from './comic-pop-dark';
@@ -143,7 +150,7 @@ export function renderCustomBlocksHtml(
     const badgeBg = textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.2)';
     const badgeBorder = textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.3)';
     const dir = block.dir || (isRTLText(content) ? 'rtl' : 'ltr');
-    const contentHtml = renderMarkdown(content);
+    const contentHtml = content ? renderMarkdown(content) : '';
 
     let blockHtml = '';
 
@@ -154,8 +161,8 @@ export function renderCustomBlocksHtml(
       case 'comic-dark':
         blockHtml = `
 <div class="comic-mnemonic-box custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; margin-top: 14px;">
-  <span class="box-label" style="background-color: ${badgeBg}; color: ${textColor}; border: 2px solid ${badgeBorder}; font-weight: 900;">${escapeHtml(title)}</span>
-  <div class="custom-block-content" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>
+  ${title ? `<span class="box-label" style="background-color: ${badgeBg}; color: ${textColor}; border: 2px solid ${badgeBorder}; font-weight: 900;">${escapeHtml(title)}</span>` : ''}
+  ${contentHtml ? `<div class="custom-block-content" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>` : ''}
 </div>`;
         break;
 
@@ -165,8 +172,8 @@ export function renderCustomBlocksHtml(
       case 'comic-manga-dark':
         blockHtml = `
 <div class="quest-mnemonic-card custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; margin-top: 14px;">
-  <span class="quest-tag-purple" style="background-color: ${badgeBg}; color: ${textColor}; font-weight: 800;">${escapeHtml(title)}</span>
-  <div class="quest-custom-content" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>
+  ${title ? `<span class="quest-tag-purple" style="background-color: ${badgeBg}; color: ${textColor}; font-weight: 800;">${escapeHtml(title)}</span>` : ''}
+  ${contentHtml ? `<div class="quest-custom-content" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>` : ''}
 </div>`;
         break;
 
@@ -174,8 +181,8 @@ export function renderCustomBlocksHtml(
       case 'comic-notebook-dark':
         blockHtml = `
 <div class="notebook-washi-mnemonic custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; margin-top: 14px;">
-  <span class="washi-title" style="color: ${textColor}; font-weight: 800;">📌 ${escapeHtml(title)}</span>
-  <div class="washi-text" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>
+  ${title ? `<span class="washi-title" style="color: ${textColor}; font-weight: 800;">📌 ${escapeHtml(title)}</span>` : ''}
+  ${contentHtml ? `<div class="washi-text" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>` : ''}
 </div>`;
         break;
 
@@ -186,8 +193,8 @@ export function renderCustomBlocksHtml(
       default:
         blockHtml = `
 <div class="minimal-mnemonic-block custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; margin-top: 14px;">
-  <div class="minimal-mnemonic-label" style="color: ${textColor}; font-weight: 700; opacity: 0.9;">${escapeHtml(title)}</div>
-  <div class="minimal-custom-content" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>
+  ${title ? `<div class="minimal-mnemonic-label" style="color: ${textColor}; font-weight: 700; opacity: 0.9;">${escapeHtml(title)}</div>` : ''}
+  ${contentHtml ? `<div class="minimal-custom-content" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>` : ''}
 </div>`;
         break;
     }
@@ -266,10 +273,20 @@ export function renderThemeHtml(
     exampleAudioUkNormal = data.exampleAudioUkNormalFileName ? `[sound:${data.exampleAudioUkNormalFileName}]` : '';
     exampleAudioUkSlow = data.exampleAudioUkSlowFileName ? `[sound:${data.exampleAudioUkSlowFileName}]` : '';
 
-    const allWordSounds = [wordAudioUsNormal, wordAudioUsSlow, wordAudioUkNormal, wordAudioUkSlow].filter(Boolean).join(' ');
+    const allWordSounds = [
+      wordAudioUsNormal,
+      wordAudioUsSlow,
+      wordAudioUkNormal,
+      wordAudioUkSlow,
+    ].filter(Boolean).join(' ');
     wordAudio = allWordSounds || (data.wordAudioFileName ? `[sound:${data.wordAudioFileName}]` : '');
 
-    const allExampleSounds = [exampleAudioUsNormal, exampleAudioUsSlow, exampleAudioUkNormal, exampleAudioUkSlow].filter(Boolean).join(' ');
+    const allExampleSounds = [
+      exampleAudioUsNormal,
+      exampleAudioUsSlow,
+      exampleAudioUkNormal,
+      exampleAudioUkSlow,
+    ].filter(Boolean).join(' ');
     exampleAudio = allExampleSounds || (data.exampleAudioFileName ? `[sound:${data.exampleAudioFileName}]` : '');
   }
 
@@ -286,11 +303,10 @@ export function renderThemeHtml(
   // 3. Spelling sentence
   const spellingSentence = data.spellingSentence || makeSpellingSentence(data.example || '', data.word || '');
 
-  // 4. Custom Sections / Blocks strictly filtered by side
+  // 4. Custom Sections / Blocks strictly filtered by side using unified helpers
   const activeThemeId = options?.themeId || 'comic-pop-dark';
-  const allBlocks = Array.isArray(data.customBlocks) ? data.customBlocks : [];
-  const frontBlocks = allBlocks.filter((b) => b.side === 'front');
-  const backBlocks = allBlocks.filter((b) => b.side === 'back' || !b.side);
+  const frontBlocks = getFrontCustomBlocks(data);
+  const backBlocks = getBackCustomBlocks(data);
 
   const customFrontSectionsHtml = renderCustomBlocksHtml(frontBlocks, activeThemeId);
   const customBackSectionsHtml = renderCustomBlocksHtml(backBlocks, activeThemeId);
@@ -337,9 +353,12 @@ export function renderThemeHtml(
     html = html.replace(/\{\{#CustomBackSections\}\}/g, '');
     html = html.replace(/\{\{\/CustomBackSections\}\}/g, '');
     html = html.replaceAll('{{CustomBackSections}}', customBackSectionsHtml);
+    html = html.replace(/\{\{\^CustomBackSections\}\}[\s\S]*?\{\{\/CustomBackSections\}\}/g, '');
   } else {
     html = html.replace(/\{\{#CustomBackSections\}\}[\s\S]*?\{\{\/CustomBackSections\}\}/g, '');
     html = html.replaceAll('{{CustomBackSections}}', '');
+    html = html.replace(/\{\{\^CustomBackSections\}\}/g, '');
+    html = html.replace(/\{\{\/CustomBackSections\}\}/g, '');
   }
 
   // Handle CustomSections conditional tags (legacy/universal)

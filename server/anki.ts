@@ -1,5 +1,5 @@
 import { THEMES, getSpellingFrontHtml, renderCustomBlocksHtml, SHARED_CARD_CSS } from '../src/themes';
-import { CardData, ThemeId, CardType } from '../src/types';
+import { CardData, ThemeId, CardType, getFrontCustomBlocks, getBackCustomBlocks } from '../src/types';
 import { renderMarkdown } from '../src/utils/markdown';
 
 export const ANKI_NOTE_TYPE_NAME = 'AI Vocabulary';
@@ -201,21 +201,27 @@ export async function ensureAnkiModel(
       const currentFields: string[] = fieldsRes.result;
       for (const requiredField of ANKI_MODEL_FIELDS) {
         if (!currentFields.includes(requiredField)) {
-          await callAnkiConnect(baseUrl, 'modelFieldAdd', {
-            model: { name: targetModel },
-            field: requiredField,
+          const addFieldRes = await callAnkiConnect(baseUrl, 'modelFieldAdd', {
+            modelName: targetModel,
+            fieldName: requiredField,
           });
+          if (!addFieldRes.success) {
+            console.warn(`[Anki] Warning: Could not add field '${requiredField}' to model '${targetModel}': ${addFieldRes.error}`);
+          }
         }
       }
     }
 
     // 2. Update model CSS styling
-    await callAnkiConnect(baseUrl, 'updateModelStyling', {
+    const cssRes = await callAnkiConnect(baseUrl, 'updateModelStyling', {
       model: {
         name: targetModel,
         css: `${theme.css}\n${SHARED_CARD_CSS}`,
       },
     });
+    if (!cssRes.success) {
+      console.warn(`[Anki] Warning: Could not update styling for model '${targetModel}': ${cssRes.error}`);
+    }
 
     // 3. Find template card names and update ONLY the primary template (avoiding duplicate identical templates)
     const templatesRes = await callAnkiConnect(baseUrl, 'modelTemplates', {
@@ -233,12 +239,15 @@ export async function ensureAnkiModel(
           },
         };
 
-        await callAnkiConnect(baseUrl, 'updateModelTemplates', {
+        const updateTemplateRes = await callAnkiConnect(baseUrl, 'updateModelTemplates', {
           model: {
             name: targetModel,
             templates: templateUpdates,
           },
         });
+        if (!updateTemplateRes.success) {
+          console.warn(`[Anki] Warning: Could not update templates for model '${targetModel}': ${updateTemplateRes.error}`);
+        }
       }
     }
 
@@ -510,9 +519,9 @@ export async function createAnkiNote(
     ExampleAudioUsSlow: cardData.exampleAudioUsSlowFileName ? `[sound:${cardData.exampleAudioUsSlowFileName}]` : '',
     ExampleAudioUkNormal: cardData.exampleAudioUkNormalFileName ? `[sound:${cardData.exampleAudioUkNormalFileName}]` : '',
     ExampleAudioUkSlow: cardData.exampleAudioUkSlowFileName ? `[sound:${cardData.exampleAudioUkSlowFileName}]` : '',
-    CustomFrontSections: renderCustomBlocksHtml((cardData.customBlocks || []).filter((b) => b.side === 'front'), themeId),
-    CustomBackSections: renderCustomBlocksHtml((cardData.customBlocks || []).filter((b) => b.side === 'back' || !b.side), themeId),
-    CustomSections: renderCustomBlocksHtml((cardData.customBlocks || []).filter((b) => b.side === 'back' || !b.side), themeId),
+    CustomFrontSections: renderCustomBlocksHtml(getFrontCustomBlocks(cardData), themeId),
+    CustomBackSections: renderCustomBlocksHtml(getBackCustomBlocks(cardData), themeId),
+    CustomSections: renderCustomBlocksHtml(getBackCustomBlocks(cardData), themeId),
   };
 
   // 6. Add Note (IMPORTANT: allowDuplicate: true so user can create multiple cards for the same word with different meanings)
