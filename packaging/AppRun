@@ -38,7 +38,7 @@ fi
 
 # Environment setup
 export PATH="$APPDIR/usr/bin:$PATH"
-export NODE_PATH="$APPDIR/usr/share/flashcard-generator/dist:$NODE_PATH"
+export NODE_PATH="$APPDIR/usr/share/flashcard-generator/node_modules:$APPDIR/usr/share/flashcard-generator/dist:$NODE_PATH"
 export NODE_ENV="production"
 
 PORT="${PORT:-3000}"
