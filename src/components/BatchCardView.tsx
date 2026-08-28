@@ -9,6 +9,7 @@ import {
   checkOnlineTTS,
   checkAnki,
   updateAnkiNote,
+  openInAnki,
 } from '../services/api';
 import { CardPreview } from './CardPreview';
 import { useAppTheme } from '../context/ThemeContext';
@@ -25,6 +26,8 @@ import {
   Sliders,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Sparkles,
   Layers,
   List,
@@ -36,6 +39,7 @@ import {
   Edit3,
   Layers3,
   ArrowRight,
+  ExternalLink,
 } from 'lucide-react';
 
 interface BatchCardViewProps {
@@ -230,6 +234,82 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
   const [isSavingCardToAnki, setIsSavingCardToAnki] = useState<boolean>(false);
   const [isSavingAllEdited, setIsSavingAllEdited] = useState<boolean>(false);
   const [saveActionMessage, setSaveActionMessage] = useState<string | null>(null);
+  const [isShowingInAnki, setIsShowingInAnki] = useState<boolean>(false);
+
+  const isUserNavigatingRef = useRef<boolean>(false);
+  const selectedItemIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    selectedItemIdRef.current = selectedItemForPreview?.id || null;
+  }, [selectedItemForPreview]);
+
+  // Compute preview index in batch
+  const previewIndex = selectedItemForPreview
+    ? items.findIndex((it) => it.id === selectedItemForPreview.id)
+    : -1;
+
+  const handlePreviousCard = () => {
+    if (previewIndex > 0) {
+      const prevItem = items[previewIndex - 1];
+      isUserNavigatingRef.current = true;
+      setSelectedItemForPreview(prevItem);
+      setPreviewCard(prevItem.cardData || batchItemToCardData(prevItem));
+    }
+  };
+
+  const handleNextCard = () => {
+    if (previewIndex >= 0 && previewIndex < items.length - 1) {
+      const nextItem = items[previewIndex + 1];
+      isUserNavigatingRef.current = true;
+      setSelectedItemForPreview(nextItem);
+      setPreviewCard(nextItem.cardData || batchItemToCardData(nextItem));
+    }
+  };
+
+  const handleSelectCard = (item: BatchItem) => {
+    isUserNavigatingRef.current = true;
+    setSelectedItemForPreview(item);
+    setPreviewCard(item.cardData || batchItemToCardData(item));
+  };
+
+  // Keyboard shortcut Ctrl+Left / Ctrl+Right for navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const tagName = activeEl?.tagName.toLowerCase();
+      if (tagName === 'input' || tagName === 'textarea' || (activeEl as HTMLElement)?.isContentEditable) {
+        return;
+      }
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          handlePreviousCard();
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          handleNextCard();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewIndex, items]);
+
+  const handleShowInAnki = async (noteIdToOpen: number) => {
+    setIsShowingInAnki(true);
+    setSaveActionMessage(null);
+    try {
+      const res = await openInAnki({ noteId: noteIdToOpen, url: settings.anki.url });
+      if (res.success) {
+        setSaveActionMessage(`✓ Opened Note #${noteIdToOpen} in Anki Browser GUI`);
+      } else {
+        setSaveActionMessage(`✕ Could not open in Anki: ${res.error || 'Anki is not running or note not found'}`);
+      }
+    } catch (err: any) {
+      setSaveActionMessage(`✕ Could not connect to Anki: ${err?.message}`);
+    } finally {
+      setIsShowingInAnki(false);
+    }
+  };
 
   const [fieldConfig, setFieldConfig] = useState<BatchFieldConfig>({
     word: true,
@@ -468,7 +548,10 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
       }
 
       setCurrentIndex(i);
-      setSelectedItemForPreview(currentItem);
+      if (!isUserNavigatingRef.current) {
+        setSelectedItemForPreview(currentItem);
+        setPreviewCard(currentItem.cardData || batchItemToCardData(currentItem));
+      }
 
       const result = await processBatchItemWithRetries(currentItem, i);
 
@@ -477,7 +560,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
         break;
       }
 
-      // REQUIREMENT 4: CARDS MUST BE AVAILABLE IMMEDIATELY!
+      // REQUIREMENT: CARDS AVAILABLE IMMEDIATELY WHILE GENERATING
       if (result.success && result.cardData) {
         const updatedCardData = result.cardData;
         const updatedNoteId = result.noteId;
@@ -496,17 +579,19 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
           )
         );
 
-        setPreviewCard(updatedCardData);
-        setSelectedItemForPreview((prev) =>
-          prev && prev.id === currentItem.id
-            ? {
-                ...prev,
-                status: 'success',
-                cardData: updatedCardData,
-                noteId: updatedNoteId,
-              }
-            : prev
-        );
+        if (!isUserNavigatingRef.current || selectedItemIdRef.current === currentItem.id) {
+          setPreviewCard(updatedCardData);
+          setSelectedItemForPreview((prev) =>
+            prev && prev.id === currentItem.id
+              ? {
+                  ...prev,
+                  status: 'success',
+                  cardData: updatedCardData,
+                  noteId: updatedNoteId,
+                }
+              : prev
+          );
+        }
       } else {
         setItems((prev) =>
           prev.map((item, idx) =>
@@ -557,8 +642,9 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
   };
 
   const handleSelectForPreview = (item: BatchItem) => {
+    isUserNavigatingRef.current = true;
     setSelectedItemForPreview(item);
-    setPreviewCard(batchItemToCardData(item));
+    setPreviewCard(item.cardData || batchItemToCardData(item));
     setSaveActionMessage(null);
   };
 
@@ -958,31 +1044,21 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                 )}
               </div>
             ) : (
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled
-                  className="flex-1 py-2.5 px-4 bg-zinc-600 text-white font-medium text-xs rounded-md flex items-center justify-center gap-2 opacity-80"
-                >
-                  <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
-                  <span>
-                    {t('batch.processingCount', {
-                      current: currentIndex + 1,
-                      total: isGroupingEnabled
-                        ? Math.min((currentGroupIndex + 1) * safeGroupSize, items.length)
-                        : items.length,
-                    })}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-                >
-                  <Square className="w-3.5 h-3.5 fill-current" />
-                  <span>{t('batch.cancelBtn')}</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="w-full py-2.5 px-4 bg-zinc-800 hover:bg-zinc-750 text-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-100 border border-zinc-600 dark:border-zinc-700 font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                title="Safely cancel batch processing"
+              >
+                <Square className="w-3.5 h-3.5 fill-current opacity-75" />
+                <span>
+                  Cancel ({currentIndex + 1} of{' '}
+                  {isGroupingEnabled
+                    ? Math.min((currentGroupIndex + 1) * safeGroupSize, items.length)
+                    : items.length}
+                  )
+                </span>
+              </button>
             )}
 
             {/* SAVE ALL EDITED CARDS BUTTON (Requirement 4) */}
@@ -1149,6 +1225,57 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             )}
           </div>
 
+          {/* PREV / NEXT CARD NAVIGATION BAR (Requirement 1) */}
+          {items.length > 0 && (
+            <div
+              className={`flex items-center justify-between gap-2 px-3 py-2 rounded-md mb-3 border text-xs ${
+                isDark ? 'bg-zinc-850/80 border-zinc-750 text-zinc-200' : 'bg-zinc-50 border-zinc-200 text-zinc-800'
+              }`}
+            >
+              <button
+                type="button"
+                onClick={handlePreviousCard}
+                disabled={previewIndex <= 0}
+                className={`py-1 px-2.5 rounded font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+                  isDark ? 'hover:bg-zinc-750 text-zinc-200' : 'hover:bg-zinc-200 text-zinc-700'
+                }`}
+                title="Previous card (Ctrl+Left)"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Previous Card</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">
+                  Card <span className="text-purple-500 font-bold">{previewIndex + 1}</span> of {items.length}
+                </span>
+                {selectedItemForPreview?.status === 'success' && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-400 font-semibold">
+                    ✓ In Anki
+                  </span>
+                )}
+                {selectedItemForPreview?.status === 'generating_ai' && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-500/15 text-purple-400 font-semibold animate-pulse">
+                    Generating...
+                  </span>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleNextCard}
+                disabled={previewIndex < 0 || previewIndex >= items.length - 1}
+                className={`py-1 px-2.5 rounded font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+                  isDark ? 'hover:bg-zinc-750 text-zinc-200' : 'hover:bg-zinc-200 text-zinc-700'
+                }`}
+                title="Next card (Ctrl+Right)"
+              >
+                <span>Next Card</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {/* Full CardPreview & Editor Panel */}
           <div className="relative z-10 w-full flex-1 flex flex-col min-w-0">
             <CardPreview
@@ -1158,6 +1285,9 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
               appTheme={isDark ? 'anki-dark' : 'anki-light'}
               editable={true}
               canSaveToAnki={Boolean(selectedItemForPreview?.noteId)}
+              noteId={selectedItemForPreview?.noteId}
+              onShowInAnki={handleShowInAnki}
+              isShowingInAnki={isShowingInAnki}
               isSavingToAnki={isSavingCardToAnki}
               onCardChange={handleCardChange}
               onSaveToAnki={handleSaveSingleCardToAnki}

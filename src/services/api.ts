@@ -419,6 +419,7 @@ export async function runFullPipeline(params: {
   createInAnki?: boolean;
   theme?: ThemeId;
   url?: string;
+  signal?: AbortSignal;
 }): Promise<{
   success: boolean;
   cardData?: CardData;
@@ -438,10 +439,12 @@ export async function runFullPipeline(params: {
     timestamp?: number;
   }>;
 }> {
+  const { signal, ...bodyParams } = params;
   const res = await fetch('/api/pipeline', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
+    body: JSON.stringify(bodyParams),
+    signal,
   });
   return res.json();
 }

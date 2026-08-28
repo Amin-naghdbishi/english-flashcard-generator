@@ -6,21 +6,21 @@
 
 <img src="Screenshot-dark.png" alt="Flashcard Generator Dark Mode" width="850">
 
-# 🗂️ راهنمای جامع و دفترچه راهنمای فارسی Flashcard Generator
-### نرم‌افزار حرفه‌ای، سریع و هوشمند ساخت خودکار فلش‌کارت‌های زبان انگلیسی برای Anki
+## 🗂️ Flashcard Generator — Anki Flashcard Automation Suite
+### Intelligent, high-speed, multi-modal English flashcard creator for Anki
 
-[![نسخه نرم‌افزار](https://img.shields.io/badge/نسخه-1.0.5-blue.svg)](https://github.com/Amin-naghdbishi/english-flashcard-generator/releases/tag/v1.0.5)
-[![سیستم‌عامل](https://img.shields.io/badge/پلتفرم-Linux%20%7C%20Windows-green.svg)]()
-[![مجوز](https://img.shields.io/badge/مجوز-MIT-orange.svg)](LICENSE)
-[![وضعیت آفلاین](https://img.shields.io/badge/کارکرد-۱۰۰٪%20آفلاین%20یا%20آنلاین-purple.svg)]()
+[![Software Version](https://img.shields.io/badge/Version-1.1.1-blue.svg)](https://github.com/Amin-naghdbishi/english-flashcard-generator/releases/tag/v1.1.1)
+[![Operating System](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-green.svg)]()
+[![License](https://img.shields.io/badge/License-MIT-orange.svg)](LICENSE)
+[![Offline Status](https://img.shields.io/badge/Status-100%25%20Offline%20or%20Online-purple.svg)]()
 
 </div>
 
 ---
 
-نرم‌افزار **Flashcard Generator** یک سامانه پیشرفته و همه‌جانبه برای زبان‌آموزان است که وظیفه سخت، خسته‌کننده و زمان‌بر ساخت فلش‌کارت در **Anki** را به یک فرآیند خودکار و لذت‌بخش در کسری از ثانیه تبدیل می‌کند. 
+**Flashcard Generator** is an advanced, all-in-one automation suite for English language learners that turns the tedious, time-consuming task of creating high-quality **Anki** flashcards into an effortless, instantaneous workflow.
 
-این برنامه با ترکیب **مدل‌های هوش مصنوعی زبانی (محلی با Ollama یا ابری با Google Gemini و Custom AI)**، **موتور تبدیل متن به گفتار باکیفیت و آفلاین (Piper TTS)**، **سیستم تفکیک ریشه و کدینگ واژگان (Memory Hook)**، **جستجوگر هوشمند تصویر** و **۱۲ تم بصری زیبا همراه با آزمون املا (Spelling)**، تمامی فیلدهای مورد نیاز یک فلش‌کارت بی‌نقص را آماده کرده و بدون نیاز به کپی-پیست مستقیم وارد نرم‌افزار Anki شما می‌کند.
+Powered by **AI language models (local with Ollama or cloud with Google Gemini & Custom AI)**, **neural offline TTS engines (Piper TTS & Edge TTS)**, **etymological memory hooks**, **smart image search**, and **8 polished card themes with interactive spelling tests**, it automatically populates every card field and directly exports ready-to-study notes into Anki without manual copy-pasting.
 
 ---
 

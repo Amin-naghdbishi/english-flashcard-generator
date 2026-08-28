@@ -36,9 +36,72 @@ import {
   HelpCircle,
   X,
   Zap,
+  ExternalLink,
+  ChevronDown,
+  Loader2,
 } from 'lucide-react';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
+
+export interface BoxPreset {
+  id: string;
+  name: string;
+  icon: string;
+  title: string;
+  defaultContent: string;
+  color: string;
+}
+
+export const READY_MADE_BOX_PRESETS: BoxPreset[] = [
+  {
+    id: 'memory_hook',
+    name: 'Memory Hook',
+    icon: '💡',
+    title: '💡 Memory Hook / کد یادسپاری',
+    defaultContent: '<strong>کد صوتی / تصویرسازی:</strong><br/>داستان یا شباهت آوایی برای یادآوری سریع در ذهن.',
+    color: '#1E1B4B',
+  },
+  {
+    id: 'collocations',
+    name: 'Collocations & Patterns',
+    icon: '🔗',
+    title: '🔗 Collocations & Patterns',
+    defaultContent: '<ul class="card-list card-bullet-list">\n  <li><strong>take a chance:</strong> ریسک کردن</li>\n  <li><strong>stand a chance:</strong> شانس داشتن</li>\n</ul>',
+    color: '#1E3A8A',
+  },
+  {
+    id: 'common_mistakes',
+    name: 'Common Mistakes',
+    icon: '⚠️',
+    title: '⚠️ Common Mistakes / اشتباهات رایج',
+    defaultContent: '<span style="color: #ef4444;">✕ Don\'t say:</span> ...<br/><span style="color: #10b981;">✓ Say:</span> ...',
+    color: '#7F1D1D',
+  },
+  {
+    id: 'root_etymology',
+    name: 'Word Root / Etymology',
+    icon: '🔤',
+    title: '🔤 Root & Etymology / ریشه‌شناسی',
+    defaultContent: '<strong>Root:</strong> Latin <em>...</em> (meaning: ...)<br/><strong>Related words:</strong> ...',
+    color: '#3B0764',
+  },
+  {
+    id: 'everyday_convo',
+    name: 'Everyday Conversation',
+    icon: '💬',
+    title: '💬 Everyday Conversation / مکالمه روزمره',
+    defaultContent: '<em>"How\'s it going?"</em><br/>در مکالمات روزمره و غیررسمی بسیار کاربرد دارد.',
+    color: '#064E3B',
+  },
+  {
+    id: 'personal_example',
+    name: 'Personal Example',
+    icon: '📝',
+    title: '📝 Personal Example / مثال شخصی',
+    defaultContent: 'جمله یا مثال مرتبط با تجربیات و موقعیت شخصی خود بنویسید...',
+    color: '#1E293B',
+  },
+];
 
 export interface CardPreviewProps {
   cardData: CardData | null;
@@ -54,6 +117,9 @@ export interface CardPreviewProps {
   onOpenImageSearch?: () => void;
   onUploadImage?: (file: File) => void;
   onRemoveImage?: () => void;
+  noteId?: number;
+  onShowInAnki?: (noteId: number) => void;
+  isShowingInAnki?: boolean;
 }
 
 export const BOX_BG_PRESETS = [
@@ -181,6 +247,9 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
   onOpenImageSearch,
   onUploadImage,
   onRemoveImage,
+  noteId,
+  onShowInAnki,
+  isShowingInAnki = false,
 }) => {
   const themeContext = useAppTheme();
   const { t, isRTL } = useTranslation();
@@ -192,6 +261,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
   const [previewCardType, setPreviewCardType] = useState<CardType>(cardType);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
+  const [openAddBoxMenu, setOpenAddBoxMenu] = useState<'front' | 'back' | 'drawer' | null>(null);
 
   // Spelling in-editor tester state
   const [testSpellingInput, setTestSpellingInput] = useState<string>('');
@@ -395,15 +465,18 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
   };
 
   // Custom Blocks Management
-  const handleAddCustomBlock = (side: 'front' | 'back' = 'back', titleOverride?: string) => {
+  const handleAddCustomBlock = (
+    side: 'front' | 'back' = 'back',
+    preset?: Partial<CustomCardBlock>
+  ) => {
     const newId = `block_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const newBlock: CustomCardBlock = {
       id: newId,
       side,
-      title: titleOverride || (side === 'front' ? 'FRONT NOTE / HINT' : 'EXTRA NOTE / SYNONYMS'),
-      content: '- Key point 1\n- Key point 2',
-      color: BOX_BG_PRESETS[Math.floor(Math.random() * BOX_BG_PRESETS.length)].hex,
-      dir: 'auto',
+      title: preset?.title || (side === 'front' ? 'FRONT NOTE / HINT' : 'EXTRA NOTE / SYNONYMS'),
+      content: preset?.content !== undefined ? preset.content : '- Key point 1\n- Key point 2',
+      color: preset?.color || BOX_BG_PRESETS[Math.floor(Math.random() * BOX_BG_PRESETS.length)].hex,
+      dir: preset?.dir || 'auto',
     };
 
     handleUpdate((prev) => {
@@ -523,18 +596,71 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               {blocks.length}
             </span>
           </span>
-          <button
-            type="button"
-            onClick={() => handleAddCustomBlock(side)}
-            className={`px-2.5 py-1 text-[11px] font-bold rounded flex items-center gap-1 cursor-pointer transition-colors shadow-xs ${
-              side === 'front'
-                ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-            }`}
-          >
-            <Plus className="w-3 h-3" />
-            <span>+ Add Box ({sideLabel})</span>
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setOpenAddBoxMenu(openAddBoxMenu === side ? null : side)}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs ${
+                side === 'front'
+                  ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+              }`}
+            >
+              <Plus className="w-3 h-3" />
+              <span>+ Add Box ({sideLabel})</span>
+              <ChevronDown className="w-3 h-3 ml-0.5" />
+            </button>
+
+            {openAddBoxMenu === side && (
+              <div className="absolute right-0 mt-1 w-64 p-2 rounded-lg border bg-zinc-900 border-zinc-700 text-zinc-100 shadow-xl z-50 space-y-1">
+                <div className="flex items-center justify-between pb-1 mb-1 border-b border-zinc-800 text-[10px] uppercase font-bold text-zinc-400">
+                  <span>Box Presets ({sideLabel})</span>
+                  <button
+                    type="button"
+                    onClick={() => setOpenAddBoxMenu(null)}
+                    className="text-zinc-400 hover:text-white text-xs cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+                {READY_MADE_BOX_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => {
+                      handleAddCustomBlock(side, {
+                        title: preset.title,
+                        content: preset.defaultContent,
+                        color: preset.color,
+                      });
+                      setOpenAddBoxMenu(null);
+                    }}
+                    className="w-full text-left p-1.5 rounded flex items-center gap-2 hover:bg-zinc-800 text-xs font-medium cursor-pointer transition-colors"
+                  >
+                    <span className="text-sm">{preset.icon}</span>
+                    <span className="flex-1 truncate">{preset.name}</span>
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0 border border-white/20"
+                      style={{ backgroundColor: preset.color }}
+                    />
+                  </button>
+                ))}
+                <div className="pt-1 border-t border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleAddCustomBlock(side);
+                      setOpenAddBoxMenu(null);
+                    }}
+                    className="w-full text-left p-1.5 rounded flex items-center gap-2 hover:bg-zinc-800 text-xs font-medium text-zinc-400 cursor-pointer transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>+ Custom Blank Box</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {blocks.length > 0 && (
@@ -1498,6 +1624,28 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             </button>
           )}
 
+          {/* Show in Anki Button (Requirement 5) */}
+          {noteId && onShowInAnki && (
+            <button
+              type="button"
+              onClick={() => onShowInAnki(noteId)}
+              disabled={isShowingInAnki}
+              className={`px-2.5 py-1 text-xs font-semibold rounded border flex items-center gap-1.5 transition-colors cursor-pointer ${
+                isDark
+                  ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-blue-400'
+                  : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-300 text-blue-600'
+              }`}
+              title={`Show Note #${noteId} in Anki Browser GUI`}
+            >
+              {isShowingInAnki ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <ExternalLink className="w-3.5 h-3.5" />
+              )}
+              <span>Show in Anki</span>
+            </button>
+          )}
+
           {/* Toggle Slide-out Editor Toolbar Button */}
           {editable && mode === 'edit' && (
             <button
@@ -1826,30 +1974,77 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                             ? `Back Boxes (${backBoxes.length})`
                             : `Boxes (F:${frontBoxes.length} / B:${backBoxes.length})`}
                         </span>
-                        <div className="flex items-center gap-1">
-                          {(isFrontSide || activeSide === 'both') && (
-                            <button
-                              type="button"
-                              onClick={() => handleAddCustomBlock('front')}
-                              className="py-0.5 px-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-bold flex items-center gap-1 shadow-xs cursor-pointer transition-colors"
-                              title="Add Box to Front side"
-                            >
-                              <Plus className="w-3 h-3" />
-                              <span>+ Add Box {activeSide === 'both' ? '(Front)' : ''}</span>
-                            </button>
-                          )}
-                          {(isBackSide || activeSide === 'both') && (
-                            <button
-                              type="button"
-                              onClick={() => handleAddCustomBlock('back')}
-                              className="py-0.5 px-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-bold flex items-center gap-1 shadow-xs cursor-pointer transition-colors"
-                              title="Add Box to Back side"
-                            >
-                              <Plus className="w-3 h-3" />
-                              <span>+ Add Box {activeSide === 'both' ? '(Back)' : ''}</span>
-                            </button>
-                          )}
-                        </div>
+                      </div>
+
+                      {/* Box Presets Dropdown in Toolbar Drawer */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setOpenAddBoxMenu(openAddBoxMenu === 'drawer' ? null : 'drawer')}
+                          className="w-full py-1.5 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold flex items-center justify-between shadow-xs cursor-pointer transition-colors"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>+ Add Box ({isFrontSide ? 'Front' : 'Back'})</span>
+                          </span>
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+
+                        {openAddBoxMenu === 'drawer' && (
+                          <div className={`mt-1 p-2 rounded-lg border shadow-xl z-50 space-y-1 ${
+                            isDark ? 'bg-zinc-900 border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+                          }`}>
+                            <div className="flex items-center justify-between pb-1 mb-1 border-b border-zinc-700/40 text-[10px] uppercase font-bold text-zinc-400">
+                              <span>Ready-Made Box Presets</span>
+                              <button
+                                type="button"
+                                onClick={() => setOpenAddBoxMenu(null)}
+                                className="text-zinc-400 hover:text-white text-xs cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                            {READY_MADE_BOX_PRESETS.map((preset) => (
+                              <button
+                                key={preset.id}
+                                type="button"
+                                onClick={() => {
+                                  handleAddCustomBlock(isFrontSide ? 'front' : 'back', {
+                                    title: preset.title,
+                                    content: preset.defaultContent,
+                                    color: preset.color,
+                                  });
+                                  setOpenAddBoxMenu(null);
+                                }}
+                                className={`w-full text-left p-1.5 rounded flex items-center gap-2 text-xs font-medium cursor-pointer transition-colors ${
+                                  isDark ? 'hover:bg-zinc-800' : 'hover:bg-zinc-100'
+                                }`}
+                              >
+                                <span className="text-sm">{preset.icon}</span>
+                                <span className="flex-1 truncate">{preset.name}</span>
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full shrink-0 border border-white/20"
+                                  style={{ backgroundColor: preset.color }}
+                                />
+                              </button>
+                            ))}
+                            <div className="pt-1 border-t border-zinc-700/40">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleAddCustomBlock(isFrontSide ? 'front' : 'back');
+                                  setOpenAddBoxMenu(null);
+                                }}
+                                className={`w-full text-left p-1.5 rounded flex items-center gap-2 text-xs font-medium text-zinc-400 cursor-pointer transition-colors ${
+                                  isDark ? 'hover:bg-zinc-800' : 'hover:bg-zinc-100'
+                                }`}
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>+ Custom Blank Box</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Box Selector Pills */}

@@ -31,6 +31,7 @@ import {
   RotateCcw,
   Save,
   Plus,
+  Square,
 } from 'lucide-react';
 
 interface CreateCardViewProps {
@@ -169,6 +170,16 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
   const [isOpeningInAnki, setIsOpeningInAnki] = useState(false);
   const [ankiActionMessage, setAnkiActionMessage] = useState<string | null>(null);
   const [isReverifying, setIsReverifying] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const handleCancelGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsGenerating(false);
+    setErrorMessage('Card generation cancelled.');
+  };
 
   // Test Card state
   const [testingAnkiOnly, setTestingAnkiOnly] = useState(false);
@@ -358,6 +369,8 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
       }
     }
 
+    const abortCtrl = new AbortController();
+    abortControllerRef.current = abortCtrl;
     setIsGenerating(true);
     setActiveStepNumber(1);
     setExecutionLogs([]);
@@ -391,6 +404,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
         createInAnki: true,
         theme: settings.theme,
         url: settings.anki.url,
+        signal: abortCtrl.signal,
       });
 
       if (pipelineRes.logs) {
@@ -422,10 +436,15 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
         onCardCreated(pipelineRes.cardData, pipelineRes.noteId);
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'An unexpected error occurred during card generation');
+      if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+        setErrorMessage('Card generation was cancelled.');
+      } else {
+        setErrorMessage(err.message || 'An unexpected error occurred during card generation');
+      }
       setActiveStepNumber(-1); // Error state
     } finally {
       setIsGenerating(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -803,26 +822,29 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
               </div>
             )}
 
-            {/* Action Buttons: Generate, Update, Clear */}
+            {/* Action Buttons: Generate, Cancel, Update, Show in Anki, Clear */}
             <div className="flex flex-col gap-2 pt-1">
               <div className="flex items-center gap-2">
-                <button
-                  type="submit"
-                  disabled={isGenerating || testingAnkiOnly || !word.trim()}
-                  className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-white" />
-                      <span>{t('create.generating')}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4" />
-                      <span>{t('create.generateCardBtn')}</span>
-                    </>
-                  )}
-                </button>
+                {isGenerating ? (
+                  <button
+                    type="button"
+                    onClick={handleCancelGeneration}
+                    className="flex-1 py-2.5 px-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-100 border border-zinc-600 dark:border-zinc-700 font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                    title="Cancel card generation"
+                  >
+                    <Square className="w-3.5 h-3.5 fill-current opacity-75" />
+                    <span>Cancel</span>
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={testingAnkiOnly || !word.trim()}
+                    className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>{t('create.generateCardBtn')}</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -840,26 +862,47 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
                 </button>
               </div>
 
-              {/* Direct "Update Note in Anki" button when note exists */}
+              {/* Direct "Update Note in Anki" and "Show in Anki" buttons when note exists */}
               {createdNoteId && (
-                <button
-                  type="button"
-                  onClick={handleSaveToAnki}
-                  disabled={isUpdatingAnki}
-                  className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-md shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
-                >
-                  {isUpdatingAnki ? (
-                    <>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveToAnki}
+                    disabled={isUpdatingAnki}
+                    className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-md shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
+                  >
+                    {isUpdatingAnki ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Updating Note #{createdNoteId}...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Update Note in Anki</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenInAnki(createdNoteId)}
+                    disabled={isOpeningInAnki}
+                    className={`py-2 px-3 border rounded-md text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shrink-0 ${
+                      isDark
+                        ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-blue-400'
+                        : 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700'
+                    }`}
+                    title={`Open Note #${createdNoteId} in Anki Browser GUI`}
+                  >
+                    {isOpeningInAnki ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Updating Note #{createdNoteId}...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-3.5 h-3.5" />
-                      <span>{t('preview.saveToAnki') || `Update Note #${createdNoteId} in Anki`}</span>
-                    </>
-                  )}
-                </button>
+                    ) : (
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    )}
+                    <span>Show in Anki</span>
+                  </button>
+                </div>
               )}
             </div>
           </form>
@@ -1063,6 +1106,9 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
             onSaveToAnki={handleSaveToAnki}
             isSavingToAnki={isUpdatingAnki}
             canSaveToAnki={!!createdNoteId}
+            noteId={createdNoteId || undefined}
+            onShowInAnki={handleOpenInAnki}
+            isShowingInAnki={isOpeningInAnki}
             onOpenImageSearch={handleOpenInternetSearch}
             onUploadImage={handleLocalImageUpload}
             onRemoveImage={handleRemoveImage}

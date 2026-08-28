@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AppSettings, AppTheme, TaggedNoteItem, CardData } from '../types';
-import { getAnkiTags, findNotesByTag, completeAnkiNote, checkAnki, updateAnkiNote } from '../services/api';
+import { getAnkiTags, findNotesByTag, completeAnkiNote, checkAnki, updateAnkiNote, openInAnki } from '../services/api';
 import { CardPreview } from './CardPreview';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
@@ -24,6 +24,9 @@ import {
   PauseCircle,
   Save,
   Edit3,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
 } from 'lucide-react';
 
 interface CompleteCardsByTagViewProps {
@@ -101,6 +104,83 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
   const [isSavingCardToAnki, setIsSavingCardToAnki] = useState<boolean>(false);
   const [isSavingAllEdited, setIsSavingAllEdited] = useState<boolean>(false);
   const [saveActionMessage, setSaveActionMessage] = useState<string | null>(null);
+  const [isShowingInAnki, setIsShowingInAnki] = useState<boolean>(false);
+
+  const isUserNavigatingRef = useRef<boolean>(false);
+  const selectedNoteIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    selectedNoteIdRef.current = selectedNoteForPreview?.noteId || null;
+  }, [selectedNoteForPreview]);
+
+  // Compute preview index in notes
+  const previewIndex = selectedNoteForPreview
+    ? notes.findIndex((n) => n.noteId === selectedNoteForPreview.noteId)
+    : -1;
+
+  const handlePreviousNote = () => {
+    if (previewIndex > 0) {
+      const prevNote = notes[previewIndex - 1];
+      isUserNavigatingRef.current = true;
+      setSelectedNoteForPreview(prevNote);
+      setPreviewCard(noteItemToCardData(prevNote));
+    }
+  };
+
+  const handleNextNote = () => {
+    if (previewIndex >= 0 && previewIndex < notes.length - 1) {
+      const nextNote = notes[previewIndex + 1];
+      isUserNavigatingRef.current = true;
+      setSelectedNoteForPreview(nextNote);
+      setPreviewCard(noteItemToCardData(nextNote));
+    }
+  };
+
+  const handleSelectNote = (note: TaggedNoteItem) => {
+    isUserNavigatingRef.current = true;
+    setSelectedNoteForPreview(note);
+    setPreviewCard(noteItemToCardData(note));
+    setSaveActionMessage(null);
+  };
+
+  // Keyboard shortcut Ctrl+Left / Ctrl+Right for note navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const tagName = activeEl?.tagName.toLowerCase();
+      if (tagName === 'input' || tagName === 'textarea' || (activeEl as HTMLElement)?.isContentEditable) {
+        return;
+      }
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          handlePreviousNote();
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          handleNextNote();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewIndex, notes]);
+
+  const handleShowInAnki = async (noteIdToOpen: number) => {
+    setIsShowingInAnki(true);
+    setSaveActionMessage(null);
+    try {
+      const res = await openInAnki({ noteId: noteIdToOpen, url: settings.anki.url });
+      if (res.success) {
+        setSaveActionMessage(`✓ Opened Note #${noteIdToOpen} in Anki Browser GUI`);
+      } else {
+        setSaveActionMessage(`✕ Could not open in Anki: ${res.error || 'Anki is not running or note not found'}`);
+      }
+    } catch (err: any) {
+      setSaveActionMessage(`✕ Could not connect to Anki: ${err?.message}`);
+    } finally {
+      setIsShowingInAnki(false);
+    }
+  };
 
   const abortControllerRef = useRef<boolean>(false);
 
@@ -288,7 +368,10 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
       }
 
       setCurrentIndex(i);
-      setSelectedNoteForPreview(item);
+      if (!isUserNavigatingRef.current) {
+        setSelectedNoteForPreview(item);
+        setPreviewCard(noteItemToCardData(item));
+      }
 
       const result = await processCardWithRetries(item, i, tagToProcess);
 
@@ -297,11 +380,10 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
         break;
       }
 
-      // REQUIREMENT 4: Cards immediately available as soon as generated!
+      // REQUIREMENT: Cards immediately available as soon as generated!
       if (result.success && result.cardData) {
         comp++;
         setCompletedCount(comp);
-        setPreviewCard(result.cardData);
 
         setNotes((prev) =>
           prev.map((it, idx) =>
@@ -319,18 +401,21 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
           )
         );
 
-        setSelectedNoteForPreview((prev) =>
-          prev && prev.noteId === item.noteId
-            ? {
-                ...prev,
-                status: 'success' as const,
-                updatedCardData: result.cardData,
-                generatedFieldsSummary: result.generatedFields,
-                missingFields: [],
-                needsCompletion: false,
-              }
-            : prev
-        );
+        if (!isUserNavigatingRef.current || selectedNoteIdRef.current === item.noteId) {
+          setPreviewCard(result.cardData);
+          setSelectedNoteForPreview((prev) =>
+            prev && prev.noteId === item.noteId
+              ? {
+                  ...prev,
+                  status: 'success' as const,
+                  updatedCardData: result.cardData,
+                  generatedFieldsSummary: result.generatedFields,
+                  missingFields: [],
+                  needsCompletion: false,
+                }
+              : prev
+          );
+        }
       } else {
         fail++;
         setFailedCount(fail);
@@ -412,13 +497,6 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
 
     setIsProcessing(false);
     setCurrentIndex(-1);
-  };
-
-  // Select note from queue to view preview/editor
-  const handleSelectNote = (item: TaggedNoteItem) => {
-    setSelectedNoteForPreview(item);
-    setPreviewCard(noteItemToCardData(item));
-    setSaveActionMessage(null);
   };
 
   // REQUIREMENT 2: EDIT CARD AND SAVE IN ANKI (IN-PLACE WITHOUT DUPLICATES)
@@ -705,32 +783,17 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                   )}
                 </div>
               ) : (
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled
-                    className={`flex-1 py-2.5 px-4 rounded-md font-medium text-xs flex items-center justify-center gap-2 cursor-wait border ${
-                      isDark
-                        ? 'bg-blue-900/40 border-blue-700 text-blue-200'
-                        : 'bg-blue-50 border-blue-300 text-blue-900'
-                    }`}
-                  >
-                    <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                    <span className="font-semibold">
-                      {t('completeByTag.processingProgress', { current: currentIndex + 1, total: notes.length })}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleCancelProcessing}
-                    className="py-2.5 px-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-600 font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                    title="Safely cancel processing and keep completed cards"
-                  >
-                    <Square className="w-3.5 h-3.5 text-zinc-300" />
-                    <span>{t('completeByTag.cancelBtn')}</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleCancelProcessing}
+                  className="w-full py-2.5 px-4 bg-zinc-800 hover:bg-zinc-750 text-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-100 border border-zinc-600 dark:border-zinc-700 font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                  title="Safely cancel tag processing"
+                >
+                  <Square className="w-3.5 h-3.5 fill-current opacity-75" />
+                  <span>
+                    Cancel Processing ({currentIndex + 1} of {notes.length})
+                  </span>
+                </button>
               )}
 
               {/* SAVE ALL EDITED NOTES BUTTON */}
@@ -1003,6 +1066,57 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
             )}
           </div>
 
+          {/* PREV / NEXT CARD NAVIGATION BAR (Requirement 1) */}
+          {notes.length > 0 && (
+            <div
+              className={`flex items-center justify-between gap-2 px-3 py-2 rounded-md mb-3 border text-xs ${
+                isDark ? 'bg-zinc-850/80 border-zinc-750 text-zinc-200' : 'bg-zinc-50 border-zinc-200 text-zinc-800'
+              }`}
+            >
+              <button
+                type="button"
+                onClick={handlePreviousNote}
+                disabled={previewIndex <= 0}
+                className={`py-1 px-2.5 rounded font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+                  isDark ? 'hover:bg-zinc-750 text-zinc-200' : 'hover:bg-zinc-200 text-zinc-700'
+                }`}
+                title="Previous card (Ctrl+Left)"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Previous Card</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">
+                  Card <span className="text-blue-500 font-bold">{previewIndex + 1}</span> of {notes.length}
+                </span>
+                {selectedNoteForPreview?.status === 'success' && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-400 font-semibold">
+                    ✓ Completed
+                  </span>
+                )}
+                {(selectedNoteForPreview?.status === 'generating_ai' || selectedNoteForPreview?.status === 'generating_audio') && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-400 font-semibold animate-pulse">
+                    Processing...
+                  </span>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleNextNote}
+                disabled={previewIndex < 0 || previewIndex >= notes.length - 1}
+                className={`py-1 px-2.5 rounded font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+                  isDark ? 'hover:bg-zinc-750 text-zinc-200' : 'hover:bg-zinc-200 text-zinc-700'
+                }`}
+                title="Next card (Ctrl+Right)"
+              >
+                <span>Next Card</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           <div className="relative z-10 w-full flex-1 flex flex-col min-w-0">
             <CardPreview
               cardData={previewCard}
@@ -1011,6 +1125,9 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
               appTheme={isDark ? 'anki-dark' : 'anki-light'}
               editable={true}
               canSaveToAnki={Boolean(selectedNoteForPreview?.noteId)}
+              noteId={selectedNoteForPreview?.noteId}
+              onShowInAnki={handleShowInAnki}
+              isShowingInAnki={isShowingInAnki}
               isSavingToAnki={isSavingCardToAnki}
               onCardChange={handleCardChange}
               onSaveToAnki={handleSaveSingleNoteToAnki}

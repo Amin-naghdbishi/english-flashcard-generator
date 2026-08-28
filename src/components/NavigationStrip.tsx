@@ -250,20 +250,17 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
               type="button"
               onClick={onTogglePin}
               title={isPinned ? t('nav.unpinToolbar') : t('nav.pinToolbar')}
-              className={`p-1.5 rounded-md border text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer ${
+              className={`p-1.5 rounded-md border text-xs font-medium flex items-center justify-center transition-colors cursor-pointer ${
                 isPinned
                   ? isDark
-                    ? 'border-blue-500/70 bg-blue-950/50 text-blue-400 font-semibold'
-                    : 'border-blue-400 bg-blue-50 text-blue-700 font-semibold shadow-xs'
+                    ? 'border-blue-500/60 bg-blue-950/40 text-blue-400 font-semibold'
+                    : 'border-blue-300 bg-blue-50 text-blue-700 font-semibold'
                   : isDark
                   ? 'border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
                   : 'border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
               }`}
             >
               {isPinned ? <Pin className="w-3.5 h-3.5 fill-current" /> : <PinOff className="w-3.5 h-3.5" />}
-              <span className="hidden xl:inline text-[11px]">
-                {isPinned ? 'Pinned' : 'Auto-Hide'}
-              </span>
             </button>
           )}
 
@@ -272,22 +269,16 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
             type="button"
             onClick={() => themeContext.toggleTheme()}
             title={isDark ? t('nav.switchToLight') : t('nav.switchToDark')}
-            className={`px-2 py-1 rounded border text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
+            className={`p-1.5 rounded-md border text-xs font-medium flex items-center justify-center transition-colors cursor-pointer ${
               isDark
-                ? 'border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-750'
+                ? 'border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-700'
                 : 'border-zinc-300 bg-zinc-100 text-zinc-800 hover:bg-zinc-200'
             }`}
           >
             {isDark ? (
-              <>
-                <span className="text-amber-400">☀️</span>
-                <span className="hidden md:inline">{t('nav.light')}</span>
-              </>
+              <span className="text-amber-400 text-xs">☀️</span>
             ) : (
-              <>
-                <span className="text-blue-500">🌙</span>
-                <span className="hidden md:inline">{t('nav.dark')}</span>
-              </>
+              <span className="text-blue-500 text-xs">🌙</span>
             )}
           </button>
         </div>
