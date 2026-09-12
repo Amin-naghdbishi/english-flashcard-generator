@@ -9,7 +9,7 @@
 
 <br>
 
-<img src="Screenshot1.png" alt="Flashcard Generator Light Mode" width="850">
+<img src="Screenshotv.png" alt="Flashcard Generator Light Mode" width="850">
 
 <br><br>
 
@@ -18,7 +18,7 @@
 <br><br>
 
 
-<img src="Screenshotv.png" alt="Flashcard Generator Dark Mode" width="850">
+<img src="Screenshot1.png" alt="Flashcard Generator Dark Mode" width="850">
 
 </div>
 
