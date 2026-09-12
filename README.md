@@ -759,14 +759,13 @@ Anki
 
 <div align="center">
 
-<div align="center">
-
 # 🗂️ Flashcard Generator
 
 ### Automatically create professional Anki flashcards for learning English
 
 Automatically generate meanings, IPA, examples, translations, memory hooks, pronunciations, and images
 with support for **Ollama, Piper TTS, and AnkiConnect**
+
 ---
 
 ## ✨ Features
@@ -802,7 +801,7 @@ First, download and install Node.js from the official website:
 
 https://nodejs.org/en/download/
 
-Choose the **LTS** version. The official Node.js website clearly identifies the current LTS release.
+Choose the **LTS** version.
 
 After installation, open PowerShell or Command Prompt and verify the installation:
 
@@ -828,7 +827,7 @@ git clone https://github.com/Amin-naghdbishi/english-flashcard-generator.git
 cd english-flashcard-generator
 ```
 
-If you don't have Git installed, you can open the GitHub repository and select:
+If you don't have Git installed, open the GitHub repository and select:
 
 **Code → Download ZIP**
 
@@ -1054,7 +1053,7 @@ This project uses two high-quality voices:
 
 `en_GB-cori-high`
 
-Both voices are available in the official Piper Voices collection on Hugging Face. Lessac `high` is an American English voice, while Cori `high` is a British English voice.
+Both voices are available in the official Piper Voices collection on Hugging Face.
 
 ## Download the Models
 
@@ -1128,8 +1127,6 @@ Test it:
 curl http://127.0.0.1:5000/voices
 ```
 
-The official Piper API provides the `/voices` endpoint for listing available voices and `/synthesize` for generating WAV audio.
-
 ---
 
 # ⚙️ Run Piper as a systemd Service
@@ -1159,8 +1156,6 @@ RestartSec=3
 [Install]
 WantedBy=default.target
 ```
-
-> If this configuration does not work with your systemd setup, you can remove `User=%i` and replace it with your actual username.
 
 Then run:
 
@@ -1246,8 +1241,6 @@ Enter the following code:
 
 After installing the add-on, **completely close Anki and launch it again.**
 
-AnkiConnect is an add-on that provides an API for other applications to communicate with Anki. Its original GitHub repository was archived in 2025, and the project has moved to SourceHut.
-
 ---
 
 # 🧪 Test AnkiConnect
@@ -1261,7 +1254,7 @@ curl -s http://127.0.0.1:8765 \
   -d '{"action":"version","version":6}'
 ```
 
-If everything is working correctly, you should receive a response similar to:
+If everything is working correctly, you should receive:
 
 ```json
 {"result":6,"error":null}
@@ -1498,16 +1491,7 @@ In fully offline mode, text and audio generation are performed locally on your c
 
 ---
 
-<div align="center">
-
 ### ❤️ Built to make learning English with Anki easier
 
 If you encounter a problem, please report it in the [Issues section](https://github.com/Amin-naghdbishi/english-flashcard-generator/issues) of the project.
 
-</div>
-
-
-### ❤️ ساخته شده برای ساده‌تر کردن یادگیری زبان با Anki
-
-اگر مشکلی پیدا کردید، لطفاً آن را در [بخش Issues پروژه](https://github.com/Amin-naghdbishi/english-flashcard-generator/issues) گزارش دهید.
-</div>
