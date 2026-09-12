@@ -759,8 +759,755 @@ Anki
 
 <div align="center">
 
+<div align="center">
+
+# 🗂️ Flashcard Generator
+
+### Automatically create professional Anki flashcards for learning English
+
+Automatically generate meanings, IPA, examples, translations, memory hooks, pronunciations, and images
+with support for **Ollama, Piper TTS, and AnkiConnect**
+---
+
+## ✨ Features
+
+* 🧠 Generate vocabulary information using AI
+* 🤖 **Ollama** support for fully offline use
+* ☁️ Support for Gemini and OpenAI-compatible services
+* 🔊 Generate pronunciations with **Piper TTS**
+* 🇺🇸 American and 🇬🇧 British English pronunciation
+* 📝 Create standard and spelling cards
+* 🖼️ Automatically search for images when appropriate
+* 📚 Direct integration with Anki using AnkiConnect
+* 📦 Batch processing for large numbers of words
+* 🌙 Multiple themes for Anki cards
+* 🌐 Persian and English interface
+
+---
+
+# 🚀 Installation & Usage
+
+There are two ways to run the application:
+
+1. **Pre-built AppImage on Linux**
+2. **Run the project with Node.js on Windows or Linux**
+
+---
+
+# 🪟 Installation on Windows
+
+## 1. Install Node.js
+
+First, download and install Node.js from the official website:
+
+https://nodejs.org/en/download/
+
+Choose the **LTS** version. The official Node.js website clearly identifies the current LTS release.
+
+After installation, open PowerShell or Command Prompt and verify the installation:
+
+```powershell
+node --version
+npm --version
+```
+
+If version numbers are displayed, Node.js has been installed successfully.
+
+---
+
+## 2. Get the Project
+
+Project repository:
+
+https://github.com/Amin-naghdbishi/english-flashcard-generator
+
+Using Git:
+
+```powershell
+git clone https://github.com/Amin-naghdbishi/english-flashcard-generator.git
+cd english-flashcard-generator
+```
+
+If you don't have Git installed, you can open the GitHub repository and select:
+
+**Code → Download ZIP**
+
+Then extract the downloaded ZIP file.
+
+---
+
+## 3. Install Dependencies
+
+Open a terminal inside the project folder and run:
+
+```powershell
+npm install
+```
+
+This will install all the dependencies required by the project.
+
+---
+
+## 4. Run the Application
+
+To run the development version:
+
+```powershell
+npm run dev
+```
+
+Or, if you want to run the production build:
+
+```powershell
+npm run build
+npm start
+```
+
+After starting the application, open the URL shown in the terminal in your browser.
+
+Usually:
+
+```text
+http://localhost:3000
+```
+
+---
+
+# 🐧 Installation on Linux
+
+## Quick Method: AppImage
+
+If you only want to use the application and don't need to modify the source code, the AppImage is the easiest option.
+
+Download the latest release from the Releases page:
+
+https://github.com/Amin-naghdbishi/english-flashcard-generator/releases
+
+Then make the AppImage executable:
+
+```bash
+chmod +x Flashcard-Generator-*.AppImage
+```
+
+Run it:
+
+```bash
+./Flashcard-Generator-*.AppImage
+```
+
+The AppImage does not require Node.js.
+
+> To use the offline features, you still need to install Ollama and Piper separately.
+
+---
+
+# 🐧 Run from Source with Node.js on Linux
+
+If you want to run or modify the project source code, install Node.js first.
+
+Official website:
+
+https://nodejs.org/en/download/
+
+Then:
+
+```bash
+git clone https://github.com/Amin-naghdbishi/english-flashcard-generator.git
+cd english-flashcard-generator
+npm install
+npm run dev
+```
+
+To run the production version:
+
+```bash
+npm run build
+npm start
+```
+
+---
+
+# 📴 Fully Offline Mode
+
+To use the application without cloud services, you need two additional components:
+
+* **Ollama** → Generates vocabulary information locally
+* **Piper TTS** → Generates pronunciation audio locally
+
+You will also need:
+
+* **Anki + AnkiConnect** → Stores the generated flashcards
+
+Overall architecture:
+
+```text
+                  Flashcard Generator
+                                      │
+              ┌──────────┴──────────┐
+              │                     │
+           Ollama                 Piper
+        Offline AI            Offline TTS
+              │                     │
+              └──────────┬──────────┘
+                         │
+                    AnkiConnect
+                         │
+                        Anki
+```
+
+---
+
+# 🤖 Install Ollama
+
+## Linux
+
+Official documentation:
+
+https://docs.ollama.com/linux
+
+Install Ollama:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+Then verify the installation:
+
+```bash
+ollama --version
+```
+
+If the Ollama service does not start automatically:
+
+```bash
+ollama serve
+```
+
+---
+
+## Download the Recommended Model
+
+The recommended model for this project is:
+
+```bash
+ollama pull gemma3:4b
+```
+
+Check the installed models:
+
+```bash
+ollama list
+```
+
+You should see something similar to:
+
+```text
+gemma3:4b
+```
+
+In Flashcard Generator, select:
+
+```text
+Settings
+→ AI Provider
+→ Ollama
+→ Model: gemma3:4b
+```
+
+Then test the connection.
+
+---
+
+# 🔊 Install Piper TTS
+
+Piper is a local text-to-speech engine that can run as an HTTP server on port `5000`.
+
+This step is **optional but recommended** for offline use.
+
+## 1. Create a Python Environment
+
+On Linux:
+
+```bash
+python3 -m venv ~/piper-env
+source ~/piper-env/bin/activate
+```
+
+Then:
+
+```bash
+pip install --upgrade pip
+pip install "piper-tts[http]"
+```
+
+---
+
+# 🎙️ Download Piper Voices
+
+This project uses two high-quality voices:
+
+### 🇺🇸 American English
+
+`en_US-lessac-high`
+
+### 🇬🇧 British English
+
+`en_GB-cori-high`
+
+Both voices are available in the official Piper Voices collection on Hugging Face. Lessac `high` is an American English voice, while Cori `high` is a British English voice.
+
+## Download the Models
+
+First, create a directory for the voices:
+
+```bash
+mkdir -p ~/piper-voices
+cd ~/piper-voices
+```
+
+### 🇺🇸 Lessac
+
+```bash
+wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/high/en_US-lessac-high.onnx
+
+wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/high/en_US-lessac-high.onnx.json
+```
+
+### 🇬🇧 Cori
+
+```bash
+wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/cori/high/en_GB-cori-high.onnx
+
+wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/cori/high/en_GB-cori-high.onnx.json
+```
+
+Verify the downloaded files:
+
+```bash
+ls -lh ~/piper-voices
+```
+
+You should have these four files:
+
+```text
+en_US-lessac-high.onnx
+en_US-lessac-high.onnx.json
+
+en_GB-cori-high.onnx
+en_GB-cori-high.onnx.json
+```
+
+---
+
+# 🌐 Run Piper as a Server
+
+Activate the Piper environment:
+
+```bash
+source ~/piper-env/bin/activate
+```
+
+Then start the server:
+
+```bash
+python3 -m piper.http_server \
+  --model ~/piper-voices/en_US-lessac-high.onnx \
+  --data-dir ~/piper-voices \
+  --port 5000
+```
+
+The server should now be available at:
+
+```text
+http://127.0.0.1:5000
+```
+
+Test it:
+
+```bash
+curl http://127.0.0.1:5000/voices
+```
+
+The official Piper API provides the `/voices` endpoint for listing available voices and `/synthesize` for generating WAV audio.
+
+---
+
+# ⚙️ Run Piper as a systemd Service
+
+If you don't want to start Piper manually every time, you can run it as a persistent Linux service.
+
+Create the service file:
+
+```bash
+sudo nano /etc/systemd/system/piper.service
+```
+
+Add:
+
+```ini
+[Unit]
+Description=Piper TTS Server
+After=network.target
+
+[Service]
+Type=simple
+User=%i
+ExecStart=%h/piper-env/bin/python -m piper.http_server --model %h/piper-voices/en_US-lessac-high.onnx --data-dir %h/piper-voices --port 5000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target
+```
+
+> If this configuration does not work with your systemd setup, you can remove `User=%i` and replace it with your actual username.
+
+Then run:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now piper.service
+```
+
+Check the service status:
+
+```bash
+systemctl --user status piper.service
+```
+
+View the logs:
+
+```bash
+journalctl --user -u piper.service -f
+```
+
+Test the server:
+
+```bash
+curl http://127.0.0.1:5000/voices
+```
+
+If you receive a JSON response, Piper is running correctly.
+
+---
+
+# 🇺🇸🇬🇧 Using American and British Voices
+
+To allow the application to use both voices, keep both voice files in:
+
+```text
+~/piper-voices/
+```
+
+In Flashcard Generator settings:
+
+```text
+TTS Engine: Piper
+Server: http://127.0.0.1:5000
+
+American Voice:
+en_US-lessac-high
+
+British Voice:
+en_GB-cori-high
+```
+
+For slower pronunciation, the application can use a higher `length_scale` value. Piper's default value is `1`.
+
+---
+
+# 🃏 Install Anki
+
+Download Anki from the official website:
+
+https://apps.ankiweb.net/
+
+Install and launch Anki.
+
+---
+
+# 🔌 Install AnkiConnect
+
+Flashcard Generator uses **AnkiConnect** to send generated cards directly to Anki.
+
+In Anki, go to:
+
+```text
+Tools
+→ Add-ons
+→ Get Add-ons
+```
+
+Enter the following code:
+
+```text
+2055492159
+```
+
+After installing the add-on, **completely close Anki and launch it again.**
+
+AnkiConnect is an add-on that provides an API for other applications to communicate with Anki. Its original GitHub repository was archived in 2025, and the project has moved to SourceHut.
+
+---
+
+# 🧪 Test AnkiConnect
+
+With Anki running, you can test AnkiConnect on Linux with:
+
+```bash
+curl -s http://127.0.0.1:8765 \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"action":"version","version":6}'
+```
+
+If everything is working correctly, you should receive a response similar to:
+
+```json
+{"result":6,"error":null}
+```
+
+If you receive this response, AnkiConnect is ready to use.
+
+---
+
+# ⚙️ Configure Flashcard Generator
+
+After installing the required services, launch the application.
+
+Open **Settings**.
+
+## AI
+
+For offline use:
+
+```text
+Provider: Ollama
+URL: http://127.0.0.1:11434
+Model: gemma3:4b
+```
+
+## TTS
+
+```text
+Engine: Piper
+URL: http://127.0.0.1:5000
+
+American:
+en_US-lessac-high
+
+British:
+en_GB-cori-high
+```
+
+## Anki
+
+```text
+URL: http://127.0.0.1:8765
+```
+
+---
+
+# 📝 Create Your First Flashcard
+
+Go to:
+
+```text
+Create Card
+```
+
+Enter a word, for example:
+
+```text
+readability
+```
+
+Then select:
+
+```text
+Generate Flashcard
+```
+
+The application will generate the card information and send it directly to Anki.
+
+Example generated content:
+
+```text
+Word:
+readability
+
+Phonetic:
+/ˌriːdəˈbɪləti/
+
+Meaning:
+the ease with which something can be read
+
+Example:
+The readability of this book is excellent.
+
+Memory Hook:
+read + ability
+```
+
+---
+
+# 📦 Create Multiple Cards at Once
+
+You can use Batch Processing to generate a large number of flashcards at once.
+
+Example:
+
+```text
+Word=abandon
+Deck=English::Vocabulary
+--
+Word=hesitate
+Deck=English::Vocabulary
+--
+Word=readability
+Deck=English::Vocabulary
+```
+
+The application will convert each block into a separate flashcard.
+
+---
+
+# 🛠️ Quick Troubleshooting
+
+## The Application Does Not Start
+
+Check Node.js:
+
+```bash
+node --version
+npm --version
+```
+
+Then:
+
+```bash
+npm install
+npm run dev
+```
+
+---
+
+## Ollama Is Not Working
+
+Check the installed models:
+
+```bash
+ollama list
+```
+
+Or test the server:
+
+```bash
+curl http://127.0.0.1:11434
+```
+
+If Ollama is not running:
+
+```bash
+ollama serve
+```
+
+---
+
+## Piper Is Not Working
+
+Check the Piper server:
+
+```bash
+curl http://127.0.0.1:5000/voices
+```
+
+If you don't receive a response:
+
+```bash
+systemctl --user status piper.service
+```
+
+View the logs:
+
+```bash
+journalctl --user -u piper.service -f
+```
+
+---
+
+## AnkiConnect Is Not Working
+
+First, make sure Anki is running.
+
+Then test:
+
+```bash
+curl -s http://127.0.0.1:8765 \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"action":"version","version":6}'
+```
+
+If you do not receive `result: 6`, check your AnkiConnect installation and restart Anki.
+
+---
+
+# 🔐 Usage Modes
+
+### ☁️ Online
+
+```text
+Flashcard Generator
+        ↓
+Google Gemini / Custom AI
+        ↓
+Piper or Online TTS
+        ↓
+Anki
+```
+
+### 📴 Fully Offline
+
+```text
+Flashcard Generator
+        ↓
+Ollama
+        ↓
+Piper TTS
+        ↓
+AnkiConnect
+        ↓
+Anki
+```
+
+In fully offline mode, text and audio generation are performed locally on your computer, so no cloud API is required for these features.
+
+---
+
+# 📚 Important Links
+
+* **Project:** https://github.com/Amin-naghdbishi/english-flashcard-generator
+* **Releases:** https://github.com/Amin-naghdbishi/english-flashcard-generator/releases
+* **Node.js:** https://nodejs.org/en/download/
+* **Ollama:** https://ollama.com/
+* **Ollama Linux Documentation:** https://docs.ollama.com/linux
+* **Piper Voices:** https://huggingface.co/rhasspy/piper-voices
+* **Anki:** https://apps.ankiweb.net/
+* **AnkiConnect:** https://github.com/FooSoft/anki-connect
+
+---
+
+<div align="center">
+
+### ❤️ Built to make learning English with Anki easier
+
+If you encounter a problem, please report it in the [Issues section](https://github.com/Amin-naghdbishi/english-flashcard-generator/issues) of the project.
+
+</div>
+
+
 ### ❤️ ساخته شده برای ساده‌تر کردن یادگیری زبان با Anki
 
-اگر مشکلی پیدا کردید، در بخش Issues پروژه گزارش دهید.
-
+اگر مشکلی پیدا کردید، لطفاً آن را در [بخش Issues پروژه](https://github.com/Amin-naghdbishi/english-flashcard-generator/issues) گزارش دهید.
 </div>
