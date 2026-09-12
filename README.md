@@ -757,7 +757,7 @@ Anki
 
 ---
 
-<div align="center">
+<div>
 
 # 🗂️ Flashcard Generator
 
