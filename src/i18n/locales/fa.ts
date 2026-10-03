@@ -4,6 +4,7 @@ export const fa = {
     create: 'ایجاد کارت',
     batch: 'پردازش دسته‌ای',
     completeByTag: 'تکمیل با تگ',
+    cardBrowser: 'مرورگر کارت‌ها',
     settings: 'تنظیمات',
     light: 'روشن',
     dark: 'تاریک',

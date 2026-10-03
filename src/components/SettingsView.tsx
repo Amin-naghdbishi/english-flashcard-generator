@@ -519,7 +519,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             <Sliders className="w-5 h-5 text-blue-500" />
             <span>{t('settings.headerTitle')}</span>
             <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
-              v1.1.4
+              v1.1.5
             </span>
           </h1>
         </div>

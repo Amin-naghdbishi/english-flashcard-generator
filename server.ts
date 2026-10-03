@@ -42,6 +42,7 @@ import {
   updateAnkiNoteFields,
   removeAnkiNoteTag,
   storeAnkiMediaFile,
+  searchAnkiNotes,
   callAnkiConnect,
 } from './server/anki';
 import { AppSettings, CardData, ManualOverrides, DiagnosticsReport, StepLog, ThemeId, CardType, CustomAIProviderConfig, CustomTTSProviderConfig, SmartImagesConfig, AIPromptsConfig, getFrontCustomBlocks, getBackCustomBlocks, getAllCustomBlocks, isCardComplete } from './src/types';
@@ -791,6 +792,15 @@ async function startServer() {
     res.json(result);
   });
 
+  // --- Card Browser / Search Notes Endpoint ---
+  app.post('/api/anki/search-notes', async (req, res) => {
+    const { query, url, limit } = req.body;
+    const ankiUrl = url || appSettings.anki.url || 'http://127.0.0.1:8765';
+    const effectiveLimit = typeof limit === 'number' ? limit : 300;
+    const result = await searchAnkiNotes(ankiUrl, query || '', effectiveLimit);
+    res.json(result);
+  });
+
   // --- Complete Cards by Tag Endpoints ---
   app.get('/api/anki/tags', async (req, res) => {
     const url = (req.query.url as string) || appSettings.anki.url || 'http://127.0.0.1:8765';
@@ -1229,7 +1239,7 @@ async function startServer() {
   });
 
   app.post('/api/anki/update-note', async (req, res) => {
-    const { noteId, cardData, themeId, url, tags } = req.body;
+    const { noteId, cardData, themeId, url, tags, deck } = req.body;
     if (!noteId || !cardData) {
       return res.status(400).json({ success: false, error: 'noteId and cardData are required.' });
     }
@@ -1280,6 +1290,62 @@ async function startServer() {
         fields.CardType = cardData.cardType;
       }
 
+      // If audio is present, upload media and populate audio tags
+      const wordAudioTags: string[] = [];
+      if (cardData.wordAudioUsNormalFileName) wordAudioTags.push(`[sound:${cardData.wordAudioUsNormalFileName}]`);
+      if (cardData.wordAudioUsSlowFileName) wordAudioTags.push(`[sound:${cardData.wordAudioUsSlowFileName}]`);
+      if (cardData.wordAudioUkNormalFileName) wordAudioTags.push(`[sound:${cardData.wordAudioUkNormalFileName}]`);
+      if (cardData.wordAudioUkSlowFileName) wordAudioTags.push(`[sound:${cardData.wordAudioUkSlowFileName}]`);
+      if (wordAudioTags.length === 0 && cardData.wordAudioFileName) {
+        wordAudioTags.push(`[sound:${cardData.wordAudioFileName}]`);
+      }
+
+      const exampleAudioTags: string[] = [];
+      if (cardData.exampleAudioUsNormalFileName) exampleAudioTags.push(`[sound:${cardData.exampleAudioUsNormalFileName}]`);
+      if (cardData.exampleAudioUsSlowFileName) exampleAudioTags.push(`[sound:${cardData.exampleAudioUsSlowFileName}]`);
+      if (cardData.exampleAudioUkNormalFileName) exampleAudioTags.push(`[sound:${cardData.exampleAudioUkNormalFileName}]`);
+      if (cardData.exampleAudioUkSlowFileName) exampleAudioTags.push(`[sound:${cardData.exampleAudioUkSlowFileName}]`);
+      if (exampleAudioTags.length === 0 && cardData.exampleAudioFileName) {
+        exampleAudioTags.push(`[sound:${cardData.exampleAudioFileName}]`);
+      }
+
+      if (wordAudioTags.length > 0) fields.WordAudio = wordAudioTags.join(' ');
+      if (exampleAudioTags.length > 0) fields.ExampleAudio = exampleAudioTags.join(' ');
+      if (cardData.wordAudioUsNormalFileName) fields.WordAudioUsNormal = `[sound:${cardData.wordAudioUsNormalFileName}]`;
+      if (cardData.wordAudioUsSlowFileName) fields.WordAudioUsSlow = `[sound:${cardData.wordAudioUsSlowFileName}]`;
+      if (cardData.wordAudioUkNormalFileName) fields.WordAudioUkNormal = `[sound:${cardData.wordAudioUkNormalFileName}]`;
+      if (cardData.wordAudioUkSlowFileName) fields.WordAudioUkSlow = `[sound:${cardData.wordAudioUkSlowFileName}]`;
+      if (cardData.exampleAudioUsNormalFileName) fields.ExampleAudioUsNormal = `[sound:${cardData.exampleAudioUsNormalFileName}]`;
+      if (cardData.exampleAudioUsSlowFileName) fields.ExampleAudioUsSlow = `[sound:${cardData.exampleAudioUsSlowFileName}]`;
+      if (cardData.exampleAudioUkNormalFileName) fields.ExampleAudioUkNormal = `[sound:${cardData.exampleAudioUkNormalFileName}]`;
+      if (cardData.exampleAudioUkSlowFileName) fields.ExampleAudioUkSlow = `[sound:${cardData.exampleAudioUkSlowFileName}]`;
+
+      // Upload any audio data
+      if (cardData.wordAudioUsNormalBase64 && cardData.wordAudioUsNormalFileName) {
+        await storeAnkiMediaFile(ankiUrl, cardData.wordAudioUsNormalFileName, cardData.wordAudioUsNormalBase64);
+      }
+      if (cardData.wordAudioUsSlowBase64 && cardData.wordAudioUsSlowFileName) {
+        await storeAnkiMediaFile(ankiUrl, cardData.wordAudioUsSlowFileName, cardData.wordAudioUsSlowBase64);
+      }
+      if (cardData.wordAudioUkNormalBase64 && cardData.wordAudioUkNormalFileName) {
+        await storeAnkiMediaFile(ankiUrl, cardData.wordAudioUkNormalFileName, cardData.wordAudioUkNormalBase64);
+      }
+      if (cardData.wordAudioUkSlowBase64 && cardData.wordAudioUkSlowFileName) {
+        await storeAnkiMediaFile(ankiUrl, cardData.wordAudioUkSlowFileName, cardData.wordAudioUkSlowBase64);
+      }
+      if (cardData.exampleAudioUsNormalBase64 && cardData.exampleAudioUsNormalFileName) {
+        await storeAnkiMediaFile(ankiUrl, cardData.exampleAudioUsNormalFileName, cardData.exampleAudioUsNormalBase64);
+      }
+      if (cardData.exampleAudioUsSlowBase64 && cardData.exampleAudioUsSlowFileName) {
+        await storeAnkiMediaFile(ankiUrl, cardData.exampleAudioUsSlowFileName, cardData.exampleAudioUsSlowBase64);
+      }
+      if (cardData.exampleAudioUkNormalBase64 && cardData.exampleAudioUkNormalFileName) {
+        await storeAnkiMediaFile(ankiUrl, cardData.exampleAudioUkNormalFileName, cardData.exampleAudioUkNormalBase64);
+      }
+      if (cardData.exampleAudioUkSlowBase64 && cardData.exampleAudioUkSlowFileName) {
+        await storeAnkiMediaFile(ankiUrl, cardData.exampleAudioUkSlowFileName, cardData.exampleAudioUkSlowBase64);
+      }
+
       // If there is a manual image uploaded, store it
       if (cardData.imageBase64 && cardData.imageFileName) {
         await storeAnkiMediaFile(ankiUrl, cardData.imageFileName, cardData.imageBase64);
@@ -1291,7 +1357,20 @@ async function startServer() {
         return res.status(500).json({ success: false, error: updateRes.error });
       }
 
-      // 3. Synchronize tags if provided
+      // 3. Change deck if specified and different
+      if (deck && typeof deck === 'string' && deck.trim()) {
+        try {
+          const infoRes = await getNotesInfo(ankiUrl, [Number(noteId)]);
+          if (infoRes.success && infoRes.notes && infoRes.notes[0]?.cards?.length > 0) {
+            const cardIds = infoRes.notes[0].cards;
+            await changeCardsDeck(ankiUrl, cardIds, deck.trim());
+          }
+        } catch (deckErr) {
+          console.warn(`[Anki] Could not change deck for note #${noteId}:`, deckErr);
+        }
+      }
+
+      // 4. Synchronize tags if provided
       const userTags: string[] | undefined = Array.isArray(tags)
         ? tags
         : (Array.isArray(cardData.tags) ? cardData.tags : undefined);

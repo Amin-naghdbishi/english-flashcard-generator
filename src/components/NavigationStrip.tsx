@@ -1,10 +1,10 @@
 import React from 'react';
-import { Sparkles, Layers, Sliders, RefreshCw, Tags, Pin, PinOff } from 'lucide-react';
+import { Sparkles, Layers, Sliders, RefreshCw, Tags, Pin, PinOff, Search } from 'lucide-react';
 import { AppTheme } from '../types';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
 
-export type NavTab = 'create' | 'batch' | 'complete-by-tag' | 'settings';
+export type NavTab = 'create' | 'batch' | 'complete-by-tag' | 'browser' | 'settings';
 export type ServiceState = 'connected' | 'checking' | 'disconnected' | 'disabled';
 
 export interface ServiceIndicatorInfo {
@@ -177,6 +177,23 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
           >
             <Tags className="w-4 h-4 shrink-0" />
             <span>{t('nav.completeByTag')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSelectTab('browser')}
+            className={`py-3 sm:py-3.5 px-3 sm:px-4 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 transition-colors cursor-pointer ${
+              currentTab === 'browser'
+                ? isDark
+                  ? 'border-blue-500 text-blue-400 bg-blue-950/25 font-semibold'
+                  : 'border-blue-600 text-blue-600 bg-blue-50/60 font-semibold'
+                : isDark
+                ? 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
+                : 'border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/70'
+            }`}
+          >
+            <Search className="w-4 h-4 shrink-0" />
+            <span>{t('nav.cardBrowser')}</span>
           </button>
 
           <button

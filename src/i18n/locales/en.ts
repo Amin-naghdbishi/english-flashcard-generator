@@ -4,6 +4,7 @@ export const en = {
     create: 'Create',
     batch: 'Batch',
     completeByTag: 'Complete by Tag',
+    cardBrowser: 'Card Browser',
     settings: 'Settings',
     light: 'Light',
     dark: 'Dark',

@@ -1,0 +1,907 @@
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { AppSettings, AppTheme, CardData } from '../types';
+import { searchAnkiNotes, updateAnkiNote, checkAnki, getAnkiDecks, getAnkiTags, openInAnki, AnkiBrowserNoteItem } from '../services/api';
+import { CardPreview } from './CardPreview';
+import { useAppTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n';
+import {
+  Search,
+  RotateCcw,
+  Loader2,
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  Save,
+  CheckCircle2,
+  ExternalLink,
+  Layers,
+  X,
+  Tag,
+  Folder,
+  RefreshCw,
+  Sliders,
+} from 'lucide-react';
+
+interface CardBrowserViewProps {
+  settings: AppSettings;
+  appTheme?: AppTheme;
+}
+
+export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) => {
+  const themeContext = useAppTheme();
+  const { t, isRTL } = useTranslation();
+  const isDark = themeContext.isDark;
+
+  // Search state
+  const [searchInput, setSearchInput] = useState<string>('');
+  const [activeQuery, setActiveQuery] = useState<string>('');
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [isAnkiConnected, setIsAnkiConnected] = useState<boolean | null>(null);
+
+  // Notes state
+  const [notes, setNotes] = useState<AnkiBrowserNoteItem[]>([]);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
+
+  // Available metadata for quick filter suggestions
+  const [availableDecks, setAvailableDecks] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+
+  // Current editing card in editor
+  const [editingCard, setEditingCard] = useState<CardData | null>(null);
+  const [originalCardJson, setOriginalCardJson] = useState<string>('');
+  const [isDirty, setIsDirty] = useState<boolean>(false);
+
+  // Save state
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [isShowingInAnki, setIsShowingInAnki] = useState<boolean>(false);
+
+  // Unsaved changes confirmation modal
+  const [unsavedModal, setUnsavedModal] = useState<{
+    isOpen: boolean;
+    pendingAction: (() => void) | null;
+    targetTitle?: string;
+  }>({
+    isOpen: false,
+    pendingAction: null,
+  });
+
+  const selectedNote = selectedIndex >= 0 && selectedIndex < notes.length ? notes[selectedIndex] : null;
+
+  // Check connection and fetch metadata on mount
+  useEffect(() => {
+    let isMounted = true;
+
+    async function init() {
+      const health = await checkAnki(settings.anki.url);
+      if (!isMounted) return;
+      setIsAnkiConnected(health.connected);
+
+      if (health.connected) {
+        // Fetch decks & tags for quick hints
+        getAnkiDecks(settings.anki.url).then((res) => {
+          if (isMounted && res.success && Array.isArray(res.decks)) {
+            setAvailableDecks(res.decks);
+          }
+        });
+
+        getAnkiTags(settings.anki.url).then((res) => {
+          if (isMounted && res.success && Array.isArray(res.tags)) {
+            setAvailableTags(res.tags);
+          }
+        });
+
+        // Run default search for the default deck or all cards
+        const initialQuery = settings.anki.defaultDeck ? `deck:"${settings.anki.defaultDeck}"` : '';
+        setSearchInput(initialQuery);
+        executeSearch(initialQuery);
+      }
+    }
+
+    init();
+    return () => {
+      isMounted = false;
+    };
+  }, [settings.anki.url, settings.anki.defaultDeck]);
+
+  // Execute AnkiConnect search
+  const executeSearch = useCallback(
+    async (queryToSearch: string) => {
+      setIsSearching(true);
+      setSearchError(null);
+      setActiveQuery(queryToSearch);
+
+      try {
+        const res = await searchAnkiNotes({
+          query: queryToSearch,
+          url: settings.anki.url,
+          limit: 300,
+        });
+
+        if (!res.success) {
+          setSearchError(res.error || 'Failed to search cards in AnkiConnect');
+          setNotes([]);
+          setTotalCount(0);
+          setSelectedIndex(-1);
+          setEditingCard(null);
+          setOriginalCardJson('');
+          setIsDirty(false);
+          setIsAnkiConnected(false);
+        } else {
+          setIsAnkiConnected(true);
+          setNotes(res.notes);
+          setTotalCount(res.totalCount);
+
+          if (res.notes.length > 0) {
+            // Select first card by default
+            setSelectedIndex(0);
+            const firstCardData = { ...res.notes[0].cardData };
+            setEditingCard(firstCardData);
+            setOriginalCardJson(JSON.stringify(firstCardData));
+            setIsDirty(false);
+          } else {
+            setSelectedIndex(-1);
+            setEditingCard(null);
+            setOriginalCardJson('');
+            setIsDirty(false);
+          }
+        }
+      } catch (err: any) {
+        setSearchError(err?.message || 'Error querying AnkiConnect');
+        setIsAnkiConnected(false);
+        setNotes([]);
+        setTotalCount(0);
+        setSelectedIndex(-1);
+        setEditingCard(null);
+        setOriginalCardJson('');
+        setIsDirty(false);
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [settings.anki.url]
+  );
+
+  // Safe navigation guard for unsaved changes
+  const requestNavigation = useCallback(
+    (action: () => void, targetTitle?: string) => {
+      if (isDirty) {
+        setUnsavedModal({
+          isOpen: true,
+          pendingAction: action,
+          targetTitle,
+        });
+      } else {
+        action();
+      }
+    },
+    [isDirty]
+  );
+
+  const handleSelectCard = useCallback(
+    (index: number) => {
+      if (index === selectedIndex) return;
+      if (index < 0 || index >= notes.length) return;
+
+      const target = notes[index];
+      requestNavigation(() => {
+        setSelectedIndex(index);
+        const cardCopy = { ...target.cardData };
+        setEditingCard(cardCopy);
+        setOriginalCardJson(JSON.stringify(cardCopy));
+        setIsDirty(false);
+        setSaveSuccessMsg(null);
+      }, target.word);
+    },
+    [notes, selectedIndex, requestNavigation]
+  );
+
+  const handlePreviousCard = useCallback(() => {
+    if (selectedIndex > 0) {
+      handleSelectCard(selectedIndex - 1);
+    }
+  }, [selectedIndex, handleSelectCard]);
+
+  const handleNextCard = useCallback(() => {
+    if (selectedIndex >= 0 && selectedIndex < notes.length - 1) {
+      handleSelectCard(selectedIndex + 1);
+    }
+  }, [selectedIndex, notes.length, handleSelectCard]);
+
+  // Card editing change handler from CardPreview
+  const handleCardChange = useCallback(
+    (updated: CardData) => {
+      setEditingCard(updated);
+      const isChanged = JSON.stringify(updated) !== originalCardJson;
+      setIsDirty(isChanged);
+      setSaveSuccessMsg(null);
+    },
+    [originalCardJson]
+  );
+
+  // Save to Anki
+  const handleSaveToAnki = useCallback(async (): Promise<boolean> => {
+    if (!selectedNote || !editingCard) return false;
+
+    setIsSaving(true);
+    setSaveSuccessMsg(null);
+
+    try {
+      const res = await updateAnkiNote(
+        selectedNote.noteId,
+        editingCard,
+        settings.theme,
+        settings.anki.url,
+        selectedNote.deckName
+      );
+
+      if (res.success) {
+        // Update snapshot and dirty flag
+        setOriginalCardJson(JSON.stringify(editingCard));
+        setIsDirty(false);
+        setSaveSuccessMsg(`✓ Note #${selectedNote.noteId} saved successfully!`);
+
+        // Update card data in notes table
+        setNotes((prevNotes) =>
+          prevNotes.map((n, idx) =>
+            idx === selectedIndex
+              ? {
+                  ...n,
+                  word: editingCard.word,
+                  partOfSpeech: editingCard.partOfSpeech,
+                  meaningFa: editingCard.meaningFa,
+                  definitionEn: editingCard.definitionEn,
+                  cardType: editingCard.cardType,
+                  tags: editingCard.tags || n.tags,
+                  cardData: { ...editingCard },
+                }
+              : n
+          )
+        );
+
+        setTimeout(() => setSaveSuccessMsg(null), 4000);
+        return true;
+      } else {
+        alert(res.error || 'Failed to save note to Anki');
+        return false;
+      }
+    } catch (err: any) {
+      alert(`Save error: ${err?.message || 'Failed to update note'}`);
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  }, [selectedNote, editingCard, settings.theme, settings.anki.url, selectedIndex]);
+
+  // Modal actions
+  const handleModalSaveAndContinue = async () => {
+    const success = await handleSaveToAnki();
+    if (success) {
+      const action = unsavedModal.pendingAction;
+      setUnsavedModal({ isOpen: false, pendingAction: null });
+      if (action) action();
+    }
+  };
+
+  const handleModalDiscard = () => {
+    const action = unsavedModal.pendingAction;
+    setIsDirty(false);
+    setUnsavedModal({ isOpen: false, pendingAction: null });
+    if (action) action();
+  };
+
+  const handleModalCancel = () => {
+    setUnsavedModal({ isOpen: false, pendingAction: null });
+  };
+
+  // Keyboard shortcuts (Ctrl+Left / Ctrl+Right / Ctrl+S)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInput =
+        activeEl?.tagName === 'INPUT' ||
+        activeEl?.tagName === 'TEXTAREA' ||
+        activeEl?.getAttribute('contenteditable') === 'true';
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSaveToAnki();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowLeft') {
+        if (!isInput) {
+          e.preventDefault();
+          handlePreviousCard();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowRight') {
+        if (!isInput) {
+          e.preventDefault();
+          handleNextCard();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSaveToAnki, handlePreviousCard, handleNextCard]);
+
+  // Open note in Anki browser GUI
+  const handleShowInAnki = async (noteId: number) => {
+    setIsShowingInAnki(true);
+    try {
+      await openInAnki({ noteId, url: settings.anki.url });
+    } catch (err) {
+      console.warn('Could not open in Anki GUI:', err);
+    } finally {
+      setIsShowingInAnki(false);
+    }
+  };
+
+  // Search form submit
+  const handleSearchSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    requestNavigation(() => {
+      executeSearch(searchInput);
+    }, 'new search');
+  };
+
+  // Quick filter chips click
+  const handleQuickFilter = (syntax: string) => {
+    const current = searchInput.trim();
+    let nextQuery = '';
+    if (!current) {
+      nextQuery = syntax;
+    } else if (current.includes(syntax)) {
+      nextQuery = current;
+    } else {
+      nextQuery = `${current} ${syntax}`;
+    }
+    setSearchInput(nextQuery);
+    requestNavigation(() => {
+      executeSearch(nextQuery);
+    }, 'quick filter');
+  };
+
+  return (
+    <div className="w-full max-w-[1600px] mx-auto px-2 sm:px-4 py-3 flex flex-col gap-3 min-h-[calc(100vh-8rem)]">
+      {/* Top Banner / Header Bar */}
+      <div
+        className={`px-4 py-2.5 rounded-xl border flex flex-wrap items-center justify-between gap-3 shadow-xs ${
+          isDark ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-zinc-200'
+        }`}
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold">
+            <Search className="w-4 h-4" />
+          </div>
+          <div>
+            <h1 className="text-sm sm:text-base font-bold flex items-center gap-2">
+              <span>Card Browser</span>
+              <span className="text-[11px] font-normal px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-mono">
+                AnkiConnect
+              </span>
+            </h1>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Browse, search, and edit your existing Anki flashcards directly in the card editor.
+            </p>
+          </div>
+        </div>
+
+        {/* Global Connection / Status info */}
+        <div className="flex items-center gap-2 text-xs">
+          {isAnkiConnected === false ? (
+            <span className="px-2.5 py-1 rounded-md bg-amber-500/15 text-amber-500 font-medium flex items-center gap-1.5 border border-amber-500/30">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              AnkiConnect Offline
+            </span>
+          ) : isAnkiConnected === true ? (
+            <span className="px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-500 font-medium flex items-center gap-1.5 border border-emerald-500/30">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              AnkiConnect Ready
+            </span>
+          ) : (
+            <span className="px-2.5 py-1 rounded-md bg-zinc-500/15 text-zinc-400 font-medium flex items-center gap-1.5">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              Connecting...
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={() => executeSearch(searchInput)}
+            disabled={isSearching}
+            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+              isDark
+                ? 'bg-zinc-800 border-zinc-700 hover:bg-zinc-750 text-zinc-200'
+                : 'bg-zinc-100 border-zinc-200 hover:bg-zinc-200 text-zinc-700'
+            }`}
+            title="Refresh search results"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSearching ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Main Two-Pane Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1 items-start">
+        {/* LEFT PANE: Search & Text-Based Table (5 cols on lg) */}
+        <div
+          className={`lg:col-span-5 flex flex-col rounded-xl border shadow-xs overflow-hidden h-[750px] ${
+            isDark ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-zinc-200'
+          }`}
+        >
+          {/* Search Box Header */}
+          <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 flex flex-col gap-2 bg-zinc-50/50 dark:bg-zinc-950/40">
+            <form onSubmit={handleSearchSubmit} className="relative flex items-center gap-1.5">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="deck:English tag:B1 abandon..."
+                  className={`w-full pl-9 pr-8 py-2 text-xs sm:text-sm rounded-lg border transition-colors outline-none focus:ring-2 focus:ring-blue-500 font-mono ${
+                    isDark
+                      ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500'
+                      : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400'
+                  }`}
+                />
+                {searchInput && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchInput('');
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                    title="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              <button
+                type="submit"
+                disabled={isSearching}
+                className="py-2 px-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors shrink-0"
+              >
+                {isSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                <span>Search</span>
+              </button>
+            </form>
+
+            {/* Quick Filter Suggestion Chips */}
+            <div className="flex flex-wrap items-center gap-1 text-[11px] pt-1">
+              <span className="text-zinc-400 dark:text-zinc-500 text-[10px] font-semibold uppercase mr-1">
+                Quick:
+              </span>
+              {settings.anki.defaultDeck && (
+                <button
+                  type="button"
+                  onClick={() => handleQuickFilter(`deck:"${settings.anki.defaultDeck}"`)}
+                  className={`px-2 py-0.5 rounded-md border font-mono transition-colors cursor-pointer flex items-center gap-1 ${
+                    isDark
+                      ? 'bg-zinc-800/80 hover:bg-zinc-750 border-zinc-700 text-zinc-300'
+                      : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-200 text-zinc-700'
+                  }`}
+                  title="Filter by default deck"
+                >
+                  <Folder className="w-2.5 h-2.5 text-blue-500" />
+                  <span>{settings.anki.defaultDeck.split('::').pop()}</span>
+                </button>
+              )}
+              {availableTags.slice(0, 3).map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => handleQuickFilter(`tag:"${tag}"`)}
+                  className={`px-2 py-0.5 rounded-md border font-mono transition-colors cursor-pointer flex items-center gap-1 ${
+                    isDark
+                      ? 'bg-zinc-800/80 hover:bg-zinc-750 border-zinc-700 text-zinc-300'
+                      : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-200 text-zinc-700'
+                  }`}
+                  title={`Filter by tag ${tag}`}
+                >
+                  <Tag className="w-2.5 h-2.5 text-emerald-500" />
+                  <span>{tag}</span>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput('');
+                  executeSearch('');
+                }}
+                className={`px-2 py-0.5 rounded-md border font-mono transition-colors cursor-pointer text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 ${
+                  isDark ? 'bg-zinc-800/40 border-zinc-750' : 'bg-zinc-50 border-zinc-200'
+                }`}
+              >
+                All Cards
+              </button>
+            </div>
+          </div>
+
+          {/* Search Result Status & Counter */}
+          <div
+            className={`px-3 py-1.5 text-xs border-b flex items-center justify-between font-mono ${
+              isDark ? 'bg-zinc-850/60 border-zinc-800 text-zinc-400' : 'bg-zinc-100/70 border-zinc-200 text-zinc-600'
+            }`}
+          >
+            <span>
+              {isSearching ? (
+                <span className="flex items-center gap-1.5 text-blue-500">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Searching AnkiConnect...
+                </span>
+              ) : (
+                <span>
+                  Found <strong className="text-blue-500">{totalCount}</strong> cards
+                  {totalCount > notes.length && (
+                    <span className="text-[10px] text-zinc-400 ml-1 font-sans">
+                      (showing first {notes.length})
+                    </span>
+                  )}
+                </span>
+              )}
+            </span>
+            {activeQuery && (
+              <span className="truncate max-w-[200px] text-[10px] text-zinc-400" title={activeQuery}>
+                Query: {activeQuery}
+              </span>
+            )}
+          </div>
+
+          {/* Table Container (Strictly Text-Based, NO images/thumbnails) */}
+          <div className="flex-1 overflow-y-auto min-h-0 select-none divide-y divide-zinc-100 dark:divide-zinc-800/60">
+            {/* Table Header */}
+            <div
+              className={`sticky top-0 z-10 grid grid-cols-12 px-3 py-2 text-[11px] font-bold uppercase tracking-wider border-b ${
+                isDark
+                  ? 'bg-zinc-900 border-zinc-800 text-zinc-400'
+                  : 'bg-zinc-100/90 border-zinc-200 text-zinc-600 backdrop-blur-xs'
+              }`}
+            >
+              <div className="col-span-3">Type</div>
+              <div className="col-span-4">Deck</div>
+              <div className="col-span-5">Word / Term</div>
+            </div>
+
+            {/* Offline Error State */}
+            {isAnkiConnected === false && (
+              <div className="p-6 text-center flex flex-col items-center justify-center gap-2 text-zinc-500">
+                <AlertTriangle className="w-8 h-8 text-amber-500" />
+                <p className="font-semibold text-sm text-zinc-800 dark:text-zinc-200">
+                  AnkiConnect is Offline
+                </p>
+                <p className="text-xs max-w-sm">
+                  Please ensure Anki is open on your computer and the AnkiConnect add-on is installed.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => executeSearch(searchInput)}
+                  className="mt-2 py-1.5 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium cursor-pointer"
+                >
+                  Retry Connection
+                </button>
+              </div>
+            )}
+
+            {/* Search Syntax or Execution Error */}
+            {searchError && (
+              <div className="p-4 m-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 text-xs flex flex-col gap-1">
+                <strong className="font-bold flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  Search Query Error
+                </strong>
+                <span>{searchError}</span>
+                <span className="text-[10px] text-zinc-400 mt-1">
+                  Tip: Check search syntax. Example: <code className="text-blue-400">deck:English</code> or{' '}
+                  <code className="text-blue-400">tag:B1</code>.
+                </span>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {!isSearching && !searchError && isAnkiConnected !== false && notes.length === 0 && (
+              <div className="p-8 text-center flex flex-col items-center justify-center gap-2 text-zinc-400">
+                <Search className="w-8 h-8 opacity-40" />
+                <p className="font-semibold text-sm text-zinc-700 dark:text-zinc-300">No cards found</p>
+                <p className="text-xs max-w-xs text-zinc-400">
+                  No notes match your search query in Anki. Try clearing the filter or searching for another term.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchInput('');
+                    executeSearch('');
+                  }}
+                  className="mt-2 py-1 px-3 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+                >
+                  Show All Cards
+                </button>
+              </div>
+            )}
+
+            {/* Rows Listing */}
+            {notes.map((note, index) => {
+              const isSelected = index === selectedIndex;
+              const typeLabel =
+                note.partOfSpeech ||
+                (note.cardType === 'spelling' ? 'spelling' : note.modelName.replace(/^AI Vocabulary\s*-?\s*/i, '').trim()) ||
+                'vocab';
+
+              const cleanDeck = note.deckName.split('::').pop() || note.deckName;
+
+              return (
+                <div
+                  key={note.noteId}
+                  onClick={() => handleSelectCard(index)}
+                  className={`grid grid-cols-12 px-3 py-2 text-xs transition-colors cursor-pointer items-center border-l-3 ${
+                    isSelected
+                      ? isDark
+                        ? 'bg-blue-950/40 border-l-blue-500 text-white font-medium'
+                        : 'bg-blue-50/80 border-l-blue-600 text-blue-950 font-medium'
+                      : isDark
+                      ? 'border-l-transparent text-zinc-300 hover:bg-zinc-800/50'
+                      : 'border-l-transparent text-zinc-700 hover:bg-zinc-50'
+                  }`}
+                >
+                  {/* Type Column */}
+                  <div className="col-span-3 truncate pr-1">
+                    <span
+                      className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-mono capitalize ${
+                        isSelected
+                          ? 'bg-blue-500/20 text-blue-400 font-bold'
+                          : isDark
+                          ? 'bg-zinc-800 text-zinc-400'
+                          : 'bg-zinc-200 text-zinc-700'
+                      }`}
+                      title={typeLabel}
+                    >
+                      {typeLabel}
+                    </span>
+                  </div>
+
+                  {/* Deck Column */}
+                  <div
+                    className="col-span-4 truncate pr-2 text-zinc-500 dark:text-zinc-400 text-[11px]"
+                    title={note.deckName}
+                  >
+                    {cleanDeck}
+                  </div>
+
+                  {/* Word Column */}
+                  <div
+                    className={`col-span-5 font-semibold truncate ${
+                      isSelected ? 'text-blue-500 dark:text-blue-400' : ''
+                    }`}
+                    title={note.word}
+                  >
+                    {note.word}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* RIGHT PANE: Existing Card Editor (7 cols on lg) */}
+        <div
+          className={`lg:col-span-7 flex flex-col rounded-xl border shadow-xs overflow-hidden h-[750px] relative ${
+            isDark ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-zinc-200'
+          }`}
+        >
+          {selectedNote && editingCard ? (
+            <div className="flex-1 flex flex-col h-full min-h-0">
+              {/* Card Header & Save Feedback Banner */}
+              <div
+                className={`px-3 py-2 border-b flex flex-wrap items-center justify-between gap-2 text-xs shrink-0 ${
+                  isDark ? 'bg-zinc-850/80 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-sm text-zinc-800 dark:text-zinc-200">
+                    {editingCard.word}
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-750 text-zinc-600 dark:text-zinc-400">
+                    Note #{selectedNote.noteId}
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-500">
+                    {selectedNote.deckName}
+                  </span>
+                  {isDirty && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 font-semibold border border-amber-500/30">
+                      Unsaved changes
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {saveSuccessMsg && (
+                    <span className="text-xs text-emerald-500 font-semibold flex items-center gap-1 animate-fade-in">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      {saveSuccessMsg}
+                    </span>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => handleShowInAnki(selectedNote.noteId)}
+                    disabled={isShowingInAnki}
+                    className={`py-1 px-2.5 rounded text-xs font-medium flex items-center gap-1 border transition-colors cursor-pointer ${
+                      isDark
+                        ? 'border-zinc-700 bg-zinc-800 hover:bg-zinc-750 text-zinc-200'
+                        : 'border-zinc-200 bg-white hover:bg-zinc-100 text-zinc-700'
+                    }`}
+                    title="Open note in Anki's Browser GUI"
+                  >
+                    {isShowingInAnki ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <ExternalLink className="w-3 h-3" />
+                    )}
+                    <span>Open in Anki</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Embedded Existing Card Editor */}
+              <div className="flex-1 overflow-y-auto min-h-0 relative">
+                <CardPreview
+                  cardData={editingCard}
+                  themeId={settings.theme}
+                  emptyWordPlaceholder={selectedNote.word}
+                  appTheme={isDark ? 'anki-dark' : 'anki-light'}
+                  editable={true}
+                  canSaveToAnki={true}
+                  noteId={selectedNote.noteId}
+                  onShowInAnki={handleShowInAnki}
+                  isShowingInAnki={isShowingInAnki}
+                  isSavingToAnki={isSaving}
+                  onCardChange={handleCardChange}
+                  onSaveToAnki={handleSaveToAnki}
+                />
+              </div>
+
+              {/* Bottom Navigation & Save Controls Bar */}
+              <div
+                className={`p-2.5 sm:px-4 border-t flex flex-wrap items-center justify-between gap-3 shrink-0 ${
+                  isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
+                }`}
+              >
+                {/* Previous Button */}
+                <button
+                  type="button"
+                  onClick={handlePreviousCard}
+                  disabled={selectedIndex <= 0}
+                  className={`py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+                    isDark
+                      ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-100 border border-zinc-700'
+                      : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 shadow-xs'
+                  }`}
+                  title="Previous Card (Ctrl+Left)"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Previous</span>
+                </button>
+
+                {/* Save to Anki Button */}
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSaveToAnki}
+                    disabled={isSaving}
+                    className={`py-1.5 px-4 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs ${
+                      isDirty
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : isDark
+                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-200 border border-zinc-700'
+                        : 'bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200'
+                    }`}
+                    title="Save changes to existing note in Anki (Ctrl+S)"
+                  >
+                    {isSaving ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Save className="w-3.5 h-3.5" />
+                    )}
+                    <span>Save to Anki</span>
+                  </button>
+
+                  {/* Card X / Y Indicator */}
+                  <span className="text-xs font-mono font-medium text-zinc-500 dark:text-zinc-400">
+                    Card <strong className="text-blue-500 font-bold">{selectedIndex + 1}</strong> / {notes.length}
+                  </span>
+                </div>
+
+                {/* Next Button */}
+                <button
+                  type="button"
+                  onClick={handleNextCard}
+                  disabled={selectedIndex < 0 || selectedIndex >= notes.length - 1}
+                  className={`py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+                    isDark
+                      ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-100 border border-zinc-700'
+                      : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 shadow-xs'
+                  }`}
+                  title="Next Card (Ctrl+Right)"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center p-8 text-center text-zinc-400 gap-3">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                <Search className="w-6 h-6" />
+              </div>
+              <h2 className="text-base font-bold text-zinc-700 dark:text-zinc-200">
+                No Card Selected
+              </h2>
+              <p className="text-xs max-w-sm text-zinc-500 dark:text-zinc-400">
+                Select a flashcard from the left list to view and edit it in the full card editor.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Unsaved Changes Confirmation Modal */}
+      {unsavedModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div
+            className={`w-full max-w-md p-5 rounded-2xl border shadow-xl flex flex-col gap-4 ${
+              isDark ? 'bg-zinc-900 border-zinc-750 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm sm:text-base font-bold">Unsaved Changes</h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  You have unsaved changes to &ldquo;{editingCard?.word || 'this card'}&rdquo;.
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-600 dark:text-zinc-300">
+              Do you want to save your changes before proceeding?
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+              <button
+                type="button"
+                onClick={handleModalCancel}
+                className={`py-1.5 px-3 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                  isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-700'
+                }`}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleModalDiscard}
+                className="py-1.5 px-3 rounded-lg text-xs font-medium text-red-500 hover:bg-red-500/10 cursor-pointer transition-colors"
+              >
+                Discard
+              </button>
+
+              <button
+                type="button"
+                onClick={handleModalSaveAndContinue}
+                disabled={isSaving}
+                className="py-1.5 px-3.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-xs transition-colors flex items-center gap-1.5"
+              >
+                {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                <span>Save & Continue</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

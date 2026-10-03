@@ -53,12 +53,13 @@ export async function updateAnkiNote(
   noteId: number,
   cardData: CardData,
   themeId?: ThemeId,
-  url?: string
+  url?: string,
+  deck?: string
 ): Promise<{ success: boolean; noteId: number; error?: string }> {
   const res = await fetch('/api/anki/update-note', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ noteId, cardData, themeId, url, tags: cardData.tags }),
+    body: JSON.stringify({ noteId, cardData, themeId, url, tags: cardData.tags, deck }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -497,6 +498,44 @@ export async function completeAnkiNote(params: {
   error?: string;
 }> {
   const res = await fetch('/api/anki/complete-note', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  return res.json();
+}
+
+export interface AnkiBrowserNoteItem {
+  noteId: number;
+  modelName: string;
+  deckName: string;
+  tags: string[];
+  word: string;
+  partOfSpeech?: string;
+  meaningFa?: string;
+  definitionEn?: string;
+  phonetic?: string;
+  example?: string;
+  translationFa?: string;
+  mnemonic?: string;
+  cardType?: CardType;
+  fields: Record<string, string>;
+  cardIds: number[];
+  cardData: CardData;
+}
+
+export async function searchAnkiNotes(params: {
+  query?: string;
+  url?: string;
+  limit?: number;
+}): Promise<{
+  success: boolean;
+  totalCount: number;
+  noteIds: number[];
+  notes: AnkiBrowserNoteItem[];
+  error?: string;
+}> {
+  const res = await fetch('/api/anki/search-notes', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),

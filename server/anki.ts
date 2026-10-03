@@ -745,3 +745,311 @@ export async function storeAnkiMediaFile(
   return { success: false, error: res.error };
 }
 
+export function parseCustomBlocksHtml(html?: string, side: 'front' | 'back' = 'back'): any[] {
+  if (!html || typeof html !== 'string' || !html.trim()) return [];
+
+  const blocks: any[] = [];
+  const blockRegex = /<div\s+[^>]*class="[^"]*custom-card-block[^"]*"[^>]*style="([^"]*)"[^>]*>([\s\S]*?)<\/div>\s*(?=(?:<div\s+[^>]*class="[^"]*custom-card-block|$))/gi;
+
+  let match: RegExpExecArray | null;
+  while ((match = blockRegex.exec(html)) !== null) {
+    const styleAttr = match[1] || '';
+    const innerHtml = match[2] || '';
+
+    const bgMatch = styleAttr.match(/background-color:\s*([^;!]+)/i);
+    const bgColor = bgMatch ? bgMatch[1].trim() : undefined;
+
+    const textMatch = styleAttr.match(/(?:^|;)\s*color:\s*([^;!]+)/i);
+    const textColor = textMatch ? textMatch[1].trim() : undefined;
+
+    const borderMatch = styleAttr.match(/border(?:-color)?:\s*(?:[0-9.]+(?:px|rem)?\s+solid\s+)?([^;!]+)/i);
+    const borderColor = borderMatch ? borderMatch[1].trim() : undefined;
+
+    const titleMatch = innerHtml.match(/<(?:span|div)\s+[^>]*class="[^"]*(?:box-label|botanical-custom-title|quest-tag-purple|washi-title|minimal-mnemonic-label)[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/i);
+    let title = '';
+    if (titleMatch) {
+      title = titleMatch[1].replace(/<[^>]+>/g, '').trim();
+      title = title.replace(/^📌\s*/, '');
+    }
+
+    const contentMatch = innerHtml.match(/<div\s+[^>]*class="[^"]*(?:custom-block-content|botanical-custom-content|quest-custom-content|washi-text|minimal-custom-content)[^"]*"[^>]*dir="([^"]*)"[^>]*>([\s\S]*?)<\/div>/i) ||
+      innerHtml.match(/<div\s+[^>]*class="[^"]*(?:custom-block-content|botanical-custom-content|quest-custom-content|washi-text|minimal-custom-content)[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+
+    let content = '';
+    let dir: 'rtl' | 'ltr' | 'auto' | undefined = undefined;
+    if (contentMatch) {
+      if (contentMatch.length === 3) {
+        dir = (contentMatch[1] as any) || undefined;
+        content = contentMatch[2].trim();
+      } else {
+        content = contentMatch[1].trim();
+      }
+    }
+
+    if (title || content) {
+      blocks.push({
+        id: `block_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        title,
+        content,
+        color: bgColor,
+        textColor,
+        borderColor,
+        dir,
+        side,
+      });
+    }
+  }
+
+  return blocks;
+}
+
+export function parseMainBoxStyles(html?: string): any | undefined {
+  if (!html || typeof html !== 'string') return undefined;
+  const res: any = {};
+  let hasAny = false;
+
+  const boxes: Array<'meaning' | 'definition' | 'example' | 'mnemonic'> = ['meaning', 'definition', 'example', 'mnemonic'];
+
+  for (const box of boxes) {
+    const titleRegex = new RegExp(`setBoxTitle\\(\\[[^\\]]*label-${box}[^\\]]*\\],\\s*(".*?"|'.*?')\\)`, 'i');
+    const titleMatch = html.match(titleRegex);
+    let title: string | undefined = undefined;
+    if (titleMatch) {
+      try {
+        title = JSON.parse(titleMatch[1]);
+      } catch {
+        title = titleMatch[1].slice(1, -1);
+      }
+    }
+
+    const cssRegex = new RegExp(`\\.(?:comic|quest|notebook|minimal|botanical)-${box}-[a-z]+[^\\{]*\\{([^\\}]*)\\}`, 'i');
+    const cssMatch = html.match(cssRegex);
+    let bgColor: string | undefined;
+    let textColor: string | undefined;
+    let borderColor: string | undefined;
+
+    if (cssMatch) {
+      const styles = cssMatch[1];
+      const bg = styles.match(/background-color:\s*([^;!]+)/i);
+      if (bg) bgColor = bg[1].trim();
+
+      const tc = styles.match(/(?:^|;)\s*color:\s*([^;!]+)/i);
+      if (tc) textColor = tc[1].trim();
+
+      const bc = styles.match(/border(?:-left)?-color:\s*([^;!]+)/i);
+      if (bc) borderColor = bc[1].trim();
+    }
+
+    if (title || bgColor || textColor || borderColor) {
+      hasAny = true;
+      res[box] = {
+        title,
+        bgColor,
+        textColor,
+        borderColor,
+      };
+    }
+  }
+
+  return hasAny ? res : undefined;
+}
+
+export async function searchAnkiNotes(
+  baseUrl: string = 'http://127.0.0.1:8765',
+  query: string = '',
+  limit: number = 300
+): Promise<{
+  success: boolean;
+  totalCount: number;
+  noteIds: number[];
+  notes: any[];
+  error?: string;
+}> {
+  const cleanQuery = (query || '').trim();
+  const ankiQuery = cleanQuery || '';
+
+  const findRes = await callAnkiConnect(baseUrl, 'findNotes', { query: ankiQuery });
+  if (!findRes.success) {
+    return {
+      success: false,
+      totalCount: 0,
+      noteIds: [],
+      notes: [],
+      error: findRes.error || 'Failed to search notes in Anki',
+    };
+  }
+
+  const allNoteIds: number[] = Array.isArray(findRes.result) ? findRes.result : [];
+  const totalCount = allNoteIds.length;
+  if (totalCount === 0) {
+    return {
+      success: true,
+      totalCount: 0,
+      noteIds: [],
+      notes: [],
+    };
+  }
+
+  const pagedNoteIds = limit > 0 ? allNoteIds.slice(0, limit) : allNoteIds;
+  const notesInfoRes = await callAnkiConnect(baseUrl, 'notesInfo', { notes: pagedNoteIds });
+  if (!notesInfoRes.success) {
+    return {
+      success: false,
+      totalCount,
+      noteIds: pagedNoteIds,
+      notes: [],
+      error: notesInfoRes.error || 'Failed to fetch notes information from Anki',
+    };
+  }
+
+  const rawNotes: any[] = Array.isArray(notesInfoRes.result) ? notesInfoRes.result : [];
+
+  const firstCardIds: number[] = [];
+  const noteToFirstCard = new Map<number, number>();
+  for (const n of rawNotes) {
+    if (Array.isArray(n.cards) && n.cards.length > 0) {
+      firstCardIds.push(n.cards[0]);
+      noteToFirstCard.set(n.noteId, n.cards[0]);
+    }
+  }
+
+  const cardDeckMap = new Map<number, string>();
+  if (firstCardIds.length > 0) {
+    const cardsInfoRes = await callAnkiConnect(baseUrl, 'cardsInfo', { cards: firstCardIds });
+    if (cardsInfoRes.success && Array.isArray(cardsInfoRes.result)) {
+      for (const c of cardsInfoRes.result) {
+        if (c.cardId && c.deckName) {
+          cardDeckMap.set(c.cardId, c.deckName);
+        }
+      }
+    }
+  }
+
+  const formattedNotes = rawNotes.map((n) => {
+    const noteFields = n.fields || {};
+    const getVal = (...keys: string[]) => {
+      for (const k of keys) {
+        if (noteFields[k]?.value !== undefined) {
+          const raw = String(noteFields[k].value).replace(/<[^>]+>/g, '').trim();
+          if (raw) return raw;
+        }
+      }
+      return '';
+    };
+
+    const getRawVal = (...keys: string[]) => {
+      for (const k of keys) {
+        if (noteFields[k]?.value !== undefined) {
+          return String(noteFields[k].value).trim();
+        }
+      }
+      return '';
+    };
+
+    const word = getVal('Word', 'word', 'Front', 'front', 'English', 'english', 'Term', 'term', 'Text', 'text') || `Note #${n.noteId}`;
+    const meaning = getRawVal('Meaning', 'meaning', 'Persian Meaning', 'persianmeaning', 'Back', 'back', 'Translation', 'translation');
+    const definitionEn = getRawVal('EnglishDefinition', 'englishdefinition', 'Definition', 'definition', 'DefinitionEn', 'definitionen');
+    const phonetic = getVal('Phonetic', 'phonetic', 'IPA', 'ipa', 'Pronunciation', 'pronunciation');
+    const partOfSpeech = getVal('PartOfSpeech', 'partofspeech', 'Part of Speech', 'pos', 'POS', 'Type', 'type');
+    const example = getRawVal('Example', 'example', 'Example Sentence', 'examplesentence', 'Sentence', 'sentence');
+    const translation = getRawVal('Translation', 'translation', 'Example Translation', 'exampletranslation', 'Sentence Fa', 'sentencefa');
+    const mnemonic = getRawVal('Mnemonic', 'mnemonic', 'Memory Aid', 'memoryaid', 'Aid', 'aid');
+    const spellingSentence = getVal('SpellingSentence', 'spellingsentence');
+    const cardTypeRaw = getVal('CardType', 'cardtype');
+    const cardType: CardType = cardTypeRaw === 'spelling' || n.modelName?.includes('Spelling') ? 'spelling' : 'normal';
+
+    const cardImageRaw = getRawVal('CardImage', 'cardimage', 'Image', 'image', 'Picture', 'picture', 'Photo', 'photo');
+    let imageFileName = '';
+    const imgMatch = cardImageRaw.match(/<img\s+[^>]*src="([^"]+)"/i);
+    if (imgMatch) {
+      imageFileName = imgMatch[1];
+    }
+
+    const customFrontRaw = getRawVal('CustomFrontSections');
+    const customBackRaw = getRawVal('CustomBackSections') || getRawVal('CustomSections');
+    const mainBoxStylesRaw = getRawVal('MainBoxStyles');
+
+    const frontCustomBlocks = parseCustomBlocksHtml(customFrontRaw, 'front');
+    const backCustomBlocks = parseCustomBlocksHtml(customBackRaw, 'back');
+    const mainBoxStyles = parseMainBoxStyles(mainBoxStylesRaw);
+
+    const firstCard = noteToFirstCard.get(n.noteId);
+    const deckName = firstCard ? (cardDeckMap.get(firstCard) || 'Default') : 'Default';
+
+    const extractSound = (val: string) => {
+      const m = val.match(/\[sound:([^\]]+)\]/);
+      return m ? m[1] : '';
+    };
+
+    const wordAudioUsNormalFileName = extractSound(getRawVal('WordAudioUsNormal'));
+    const wordAudioUsSlowFileName = extractSound(getRawVal('WordAudioUsSlow'));
+    const wordAudioUkNormalFileName = extractSound(getRawVal('WordAudioUkNormal'));
+    const wordAudioUkSlowFileName = extractSound(getRawVal('WordAudioUkSlow'));
+    const exampleAudioUsNormalFileName = extractSound(getRawVal('ExampleAudioUsNormal'));
+    const exampleAudioUsSlowFileName = extractSound(getRawVal('ExampleAudioUsSlow'));
+    const exampleAudioUkNormalFileName = extractSound(getRawVal('ExampleAudioUkNormal'));
+    const exampleAudioUkSlowFileName = extractSound(getRawVal('ExampleAudioUkSlow'));
+    const wordAudioFileName = extractSound(getRawVal('WordAudio')) || wordAudioUsNormalFileName;
+    const exampleAudioFileName = extractSound(getRawVal('ExampleAudio')) || exampleAudioUsNormalFileName;
+
+    const cleanFieldsMap: Record<string, string> = {};
+    for (const [k, v] of Object.entries(noteFields)) {
+      cleanFieldsMap[k] = (v as any)?.value || '';
+    }
+
+    const cardData: CardData = {
+      word,
+      phonetic,
+      partOfSpeech,
+      meaningFa: meaning,
+      definitionEn,
+      example,
+      translationFa: translation,
+      mnemonic,
+      cardType,
+      spellingSentence,
+      imageFileName,
+      wordAudioUsNormalFileName,
+      wordAudioUsSlowFileName,
+      wordAudioUkNormalFileName,
+      wordAudioUkSlowFileName,
+      exampleAudioUsNormalFileName,
+      exampleAudioUsSlowFileName,
+      exampleAudioUkNormalFileName,
+      exampleAudioUkSlowFileName,
+      wordAudioFileName,
+      exampleAudioFileName,
+      frontCustomBlocks,
+      backCustomBlocks,
+      mainBoxStyles,
+      tags: n.tags || [],
+    };
+
+    return {
+      noteId: n.noteId,
+      modelName: n.modelName || '',
+      deckName,
+      tags: n.tags || [],
+      word,
+      partOfSpeech,
+      meaningFa: meaning,
+      definitionEn,
+      phonetic,
+      example,
+      translationFa: translation,
+      mnemonic,
+      cardType,
+      fields: cleanFieldsMap,
+      cardIds: n.cards || [],
+      cardData,
+    };
+  });
+
+  return {
+    success: true,
+    totalCount,
+    noteIds: allNoteIds,
+    notes: formattedNotes,
+  };
+}
+

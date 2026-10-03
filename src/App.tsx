@@ -4,6 +4,7 @@ import { NavigationStrip, NavTab, NavigationStatus, ServiceState } from './compo
 import { CreateCardView } from './components/CreateCardView';
 import { BatchCardView } from './components/BatchCardView';
 import { CompleteCardsByTagView } from './components/CompleteCardsByTagView';
+import { CardBrowserView } from './components/CardBrowserView';
 import { SettingsView } from './components/SettingsView';
 import { fetchConfig, saveConfig, checkOllama, checkGemini, checkTTS, checkOnlineTTS, checkAnki } from './services/api';
 import { AppThemeProvider, normalizeAppTheme } from './context/ThemeContext';
@@ -203,6 +204,13 @@ function AppShell({
             />
           </div>
 
+          <div className={currentTab === 'browser' ? 'block' : 'hidden'}>
+            <CardBrowserView
+              settings={settings}
+              appTheme={activeAppTheme}
+            />
+          </div>
+
           <div className={currentTab === 'settings' ? 'block' : 'hidden'}>
             <SettingsView
               settings={settings}
@@ -233,7 +241,7 @@ function AppShell({
               </span>
             </div>
             <div className="text-xs font-medium opacity-80">
-              English Flashcard Generator v1.1.4
+              English Flashcard Generator v1.1.5
             </div>
           </div>
         </footer>
