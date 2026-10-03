@@ -14,6 +14,7 @@ const defaultSettings: AppSettings = {
   language: 'en',
   direction: 'ltr',
   ai: {
+    enabled: true,
     provider: 'ollama',
     ollama: {
       url: 'http://127.0.0.1:11434',
