@@ -77,6 +77,7 @@ export interface BoxCustomStyle {
   title?: string;
   textColor?: string;
   bgColor?: string;
+  borderColor?: string;
 }
 
 export interface MainBoxCustomizations {

@@ -102,66 +102,81 @@ const css = `/* THEME 6: BOTANICAL SAGE (DARK) */
   margin: 20px 0 !important;
 }
 
+.botanical-play-row,
 .botanical-play-wrapper {
   display: flex !important;
-  flex-direction: column !important;
+  flex-direction: row !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 10px !important;
-}
-
-.botanical-audio-main {
-  display: flex !important;
-  justify-content: center !important;
-}
-
-.botanical-audio-options {
-  display: flex !important;
-  justify-content: center !important;
-  gap: 8px !important;
+  gap: 14px !important;
   flex-wrap: wrap !important;
+  margin: 0 auto !important;
 }
 
-.botanical-audio-sub {
-  font-size: 11px !important;
-}
-
-/* Audio Button Styling (Circle Play) */
+/* Audio Button Styling (Pure Circle Play, No border/frame) */
 .botanical-wrapper .preview-play-btn,
+.botanical-wrapper .botanical-play-btn,
 .botanical-wrapper .replay-button,
 .botanical-wrapper a.replay-button,
 .botanical-wrapper button[data-audio-target] {
-  background-color: #4A5B40 !important;
-  color: #D8E8D0 !important;
-  border-radius: 50px !important;
-  border: 1px solid #5C6E52 !important;
-  padding: 8px 16px !important;
-  font-size: 12px !important;
-  font-weight: 700 !important;
-  cursor: pointer !important;
-  transition: transform 0.15s ease, background-color 0.15s ease !important;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4) !important;
+  background-color: #3F5236 !important;
+  color: #FFFFFF !important;
+  width: 48px !important;
+  height: 48px !important;
+  min-width: 48px !important;
+  min-height: 48px !important;
+  max-width: 48px !important;
+  max-height: 48px !important;
+  border-radius: 50% !important;
+  border: 0 !important;
+  border-style: none !important;
+  outline: none !important;
+  box-shadow: none !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 6px !important;
-}
-
-.botanical-audio-main .preview-play-btn,
-.botanical-audio-main .replay-button,
-.botanical-audio-main a.replay-button {
-  width: 52px !important;
-  height: 52px !important;
-  border-radius: 50% !important;
-  padding: 0 !important;
   justify-content: center !important;
-  font-size: 16px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  cursor: pointer !important;
+  transition: transform 0.15s ease, background-color 0.15s ease !important;
 }
 
 .botanical-wrapper .preview-play-btn:hover,
+.botanical-wrapper .botanical-play-btn:hover,
 .botanical-wrapper .replay-button:hover,
 .botanical-wrapper a.replay-button:hover {
-  background-color: #586B4D !important;
-  transform: scale(1.05) !important;
+  background-color: #4C6341 !important;
+  transform: scale(1.06) !important;
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Completely remove green/gray circular outline from Anki default sound button */
+.botanical-wrapper .replay-button svg,
+.botanical-wrapper a.replay-button svg {
+  width: 22px !important;
+  height: 22px !important;
+  border: none !important;
+  outline: none !important;
+}
+
+.botanical-wrapper .replay-button svg circle,
+.botanical-wrapper a.replay-button svg circle,
+.botanical-wrapper .replay-button svg ellipse,
+.botanical-wrapper a.replay-button svg ellipse {
+  display: none !important;
+  fill: none !important;
+  stroke: none !important;
+  border: none !important;
+}
+
+.botanical-wrapper .replay-button svg path,
+.botanical-wrapper a.replay-button svg path,
+.botanical-wrapper .replay-button svg polygon,
+.botanical-wrapper a.replay-button svg polygon {
+  fill: #FFFFFF !important;
+  stroke: none !important;
 }
 
 /* Persian Meaning Box */
@@ -328,22 +343,40 @@ const css = `/* THEME 6: BOTANICAL SAGE (DARK) */
   margin: 12px 0 !important;
 }
 
+.spelling-result {
+  margin-top: 14px !important;
+  text-align: center !important;
+  display: block !important;
+  box-sizing: border-box !important;
+}
+
 .spelling-result.is-correct {
-  background-color: #182415 !important;
-  border: 1px solid #3E5A35 !important;
-  color: #D8E8D0 !important;
-  padding: 10px 16px !important;
-  border-radius: 12px !important;
-  font-weight: 700 !important;
+  background-color: #1A2E16 !important;
+  border: 2px solid #4ADE80 !important;
+  color: #86EFAC !important;
+  padding: 12px 20px !important;
+  border-radius: 14px !important;
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.5px !important;
 }
 
 .spelling-result.is-incorrect {
-  background-color: #2D1414 !important;
-  border: 1px solid #732323 !important;
-  color: #F8B4B4 !important;
-  padding: 10px 16px !important;
-  border-radius: 12px !important;
-  font-weight: 600 !important;
+  background-color: #381616 !important;
+  border: 2px solid #EF4444 !important;
+  color: #FCA5A5 !important;
+  padding: 12px 20px !important;
+  border-radius: 14px !important;
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.5px !important;
+}
+
+.spelling-word-reveal {
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.5px !important;
+  display: inline-block !important;
 }
 `;
 

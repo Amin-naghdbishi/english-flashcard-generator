@@ -29,16 +29,12 @@ function checkSpelling() {
   
   if (typed.toLowerCase() === target) {
     result.className = 'spelling-result is-correct';
-    result.innerHTML = '<div class="spelling-success-badge">✓ EXCELLENT! PERFECT SPELLING!</div><div class="spelling-word-reveal">' + originalTarget + '</div>';
+    result.innerHTML = '<span class="spelling-word-reveal">' + originalTarget + '</span>';
     input.classList.remove('has-error');
     input.classList.add('is-valid');
   } else {
     result.className = 'spelling-result is-incorrect';
-    result.innerHTML = '<div class="spelling-error-badge">✕ INCORRECT SPELLING</div>' +
-      '<div class="spelling-compare-box">' +
-        '<div class="spelling-user-typed"><span class="spelling-label">You typed:</span> <del class="spelling-mistake">' + typed + '</del></div>' +
-        '<div class="spelling-correct-ans"><span class="spelling-label">Correct spelling:</span> <strong class="spelling-exact">' + originalTarget + '</strong></div>' +
-      '</div>';
+    result.innerHTML = '<span class="spelling-word-reveal">' + originalTarget + '</span>';
     input.classList.add('has-error');
     input.classList.remove('is-valid');
   }
@@ -761,12 +757,10 @@ export const botanicalFrontNormalHtml = `
     <div class="botanical-box botanical-audio-box">
       <div class="botanical-ipa-pill">{{Phonetic}}</div>
       <div class="botanical-audio-divider"></div>
-      <div class="botanical-play-wrapper">
-        <div class="botanical-audio-main">{{WordAudioUsNormal}}</div>
-        <div class="botanical-audio-options">
-          <span class="botanical-audio-sub">{{WordAudioUsSlow}}</span>
-          <span class="botanical-audio-sub">{{WordAudioUkNormal}}</span>
-        </div>
+      <div class="botanical-play-row">
+        {{WordAudioUsNormal}}
+        {{WordAudioUsSlow}}
+        {{WordAudioUkNormal}}
       </div>
     </div>
 
@@ -797,14 +791,10 @@ export const botanicalFrontSpellingHtml = `
 
     <!-- Box 2: Audio listening clue -->
     <div class="botanical-box botanical-audio-box">
-      <div class="botanical-ipa-pill">🎧 Listen carefully</div>
-      <div class="botanical-audio-divider"></div>
-      <div class="botanical-play-wrapper">
-        <div class="botanical-audio-main">{{WordAudioUsNormal}}</div>
-        <div class="botanical-audio-options">
-          <span class="botanical-audio-sub">{{WordAudioUsSlow}}</span>
-          <span class="botanical-audio-sub">{{ExampleAudioUsNormal}}</span>
-        </div>
+      <div class="botanical-play-row">
+        {{WordAudioUsNormal}}
+        {{WordAudioUsSlow}}
+        {{ExampleAudioUsNormal}}
       </div>
     </div>
 
@@ -858,12 +848,10 @@ export const botanicalBackHtml = `
     <div class="botanical-box botanical-audio-box">
       <div class="botanical-ipa-pill">{{Phonetic}}</div>
       <div class="botanical-audio-divider"></div>
-      <div class="botanical-play-wrapper">
-        <div class="botanical-audio-main">{{WordAudioUsNormal}}</div>
-        <div class="botanical-audio-options">
-          <span class="botanical-audio-sub">{{WordAudioUsSlow}}</span>
-          <span class="botanical-audio-sub">{{WordAudioUkNormal}}</span>
-        </div>
+      <div class="botanical-play-row">
+        {{WordAudioUsNormal}}
+        {{WordAudioUsSlow}}
+        {{WordAudioUkNormal}}
       </div>
     </div>
 

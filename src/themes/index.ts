@@ -173,7 +173,7 @@ export function renderCustomBlocksHtml(
     if (!title && !content) continue;
 
     const bgColor = block.color || '#1E293B';
-    const textColor = getContrastTextColor(bgColor);
+    const textColor = block.textColor || getContrastTextColor(bgColor);
     const borderColor = block.borderColor || getHarmonizedBorder(bgColor);
     const badgeBg = textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.2)';
     const badgeBorder = textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.3)';
@@ -257,9 +257,11 @@ export function renderMainBoxStyles(
   if (meaning) {
     const bg = meaning.bgColor;
     const tc = meaning.textColor || (bg ? getContrastTextColor(bg) : undefined);
-    if (bg || tc) {
+    const bc = meaning.borderColor || (bg ? getHarmonizedBorder(bg) : undefined);
+    if (bg || tc || bc) {
       const parts = [];
-      if (bg) parts.push(`background-color: ${bg} !important; border-color: ${getHarmonizedBorder(bg)} !important;`);
+      if (bg) parts.push(`background-color: ${bg} !important;`);
+      if (bc) parts.push(`border-color: ${bc} !important; border-left-color: ${bc} !important;`);
       if (tc) parts.push(`color: ${tc} !important;`);
       cssRules.push(`.comic-meaning-box, .quest-meaning-banner, .notebook-highlighter-meaning, .minimal-meaning-block, .botanical-meaning-box { ${parts.join(' ')} }`);
       if (tc) {
@@ -275,9 +277,11 @@ export function renderMainBoxStyles(
   if (definition) {
     const bg = definition.bgColor;
     const tc = definition.textColor || (bg ? getContrastTextColor(bg) : undefined);
-    if (bg || tc) {
+    const bc = definition.borderColor || (bg ? getHarmonizedBorder(bg) : undefined);
+    if (bg || tc || bc) {
       const parts = [];
-      if (bg) parts.push(`background-color: ${bg} !important; border-color: ${getHarmonizedBorder(bg)} !important;`);
+      if (bg) parts.push(`background-color: ${bg} !important;`);
+      if (bc) parts.push(`border-color: ${bc} !important; border-left-color: ${bc} !important;`);
       if (tc) parts.push(`color: ${tc} !important;`);
       cssRules.push(`.comic-definition-box, .quest-definition-card, .notebook-definition-note, .minimal-definition-block, .botanical-definition-box { ${parts.join(' ')} }`);
       if (tc) {
@@ -293,9 +297,11 @@ export function renderMainBoxStyles(
   if (example) {
     const bg = example.bgColor;
     const tc = example.textColor || (bg ? getContrastTextColor(bg) : undefined);
-    if (bg || tc) {
+    const bc = example.borderColor || (bg ? getHarmonizedBorder(bg) : undefined);
+    if (bg || tc || bc) {
       const parts = [];
-      if (bg) parts.push(`background-color: ${bg} !important; border-color: ${getHarmonizedBorder(bg)} !important;`);
+      if (bg) parts.push(`background-color: ${bg} !important;`);
+      if (bc) parts.push(`border-color: ${bc} !important; border-left-color: ${bc} !important;`);
       if (tc) parts.push(`color: ${tc} !important;`);
       cssRules.push(`.comic-example-box, .quest-example-card, .notebook-sticky-example, .minimal-example-block, .botanical-example-box { ${parts.join(' ')} }`);
       if (tc) {
@@ -311,9 +317,11 @@ export function renderMainBoxStyles(
   if (mnemonic) {
     const bg = mnemonic.bgColor;
     const tc = mnemonic.textColor || (bg ? getContrastTextColor(bg) : undefined);
-    if (bg || tc) {
+    const bc = mnemonic.borderColor || (bg ? getHarmonizedBorder(bg) : undefined);
+    if (bg || tc || bc) {
       const parts = [];
-      if (bg) parts.push(`background-color: ${bg} !important; border-color: ${getHarmonizedBorder(bg)} !important; border-left-color: ${getHarmonizedBorder(bg)} !important;`);
+      if (bg) parts.push(`background-color: ${bg} !important;`);
+      if (bc) parts.push(`border-color: ${bc} !important; border-left-color: ${bc} !important;`);
       if (tc) parts.push(`color: ${tc} !important;`);
       cssRules.push(`.comic-mnemonic-box, .quest-mnemonic-card, .notebook-washi-mnemonic, .minimal-mnemonic-block, .botanical-mnemonic-box { ${parts.join(' ')} }`);
       if (tc) {
@@ -373,8 +381,12 @@ export function renderThemeHtml(
   let exampleAudioUkSlow = '';
 
   if (options?.isPreview) {
+    const isBotanical = options?.themeId?.includes('botanical');
     const makePreviewBtn = (target: string, label: string, b64?: string) => {
       if (b64) {
+        if (isBotanical) {
+          return `<button type="button" class="botanical-play-btn preview-play-btn" data-audio-target="${target}" title="Play ${label}"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="8 5 19 12 8 19 8 5" fill="#FFFFFF"/></svg></button>`;
+        }
         return `<button type="button" class="comic-audio-btn preview-play-btn" data-audio-target="${target}" title="Play ${label}">▶ ${label}</button>`;
       }
       return '';

@@ -164,6 +164,117 @@ export const HIGHLIGHT_PRESETS = [
   { name: 'Warm Orange', hex: '#FED7AA' },
 ];
 
+export const BORDER_COLOR_PRESETS = [
+  { name: 'Transparent', hex: 'transparent' },
+  { name: 'Emerald', hex: '#10B981' },
+  { name: 'Sky Blue', hex: '#38BDF8' },
+  { name: 'Amber Gold', hex: '#F59E0B' },
+  { name: 'Purple', hex: '#A855F7' },
+  { name: 'Rose Red', hex: '#F43F5E' },
+  { name: 'Slate Gray', hex: '#64748B' },
+  { name: 'White', hex: '#FFFFFF' },
+];
+
+export interface ColorPickerInputProps {
+  label: string;
+  value?: string;
+  defaultValue?: string;
+  presets?: Array<{ name: string; hex: string }>;
+  onChange: (color: string | undefined) => void;
+  onReset?: () => void;
+}
+
+export const ColorPickerInput: React.FC<ColorPickerInputProps> = ({
+  label,
+  value,
+  defaultValue = '#3b82f6',
+  presets = BOX_BG_PRESETS,
+  onChange,
+  onReset,
+}) => {
+  const safeHex = useMemo(() => {
+    if (value && /^#[0-9A-Fa-f]{6}$/.test(value)) return value;
+    if (defaultValue && /^#[0-9A-Fa-f]{6}$/.test(defaultValue)) return defaultValue;
+    return '#3b82f6';
+  }, [value, defaultValue]);
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-wider">
+          {label}:
+        </span>
+        {value && (
+          <button
+            type="button"
+            onClick={() => {
+              if (onReset) onReset();
+              else onChange(undefined);
+            }}
+            className="text-[9px] text-zinc-400 hover:text-white flex items-center gap-0.5 cursor-pointer"
+            title="Reset color to default"
+          >
+            <RotateCcw className="w-2.5 h-2.5" />
+            <span>Default</span>
+          </button>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2">
+        {/* Native color picker swatch */}
+        <label
+          className="relative cursor-pointer shrink-0 inline-block w-6 h-6 rounded border border-white/20 overflow-hidden shadow-xs hover:border-white/40"
+          title="Pick custom color"
+          style={{ backgroundColor: value || defaultValue }}
+        >
+          <input
+            type="color"
+            value={safeHex}
+            onChange={(e) => onChange(e.target.value)}
+            className="absolute -top-3 -left-3 w-14 h-14 opacity-0 cursor-pointer"
+          />
+        </label>
+
+        {/* Hex input */}
+        <input
+          type="text"
+          value={value || ''}
+          placeholder={defaultValue}
+          onChange={(e) => {
+            const v = e.target.value.trim();
+            if (!v) {
+              onChange(undefined);
+            } else if (v.startsWith('#') || /^[0-9A-Fa-f]{1,6}$/.test(v)) {
+              onChange(v.startsWith('#') ? v : `#${v}`);
+            }
+          }}
+          className="w-20 px-1.5 py-1 text-xs font-mono rounded bg-black/40 text-white border border-white/20 focus:border-blue-400 focus:outline-none uppercase"
+          maxLength={7}
+        />
+
+        {/* Quick color preset chips */}
+        <div className="flex items-center gap-1 flex-wrap flex-1">
+          {presets.slice(0, 6).map((preset) => {
+            const isSelected = (value || '').toLowerCase() === preset.hex.toLowerCase();
+            return (
+              <button
+                key={preset.hex}
+                type="button"
+                onClick={() => onChange(preset.hex)}
+                className={`w-4 h-4 rounded-full border border-black/30 cursor-pointer transition-transform ${
+                  isSelected ? 'scale-125 ring-2 ring-white shadow-xs' : 'opacity-80 hover:opacity-100 hover:scale-110'
+                }`}
+                style={{ backgroundColor: preset.hex }}
+                title={`${preset.name} (${preset.hex})`}
+              />
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 function getThemeCardClasses(themeId: ThemeId) {
   if (themeId.includes('pop') || themeId === 'comic-light' || themeId === 'comic-dark' || themeId.includes('strip')) {
     return {
@@ -649,6 +760,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
 
   const theme: ThemeDefinition = THEMES[themeId] || THEMES['comic-pop-dark'] || THEMES['comic-dark'];
   const themeClasses = getThemeCardClasses(theme.id);
+  const isCardLight = !theme.id.includes('dark');
 
   // Render front/back HTML for Preview Mode
   const frontRendered = useMemo(() => {
@@ -680,7 +792,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
         const currentBox = currentStyles[boxKey] || {};
         const newBoxStyle = { ...currentBox, ...updates };
 
-        const hasValues = Boolean(newBoxStyle.title?.trim() || newBoxStyle.bgColor || newBoxStyle.textColor);
+        const hasValues = Boolean(newBoxStyle.title?.trim() || newBoxStyle.bgColor || newBoxStyle.textColor || newBoxStyle.borderColor);
         const updatedMainBoxStyles: MainBoxCustomizations = {
           ...currentStyles,
           [boxKey]: hasValues ? newBoxStyle : undefined,
@@ -720,14 +832,14 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
     if (!isOpen) return null;
 
     return (
-      <div className="mt-2.5 p-3 rounded-lg border border-white/20 bg-black/50 space-y-2.5 text-xs text-white">
+      <div className="mt-2.5 p-3 rounded-lg border border-white/20 bg-black/60 space-y-2.5 text-xs text-white">
         <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
           <span className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
             <Palette className="w-3.5 h-3.5" />
             <span>Customize Box Appearance</span>
           </span>
           <div className="flex items-center gap-2">
-            {(boxStyle.title || boxStyle.bgColor || boxStyle.textColor) && (
+            {(boxStyle.title || boxStyle.bgColor || boxStyle.textColor || boxStyle.borderColor) && (
               <button
                 type="button"
                 onClick={() => handleResetMainBoxStyle(boxKey)}
@@ -762,51 +874,35 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
           />
         </div>
 
-        {/* Background Color */}
-        <div>
-          <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-wider block mb-1.5">
-            Background Color:
-          </span>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {BOX_BG_PRESETS.map((preset) => (
-              <button
-                key={preset.hex}
-                type="button"
-                onClick={() => handleUpdateMainBoxStyle(boxKey, { bgColor: preset.hex })}
-                className={`w-5 h-5 rounded-full border border-black/30 cursor-pointer transition-transform ${
-                  (boxStyle.bgColor || '').toLowerCase() === preset.hex.toLowerCase()
-                    ? 'scale-125 ring-2 ring-white shadow-xs'
-                    : 'opacity-80 hover:opacity-100 hover:scale-110'
-                }`}
-                style={{ backgroundColor: preset.hex }}
-                title={preset.name}
-              />
-            ))}
-          </div>
-        </div>
+        {/* Background Color Picker */}
+        <ColorPickerInput
+          label="Background Color"
+          value={boxStyle.bgColor}
+          defaultValue="#1E293B"
+          presets={BOX_BG_PRESETS}
+          onChange={(c) => handleUpdateMainBoxStyle(boxKey, { bgColor: c })}
+          onReset={() => handleUpdateMainBoxStyle(boxKey, { bgColor: undefined })}
+        />
 
-        {/* Text Color */}
-        <div>
-          <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-wider block mb-1.5">
-            Text Color:
-          </span>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {TEXT_COLOR_PRESETS.map((preset) => (
-              <button
-                key={preset.hex}
-                type="button"
-                onClick={() => handleUpdateMainBoxStyle(boxKey, { textColor: preset.hex })}
-                className={`w-5 h-5 rounded-full border border-black/30 cursor-pointer transition-transform ${
-                  (boxStyle.textColor || '').toLowerCase() === preset.hex.toLowerCase()
-                    ? 'scale-125 ring-2 ring-white shadow-xs'
-                    : 'opacity-80 hover:opacity-100 hover:scale-110'
-                }`}
-                style={{ backgroundColor: preset.hex }}
-                title={`Text Color: ${preset.name}`}
-              />
-            ))}
-          </div>
-        </div>
+        {/* Text Color Picker */}
+        <ColorPickerInput
+          label="Text / Accent Color"
+          value={boxStyle.textColor}
+          defaultValue="#FFFFFF"
+          presets={TEXT_COLOR_PRESETS}
+          onChange={(c) => handleUpdateMainBoxStyle(boxKey, { textColor: c })}
+          onReset={() => handleUpdateMainBoxStyle(boxKey, { textColor: undefined })}
+        />
+
+        {/* Border Color Picker */}
+        <ColorPickerInput
+          label="Border Color"
+          value={boxStyle.borderColor}
+          defaultValue={boxStyle.bgColor || '#1E293B'}
+          presets={BORDER_COLOR_PRESETS}
+          onChange={(c) => handleUpdateMainBoxStyle(boxKey, { borderColor: c })}
+          onReset={() => handleUpdateMainBoxStyle(boxKey, { borderColor: undefined })}
+        />
       </div>
     );
   };
@@ -902,7 +998,8 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
           <div className="space-y-2">
             {blocks.map((blk) => {
               const bgColor = blk.color || '#1E293B';
-              const borderColor = blk.borderColor || getHarmonizedBorder(bgColor);
+              const borderColor = blk.borderColor || blk.color || getHarmonizedBorder(bgColor);
+              const textColor = blk.textColor || getContrastTextColor(bgColor);
               const isSelected = selectedBoxId === blk.id;
               return (
                 <div
@@ -987,30 +1084,26 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                     }}
                     placeholder="Content (HTML supported: <strong>bold</strong>, <em>italic</em>, <u>underline</u>, lists, etc.)..."
                     className="w-full p-2 text-xs rounded bg-black/35 text-white border border-white/15 focus:outline-none focus:ring-1 focus:ring-white/50 leading-relaxed font-sans placeholder-white/40"
+                    style={{ color: textColor }}
                   />
 
-                  {/* Color Palette Chips */}
-                  <div className="flex items-center justify-between gap-1 pt-1 border-t border-black/20">
-                    <span className="text-[10px] text-white/70 font-semibold">Color:</span>
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {BOX_BG_PRESETS.map((preset) => (
-                        <button
-                          key={preset.hex}
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleUpdateCustomBlock(blk.id, { color: preset.hex });
-                          }}
-                          className={`w-4 h-4 rounded-full border border-black/30 cursor-pointer transition-transform ${
-                            (blk.color || '#1E293B').toLowerCase() === preset.hex.toLowerCase()
-                              ? 'scale-125 ring-2 ring-white shadow-xs'
-                              : 'opacity-80 hover:opacity-100 hover:scale-110'
-                          }`}
-                          style={{ backgroundColor: preset.hex }}
-                          title={preset.name}
-                        />
-                      ))}
-                    </div>
+                  {/* Color Pickers */}
+                  <div className="pt-2 border-t border-black/20 space-y-2" onClick={(e) => e.stopPropagation()}>
+                    <ColorPickerInput
+                      label="Background Color"
+                      value={blk.color}
+                      defaultValue="#1E293B"
+                      presets={BOX_BG_PRESETS}
+                      onChange={(c) => handleUpdateCustomBlock(blk.id, { color: c })}
+                    />
+                    <ColorPickerInput
+                      label="Border Color"
+                      value={blk.borderColor}
+                      defaultValue={blk.color || '#1E293B'}
+                      presets={BORDER_COLOR_PRESETS}
+                      onChange={(c) => handleUpdateCustomBlock(blk.id, { borderColor: c })}
+                      onReset={() => handleUpdateCustomBlock(blk.id, { borderColor: undefined })}
+                    />
                   </div>
                 </div>
               );
@@ -1115,11 +1208,17 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                 activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' };
               }}
               placeholder="pos (e.g. noun)"
-              className="text-[11px] font-bold px-2 py-0.5 rounded border border-zinc-700/50 bg-black/20 text-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className={`text-[11px] font-bold px-2 py-0.5 rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                isCardLight
+                  ? 'border-zinc-300 bg-white/80 text-blue-700'
+                  : 'border-zinc-700/50 bg-black/20 text-blue-400'
+              }`}
               title="Part of speech"
             />
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${
+            isCardLight ? 'text-zinc-500' : 'text-zinc-400'
+          }`}>
             {theme.name}
           </span>
         </div>
@@ -1137,7 +1236,9 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               activeInputRef.current = { element: e.target, fieldName: 'word' };
             }}
             placeholder="Target Word..."
-            className="w-full text-center text-2xl sm:text-3xl font-extrabold tracking-wide bg-transparent border-b-2 border-dashed border-blue-500/40 focus:border-blue-500 focus:outline-none py-1 mb-2"
+            className={`w-full text-center text-2xl sm:text-3xl font-extrabold tracking-wide bg-transparent border-b-2 border-dashed border-blue-500/40 focus:border-blue-500 focus:outline-none py-1 mb-2 ${
+              isCardLight ? 'text-zinc-900 placeholder-zinc-400' : 'text-white placeholder-zinc-500'
+            }`}
           />
           <input
             type="text"
@@ -1147,14 +1248,22 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               activeInputRef.current = { element: e.target, fieldName: 'phonetic' };
             }}
             placeholder="/ipa/"
-            className="text-center font-mono text-sm px-3 py-1 rounded bg-black/20 border border-zinc-700/50 text-sky-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className={`text-center font-mono text-sm px-3 py-1 rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+              isCardLight
+                ? 'bg-white/80 border-zinc-300 text-sky-700'
+                : 'bg-black/20 border-zinc-700/50 text-sky-400'
+            }`}
           />
         </div>
 
         {/* Audio Clues Dock */}
-        <div className="mb-4 p-2.5 rounded-lg border border-zinc-700/50 bg-black/10 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs font-semibold text-zinc-400 flex items-center gap-1.5">
-            <Volume2 className="w-3.5 h-3.5 text-blue-400" />
+        <div className={`mb-4 p-2.5 rounded-lg border flex flex-wrap items-center justify-between gap-2 ${
+          isCardLight ? 'border-zinc-300 bg-black/5' : 'border-zinc-700/50 bg-black/10'
+        }`}>
+          <span className={`text-xs font-semibold flex items-center gap-1.5 ${
+            isCardLight ? 'text-zinc-700' : 'text-zinc-400'
+          }`}>
+            <Volume2 className={`w-3.5 h-3.5 ${isCardLight ? 'text-blue-600' : 'text-blue-400'}`} />
             <span>Pronunciation Clues:</span>
           </span>
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -1162,7 +1271,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               <button
                 type="button"
                 onClick={() => playAudio(internalCard.wordAudioUsNormalBase64!)}
-                className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-600/30 text-blue-300 border border-blue-500/40 hover:bg-blue-600/50 cursor-pointer"
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold border cursor-pointer ${
+                  isCardLight
+                    ? 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200'
+                    : 'bg-blue-600/30 text-blue-300 border-blue-500/40 hover:bg-blue-600/50'
+                }`}
               >
                 US Normal
               </button>
@@ -1171,7 +1284,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               <button
                 type="button"
                 onClick={() => playAudio(internalCard.wordAudioUsSlowBase64!)}
-                className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-600/20 text-blue-300 border border-blue-500/30 hover:bg-blue-600/40 cursor-pointer"
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold border cursor-pointer ${
+                  isCardLight
+                    ? 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
+                    : 'bg-blue-600/20 text-blue-300 border-blue-500/30 hover:bg-blue-600/40'
+                }`}
               >
                 US Slow
               </button>
@@ -1180,7 +1297,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               <button
                 type="button"
                 onClick={() => playAudio(internalCard.wordAudioUkNormalBase64!)}
-                className="px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-600/30 text-purple-300 border border-purple-500/40 hover:bg-purple-600/50 cursor-pointer"
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold border cursor-pointer ${
+                  isCardLight
+                    ? 'bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200'
+                    : 'bg-purple-600/30 text-purple-300 border-purple-500/40 hover:bg-purple-600/50'
+                }`}
               >
                 UK Normal
               </button>
@@ -1189,8 +1310,12 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
         </div>
 
         {/* Front Context / Example */}
-        <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/10">
-          <label className="text-[11px] font-bold text-amber-400 uppercase tracking-wider block mb-1.5">
+        <div className={`p-3 rounded-lg border ${
+          isCardLight ? 'border-zinc-300 bg-white/70' : 'border-zinc-700/50 bg-black/10'
+        }`}>
+          <label className={`text-[11px] font-bold uppercase tracking-wider block mb-1.5 ${
+            isCardLight ? 'text-amber-800' : 'text-amber-400'
+          }`}>
             💡 Front Context / Example Prompt:
           </label>
           <textarea
@@ -1201,7 +1326,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               activeInputRef.current = { element: e.target, fieldName: 'example' };
             }}
             placeholder="Context sentence..."
-            className="w-full p-2 text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className={`w-full p-2 text-sm rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+              isCardLight
+                ? 'bg-white text-zinc-900 border-zinc-300 placeholder-zinc-400'
+                : 'bg-black/20 text-white border-zinc-700/60 placeholder-zinc-500'
+            }`}
           />
         </div>
 
@@ -1221,21 +1350,33 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-emerald-600 text-white uppercase tracking-wider">
               💥 VOCABULARY (BACK)
             </span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-black/20 text-zinc-300 border border-zinc-700/50">
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${
+              isCardLight
+                ? 'bg-white/80 text-zinc-700 border-zinc-300'
+                : 'bg-black/20 text-zinc-300 border-zinc-700/50'
+            }`}>
               {internalCard.partOfSpeech || 'noun'}
             </span>
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${
+            isCardLight ? 'text-zinc-500' : 'text-zinc-400'
+          }`}>
             {theme.name}
           </span>
         </div>
 
         {/* Word Reference (if only Back is shown) */}
         {showCompactHeader && (
-          <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/15 flex items-center justify-between gap-3">
+          <div className={`p-3 rounded-lg border flex items-center justify-between gap-3 ${
+            isCardLight ? 'border-zinc-300 bg-white/70' : 'border-zinc-700/50 bg-black/15'
+          }`}>
             <div>
-              <div className="text-lg font-extrabold text-blue-400">{internalCard.word}</div>
-              <div className="text-xs font-mono text-zinc-400">{internalCard.phonetic}</div>
+              <div className={`text-lg font-extrabold ${isCardLight ? 'text-blue-700' : 'text-blue-400'}`}>
+                {internalCard.word}
+              </div>
+              <div className={`text-xs font-mono ${isCardLight ? 'text-zinc-600' : 'text-zinc-400'}`}>
+                {internalCard.phonetic}
+              </div>
             </div>
             {internalCard.wordAudioUsNormalBase64 && (
               <button
@@ -1255,10 +1396,12 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
           const style = internalCard.mainBoxStyles?.meaning;
           const bg = style?.bgColor;
           const tc = style?.textColor;
-          const border = bg ? getHarmonizedBorder(bg) : undefined;
+          const border = style?.borderColor || (bg ? getHarmonizedBorder(bg) : undefined);
           return (
             <div
-              className="p-3 rounded-lg border border-zinc-700/50 bg-black/10 transition-colors"
+              className={`p-3 rounded-lg border transition-colors ${
+                !bg && (isCardLight ? 'border-zinc-300 bg-white/70' : 'border-zinc-700/50 bg-black/10')
+              }`}
               style={{
                 backgroundColor: bg || undefined,
                 borderColor: border || undefined,
@@ -1266,20 +1409,27 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               }}
             >
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5" style={{ color: tc || undefined }}>
+                <label
+                  className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5"
+                  style={{ color: tc || (isCardLight ? '#065F46' : '#34D399') }}
+                >
                   <span>{style?.title || '📖 Persian Meaning / معنی فارسی'}</span>
                 </label>
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setOpenMainBoxStyleKey(openMainBoxStyleKey === 'meaning' ? null : 'meaning')}
-                    className="px-2 py-0.5 text-[10px] font-semibold rounded bg-black/30 hover:bg-black/50 text-zinc-300 border border-white/10 flex items-center gap-1 cursor-pointer"
+                    className={`px-2 py-0.5 text-[10px] font-semibold rounded border flex items-center gap-1 cursor-pointer ${
+                      isCardLight
+                        ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-300'
+                        : 'bg-black/30 hover:bg-black/50 text-zinc-300 border-white/10'
+                    }`}
                     title="Customize Title & Colors of Meaning Box"
                   >
-                    <Palette className="w-3 h-3 text-emerald-400" />
+                    <Palette className="w-3 h-3 text-emerald-500" />
                     <span>Style</span>
                   </button>
-                  <span className="text-[10px] text-zinc-400 font-mono">RTL</span>
+                  <span className={`text-[10px] font-mono ${isCardLight ? 'text-zinc-500' : 'text-zinc-400'}`}>RTL</span>
                 </div>
               </div>
               {renderMainBoxCustomizerControl('meaning', '📖 PERSIAN MEANING')}
@@ -1293,8 +1443,16 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                   activeInputRef.current = { element: e.target, fieldName: 'meaningFa' };
                 }}
                 placeholder="معنی دقیق و روان به فارسی..."
-                className="w-full p-2.5 text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium mt-1.5"
-                style={{ color: tc || undefined }}
+                className={`w-full p-2.5 text-sm rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium mt-1.5 ${
+                  !bg && (isCardLight
+                    ? 'bg-white text-zinc-900 border-zinc-300 placeholder-zinc-400'
+                    : 'bg-black/20 text-white border-zinc-700/60 placeholder-zinc-500')
+                }`}
+                style={{
+                  backgroundColor: bg ? 'rgba(0,0,0,0.1)' : undefined,
+                  color: tc || (isCardLight && !bg ? '#18181b' : undefined),
+                  borderColor: border || undefined,
+                }}
               />
             </div>
           );
@@ -1305,10 +1463,12 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
           const style = internalCard.mainBoxStyles?.definition;
           const bg = style?.bgColor;
           const tc = style?.textColor;
-          const border = bg ? getHarmonizedBorder(bg) : undefined;
+          const border = style?.borderColor || (bg ? getHarmonizedBorder(bg) : undefined);
           return (
             <div
-              className="p-3 rounded-lg border border-zinc-700/50 bg-black/10 transition-colors"
+              className={`p-3 rounded-lg border transition-colors ${
+                !bg && (isCardLight ? 'border-zinc-300 bg-white/70' : 'border-zinc-700/50 bg-black/10')
+              }`}
               style={{
                 backgroundColor: bg || undefined,
                 borderColor: border || undefined,
@@ -1316,20 +1476,27 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               }}
             >
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[11px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5" style={{ color: tc || undefined }}>
+                <label
+                  className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5"
+                  style={{ color: tc || (isCardLight ? '#1E40AF' : '#38BDF8') }}
+                >
                   <span>{style?.title || '📖 English Definition / تعریف انگلیسی'}</span>
                 </label>
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setOpenMainBoxStyleKey(openMainBoxStyleKey === 'definition' ? null : 'definition')}
-                    className="px-2 py-0.5 text-[10px] font-semibold rounded bg-black/30 hover:bg-black/50 text-zinc-300 border border-white/10 flex items-center gap-1 cursor-pointer"
+                    className={`px-2 py-0.5 text-[10px] font-semibold rounded border flex items-center gap-1 cursor-pointer ${
+                      isCardLight
+                        ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-300'
+                        : 'bg-black/30 hover:bg-black/50 text-zinc-300 border-white/10'
+                    }`}
                     title="Customize Title & Colors of Definition Box"
                   >
-                    <Palette className="w-3 h-3 text-sky-400" />
+                    <Palette className="w-3 h-3 text-sky-500" />
                     <span>Style</span>
                   </button>
-                  <span className="text-[10px] text-zinc-400 font-mono">LTR</span>
+                  <span className={`text-[10px] font-mono ${isCardLight ? 'text-zinc-500' : 'text-zinc-400'}`}>LTR</span>
                 </div>
               </div>
               {renderMainBoxCustomizerControl('definition', '📖 ENGLISH DEFINITION')}
@@ -1342,8 +1509,16 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                   activeInputRef.current = { element: e.target, fieldName: 'definitionEn' };
                 }}
                 placeholder="Simple, learner-friendly English definition..."
-                className="w-full p-2.5 text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium mt-1.5"
-                style={{ color: tc || undefined }}
+                className={`w-full p-2.5 text-sm rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium mt-1.5 ${
+                  !bg && (isCardLight
+                    ? 'bg-white text-zinc-900 border-zinc-300 placeholder-zinc-400'
+                    : 'bg-black/20 text-white border-zinc-700/60 placeholder-zinc-500')
+                }`}
+                style={{
+                  backgroundColor: bg ? 'rgba(0,0,0,0.1)' : undefined,
+                  color: tc || (isCardLight && !bg ? '#18181b' : undefined),
+                  borderColor: border || undefined,
+                }}
               />
             </div>
           );
@@ -1354,10 +1529,12 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
           const style = internalCard.mainBoxStyles?.example;
           const bg = style?.bgColor;
           const tc = style?.textColor;
-          const border = bg ? getHarmonizedBorder(bg) : undefined;
+          const border = style?.borderColor || (bg ? getHarmonizedBorder(bg) : undefined);
           return (
             <div
-              className="p-3 rounded-lg border border-zinc-700/50 bg-black/10 space-y-2 transition-colors"
+              className={`p-3 rounded-lg border space-y-2 transition-colors ${
+                !bg && (isCardLight ? 'border-zinc-300 bg-white/70' : 'border-zinc-700/50 bg-black/10')
+              }`}
               style={{
                 backgroundColor: bg || undefined,
                 borderColor: border || undefined,
@@ -1365,24 +1542,33 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               }}
             >
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5" style={{ color: tc || undefined }}>
+                <label
+                  className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5"
+                  style={{ color: tc || (isCardLight ? '#1E40AF' : '#38BDF8') }}
+                >
                   <span>{style?.title || '💬 Example & Translation / مثال و ترجمه'}</span>
                 </label>
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setOpenMainBoxStyleKey(openMainBoxStyleKey === 'example' ? null : 'example')}
-                    className="px-2 py-0.5 text-[10px] font-semibold rounded bg-black/30 hover:bg-black/50 text-zinc-300 border border-white/10 flex items-center gap-1 cursor-pointer"
+                    className={`px-2 py-0.5 text-[10px] font-semibold rounded border flex items-center gap-1 cursor-pointer ${
+                      isCardLight
+                        ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-300'
+                        : 'bg-black/30 hover:bg-black/50 text-zinc-300 border-white/10'
+                    }`}
                     title="Customize Title & Colors of Example Box"
                   >
-                    <Palette className="w-3 h-3 text-sky-400" />
+                    <Palette className="w-3 h-3 text-sky-500" />
                     <span>Style</span>
                   </button>
                   {internalCard.exampleAudioUsNormalBase64 && (
                     <button
                       type="button"
                       onClick={() => playAudio(internalCard.exampleAudioUsNormalBase64!)}
-                      className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer"
+                      className={`text-[10px] font-semibold flex items-center gap-1 cursor-pointer ${
+                        isCardLight ? 'text-blue-700 hover:text-blue-900' : 'text-blue-400 hover:text-blue-300'
+                      }`}
                     >
                       <Volume2 className="w-3 h-3" />
                       <span>Play</span>
@@ -1400,8 +1586,16 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                   activeInputRef.current = { element: e.target, fieldName: 'example' };
                 }}
                 placeholder="English example sentence..."
-                className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                style={{ color: tc || undefined }}
+                className={`w-full p-2 text-xs sm:text-sm rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  !bg && (isCardLight
+                    ? 'bg-white text-zinc-900 border-zinc-300 placeholder-zinc-400'
+                    : 'bg-black/20 text-white border-zinc-700/60 placeholder-zinc-500')
+                }`}
+                style={{
+                  backgroundColor: bg ? 'rgba(0,0,0,0.1)' : undefined,
+                  color: tc || (isCardLight && !bg ? '#18181b' : undefined),
+                  borderColor: border || undefined,
+                }}
               />
               <textarea
                 rows={2}
@@ -1413,8 +1607,16 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                   activeInputRef.current = { element: e.target, fieldName: 'translationFa' };
                 }}
                 placeholder="ترجمه فارسی مثال..."
-                className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                style={{ color: tc || undefined }}
+                className={`w-full p-2 text-xs sm:text-sm rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  !bg && (isCardLight
+                    ? 'bg-white text-zinc-900 border-zinc-300 placeholder-zinc-400'
+                    : 'bg-black/20 text-white border-zinc-700/60 placeholder-zinc-500')
+                }`}
+                style={{
+                  backgroundColor: bg ? 'rgba(0,0,0,0.1)' : undefined,
+                  color: tc || (isCardLight && !bg ? '#18181b' : undefined),
+                  borderColor: border || undefined,
+                }}
               />
             </div>
           );
@@ -1425,10 +1627,12 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
           const style = internalCard.mainBoxStyles?.mnemonic;
           const bg = style?.bgColor;
           const tc = style?.textColor;
-          const border = bg ? getHarmonizedBorder(bg) : undefined;
+          const border = style?.borderColor || (bg ? getHarmonizedBorder(bg) : undefined);
           return (
             <div
-              className="p-3 rounded-lg border border-zinc-700/50 bg-black/10 transition-colors"
+              className={`p-3 rounded-lg border transition-colors ${
+                !bg && (isCardLight ? 'border-zinc-300 bg-white/70' : 'border-zinc-700/50 bg-black/10')
+              }`}
               style={{
                 backgroundColor: bg || undefined,
                 borderColor: border || undefined,
@@ -1436,16 +1640,23 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               }}
             >
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[11px] font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5" style={{ color: tc || undefined }}>
+                <label
+                  className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5"
+                  style={{ color: tc || (isCardLight ? '#6B21A8' : '#C084FC') }}
+                >
                   <span>{style?.title || '🧠 Memory Hook / کد یادسپاری'}</span>
                 </label>
                 <button
                   type="button"
                   onClick={() => setOpenMainBoxStyleKey(openMainBoxStyleKey === 'mnemonic' ? null : 'mnemonic')}
-                  className="px-2 py-0.5 text-[10px] font-semibold rounded bg-black/30 hover:bg-black/50 text-zinc-300 border border-white/10 flex items-center gap-1 cursor-pointer"
+                  className={`px-2 py-0.5 text-[10px] font-semibold rounded border flex items-center gap-1 cursor-pointer ${
+                    isCardLight
+                      ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-300'
+                      : 'bg-black/30 hover:bg-black/50 text-zinc-300 border-white/10'
+                  }`}
                   title="Customize Title & Colors of Mnemonic Box"
                 >
-                  <Palette className="w-3 h-3 text-purple-400" />
+                  <Palette className="w-3 h-3 text-purple-500" />
                   <span>Style</span>
                 </button>
               </div>
@@ -1459,8 +1670,16 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                   activeInputRef.current = { element: e.target, fieldName: 'mnemonic' };
                 }}
                 placeholder="کد صوتی، ریشه‌شناسی یا داستان تصویرسازی ذهنی..."
-                className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono mt-1.5"
-                style={{ color: tc || undefined }}
+                className={`w-full p-2 text-xs sm:text-sm rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono mt-1.5 ${
+                  !bg && (isCardLight
+                    ? 'bg-white text-zinc-900 border-zinc-300 placeholder-zinc-400'
+                    : 'bg-black/20 text-white border-zinc-700/60 placeholder-zinc-500')
+                }`}
+                style={{
+                  backgroundColor: bg ? 'rgba(0,0,0,0.1)' : undefined,
+                  color: tc || (isCardLight && !bg ? '#18181b' : undefined),
+                  borderColor: border || undefined,
+                }}
               />
             </div>
           );
@@ -1490,10 +1709,16 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                 activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' };
               }}
               placeholder="pos (e.g. noun)"
-              className="text-[11px] font-bold px-2 py-0.5 rounded border border-zinc-700/50 bg-black/20 text-purple-300 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              className={`text-[11px] font-bold px-2 py-0.5 rounded border focus:outline-none focus:ring-1 focus:ring-purple-500 ${
+                isCardLight
+                  ? 'border-zinc-300 bg-white/80 text-purple-700'
+                  : 'border-zinc-700/50 bg-black/20 text-purple-300'
+              }`}
             />
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${
+            isCardLight ? 'text-zinc-500' : 'text-zinc-400'
+          }`}>
             {theme.name}
           </span>
         </div>
@@ -1502,12 +1727,18 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
         {renderImageEditor()}
 
         {/* Target Word Reference */}
-        <div className="p-3 rounded-lg border border-purple-500/30 bg-purple-950/20">
+        <div className={`p-3 rounded-lg border ${
+          isCardLight ? 'border-purple-300 bg-purple-50/70' : 'border-purple-500/30 bg-purple-950/20'
+        }`}>
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400">
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${
+              isCardLight ? 'text-purple-800' : 'text-purple-400'
+            }`}>
               Target Word (Concealed on Anki Front):
             </span>
-            <span className="text-[10px] text-zinc-400 font-mono">Hidden during test</span>
+            <span className={`text-[10px] font-mono ${
+              isCardLight ? 'text-zinc-500' : 'text-zinc-400'
+            }`}>Hidden during test</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <input
@@ -1518,7 +1749,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                 activeInputRef.current = { element: e.target, fieldName: 'word' };
               }}
               placeholder="Target Word..."
-              className="p-1.5 text-sm font-bold bg-black/30 rounded border border-zinc-700 text-white"
+              className={`p-1.5 text-sm font-bold rounded border ${
+                isCardLight
+                  ? 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400'
+                  : 'bg-black/30 border-zinc-700 text-white placeholder-zinc-500'
+              }`}
             />
             <input
               type="text"
@@ -1528,24 +1763,34 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                 activeInputRef.current = { element: e.target, fieldName: 'phonetic' };
               }}
               placeholder="/ipa/"
-              className="p-1.5 text-xs font-mono bg-black/30 rounded border border-zinc-700 text-sky-400"
+              className={`p-1.5 text-xs font-mono rounded border ${
+                isCardLight
+                  ? 'bg-white border-zinc-300 text-sky-700 placeholder-zinc-400'
+                  : 'bg-black/30 border-zinc-700 text-sky-400 placeholder-zinc-500'
+              }`}
             />
           </div>
         </div>
 
         {/* Spelling Gap Sentence */}
-        <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/10">
+        <div className={`p-3 rounded-lg border ${
+          isCardLight ? 'border-zinc-300 bg-white/70' : 'border-zinc-700/50 bg-black/10'
+        }`}>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">
+            <label className={`text-[11px] font-bold uppercase tracking-wider ${
+              isCardLight ? 'text-amber-800' : 'text-amber-400'
+            }`}>
               ✍️ Missing Word Gap Sentence:
             </label>
             <button
               type="button"
               onClick={handleAutoBlankSentence}
-              className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer"
+              className={`text-[10px] font-semibold flex items-center gap-1 cursor-pointer ${
+                isCardLight ? 'text-blue-700 hover:text-blue-900' : 'text-blue-400 hover:text-blue-300'
+              }`}
               title="Automatically replace target word in example with [ ______ ]"
             >
-              <Zap className="w-3 h-3 text-amber-400" />
+              <Zap className="w-3 h-3 text-amber-500" />
               <span>Auto-Blank Word</span>
             </button>
           </div>
@@ -1557,14 +1802,22 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               activeInputRef.current = { element: e.target, fieldName: 'spellingSentence' };
             }}
             placeholder="Sentence with ______ blank..."
-            className="w-full p-2 text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+            className={`w-full p-2 text-sm rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium ${
+              isCardLight
+                ? 'bg-white text-zinc-900 border-zinc-300 placeholder-zinc-400'
+                : 'bg-black/20 text-white border-zinc-700/60 placeholder-zinc-500'
+            }`}
           />
         </div>
 
         {/* Audio Clues Dock */}
-        <div className="p-2.5 rounded-lg border border-zinc-700/50 bg-black/10 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs font-semibold text-zinc-400 flex items-center gap-1.5">
-            <Volume2 className="w-3.5 h-3.5 text-purple-400" />
+        <div className={`p-2.5 rounded-lg border flex flex-wrap items-center justify-between gap-2 ${
+          isCardLight ? 'border-zinc-300 bg-black/5' : 'border-zinc-700/50 bg-black/10'
+        }`}>
+          <span className={`text-xs font-semibold flex items-center gap-1.5 ${
+            isCardLight ? 'text-zinc-700' : 'text-zinc-400'
+          }`}>
+            <Volume2 className={`w-3.5 h-3.5 ${isCardLight ? 'text-purple-600' : 'text-purple-400'}`} />
             <span>Audio Clues:</span>
           </span>
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -1572,7 +1825,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               <button
                 type="button"
                 onClick={() => playAudio(internalCard.wordAudioUsNormalBase64!)}
-                className="px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-600/30 text-purple-300 border border-purple-500/40 hover:bg-purple-600/50 cursor-pointer"
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold border cursor-pointer ${
+                  isCardLight
+                    ? 'bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200'
+                    : 'bg-purple-600/30 text-purple-300 border-purple-500/40 hover:bg-purple-600/50'
+                }`}
               >
                 Word Audio
               </button>
@@ -1581,7 +1838,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               <button
                 type="button"
                 onClick={() => playAudio(internalCard.exampleAudioUsNormalBase64!)}
-                className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-600/30 text-blue-300 border border-blue-500/40 hover:bg-blue-600/50 cursor-pointer"
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold border cursor-pointer ${
+                  isCardLight
+                    ? 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200'
+                    : 'bg-blue-600/30 text-blue-300 border-blue-500/40 hover:bg-blue-600/50'
+                }`}
               >
                 Sentence Audio
               </button>
@@ -1590,8 +1851,12 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
         </div>
 
         {/* Interactive In-Editor Spelling Practice Tester */}
-        <div className="p-3 rounded-lg border border-purple-500/40 bg-purple-950/25 space-y-2">
-          <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider block">
+        <div className={`p-3 rounded-lg border space-y-2 ${
+          isCardLight ? 'border-purple-300 bg-purple-50/70' : 'border-purple-500/40 bg-purple-950/25'
+        }`}>
+          <span className={`text-[11px] font-bold uppercase tracking-wider block ${
+            isCardLight ? 'text-purple-900' : 'text-purple-300'
+          }`}>
             🎮 Interactive In-Editor Spelling Practice
           </span>
           <div className="flex items-center gap-2">
@@ -1609,7 +1874,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                 }
               }}
               placeholder="Type word to test spelling..."
-              className="flex-1 p-2 text-sm bg-black/40 rounded border border-purple-500/50 text-white focus:outline-none focus:ring-1 focus:ring-purple-400 font-bold"
+              className={`flex-1 p-2 text-sm rounded border focus:outline-none focus:ring-1 font-bold ${
+                isCardLight
+                  ? 'bg-white text-zinc-900 border-purple-300 focus:ring-purple-500 placeholder-zinc-400'
+                  : 'bg-black/40 text-white border-purple-500/50 focus:ring-purple-400 placeholder-zinc-500'
+              }`}
             />
             <button
               type="button"
@@ -1620,21 +1889,21 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             </button>
           </div>
           {testSpellingResult === 'correct' && (
-            <div className="p-2 rounded bg-emerald-950/50 border border-emerald-500/60 text-emerald-300 text-xs font-bold flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>Correct! Perfect spelling match for "{internalCard.word}".</span>
+            <div className={`p-3 rounded-lg border-2 text-center text-lg font-black tracking-wide ${
+              isCardLight
+                ? 'bg-emerald-100 border-emerald-600 text-emerald-950'
+                : 'bg-emerald-950/70 border-emerald-500 text-emerald-200'
+            }`}>
+              {internalCard.word}
             </div>
           )}
           {testSpellingResult === 'incorrect' && (
-            <div className="p-2 rounded bg-rose-950/50 border border-rose-500/60 text-rose-300 text-xs font-medium flex items-center justify-between">
-              <span>Incorrect spelling. Target word is "{internalCard.word}".</span>
-              <button
-                type="button"
-                onClick={() => setTestSpellingInput(internalCard.word || '')}
-                className="text-[10px] underline hover:text-white"
-              >
-                Auto-fill
-              </button>
+            <div className={`p-3 rounded-lg border-2 text-center text-lg font-black tracking-wide ${
+              isCardLight
+                ? 'bg-rose-100 border-rose-600 text-rose-950'
+                : 'bg-rose-950/70 border-rose-500 text-rose-200'
+            }`}>
+              {internalCard.word}
             </div>
           )}
         </div>
@@ -1655,24 +1924,38 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-emerald-600 text-white uppercase tracking-wider">
               🎯 SPELLING SOLUTION (BACK)
             </span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-black/20 text-zinc-300 border border-zinc-700/50">
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${
+              isCardLight
+                ? 'bg-white/80 text-zinc-700 border-zinc-300'
+                : 'bg-black/20 text-zinc-300 border-zinc-700/50'
+            }`}>
               {internalCard.partOfSpeech || 'noun'}
             </span>
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${
+            isCardLight ? 'text-zinc-500' : 'text-zinc-400'
+          }`}>
             {theme.name}
           </span>
         </div>
 
         {/* Revealed Word Solution */}
-        <div className="p-3.5 rounded-lg border border-emerald-500/40 bg-emerald-950/20 text-center space-y-1.5">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+        <div className={`p-3.5 rounded-lg border text-center space-y-1.5 ${
+          isCardLight ? 'border-emerald-500/50 bg-emerald-50/80' : 'border-emerald-500/40 bg-emerald-950/20'
+        }`}>
+          <div className={`text-[10px] font-bold uppercase tracking-wider ${
+            isCardLight ? 'text-emerald-800' : 'text-emerald-400'
+          }`}>
             Revealed Word Solution:
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-wide">
+          <div className={`text-2xl sm:text-3xl font-extrabold tracking-wide ${
+            isCardLight ? 'text-zinc-900' : 'text-white'
+          }`}>
             {internalCard.word}
           </div>
-          <div className="text-xs font-mono text-emerald-300">{internalCard.phonetic}</div>
+          <div className={`text-xs font-mono ${
+            isCardLight ? 'text-emerald-800' : 'text-emerald-300'
+          }`}>{internalCard.phonetic}</div>
           {internalCard.wordAudioUsNormalBase64 && (
             <button
               type="button"
@@ -1686,8 +1969,12 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
         </div>
 
         {/* Full Context Sentence & Translation */}
-        <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/10 space-y-2">
-          <label className="text-[11px] font-bold text-sky-400 uppercase tracking-wider block">
+        <div className={`p-3 rounded-lg border space-y-2 ${
+          isCardLight ? 'border-zinc-300 bg-white/70' : 'border-zinc-700/50 bg-black/10'
+        }`}>
+          <label className={`text-[11px] font-bold uppercase tracking-wider block ${
+            isCardLight ? 'text-sky-800' : 'text-sky-400'
+          }`}>
             💬 Full Context Example & Persian Translation:
           </label>
           <textarea
@@ -1699,7 +1986,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               activeInputRef.current = { element: e.target, fieldName: 'example' };
             }}
             placeholder="Full English example sentence with word..."
-            className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className={`w-full p-2 text-xs sm:text-sm rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+              isCardLight
+                ? 'bg-white text-zinc-900 border-zinc-300 placeholder-zinc-400'
+                : 'bg-black/20 text-white border-zinc-700/60 placeholder-zinc-500'
+            }`}
           />
           <textarea
             rows={2}
@@ -1711,13 +2002,21 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               activeInputRef.current = { element: e.target, fieldName: 'translationFa' };
             }}
             placeholder="ترجمه فارسی مثال..."
-            className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className={`w-full p-2 text-xs sm:text-sm rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+              isCardLight
+                ? 'bg-white text-zinc-900 border-zinc-300 placeholder-zinc-400'
+                : 'bg-black/20 text-white border-zinc-700/60 placeholder-zinc-500'
+            }`}
           />
         </div>
 
         {/* Persian Meaning */}
-        <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/10">
-          <label className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider block mb-1.5">
+        <div className={`p-3 rounded-lg border ${
+          isCardLight ? 'border-zinc-300 bg-white/70' : 'border-zinc-700/50 bg-black/10'
+        }`}>
+          <label className={`text-[11px] font-bold uppercase tracking-wider block mb-1.5 ${
+            isCardLight ? 'text-emerald-800' : 'text-emerald-400'
+          }`}>
             📖 Persian Meaning / معنی فارسی:
           </label>
           <textarea
@@ -1730,13 +2029,21 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               activeInputRef.current = { element: e.target, fieldName: 'meaningFa' };
             }}
             placeholder="معنی دقیق فارسی..."
-            className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className={`w-full p-2 text-xs sm:text-sm rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+              isCardLight
+                ? 'bg-white text-zinc-900 border-zinc-300 placeholder-zinc-400'
+                : 'bg-black/20 text-white border-zinc-700/60 placeholder-zinc-500'
+            }`}
           />
         </div>
 
         {/* Memory Hook */}
-        <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/10">
-          <label className="text-[11px] font-bold text-purple-400 uppercase tracking-wider block mb-1.5">
+        <div className={`p-3 rounded-lg border ${
+          isCardLight ? 'border-zinc-300 bg-white/70' : 'border-zinc-700/50 bg-black/10'
+        }`}>
+          <label className={`text-[11px] font-bold uppercase tracking-wider block mb-1.5 ${
+            isCardLight ? 'text-purple-900' : 'text-purple-400'
+          }`}>
             🧠 Memory Hook & Etymology:
           </label>
           <textarea
@@ -1748,7 +2055,11 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
               activeInputRef.current = { element: e.target, fieldName: 'mnemonic' };
             }}
             placeholder="کد یادسپاری..."
-            className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className={`w-full p-2 text-xs sm:text-sm rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+              isCardLight
+                ? 'bg-white text-zinc-900 border-zinc-300 placeholder-zinc-400'
+                : 'bg-black/20 text-white border-zinc-700/60 placeholder-zinc-500'
+            }`}
           />
         </div>
 
@@ -2680,26 +2991,30 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                             />
                           </div>
 
-                          <div>
-                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">
-                              Box Background Color:
-                            </label>
-                            <div className="grid grid-cols-6 gap-1 mb-1.5">
-                              {BOX_BG_PRESETS.map((preset) => (
-                                <button
-                                  key={preset.hex}
-                                  type="button"
-                                  onClick={() => handleUpdateCustomBlock(selectedBox.id, { color: preset.hex })}
-                                  className={`h-5 rounded border cursor-pointer transition-transform ${
-                                    (selectedBox.color || '#1E293B').toLowerCase() === preset.hex.toLowerCase()
-                                      ? 'scale-110 ring-2 ring-blue-500 shadow-xs'
-                                      : 'opacity-85 hover:opacity-100'
-                                  }`}
-                                  style={{ backgroundColor: preset.hex }}
-                                  title={`${preset.name} (${preset.hex})`}
-                                />
-                              ))}
-                            </div>
+                          <div className="space-y-2 pt-1 border-t border-zinc-700/40">
+                            <ColorPickerInput
+                              label="Background Color"
+                              value={selectedBox.color}
+                              defaultValue="#1E293B"
+                              presets={BOX_BG_PRESETS}
+                              onChange={(c) => handleUpdateCustomBlock(selectedBox.id, { color: c })}
+                            />
+                            <ColorPickerInput
+                              label="Border Color"
+                              value={selectedBox.borderColor}
+                              defaultValue={selectedBox.color || '#1E293B'}
+                              presets={BORDER_COLOR_PRESETS}
+                              onChange={(c) => handleUpdateCustomBlock(selectedBox.id, { borderColor: c })}
+                              onReset={() => handleUpdateCustomBlock(selectedBox.id, { borderColor: undefined })}
+                            />
+                            <ColorPickerInput
+                              label="Text Color"
+                              value={selectedBox.textColor}
+                              defaultValue="#FFFFFF"
+                              presets={TEXT_COLOR_PRESETS}
+                              onChange={(c) => handleUpdateCustomBlock(selectedBox.id, { textColor: c })}
+                              onReset={() => handleUpdateCustomBlock(selectedBox.id, { textColor: undefined })}
+                            />
                           </div>
 
                           {/* Delete selected box */}
