@@ -6,7 +6,7 @@ export interface I18nContextType {
   direction: AppDirection;
   setLanguage: (lang: AppLanguage) => void;
   setDirection: (dir: AppDirection) => void;
-  t: (key: string, params?: Record<string, string | number>) => string;
+  t: (key: string, paramsOrFallback?: Record<string, string | number> | string, fallback?: string) => string;
   isRTL: boolean;
   isFa: boolean;
 }

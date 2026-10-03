@@ -45,7 +45,7 @@ import {
   callAnkiConnect,
 } from './server/anki';
 import { AppSettings, CardData, ManualOverrides, DiagnosticsReport, StepLog, ThemeId, CardType, CustomAIProviderConfig, CustomTTSProviderConfig, SmartImagesConfig, AIPromptsConfig, getFrontCustomBlocks, getBackCustomBlocks, getAllCustomBlocks, isCardComplete } from './src/types';
-import { THEMES, makeSpellingSentence, renderCustomBlocksHtml } from './src/themes';
+import { THEMES, makeSpellingSentence, renderCustomBlocksHtml, renderMainBoxStyles } from './src/themes';
 import { renderMarkdown } from './src/utils/markdown';
 
 function getSettingsFilePath(): string {
@@ -841,6 +841,7 @@ async function startServer() {
 
       const word = getVal('Word', 'word', 'Front', 'front', 'English', 'english', 'Term', 'term');
       const meaning = getVal('Meaning', 'meaning', 'Persian Meaning', 'persianmeaning', 'Back', 'back', 'Translation', 'translation');
+      const definitionEn = getVal('EnglishDefinition', 'englishdefinition', 'Definition', 'definition', 'DefinitionEn', 'definitionen');
       const phonetic = getVal('Phonetic', 'phonetic', 'IPA', 'ipa', 'Pronunciation', 'pronunciation');
       const partOfSpeech = getVal('PartOfSpeech', 'partofspeech', 'Part of Speech', 'pos', 'POS', 'Type', 'type');
       const example = getVal('Example', 'example', 'Example Sentence', 'examplesentence', 'Sentence', 'sentence');
@@ -854,6 +855,7 @@ async function startServer() {
 
       if (word) presentFields.push('Word'); else missingFields.push('Word');
       if (meaning) presentFields.push('Meaning'); else missingFields.push('Meaning');
+      if (definitionEn) presentFields.push('EnglishDefinition'); else missingFields.push('EnglishDefinition');
       if (phonetic) presentFields.push('Phonetic'); else missingFields.push('Phonetic');
       if (partOfSpeech) presentFields.push('PartOfSpeech'); else missingFields.push('PartOfSpeech');
       if (example) presentFields.push('Example'); else missingFields.push('Example');
@@ -932,6 +934,7 @@ async function startServer() {
     }
 
     const existingMeaning = getCleanVal('Meaning', 'meaning', 'Persian Meaning', 'persianmeaning', 'Back', 'back');
+    const existingDefinitionEn = getCleanVal('EnglishDefinition', 'englishdefinition', 'Definition', 'definition', 'DefinitionEn', 'definitionen');
     const existingPhonetic = getCleanVal('Phonetic', 'phonetic', 'IPA', 'ipa', 'Pronunciation', 'pronunciation');
     const existingPOS = getCleanVal('PartOfSpeech', 'partofspeech', 'Part of Speech', 'pos', 'POS');
     const existingExample = getCleanVal('Example', 'example', 'Example Sentence', 'examplesentence', 'Sentence');
@@ -945,6 +948,7 @@ async function startServer() {
       phonetic: existingPhonetic || undefined,
       partOfSpeech: existingPOS || undefined,
       meaningFa: existingMeaning || undefined,
+      definitionEn: existingDefinitionEn || undefined,
       example: existingExample || undefined,
       translationFa: existingTranslation || undefined,
       mnemonic: existingMnemonic || undefined,
@@ -997,6 +1001,7 @@ async function startServer() {
 
       // Track generated fields
       if (!existingMeaning && generatedCardData.meaningFa) generatedFieldsList.push('Meaning');
+      if (!existingDefinitionEn && generatedCardData.definitionEn) generatedFieldsList.push('EnglishDefinition');
       if (!existingPhonetic && generatedCardData.phonetic) generatedFieldsList.push('Phonetic');
       if (!existingPOS && generatedCardData.partOfSpeech) generatedFieldsList.push('PartOfSpeech');
       if (!existingExample && generatedCardData.example) generatedFieldsList.push('Example');
@@ -1161,6 +1166,8 @@ async function startServer() {
         updatedFields[key] = cleanWord;
       } else if (kLow === 'meaning' || kLow === 'persianmeaning' || kLow === 'back' || kLow === 'translationfa') {
         updatedFields[key] = generatedCardData.meaningFa;
+      } else if (kLow === 'englishdefinition' || kLow === 'definitionen' || kLow === 'definition') {
+        updatedFields[key] = generatedCardData.definitionEn || '';
       } else if (kLow === 'phonetic' || kLow === 'ipa' || kLow === 'pronunciation') {
         updatedFields[key] = generatedCardData.phonetic;
       } else if (kLow === 'partofspeech' || kLow === 'pos' || kLow === 'type') {
@@ -1256,12 +1263,14 @@ async function startServer() {
         Phonetic: (cardData.phonetic || '').trim(),
         PartOfSpeech: (cardData.partOfSpeech || '').trim(),
         Meaning: renderMarkdown((cardData.meaningFa || '').trim()),
+        EnglishDefinition: renderMarkdown((cardData.definitionEn || '').trim()),
         Example: renderMarkdown((cardData.example || '').trim()),
         Translation: renderMarkdown((cardData.translationFa || '').trim()),
         Mnemonic: renderMarkdown((cardData.mnemonic || '').trim()),
         CustomFrontSections: customFrontHtml,
         CustomBackSections: customBackHtml,
         CustomSections: customBackHtml,
+        MainBoxStyles: renderMainBoxStyles(cardData.mainBoxStyles, effectiveTheme),
       };
 
       if (cardData.spellingSentence) {
@@ -1459,6 +1468,17 @@ async function startServer() {
       pushLog(3, 'Dictionary lookup', 'skipped', 'Using AI provider directly as configured.');
     }
 
+    // Process manual overrides & external dictionary merge
+    const cleanManualOverrides: ManualOverrides = manualOverrides || {};
+    const mergedOverrides: ManualOverrides = {
+      ...cleanManualOverrides,
+      meaningFa: cleanManualOverrides.meaningFa || (dictConfig.meaningFaSource !== 'ai' ? dictData.meaningFa : undefined),
+      definitionEn: cleanManualOverrides.definitionEn || (dictConfig.definitionEnSource !== 'ai' ? dictData.definitionEn : undefined),
+      example: cleanManualOverrides.example || (dictConfig.exampleSource !== 'ai' ? dictData.example : undefined),
+      phonetic: cleanManualOverrides.phonetic || (dictConfig.definitionEnSource !== 'ai' ? dictData.phonetic : undefined),
+      partOfSpeech: cleanManualOverrides.partOfSpeech || (dictConfig.definitionEnSource !== 'ai' ? dictData.partOfSpeech : undefined),
+    };
+
     // Extract tags
     const cardTags: string[] = Array.isArray(req.body.tags)
       ? req.body.tags
@@ -1473,6 +1493,7 @@ async function startServer() {
       phonetic: mergedOverrides.phonetic,
       partOfSpeech: mergedOverrides.partOfSpeech,
       meaningFa: mergedOverrides.meaningFa,
+      definitionEn: mergedOverrides.definitionEn,
       example: mergedOverrides.example,
       translationFa: mergedOverrides.translationFa,
       mnemonic: mergedOverrides.mnemonic,
@@ -1498,6 +1519,7 @@ async function startServer() {
         phonetic: mergedOverrides.phonetic || '',
         partOfSpeech: mergedOverrides.partOfSpeech || '',
         meaningFa: mergedOverrides.meaningFa || '',
+        definitionEn: mergedOverrides.definitionEn || dictData.definitionEn || '',
         example: mergedOverrides.example || '',
         translationFa: mergedOverrides.translationFa || '',
         mnemonic: mergedOverrides.mnemonic || '',
@@ -1507,11 +1529,13 @@ async function startServer() {
 
       // Preserve all manual user overrides strictly
       if (cleanManualOverrides.meaningFa) cardData.meaningFa = cleanManualOverrides.meaningFa;
+      if (cleanManualOverrides.definitionEn) cardData.definitionEn = cleanManualOverrides.definitionEn;
       if (cleanManualOverrides.example) cardData.example = cleanManualOverrides.example;
       if (cleanManualOverrides.translationFa) cardData.translationFa = cleanManualOverrides.translationFa;
       if (cleanManualOverrides.mnemonic) cardData.mnemonic = cleanManualOverrides.mnemonic;
       if (cleanManualOverrides.phonetic) cardData.phonetic = cleanManualOverrides.phonetic;
       if (cleanManualOverrides.partOfSpeech) cardData.partOfSpeech = cleanManualOverrides.partOfSpeech;
+      if (cleanManualOverrides.mainBoxStyles) cardData.mainBoxStyles = cleanManualOverrides.mainBoxStyles;
 
       // Preserve custom blocks on front and back
       const frontBlocks = getFrontCustomBlocks(cleanManualOverrides);
@@ -1613,17 +1637,19 @@ async function startServer() {
         if (dictData.example && dictConfig.exampleSource === 'freedict') {
           cardData.example = dictData.example;
         }
-        if (dictData.phonetic && dictConfig.definitionEnSource === 'freedict') {
-          cardData.phonetic = dictData.phonetic;
+        if (dictData.definitionEn && dictConfig.definitionEnSource === 'freedict') {
+          cardData.definitionEn = dictData.definitionEn;
         }
 
         // Preserve all manual user overrides strictly
         if (cleanManualOverrides.meaningFa) cardData.meaningFa = cleanManualOverrides.meaningFa;
+        if (cleanManualOverrides.definitionEn) cardData.definitionEn = cleanManualOverrides.definitionEn;
         if (cleanManualOverrides.example) cardData.example = cleanManualOverrides.example;
         if (cleanManualOverrides.translationFa) cardData.translationFa = cleanManualOverrides.translationFa;
         if (cleanManualOverrides.mnemonic) cardData.mnemonic = cleanManualOverrides.mnemonic;
         if (cleanManualOverrides.phonetic) cardData.phonetic = cleanManualOverrides.phonetic;
         if (cleanManualOverrides.partOfSpeech) cardData.partOfSpeech = cleanManualOverrides.partOfSpeech;
+        if (cleanManualOverrides.mainBoxStyles) cardData.mainBoxStyles = cleanManualOverrides.mainBoxStyles;
         // Preserve custom blocks on front and back
         const frontBlocks = getFrontCustomBlocks(cleanManualOverrides);
         const backBlocks = getBackCustomBlocks(cleanManualOverrides);

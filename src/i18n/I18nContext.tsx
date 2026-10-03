@@ -64,7 +64,10 @@ export const I18nProvider: React.FC<I18nProviderProps> = ({
   }, [onDirectionChange]);
 
   const t = useCallback(
-    (key: string, params?: Record<string, string | number>): string => {
+    (key: string, paramsOrFallback?: Record<string, string | number> | string, fallbackStr?: string): string => {
+      const params = typeof paramsOrFallback === 'object' && paramsOrFallback !== null ? paramsOrFallback : undefined;
+      const explicitFallback = typeof paramsOrFallback === 'string' ? paramsOrFallback : fallbackStr;
+
       const dict = dictionaries[language] || en;
       const keys = key.split('.');
 
@@ -83,13 +86,13 @@ export const I18nProvider: React.FC<I18nProviderProps> = ({
               break;
             }
           }
-          value = fallback !== undefined ? fallback : key;
+          value = fallback !== undefined ? fallback : (explicitFallback || key);
           break;
         }
       }
 
       if (typeof value !== 'string') {
-        return key;
+        return explicitFallback || key;
       }
 
       if (params) {

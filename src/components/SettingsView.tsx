@@ -519,7 +519,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             <Sliders className="w-5 h-5 text-blue-500" />
             <span>{t('settings.headerTitle')}</span>
             <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
-              v1.1.2
+              v1.1.3
             </span>
           </h1>
         </div>
@@ -1376,6 +1376,63 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               rows={4}
               value={currentPrompts.meaningGeneration}
               onChange={(e) => handlePromptChange('meaningGeneration', e.target.value)}
+              className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
+                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+              }`}
+            />
+          </div>
+
+          {/* Prompt: English Definition Generation */}
+          <div
+            className={`p-5 border rounded-xl space-y-3 transition-all ${
+              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-1.5 rounded-md ${isDark ? 'bg-zinc-800 text-teal-400' : 'bg-teal-50 text-teal-600'}`}>
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                    {t('settings.prompts.definitionTitle')}
+                  </h4>
+                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                    {t('settings.prompts.definitionDesc')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                {isPromptModified('definitionGeneration') ? (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                    {t('settings.prompts.customizedBadge')}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                    {t('settings.prompts.defaultBadge')}
+                  </span>
+                )}
+                {isPromptModified('definitionGeneration') && (
+                  <button
+                    type="button"
+                    onClick={() => handleResetSinglePrompt('definitionGeneration')}
+                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                    }`}
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>{t('settings.prompts.revertPromptBtn')}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <textarea
+              rows={4}
+              value={currentPrompts.definitionGeneration || ''}
+              onChange={(e) => handlePromptChange('definitionGeneration', e.target.value)}
               className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
                 isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
               }`}

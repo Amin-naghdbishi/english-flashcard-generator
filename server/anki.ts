@@ -1,4 +1,4 @@
-import { THEMES, getSpellingFrontHtml, renderCustomBlocksHtml, SHARED_CARD_CSS } from '../src/themes';
+import { THEMES, getSpellingFrontHtml, renderCustomBlocksHtml, renderMainBoxStyles, SHARED_CARD_CSS } from '../src/themes';
 import { CardData, ThemeId, CardType, getFrontCustomBlocks, getBackCustomBlocks } from '../src/types';
 import { renderMarkdown } from '../src/utils/markdown';
 
@@ -8,6 +8,7 @@ export const ANKI_MODEL_FIELDS = [
   'Phonetic',
   'PartOfSpeech',
   'Meaning',
+  'EnglishDefinition',
   'Example',
   'Translation',
   'Mnemonic',
@@ -27,6 +28,7 @@ export const ANKI_MODEL_FIELDS = [
   'CustomFrontSections',
   'CustomBackSections',
   'CustomSections',
+  'MainBoxStyles',
 ];
 
 export async function callAnkiConnect(
@@ -504,6 +506,7 @@ export async function createAnkiNote(
     Phonetic: (cardData.phonetic || '').trim(),
     PartOfSpeech: (cardData.partOfSpeech || '').trim(),
     Meaning: renderMarkdown((cardData.meaningFa || '').trim()),
+    EnglishDefinition: renderMarkdown((cardData.definitionEn || '').trim()),
     Example: renderMarkdown((cardData.example || '').trim()),
     Translation: renderMarkdown((cardData.translationFa || '').trim()),
     Mnemonic: renderMarkdown((cardData.mnemonic || '').trim()),
@@ -523,6 +526,7 @@ export async function createAnkiNote(
     CustomFrontSections: renderCustomBlocksHtml(getFrontCustomBlocks(cardData), themeId),
     CustomBackSections: renderCustomBlocksHtml(getBackCustomBlocks(cardData), themeId),
     CustomSections: renderCustomBlocksHtml(getBackCustomBlocks(cardData), themeId),
+    MainBoxStyles: renderMainBoxStyles(cardData.mainBoxStyles, themeId),
   };
 
   // 6. Add Note (IMPORTANT: allowDuplicate: true so user can create multiple cards for the same word with different meanings)

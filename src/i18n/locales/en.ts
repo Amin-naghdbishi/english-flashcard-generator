@@ -61,6 +61,8 @@ export const en = {
     phonetic: 'Phonetic',
     partOfSpeech: 'Part of Speech',
     meaning: 'Persian Meaning',
+    englishDefinition: 'English Definition',
+    definitionEn: 'English Definition',
     example: 'Example Sentence',
     translation: 'Example Translation',
     mnemonic: 'Memory Aid',
@@ -317,6 +319,9 @@ export const en = {
       meaningTitle: 'Meaning Generation (معنی فارسی)',
       meaningDesc: 'Directs the AI to generate accurate, natural, and concise Persian meaning translations.',
       
+      definitionTitle: 'English Definition Generation (تعریف انگلیسی)',
+      definitionDesc: 'Directs the AI to generate a clear, concise, dictionary-accurate English definition matching the word\'s specific sense.',
+      
       exampleTitle: 'Example Generation (جمله مثال انگلیسی)',
       exampleDesc: 'Instructs the AI to produce natural, contextual, and illustrative English example sentences.',
       
@@ -425,6 +430,7 @@ export const en = {
     phoneticLabel: 'Phonetic',
     partOfSpeechLabel: 'Part of Speech',
     meaningLabel: 'Persian Meaning',
+    definitionEnLabel: 'English Definition',
     exampleLabel: 'Example Sentence',
     translationLabel: 'Translation',
     mnemonicLabel: 'Memory Aid',

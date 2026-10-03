@@ -384,6 +384,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
         phonetic: editableCard?.phonetic || undefined,
         partOfSpeech: editableCard?.partOfSpeech || undefined,
         meaningFa: editableCard?.meaningFa || undefined,
+        definitionEn: editableCard?.definitionEn || undefined,
         example: editableCard?.example || undefined,
         translationFa: editableCard?.translationFa || undefined,
         mnemonic: editableCard?.mnemonic || undefined,
@@ -395,6 +396,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
         frontCustomBlocks: getFrontCustomBlocks(editableCard),
         backCustomBlocks: getBackCustomBlocks(editableCard),
         customBlocks: getAllCustomBlocks(editableCard),
+        mainBoxStyles: editableCard?.mainBoxStyles || undefined,
         needsPhoto: photoChoice === 'yes' || !!editableCard?.imageBase64,
       };
 
@@ -555,6 +557,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
         phonetic: '',
         partOfSpeech: '',
         meaningFa: '',
+        definitionEn: '',
         example: '',
         translationFa: '',
         mnemonic: '',

@@ -15,6 +15,7 @@ export interface CardData {
   phonetic: string;
   partOfSpeech: string;
   meaningFa: string;
+  definitionEn?: string;
   example: string;
   translationFa: string;
   mnemonic: string;
@@ -67,6 +68,22 @@ export interface CardData {
 
   // Note tags assigned in Anki
   tags?: string[];
+
+  // Main Box Customizations (title, text color, background color)
+  mainBoxStyles?: MainBoxCustomizations;
+}
+
+export interface BoxCustomStyle {
+  title?: string;
+  textColor?: string;
+  bgColor?: string;
+}
+
+export interface MainBoxCustomizations {
+  meaning?: BoxCustomStyle;
+  definition?: BoxCustomStyle;
+  example?: BoxCustomStyle;
+  mnemonic?: BoxCustomStyle;
 }
 
 export interface CustomCardBlock {
@@ -74,6 +91,8 @@ export interface CustomCardBlock {
   title: string;
   content: string;
   color?: string; // Hex or theme color preset
+  borderColor?: string;
+  textColor?: string;
   dir?: 'rtl' | 'ltr' | 'auto';
   side: 'front' | 'back'; // Which side of the card this box appears on ('front' or 'back')
 }
@@ -108,9 +127,11 @@ export function getAllCustomBlocks(card?: Partial<CardData> | null): CustomCardB
 }
 
 export interface ManualOverrides {
+  word?: string;
   phonetic?: string;
   partOfSpeech?: string;
   meaningFa?: string;
+  definitionEn?: string;
   example?: string;
   translationFa?: string;
   mnemonic?: string;
@@ -124,15 +145,18 @@ export interface ManualOverrides {
   frontCustomBlocks?: CustomCardBlock[];
   backCustomBlocks?: CustomCardBlock[];
   customBlocks?: CustomCardBlock[];
+  mainBoxStyles?: MainBoxCustomizations;
 }
 
 export function isCardComplete(card?: Partial<CardData> | ManualOverrides | null): boolean {
   if (!card) return false;
+  const word = (card as any).word;
   return Boolean(
-    card.word?.trim() &&
+    (!('word' in card) || (word && word.trim())) &&
     card.phonetic?.trim() &&
     card.partOfSpeech?.trim() &&
     card.meaningFa?.trim() &&
+    card.definitionEn?.trim() &&
     card.example?.trim() &&
     card.translationFa?.trim() &&
     card.mnemonic?.trim()
@@ -153,6 +177,8 @@ export type ThemeId =
   | 'comic-notebook-dark'
   | 'minimal-light'
   | 'minimal-dark'
+  | 'botanical-light'
+  | 'botanical-dark'
   // Legacy aliases
   | 'comic-manga-light'
   | 'comic-manga-dark'
@@ -301,6 +327,7 @@ export type AppDirection = 'ltr' | 'rtl';
 export interface AIPromptsConfig {
   systemRole: string;
   meaningGeneration: string;
+  definitionGeneration?: string;
   exampleGeneration: string;
   exampleTranslation: string;
   memoryHook: string;
@@ -329,6 +356,7 @@ export interface BatchFieldConfig {
   phonetic: boolean;
   partOfSpeech: boolean;
   meaningFa: boolean;
+  definitionEn?: boolean;
   example: boolean;
   translationFa: boolean;
   mnemonic: boolean;

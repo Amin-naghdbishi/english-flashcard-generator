@@ -233,6 +233,7 @@ export async function generateWithCustomAI(
       phonetic: manualOverrides.phonetic || parsed.phonetic || `/${cleanWord}/`,
       partOfSpeech: manualOverrides.partOfSpeech || parsed.partOfSpeech || 'word',
       meaningFa: manualOverrides.meaningFa || parsed.meaningFa || '',
+      definitionEn: manualOverrides.definitionEn || parsed.definitionEn || '',
       example: manualOverrides.example || parsed.example || `This is an example for ${cleanWord}.`,
       translationFa: manualOverrides.translationFa || parsed.translationFa || '',
       mnemonic: manualOverrides.mnemonic || parsed.mnemonic || '',

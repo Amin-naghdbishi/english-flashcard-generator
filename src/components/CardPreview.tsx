@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { CardData, ThemeDefinition, ThemeId, CardType, AppTheme, CustomCardBlock, getFrontCustomBlocks, getBackCustomBlocks, getAllCustomBlocks } from '../types';
+import { CardData, ThemeDefinition, ThemeId, CardType, AppTheme, CustomCardBlock, BoxCustomStyle, MainBoxCustomizations, getFrontCustomBlocks, getBackCustomBlocks, getAllCustomBlocks } from '../types';
 import {
   THEMES,
   renderThemeHtml,
@@ -8,6 +8,7 @@ import {
   SHARED_CARD_CSS,
   isRTLText,
   getContrastTextColor,
+  getHarmonizedBorder,
 } from '../themes';
 import { formatCardFieldHtml, applyHtmlFormattingToText, HtmlToolbarAction } from '../utils/markdown';
 import {
@@ -43,6 +44,8 @@ import {
   Tags,
   Check,
   RefreshCw,
+  Palette,
+  RotateCcw,
 } from 'lucide-react';
 import { getAnkiTags } from '../services/api';
 import { useAppTheme } from '../context/ThemeContext';
@@ -179,6 +182,25 @@ function getThemeCardClasses(themeId: ThemeId) {
       mnemonicLabel: 'box-label label-memory',
       customBox: 'comic-mnemonic-box custom-card-block',
       customLabel: 'box-label',
+    };
+  }
+  if (themeId.includes('botanical')) {
+    return {
+      wrapper: 'botanical-wrapper theme-botanical',
+      card: 'botanical-card',
+      wordSection: 'botanical-box botanical-word-box',
+      wordTitle: 'botanical-word',
+      ipaBadge: 'botanical-ipa-pill',
+      posBadge: 'botanical-pos',
+      pronunciationBox: 'botanical-box botanical-audio-box',
+      meaningBox: 'botanical-box botanical-meaning-box',
+      meaningLabel: 'botanical-meaning-title',
+      exampleBox: 'botanical-example-section botanical-example-box',
+      exampleLabel: 'botanical-example-title',
+      mnemonicBox: 'botanical-mnemonic-box',
+      mnemonicLabel: 'botanical-mnemonic-title',
+      customBox: 'botanical-custom-block custom-card-block',
+      customLabel: 'botanical-custom-title',
     };
   }
   if (themeId.includes('quest') || themeId.includes('manga') || themeId.includes('arcade')) {
@@ -648,6 +670,147 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
     return internalCard.customBlocks.find((b) => b.id === selectedBoxId) || internalCard.customBlocks[0];
   }, [internalCard.customBlocks, selectedBoxId]);
 
+  // Main Box Customization state & handlers
+  const [openMainBoxStyleKey, setOpenMainBoxStyleKey] = useState<string | null>(null);
+
+  const handleUpdateMainBoxStyle = useCallback(
+    (boxKey: 'meaning' | 'definition' | 'example' | 'mnemonic', updates: Partial<BoxCustomStyle>) => {
+      handleUpdate((prev) => {
+        const currentStyles = prev.mainBoxStyles || {};
+        const currentBox = currentStyles[boxKey] || {};
+        const newBoxStyle = { ...currentBox, ...updates };
+
+        const hasValues = Boolean(newBoxStyle.title?.trim() || newBoxStyle.bgColor || newBoxStyle.textColor);
+        const updatedMainBoxStyles: MainBoxCustomizations = {
+          ...currentStyles,
+          [boxKey]: hasValues ? newBoxStyle : undefined,
+        };
+
+        return {
+          ...prev,
+          mainBoxStyles: Object.keys(updatedMainBoxStyles).some((k) => (updatedMainBoxStyles as any)[k]) ? updatedMainBoxStyles : undefined,
+        };
+      });
+    },
+    [handleUpdate]
+  );
+
+  const handleResetMainBoxStyle = useCallback(
+    (boxKey: 'meaning' | 'definition' | 'example' | 'mnemonic') => {
+      handleUpdate((prev) => {
+        if (!prev.mainBoxStyles) return prev;
+        const updatedMainBoxStyles: MainBoxCustomizations = { ...prev.mainBoxStyles };
+        delete updatedMainBoxStyles[boxKey];
+        return {
+          ...prev,
+          mainBoxStyles: Object.keys(updatedMainBoxStyles).length > 0 ? updatedMainBoxStyles : undefined,
+        };
+      });
+    },
+    [handleUpdate]
+  );
+
+  const renderMainBoxCustomizerControl = (
+    boxKey: 'meaning' | 'definition' | 'example' | 'mnemonic',
+    defaultTitle: string
+  ) => {
+    const boxStyle = internalCard.mainBoxStyles?.[boxKey] || {};
+    const isOpen = openMainBoxStyleKey === boxKey;
+
+    if (!isOpen) return null;
+
+    return (
+      <div className="mt-2.5 p-3 rounded-lg border border-white/20 bg-black/50 space-y-2.5 text-xs text-white">
+        <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+          <span className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+            <Palette className="w-3.5 h-3.5" />
+            <span>Customize Box Appearance</span>
+          </span>
+          <div className="flex items-center gap-2">
+            {(boxStyle.title || boxStyle.bgColor || boxStyle.textColor) && (
+              <button
+                type="button"
+                onClick={() => handleResetMainBoxStyle(boxKey)}
+                className="text-[10px] text-zinc-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                title="Reset to theme default"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setOpenMainBoxStyleKey(null)}
+              className="text-zinc-400 hover:text-white text-xs cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Title Input */}
+        <div>
+          <label className="text-[10px] font-bold text-zinc-300 uppercase tracking-wider block mb-1">
+            Box Header / Title:
+          </label>
+          <input
+            type="text"
+            value={boxStyle.title ?? ''}
+            onChange={(e) => handleUpdateMainBoxStyle(boxKey, { title: e.target.value })}
+            placeholder={defaultTitle}
+            className="w-full p-1.5 text-xs rounded bg-black/40 text-white border border-white/20 focus:border-blue-400 focus:outline-none"
+          />
+        </div>
+
+        {/* Background Color */}
+        <div>
+          <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-wider block mb-1.5">
+            Background Color:
+          </span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {BOX_BG_PRESETS.map((preset) => (
+              <button
+                key={preset.hex}
+                type="button"
+                onClick={() => handleUpdateMainBoxStyle(boxKey, { bgColor: preset.hex })}
+                className={`w-5 h-5 rounded-full border border-black/30 cursor-pointer transition-transform ${
+                  (boxStyle.bgColor || '').toLowerCase() === preset.hex.toLowerCase()
+                    ? 'scale-125 ring-2 ring-white shadow-xs'
+                    : 'opacity-80 hover:opacity-100 hover:scale-110'
+                }`}
+                style={{ backgroundColor: preset.hex }}
+                title={preset.name}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Text Color */}
+        <div>
+          <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-wider block mb-1.5">
+            Text Color:
+          </span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {TEXT_COLOR_PRESETS.map((preset) => (
+              <button
+                key={preset.hex}
+                type="button"
+                onClick={() => handleUpdateMainBoxStyle(boxKey, { textColor: preset.hex })}
+                className={`w-5 h-5 rounded-full border border-black/30 cursor-pointer transition-transform ${
+                  (boxStyle.textColor || '').toLowerCase() === preset.hex.toLowerCase()
+                    ? 'scale-125 ring-2 ring-white shadow-xs'
+                    : 'opacity-80 hover:opacity-100 hover:scale-110'
+                }`}
+                style={{ backgroundColor: preset.hex }}
+                title={`Text Color: ${preset.name}`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ----------------------------------------------------
   // SUB-RENDERERS FOR EDITABLE CARDS
   // ----------------------------------------------------
@@ -736,17 +899,18 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
         </div>
 
         {blocks.length > 0 && (
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {blocks.map((blk) => {
               const bgColor = blk.color || '#1E293B';
+              const borderColor = blk.borderColor || getHarmonizedBorder(bgColor);
               const isSelected = selectedBoxId === blk.id;
               return (
                 <div
                   key={blk.id}
-                  style={{ backgroundColor: bgColor }}
+                  style={{ backgroundColor: bgColor, borderColor: borderColor }}
                   onClick={() => setSelectedBoxId(blk.id)}
                   className={`p-3 rounded-lg border transition-all duration-150 shadow-xs space-y-2 relative group ${
-                    isSelected ? 'ring-2 ring-blue-400 border-white/40' : 'border-black/30 hover:border-white/20'
+                    isSelected ? 'ring-2 ring-blue-400' : 'hover:brightness-105'
                   }`}
                 >
                   {/* Box Header Controls */}
@@ -1087,86 +1251,220 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
         )}
 
         {/* Persian Meaning */}
-        <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/10">
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
-              📖 Persian Meaning / معنی فارسی
-            </label>
-            <span className="text-[10px] text-zinc-400 font-mono">RTL</span>
-          </div>
-          <textarea
-            rows={2}
-            dir="rtl"
-            value={internalCard.meaningFa || ''}
-            onChange={(e) => updateSimpleField('meaningFa', e.target.value)}
-            onKeyDown={handleEditorKeyDown}
-            onFocus={(e) => {
-              activeInputRef.current = { element: e.target, fieldName: 'meaningFa' };
-            }}
-            placeholder="معنی دقیق و روان به فارسی..."
-            className="w-full p-2.5 text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
-          />
-        </div>
+        {(() => {
+          const style = internalCard.mainBoxStyles?.meaning;
+          const bg = style?.bgColor;
+          const tc = style?.textColor;
+          const border = bg ? getHarmonizedBorder(bg) : undefined;
+          return (
+            <div
+              className="p-3 rounded-lg border border-zinc-700/50 bg-black/10 transition-colors"
+              style={{
+                backgroundColor: bg || undefined,
+                borderColor: border || undefined,
+                color: tc || undefined,
+              }}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5" style={{ color: tc || undefined }}>
+                  <span>{style?.title || '📖 Persian Meaning / معنی فارسی'}</span>
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setOpenMainBoxStyleKey(openMainBoxStyleKey === 'meaning' ? null : 'meaning')}
+                    className="px-2 py-0.5 text-[10px] font-semibold rounded bg-black/30 hover:bg-black/50 text-zinc-300 border border-white/10 flex items-center gap-1 cursor-pointer"
+                    title="Customize Title & Colors of Meaning Box"
+                  >
+                    <Palette className="w-3 h-3 text-emerald-400" />
+                    <span>Style</span>
+                  </button>
+                  <span className="text-[10px] text-zinc-400 font-mono">RTL</span>
+                </div>
+              </div>
+              {renderMainBoxCustomizerControl('meaning', '📖 PERSIAN MEANING')}
+              <textarea
+                rows={2}
+                dir="rtl"
+                value={internalCard.meaningFa || ''}
+                onChange={(e) => updateSimpleField('meaningFa', e.target.value)}
+                onKeyDown={handleEditorKeyDown}
+                onFocus={(e) => {
+                  activeInputRef.current = { element: e.target, fieldName: 'meaningFa' };
+                }}
+                placeholder="معنی دقیق و روان به فارسی..."
+                className="w-full p-2.5 text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium mt-1.5"
+                style={{ color: tc || undefined }}
+              />
+            </div>
+          );
+        })()}
+
+        {/* English Definition */}
+        {(() => {
+          const style = internalCard.mainBoxStyles?.definition;
+          const bg = style?.bgColor;
+          const tc = style?.textColor;
+          const border = bg ? getHarmonizedBorder(bg) : undefined;
+          return (
+            <div
+              className="p-3 rounded-lg border border-zinc-700/50 bg-black/10 transition-colors"
+              style={{
+                backgroundColor: bg || undefined,
+                borderColor: border || undefined,
+                color: tc || undefined,
+              }}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[11px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5" style={{ color: tc || undefined }}>
+                  <span>{style?.title || '📖 English Definition / تعریف انگلیسی'}</span>
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setOpenMainBoxStyleKey(openMainBoxStyleKey === 'definition' ? null : 'definition')}
+                    className="px-2 py-0.5 text-[10px] font-semibold rounded bg-black/30 hover:bg-black/50 text-zinc-300 border border-white/10 flex items-center gap-1 cursor-pointer"
+                    title="Customize Title & Colors of Definition Box"
+                  >
+                    <Palette className="w-3 h-3 text-sky-400" />
+                    <span>Style</span>
+                  </button>
+                  <span className="text-[10px] text-zinc-400 font-mono">LTR</span>
+                </div>
+              </div>
+              {renderMainBoxCustomizerControl('definition', '📖 ENGLISH DEFINITION')}
+              <textarea
+                rows={2}
+                value={internalCard.definitionEn || ''}
+                onChange={(e) => updateSimpleField('definitionEn', e.target.value)}
+                onKeyDown={handleEditorKeyDown}
+                onFocus={(e) => {
+                  activeInputRef.current = { element: e.target, fieldName: 'definitionEn' };
+                }}
+                placeholder="Simple, learner-friendly English definition..."
+                className="w-full p-2.5 text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium mt-1.5"
+                style={{ color: tc || undefined }}
+              />
+            </div>
+          );
+        })()}
 
         {/* Example & Persian Translation */}
-        <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/10 space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-[11px] font-bold text-sky-400 uppercase tracking-wider">
-              💬 Example & Translation / مثال و ترجمه
-            </label>
-            {internalCard.exampleAudioUsNormalBase64 && (
-              <button
-                type="button"
-                onClick={() => playAudio(internalCard.exampleAudioUsNormalBase64!)}
-                className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer"
-              >
-                <Volume2 className="w-3 h-3" />
-                <span>Play Sentence Audio</span>
-              </button>
-            )}
-          </div>
-          <textarea
-            rows={2}
-            value={internalCard.example || ''}
-            onChange={(e) => updateSimpleField('example', e.target.value)}
-            onKeyDown={handleEditorKeyDown}
-            onFocus={(e) => {
-              activeInputRef.current = { element: e.target, fieldName: 'example' };
-            }}
-            placeholder="English example sentence..."
-            className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-          <textarea
-            rows={2}
-            dir="rtl"
-            value={internalCard.translationFa || ''}
-            onChange={(e) => updateSimpleField('translationFa', e.target.value)}
-            onKeyDown={handleEditorKeyDown}
-            onFocus={(e) => {
-              activeInputRef.current = { element: e.target, fieldName: 'translationFa' };
-            }}
-            placeholder="ترجمه فارسی مثال..."
-            className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
+        {(() => {
+          const style = internalCard.mainBoxStyles?.example;
+          const bg = style?.bgColor;
+          const tc = style?.textColor;
+          const border = bg ? getHarmonizedBorder(bg) : undefined;
+          return (
+            <div
+              className="p-3 rounded-lg border border-zinc-700/50 bg-black/10 space-y-2 transition-colors"
+              style={{
+                backgroundColor: bg || undefined,
+                borderColor: border || undefined,
+                color: tc || undefined,
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5" style={{ color: tc || undefined }}>
+                  <span>{style?.title || '💬 Example & Translation / مثال و ترجمه'}</span>
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setOpenMainBoxStyleKey(openMainBoxStyleKey === 'example' ? null : 'example')}
+                    className="px-2 py-0.5 text-[10px] font-semibold rounded bg-black/30 hover:bg-black/50 text-zinc-300 border border-white/10 flex items-center gap-1 cursor-pointer"
+                    title="Customize Title & Colors of Example Box"
+                  >
+                    <Palette className="w-3 h-3 text-sky-400" />
+                    <span>Style</span>
+                  </button>
+                  {internalCard.exampleAudioUsNormalBase64 && (
+                    <button
+                      type="button"
+                      onClick={() => playAudio(internalCard.exampleAudioUsNormalBase64!)}
+                      className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Volume2 className="w-3 h-3" />
+                      <span>Play</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+              {renderMainBoxCustomizerControl('example', '💬 EXAMPLE SENTENCE')}
+              <textarea
+                rows={2}
+                value={internalCard.example || ''}
+                onChange={(e) => updateSimpleField('example', e.target.value)}
+                onKeyDown={handleEditorKeyDown}
+                onFocus={(e) => {
+                  activeInputRef.current = { element: e.target, fieldName: 'example' };
+                }}
+                placeholder="English example sentence..."
+                className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                style={{ color: tc || undefined }}
+              />
+              <textarea
+                rows={2}
+                dir="rtl"
+                value={internalCard.translationFa || ''}
+                onChange={(e) => updateSimpleField('translationFa', e.target.value)}
+                onKeyDown={handleEditorKeyDown}
+                onFocus={(e) => {
+                  activeInputRef.current = { element: e.target, fieldName: 'translationFa' };
+                }}
+                placeholder="ترجمه فارسی مثال..."
+                className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                style={{ color: tc || undefined }}
+              />
+            </div>
+          );
+        })()}
 
         {/* Memory Hook (Mnemonic) */}
-        <div className="p-3 rounded-lg border border-zinc-700/50 bg-black/10">
-          <label className="text-[11px] font-bold text-purple-400 uppercase tracking-wider block mb-1.5">
-            🧠 Memory Hook & Etymology / کد یادسپاری و ریشه‌شناسی
-          </label>
-          <textarea
-            rows={2}
-            value={internalCard.mnemonic || ''}
-            onChange={(e) => updateSimpleField('mnemonic', e.target.value)}
-            onKeyDown={handleEditorKeyDown}
-            onFocus={(e) => {
-              activeInputRef.current = { element: e.target, fieldName: 'mnemonic' };
-            }}
-            placeholder="کد صوتی، ریشه‌شناسی یا داستان تصویرسازی ذهنی..."
-            className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
-          />
-        </div>
+        {(() => {
+          const style = internalCard.mainBoxStyles?.mnemonic;
+          const bg = style?.bgColor;
+          const tc = style?.textColor;
+          const border = bg ? getHarmonizedBorder(bg) : undefined;
+          return (
+            <div
+              className="p-3 rounded-lg border border-zinc-700/50 bg-black/10 transition-colors"
+              style={{
+                backgroundColor: bg || undefined,
+                borderColor: border || undefined,
+                color: tc || undefined,
+              }}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[11px] font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5" style={{ color: tc || undefined }}>
+                  <span>{style?.title || '🧠 Memory Hook / کد یادسپاری'}</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setOpenMainBoxStyleKey(openMainBoxStyleKey === 'mnemonic' ? null : 'mnemonic')}
+                  className="px-2 py-0.5 text-[10px] font-semibold rounded bg-black/30 hover:bg-black/50 text-zinc-300 border border-white/10 flex items-center gap-1 cursor-pointer"
+                  title="Customize Title & Colors of Mnemonic Box"
+                >
+                  <Palette className="w-3 h-3 text-purple-400" />
+                  <span>Style</span>
+                </button>
+              </div>
+              {renderMainBoxCustomizerControl('mnemonic', '🧠 MEMORY AID / MNEMONIC')}
+              <textarea
+                rows={2}
+                value={internalCard.mnemonic || ''}
+                onChange={(e) => updateSimpleField('mnemonic', e.target.value)}
+                onKeyDown={handleEditorKeyDown}
+                onFocus={(e) => {
+                  activeInputRef.current = { element: e.target, fieldName: 'mnemonic' };
+                }}
+                placeholder="کد صوتی، ریشه‌شناسی یا داستان تصویرسازی ذهنی..."
+                className="w-full p-2 text-xs sm:text-sm bg-black/20 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono mt-1.5"
+                style={{ color: tc || undefined }}
+              />
+            </div>
+          );
+        })()}
 
         {/* Back Custom Boxes */}
         {renderCustomBoxesEditor('back')}
@@ -2420,6 +2718,58 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
                     </div>
                   );
                 })()}
+              </div>
+
+              {/* SECTION 3: Main Boxes Styling */}
+              <div className={`pt-3 border-t ${isDark ? 'border-zinc-800' : 'border-zinc-200'}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                    Main Boxes Appearance
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-1 mb-2.5">
+                  {(
+                    [
+                      { key: 'meaning', label: 'Meaning' },
+                      { key: 'definition', label: 'Definition' },
+                      { key: 'example', label: 'Example' },
+                      { key: 'mnemonic', label: 'Mnemonic' },
+                    ] as const
+                  ).map((m) => {
+                    const isSel = openMainBoxStyleKey === m.key;
+                    const hasCustom = Boolean(internalCard.mainBoxStyles?.[m.key]);
+                    return (
+                      <button
+                        key={m.key}
+                        type="button"
+                        onClick={() => setOpenMainBoxStyleKey(isSel ? null : m.key)}
+                        className={`py-1 px-2 rounded text-[10px] font-semibold border flex items-center justify-between cursor-pointer transition-colors ${
+                          isSel
+                            ? 'bg-blue-600 text-white border-blue-400'
+                            : hasCustom
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                            : isDark
+                            ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700'
+                            : 'bg-zinc-100 text-zinc-700 border-zinc-300 hover:bg-zinc-200'
+                        }`}
+                      >
+                        <span>{m.label}</span>
+                        {hasCustom && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                      </button>
+                    );
+                  })}
+                </div>
+                {openMainBoxStyleKey &&
+                  renderMainBoxCustomizerControl(
+                    openMainBoxStyleKey as any,
+                    openMainBoxStyleKey === 'meaning'
+                      ? '📖 PERSIAN MEANING'
+                      : openMainBoxStyleKey === 'definition'
+                      ? '📖 ENGLISH DEFINITION'
+                      : openMainBoxStyleKey === 'example'
+                      ? '💬 EXAMPLE SENTENCE'
+                      : '🧠 MEMORY AID / MNEMONIC'
+                  )}
               </div>
             </div>
           </aside>

@@ -5,6 +5,8 @@ export const DEFAULT_AI_PROMPTS: AIPromptsConfig = {
 
   meaningGeneration: `Generate a concise, accurate, and natural Persian meaning/translation (معنی فارسی) for the target English word. Provide the most common and clear Persian equivalent, avoiding unnecessarily verbose explanations or rare archaic meanings.`,
 
+  definitionGeneration: `Generate a short, clear, and simple definition of the target English word in easy-to-understand English (1 to 2 sentences maximum). Explain the meaning in simple English for an English learner.`,
+
   exampleGeneration: `Generate exactly one short, clear, and natural English sentence demonstrating the target English word in proper grammatical and contextual usage. The sentence should clearly illustrate the meaning of the word without being excessively complex.`,
 
   exampleTranslation: `Provide a fluent, natural, and accurate Persian translation (ترجمه روان فارسی) of the English example sentence. The translation must sound natural in modern Persian while preserving the exact meaning and tone of the English sentence.`,
@@ -63,6 +65,9 @@ export function buildFlashcardPrompt(
   if (manualOverrides.meaningFa?.trim()) {
     providedContext.push(`- User-Specified Persian Meaning: "${manualOverrides.meaningFa.trim()}"`);
   }
+  if (manualOverrides.definitionEn?.trim()) {
+    providedContext.push(`- User-Specified English Definition: "${manualOverrides.definitionEn.trim()}"`);
+  }
   if (manualOverrides.example?.trim()) {
     providedContext.push(`- User-Specified English Example: "${manualOverrides.example.trim()}"`);
   }
@@ -88,7 +93,7 @@ export function buildFlashcardPrompt(
 
   if (manualOverrides.meaningFa?.trim()) {
     relationshipRules.push(
-      `* CRITICAL SENSE MATCHING: The user specified the exact meaning "${manualOverrides.meaningFa.trim()}". All generated content (especially the English example sentence, part of speech, and mnemonic/memory hook) MUST strictly match and demonstrate THIS specific meaning/sense, NOT any alternate or unrelated definitions of "${cleanWord}". (For example, if the word is "extension" and the meaning is "پسوند فایل", the example sentence MUST be about a computer file extension like .txt, NOT a browser extension, hair extension, or deadline extension).`
+      `* CRITICAL SENSE MATCHING: The user specified the exact meaning "${manualOverrides.meaningFa.trim()}". All generated content (especially the English definition, English example sentence, part of speech, and mnemonic/memory hook) MUST strictly match and demonstrate THIS specific meaning/sense, NOT any alternate or unrelated definitions of "${cleanWord}". (For example, if the word is "extension" and the meaning is "پسوند فایل", the example sentence MUST be about a computer file extension like .txt, NOT a browser extension, hair extension, or deadline extension).`
     );
   }
 
@@ -122,16 +127,19 @@ ${contextBlock}${rulesBlock}
 1. Meaning Generation (meaningFa):
 ${prompts.meaningGeneration}
 
-2. English Example Sentence (example):
+2. Simple English Definition (definitionEn):
+${prompts.definitionGeneration || 'Generate a short, clear, and simple definition of the target English word in easy-to-understand English (1 to 2 sentences maximum). Explain the meaning in simple English for an English learner.'}
+
+3. English Example Sentence (example):
 ${prompts.exampleGeneration}
 
-3. Example Sentence Translation (translationFa):
+4. Example Sentence Translation (translationFa):
 ${prompts.exampleTranslation}
 
-4. Memory Hook / Mnemonic (mnemonic):
+5. Memory Hook / Mnemonic (mnemonic):
 ${prompts.memoryHook}
 
-5. Phonetics & Part of Speech:
+6. Phonetics & Part of Speech:
 ${prompts.phoneticAndPos}
 
 ### COMPLETION & VALIDATION RULES:
@@ -142,6 +150,7 @@ Return a structured JSON object with these exact keys:
 - phonetic: Accurate IPA pronunciation between slashes (e.g. /.../).
 - partOfSpeech: Most common grammatical part of speech (noun, verb, adjective, etc.).
 - meaningFa: Concise, natural, and accurate Persian meaning.
+- definitionEn: Short, clear, and simple English definition explaining the meaning in easy-to-understand English.
 - example: Exactly one short, clear, natural English sentence illustrating the target word "${cleanWord}".
 - translationFa: Fluent and natural Persian translation of the example sentence.
 - mnemonic: The memory hook adhering to the guidelines above.

@@ -3,6 +3,7 @@ import {
   CardData,
   ThemeId,
   CustomCardBlock,
+  MainBoxCustomizations,
   getFrontCustomBlocks,
   getBackCustomBlocks,
 } from '../types';
@@ -15,25 +16,30 @@ import { comicNotebookLightTheme } from './comic-notebook-light';
 import { comicNotebookDarkTheme } from './comic-notebook-dark';
 import { minimalLightTheme } from './minimal-light';
 import { minimalDarkTheme } from './minimal-dark';
+import { botanicalLightTheme } from './botanical-light';
+import { botanicalDarkTheme } from './botanical-dark';
 import {
   heroPopFrontSpellingHtml,
   duoQuestFrontSpellingHtml,
   indexNotebookFrontSpellingHtml,
   minimalFrontSpellingHtml,
+  botanicalFrontSpellingHtml,
 } from './templates';
 
 export const THEMES: Record<string, ThemeDefinition> = {
-  // Light Themes (4)
+  // Light Themes (5)
   'comic-pop-light': comicPopLightTheme,
   'comic-quest-light': comicQuestLightTheme,
   'comic-notebook-light': comicNotebookLightTheme,
   'minimal-light': minimalLightTheme,
+  'botanical-light': botanicalLightTheme,
 
-  // Dark Themes (4)
+  // Dark Themes (5)
   'comic-pop-dark': comicPopDarkTheme,
   'comic-quest-dark': comicQuestDarkTheme,
   'comic-notebook-dark': comicNotebookDarkTheme,
   'minimal-dark': minimalDarkTheme,
+  'botanical-dark': botanicalDarkTheme,
 
   // Legacy Aliases for backwards compatibility
   'comic-manga-light': comicQuestLightTheme,
@@ -54,17 +60,22 @@ export const THEME_GROUPS = {
     { id: 'comic-quest-light', name: 'Duo Quest (Light)', desc: 'Playful Duolingo-inspired learning UX with chunky 3D buttons.' },
     { id: 'comic-notebook-light', name: 'Index Notebook (Light)', desc: 'Ruled paper notebook with sticky index tabs and washi tape.' },
     { id: 'minimal-light', name: 'Minimal (Light)', desc: 'Clean, distraction-free classic Anki design with subtle borders.' },
+    { id: 'botanical-light', name: 'Botanical Sage (Light)', desc: 'Matcha and sage palette with cream rounded boxes and serene organic aesthetics.' },
   ],
   dark: [
     { id: 'comic-pop-dark', name: 'Hero Pop (Dark)', desc: 'Midnight comic hero panels with bright amber and cyan action badges.' },
     { id: 'comic-quest-dark', name: 'Duo Quest (Dark)', desc: 'Midnight gamified educational card with glowing XP accents.' },
     { id: 'comic-notebook-dark', name: 'Index Notebook (Dark)', desc: 'Chalkboard study notebook with neon highlighters and sticky notes.' },
     { id: 'minimal-dark', name: 'Minimal (Dark)', desc: 'Distraction-free dark Anki card with restrained colors and subtle borders.' },
+    { id: 'botanical-dark', name: 'Botanical Sage (Dark)', desc: 'Charcoal-olive night mode with dark sage surfaces and pale matcha typography.' },
   ],
 };
 
 export function getSpellingFrontHtml(themeId: ThemeId): string {
   switch (themeId) {
+    case 'botanical-light':
+    case 'botanical-dark':
+      return botanicalFrontSpellingHtml;
     case 'comic-pop-light':
     case 'comic-pop-dark':
     case 'comic-light':
@@ -130,6 +141,22 @@ export function getContrastTextColor(hexColor?: string): string {
   return yiq >= 140 ? '#0f172a' : '#f8fafc';
 }
 
+export function getHarmonizedBorder(hexColor?: string): string {
+  if (!hexColor || !hexColor.startsWith('#')) return 'rgba(255, 255, 255, 0.2)';
+  let c = hexColor.replace('#', '');
+  if (c.length === 3) c = c.split('').map((x) => x + x).join('');
+  let r = parseInt(c.substring(0, 2), 16) || 0;
+  let g = parseInt(c.substring(2, 4), 16) || 0;
+  let b = parseInt(c.substring(4, 6), 16) || 0;
+  const isLight = (r * 299 + g * 587 + b * 114) / 1000 >= 140;
+  const shift = isLight ? -35 : 45;
+  r = Math.min(255, Math.max(0, r + shift));
+  g = Math.min(255, Math.max(0, g + shift));
+  b = Math.min(255, Math.max(0, b + shift));
+  const toHex = (n: number) => n.toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
 export function renderCustomBlocksHtml(
   customBlocks: CustomCardBlock[] | undefined | null,
   themeId: ThemeId = 'comic-pop-dark'
@@ -147,6 +174,7 @@ export function renderCustomBlocksHtml(
 
     const bgColor = block.color || '#1E293B';
     const textColor = getContrastTextColor(bgColor);
+    const borderColor = block.borderColor || getHarmonizedBorder(bgColor);
     const badgeBg = textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.2)';
     const badgeBorder = textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.3)';
     const dir = block.dir || (isRTLText(content) ? 'rtl' : 'ltr');
@@ -155,12 +183,21 @@ export function renderCustomBlocksHtml(
     let blockHtml = '';
 
     switch (themeId) {
+      case 'botanical-light':
+      case 'botanical-dark':
+        blockHtml = `
+<div class="botanical-custom-block custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; border: 1.5px solid ${borderColor} !important; border-radius: 18px !important; margin-top: 8px !important;">
+  ${title ? `<div class="botanical-custom-title" style="color: ${textColor}; font-weight: 800; font-size: 13px; margin-bottom: 6px; letter-spacing: 0.3px;">${escapeHtml(title)}</div>` : ''}
+  ${contentHtml ? `<div class="botanical-custom-content" dir="${dir}" style="color: ${textColor}; font-size: 14px; line-height: 1.5;">${contentHtml}</div>` : ''}
+</div>`;
+        break;
+
       case 'comic-pop-light':
       case 'comic-pop-dark':
       case 'comic-light':
       case 'comic-dark':
         blockHtml = `
-<div class="comic-mnemonic-box custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; margin-top: 14px;">
+<div class="comic-mnemonic-box custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; border: 2px solid ${borderColor} !important; border-left: 6px solid ${borderColor} !important; margin-top: 8px !important;">
   ${title ? `<span class="box-label" style="background-color: ${badgeBg}; color: ${textColor}; border: 2px solid ${badgeBorder}; font-weight: 900;">${escapeHtml(title)}</span>` : ''}
   ${contentHtml ? `<div class="custom-block-content" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>` : ''}
 </div>`;
@@ -171,7 +208,7 @@ export function renderCustomBlocksHtml(
       case 'comic-manga-light':
       case 'comic-manga-dark':
         blockHtml = `
-<div class="quest-mnemonic-card custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; margin-top: 14px;">
+<div class="quest-mnemonic-card custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; border-color: ${borderColor} !important; box-shadow: 0 4px 0 ${borderColor} !important; margin-top: 8px !important;">
   ${title ? `<span class="quest-tag-purple" style="background-color: ${badgeBg}; color: ${textColor}; font-weight: 800;">${escapeHtml(title)}</span>` : ''}
   ${contentHtml ? `<div class="quest-custom-content" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>` : ''}
 </div>`;
@@ -180,7 +217,7 @@ export function renderCustomBlocksHtml(
       case 'comic-notebook-light':
       case 'comic-notebook-dark':
         blockHtml = `
-<div class="notebook-washi-mnemonic custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; margin-top: 14px;">
+<div class="notebook-washi-mnemonic custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; border-color: ${borderColor} !important; margin-top: 8px !important;">
   ${title ? `<span class="washi-title" style="color: ${textColor}; font-weight: 800;">📌 ${escapeHtml(title)}</span>` : ''}
   ${contentHtml ? `<div class="washi-text" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>` : ''}
 </div>`;
@@ -192,7 +229,7 @@ export function renderCustomBlocksHtml(
       case 'comic-minimal-dark':
       default:
         blockHtml = `
-<div class="minimal-mnemonic-block custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; margin-top: 14px;">
+<div class="minimal-mnemonic-block custom-card-block" style="background-color: ${bgColor} !important; color: ${textColor} !important; border-color: ${borderColor} !important; margin-top: 8px !important;">
   ${title ? `<div class="minimal-mnemonic-label" style="color: ${textColor}; font-weight: 700; opacity: 0.9;">${escapeHtml(title)}</div>` : ''}
   ${contentHtml ? `<div class="minimal-custom-content" dir="${dir}" style="color: ${textColor};">${contentHtml}</div>` : ''}
 </div>`;
@@ -203,6 +240,113 @@ export function renderCustomBlocksHtml(
   }
 
   return renderedBlocks.join('\n');
+}
+
+export function renderMainBoxStyles(
+  mainBoxStyles?: MainBoxCustomizations | null,
+  themeId: ThemeId = 'comic-pop-dark'
+): string {
+  if (!mainBoxStyles) return '';
+  const { meaning, definition, example, mnemonic } = mainBoxStyles;
+  if (!meaning && !definition && !example && !mnemonic) return '';
+
+  const cssRules: string[] = [];
+  const scriptLines: string[] = [];
+
+  // 1. Meaning Box
+  if (meaning) {
+    const bg = meaning.bgColor;
+    const tc = meaning.textColor || (bg ? getContrastTextColor(bg) : undefined);
+    if (bg || tc) {
+      const parts = [];
+      if (bg) parts.push(`background-color: ${bg} !important; border-color: ${getHarmonizedBorder(bg)} !important;`);
+      if (tc) parts.push(`color: ${tc} !important;`);
+      cssRules.push(`.comic-meaning-box, .quest-meaning-banner, .notebook-highlighter-meaning, .minimal-meaning-block, .botanical-meaning-box { ${parts.join(' ')} }`);
+      if (tc) {
+        cssRules.push(`.comic-meaning-box *, .quest-meaning-banner *, .notebook-highlighter-meaning *, .minimal-meaning-block *, .botanical-meaning-box * { color: ${tc} !important; }`);
+      }
+    }
+    if (meaning.title?.trim()) {
+      scriptLines.push(`setBoxTitle(['.label-meaning', '.meaning-quest-label', '.highlighter-label', '.minimal-meaning-label', '.botanical-meaning-title'], ${JSON.stringify(meaning.title.trim())});`);
+    }
+  }
+
+  // 2. English Definition Box
+  if (definition) {
+    const bg = definition.bgColor;
+    const tc = definition.textColor || (bg ? getContrastTextColor(bg) : undefined);
+    if (bg || tc) {
+      const parts = [];
+      if (bg) parts.push(`background-color: ${bg} !important; border-color: ${getHarmonizedBorder(bg)} !important;`);
+      if (tc) parts.push(`color: ${tc} !important;`);
+      cssRules.push(`.comic-definition-box, .quest-definition-card, .notebook-definition-note, .minimal-definition-block, .botanical-definition-box { ${parts.join(' ')} }`);
+      if (tc) {
+        cssRules.push(`.comic-definition-box *, .quest-definition-card *, .notebook-definition-note *, .minimal-definition-block *, .botanical-definition-box * { color: ${tc} !important; }`);
+      }
+    }
+    if (definition.title?.trim()) {
+      scriptLines.push(`setBoxTitle(['.label-definition', '.quest-tag-blue', '.notebook-definition-title', '.minimal-definition-label', '.botanical-definition-title'], ${JSON.stringify(definition.title.trim())});`);
+    }
+  }
+
+  // 3. Example Box
+  if (example) {
+    const bg = example.bgColor;
+    const tc = example.textColor || (bg ? getContrastTextColor(bg) : undefined);
+    if (bg || tc) {
+      const parts = [];
+      if (bg) parts.push(`background-color: ${bg} !important; border-color: ${getHarmonizedBorder(bg)} !important;`);
+      if (tc) parts.push(`color: ${tc} !important;`);
+      cssRules.push(`.comic-example-box, .quest-example-card, .notebook-sticky-example, .minimal-example-block, .botanical-example-box { ${parts.join(' ')} }`);
+      if (tc) {
+        cssRules.push(`.comic-example-box *, .quest-example-card *, .notebook-sticky-example *, .minimal-example-block *, .botanical-example-box * { color: ${tc} !important; }`);
+      }
+    }
+    if (example.title?.trim()) {
+      scriptLines.push(`setBoxTitle(['.label-example', '.example-quest-header .quest-tag', '.sticky-title', '.minimal-example-label', '.botanical-example-title'], ${JSON.stringify(example.title.trim())});`);
+    }
+  }
+
+  // 4. Mnemonic Box
+  if (mnemonic) {
+    const bg = mnemonic.bgColor;
+    const tc = mnemonic.textColor || (bg ? getContrastTextColor(bg) : undefined);
+    if (bg || tc) {
+      const parts = [];
+      if (bg) parts.push(`background-color: ${bg} !important; border-color: ${getHarmonizedBorder(bg)} !important; border-left-color: ${getHarmonizedBorder(bg)} !important;`);
+      if (tc) parts.push(`color: ${tc} !important;`);
+      cssRules.push(`.comic-mnemonic-box, .quest-mnemonic-card, .notebook-washi-mnemonic, .minimal-mnemonic-block, .botanical-mnemonic-box { ${parts.join(' ')} }`);
+      if (tc) {
+        cssRules.push(`.comic-mnemonic-box *, .quest-mnemonic-card *, .notebook-washi-mnemonic *, .minimal-mnemonic-block *, .botanical-mnemonic-box * { color: ${tc} !important; }`);
+      }
+    }
+    if (mnemonic.title?.trim()) {
+      scriptLines.push(`setBoxTitle(['.label-memory', '.quest-tag-purple', '.washi-title', '.minimal-mnemonic-label', '.botanical-mnemonic-title'], ${JSON.stringify(mnemonic.title.trim())});`);
+    }
+  }
+
+  let result = '';
+  if (cssRules.length > 0) {
+    result += `<style>\n${cssRules.join('\n')}\n</style>\n`;
+  }
+  if (scriptLines.length > 0) {
+    result += `<script>
+(function() {
+  function setBoxTitle(selectors, text) {
+    if (!text) return;
+    for (var i = 0; i < selectors.length; i++) {
+      var els = document.querySelectorAll(selectors[i]);
+      for (var j = 0; j < els.length; j++) {
+        els[j].textContent = text;
+      }
+    }
+  }
+  ${scriptLines.join('\n  ')}
+})();
+</script>\n`;
+  }
+
+  return result;
 }
 
 export function renderThemeHtml(
@@ -317,6 +461,7 @@ export function renderThemeHtml(
     '{{Phonetic}}': escapeHtml(data.phonetic || '/.../'),
     '{{PartOfSpeech}}': escapeHtml(data.partOfSpeech || 'word'),
     '{{Meaning}}': renderMarkdown(data.meaningFa || ''),
+    '{{EnglishDefinition}}': renderMarkdown(data.definitionEn || ''),
     '{{Example}}': renderMarkdown(data.example || ''),
     '{{Translation}}': renderMarkdown(data.translationFa || ''),
     '{{Mnemonic}}': renderMarkdown(data.mnemonic || ''),
@@ -336,6 +481,14 @@ export function renderThemeHtml(
 
   for (const [key, value] of Object.entries(replacements)) {
     html = html.replaceAll(key, value);
+  }
+
+  // Handle EnglishDefinition conditional tags
+  if (data.definitionEn && data.definitionEn.trim()) {
+    html = html.replace(/\{\{#EnglishDefinition\}\}/g, '');
+    html = html.replace(/\{\{\/EnglishDefinition\}\}/g, '');
+  } else {
+    html = html.replace(/\{\{#EnglishDefinition\}\}[\s\S]*?\{\{\/EnglishDefinition\}\}/g, '');
   }
 
   // Handle CustomFrontSections conditional tags
@@ -369,17 +522,32 @@ export function renderThemeHtml(
     html = html.replaceAll('{{CustomSections}}', '');
   }
 
+  // Handle MainBoxStyles conditional tags
+  const mainBoxStylesHtml = renderMainBoxStyles(data.mainBoxStyles, activeThemeId);
+  if (mainBoxStylesHtml) {
+    html = html.replace(/\{\{#MainBoxStyles\}\}/g, '');
+    html = html.replace(/\{\{\/MainBoxStyles\}\}/g, '');
+    html = html.replaceAll('{{MainBoxStyles}}', mainBoxStylesHtml);
+  } else {
+    html = html.replace(/\{\{#MainBoxStyles\}\}[\s\S]*?\{\{\/MainBoxStyles\}\}/g, '');
+    html = html.replaceAll('{{MainBoxStyles}}', '');
+  }
+
   return html;
 }
 
 export const SHARED_CARD_CSS = `
 /* Shared HTML & Custom Blocks CSS */
 .custom-card-block {
-  margin-top: 14px !important;
+  margin-top: 8px !important;
   box-sizing: border-box !important;
   position: relative !important;
   transition: all 0.2s ease !important;
-  padding: 12px 14px !important;
+  padding: 10px 14px !important;
+}
+
+.custom-card-block + .custom-card-block {
+  margin-top: 8px !important;
 }
 
 .custom-block-header {

@@ -61,6 +61,8 @@ export const fa = {
     phonetic: 'تلفظ (IPA)',
     partOfSpeech: 'نقش دستوری',
     meaning: 'معنی فارسی',
+    englishDefinition: 'تعریف انگلیسی',
+    definitionEn: 'تعریف انگلیسی',
     example: 'جمله مثال',
     translation: 'ترجمه مثال',
     mnemonic: 'کدینگ و یادافزا',
@@ -317,6 +319,9 @@ export const fa = {
       meaningTitle: 'تولید معنی کلمه (Meaning Generation)',
       meaningDesc: 'دستورالعمل تولید ترجمه و معادل فارسی دقیق، روان و موجز برای کلمه انگلیسی.',
       
+      definitionTitle: 'تولید تعریف انگلیسی (English Definition)',
+      definitionDesc: 'دستورالعمل تولید تعریف دقیق، شفاف و انگلیسی متناسب با معنای کلمه.',
+      
       exampleTitle: 'تولید جمله مثال (Example Generation)',
       exampleDesc: 'دستورالعمل تولید جمله انگلیسی استاندارد، طبیعی و آموزنده برای نشان دادن کاربرد کلمه.',
       
@@ -425,6 +430,7 @@ export const fa = {
     phoneticLabel: 'تلفظ',
     partOfSpeechLabel: 'نقش',
     meaningLabel: 'معنی فارسی',
+    definitionEnLabel: 'تعریف انگلیسی',
     exampleLabel: 'جمله مثال',
     translationLabel: 'ترجمه',
     mnemonicLabel: 'یادافزا / کدینگ',

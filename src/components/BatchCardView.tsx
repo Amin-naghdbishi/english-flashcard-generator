@@ -78,6 +78,7 @@ function batchItemToCardData(item: BatchItem | null): CardData | null {
     phonetic: pf.phonetic || '/.../',
     partOfSpeech: pf.partOfSpeech || 'noun',
     meaningFa: pf.meaningFa || '[Meaning will be generated]',
+    definitionEn: pf.definitionEn || 'English definition will be generated.',
     example: pf.example || 'Example sentence will be generated.',
     translationFa: pf.translationFa || 'ترجمه مثال تولید خواهد شد.',
     mnemonic: pf.mnemonic || 'Memory aid will be generated.',
@@ -95,6 +96,7 @@ AI=false
 Phonetic=/ɪˈreɪzər/
 Part of Speech=noun
 Persian Meaning=پاک‌کن
+English Definition=A piece of rubber or other material used for erasing marks made by pencil or ink.
 Example Sentence=I need an eraser to fix this mistake.
 ExampleTranslation=من به یک پاک‌کن برای تصحیح این اشتباه نیاز دارم.
 Memory Aid=ERASE-ER: It erases mistakes on paper.
@@ -108,6 +110,7 @@ AI=true
 Phonetic=/əˈbændən/
 Part of Speech=verb
 Persian Meaning=رها کردن، ترک کردن
+English Definition=To leave a place, thing, or person forever, or to give up completely.
 Example Sentence=He abandoned his car on the highway.
 ExampleTranslation=او ماشین خود را در بزرگراه رها کرد.
 Memory Aid=A-BAND-ON: Imagine a band left behind on the stage.
@@ -220,6 +223,7 @@ export function autoDetectAndParseBatchInput(
       phonetic: fields['phonetic'] || fields['ipa'] || fields['pronunciation'] || undefined,
       partOfSpeech: fields['partofspeech'] || fields['pos'] || fields['type'] || undefined,
       meaningFa: fields['persianmeaning'] || fields['meaning'] || fields['meaningfa'] || fields['persian'] || fields['farsi'] || undefined,
+      definitionEn: fields['englishdefinition'] || fields['definition'] || fields['definitionen'] || fields['englishdef'] || fields['def'] || undefined,
       example: fields['examplesentence'] || fields['example'] || fields['sentence'] || fields['sample'] || undefined,
       translationFa: fields['exampletranslation'] || fields['translation'] || fields['translationfa'] || fields['sentencefa'] || undefined,
       mnemonic: fields['memoryaid'] || fields['mnemonic'] || fields['aid'] || fields['code'] || undefined,
@@ -354,6 +358,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
     phonetic: true,
     partOfSpeech: true,
     meaningFa: true,
+    definitionEn: true,
     example: true,
     translationFa: true,
     mnemonic: true,
@@ -505,6 +510,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
           if (fieldConfig.phonetic && item.parsedFields.phonetic) customOverrides.phonetic = item.parsedFields.phonetic;
           if (fieldConfig.partOfSpeech && item.parsedFields.partOfSpeech) customOverrides.partOfSpeech = item.parsedFields.partOfSpeech;
           if (fieldConfig.meaningFa && item.parsedFields.meaningFa) customOverrides.meaningFa = item.parsedFields.meaningFa;
+          if (fieldConfig.definitionEn && item.parsedFields.definitionEn) customOverrides.definitionEn = item.parsedFields.definitionEn;
           if (fieldConfig.example && item.parsedFields.example) customOverrides.example = item.parsedFields.example;
           if (fieldConfig.translationFa && item.parsedFields.translationFa) customOverrides.translationFa = item.parsedFields.translationFa;
           if (fieldConfig.mnemonic && item.parsedFields.mnemonic) customOverrides.mnemonic = item.parsedFields.mnemonic;
@@ -1020,6 +1026,10 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" checked={fieldConfig.meaningFa} onChange={(e) => setFieldConfig({ ...fieldConfig, meaningFa: e.target.checked })} className="w-3.5 h-3.5" />
                     <span className="text-[11px] font-medium">{t('common.meaning')}</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={fieldConfig.definitionEn} onChange={(e) => setFieldConfig({ ...fieldConfig, definitionEn: e.target.checked })} className="w-3.5 h-3.5" />
+                    <span className="text-[11px] font-medium">{t('card.definitionEn') || 'Definition (En)'}</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" checked={fieldConfig.example} onChange={(e) => setFieldConfig({ ...fieldConfig, example: e.target.checked })} className="w-3.5 h-3.5" />

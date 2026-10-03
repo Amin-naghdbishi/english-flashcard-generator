@@ -16,6 +16,7 @@ export const OLLAMA_JSON_SCHEMA = {
     phonetic: { type: "string" },
     partOfSpeech: { type: "string" },
     meaningFa: { type: "string" },
+    definitionEn: { type: "string" },
     example: { type: "string" },
     translationFa: { type: "string" },
     mnemonic: { type: "string" }
@@ -25,6 +26,7 @@ export const OLLAMA_JSON_SCHEMA = {
     "phonetic",
     "partOfSpeech",
     "meaningFa",
+    "definitionEn",
     "example",
     "translationFa",
     "mnemonic"
@@ -197,6 +199,7 @@ export async function generateWithOllama(
       phonetic: (parsed.phonetic || '').trim(),
       partOfSpeech: (parsed.partOfSpeech || '').trim(),
       meaningFa: (parsed.meaningFa || '').trim(),
+      definitionEn: (parsed.definitionEn || '').trim(),
       example: (parsed.example || '').trim(),
       translationFa: (parsed.translationFa || '').trim(),
       mnemonic: (parsed.mnemonic || '').trim(),
@@ -209,6 +212,7 @@ export async function generateWithOllama(
       phonetic: manualOverrides.phonetic?.trim() || aiData.phonetic,
       partOfSpeech: manualOverrides.partOfSpeech?.trim() || aiData.partOfSpeech,
       meaningFa: manualOverrides.meaningFa?.trim() || aiData.meaningFa,
+      definitionEn: manualOverrides.definitionEn?.trim() || aiData.definitionEn,
       example: manualOverrides.example?.trim() || aiData.example,
       translationFa: manualOverrides.translationFa?.trim() || aiData.translationFa,
       mnemonic: manualOverrides.mnemonic?.trim() || aiData.mnemonic,

@@ -237,6 +237,13 @@ export const heroPopBackHtml = `
       <p class="meaning-text" dir="rtl">{{Meaning}}</p>
     </div>
 
+    {{#EnglishDefinition}}
+    <div class="comic-definition-box">
+      <span class="box-label label-definition">📖 ENGLISH DEFINITION</span>
+      <p class="definition-text">{{EnglishDefinition}}</p>
+    </div>
+    {{/EnglishDefinition}}
+
     <div class="comic-example-box">
       <div class="example-header">
         <span class="box-label label-example">💬 EXAMPLE SENTENCE</span>
@@ -262,6 +269,10 @@ export const heroPopBackHtml = `
     {{CustomSections}}
     {{/CustomSections}}
     {{/CustomBackSections}}
+
+    {{#MainBoxStyles}}
+    {{MainBoxStyles}}
+    {{/MainBoxStyles}}
   </div>
 </div>
 `;
@@ -389,6 +400,13 @@ export const duoQuestBackHtml = `
       <p class="quest-meaning-fa" dir="rtl">{{Meaning}}</p>
     </div>
 
+    {{#EnglishDefinition}}
+    <div class="quest-definition-card">
+      <span class="quest-tag-blue">ENGLISH DEFINITION</span>
+      <p class="quest-definition-text">{{EnglishDefinition}}</p>
+    </div>
+    {{/EnglishDefinition}}
+
     <div class="quest-example-card">
       <div class="example-quest-header">
         <span class="quest-tag">EXAMPLE & TRANSLATION</span>
@@ -411,6 +429,10 @@ export const duoQuestBackHtml = `
     {{CustomSections}}
     {{/CustomSections}}
     {{/CustomBackSections}}
+
+    {{#MainBoxStyles}}
+    {{MainBoxStyles}}
+    {{/MainBoxStyles}}
   </div>
 </div>
 `;
@@ -528,6 +550,14 @@ export const indexNotebookBackHtml = `
       <span class="highlighter-text">{{Meaning}}</span>
     </div>
 
+    {{#EnglishDefinition}}
+    <div class="notebook-definition-note">
+      <span class="sticky-pin">📌</span>
+      <span class="sticky-title">Definition:</span>
+      <p class="sticky-text">{{EnglishDefinition}}</p>
+    </div>
+    {{/EnglishDefinition}}
+
     <div class="notebook-sticky-example">
       <div class="sticky-header-row">
         <span class="sticky-pin">📌</span>
@@ -552,6 +582,10 @@ export const indexNotebookBackHtml = `
     {{CustomSections}}
     {{/CustomSections}}
     {{/CustomBackSections}}
+
+    {{#MainBoxStyles}}
+    {{MainBoxStyles}}
+    {{/MainBoxStyles}}
   </div>
 </div>
 `;
@@ -672,6 +706,13 @@ export const minimalBackHtml = `
       <p class="minimal-meaning-text">{{Meaning}}</p>
     </div>
 
+    {{#EnglishDefinition}}
+    <div class="minimal-definition-block">
+      <div class="minimal-definition-label">English Definition</div>
+      <p class="minimal-definition-text">{{EnglishDefinition}}</p>
+    </div>
+    {{/EnglishDefinition}}
+
     <div class="minimal-example-block">
       <div class="minimal-example-header">
         <span class="minimal-example-label">Example & Translation</span>
@@ -694,6 +735,179 @@ export const minimalBackHtml = `
     {{CustomSections}}
     {{/CustomSections}}
     {{/CustomBackSections}}
+
+    {{#MainBoxStyles}}
+    {{MainBoxStyles}}
+    {{/MainBoxStyles}}
+  </div>
+</div>
+`;
+
+/**
+ * 5. BOTANICAL SAGE TEMPLATES (Theme 5 - Elegant Sage & Matcha Rounded Study Cards)
+ */
+export const botanicalFrontNormalHtml = `
+<div class="botanical-wrapper">
+  <div class="botanical-card">
+    {{CardImage}}
+
+    <!-- Box 1: Word & Part of Speech -->
+    <div class="botanical-box botanical-word-box">
+      <h1 class="botanical-word">{{Word}}</h1>
+      <div class="botanical-pos">{{PartOfSpeech}}</div>
+    </div>
+
+    <!-- Box 2: Pronunciation & Audio -->
+    <div class="botanical-box botanical-audio-box">
+      <div class="botanical-ipa-pill">{{Phonetic}}</div>
+      <div class="botanical-audio-divider"></div>
+      <div class="botanical-play-wrapper">
+        <div class="botanical-audio-main">{{WordAudioUsNormal}}</div>
+        <div class="botanical-audio-options">
+          <span class="botanical-audio-sub">{{WordAudioUsSlow}}</span>
+          <span class="botanical-audio-sub">{{WordAudioUkNormal}}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Context Clue / Example Prompt -->
+    <div class="botanical-example-section">
+      <p class="botanical-example-en">{{Example}}</p>
+    </div>
+
+    {{#CustomFrontSections}}
+    {{CustomFrontSections}}
+    {{/CustomFrontSections}}
+  </div>
+</div>
+`;
+
+export const botanicalFrontSpellingHtml = `
+<div class="botanical-wrapper">
+  <div class="botanical-card spelling-botanical">
+    {{CardImage}}
+
+    <div id="spelling-target-word" style="display: none;">{{Word}}</div>
+
+    <!-- Box 1: Spelling Header & POS -->
+    <div class="botanical-box botanical-word-box">
+      <div class="botanical-spelling-badge">SPELLING EXERCISE</div>
+      <div class="botanical-pos">{{PartOfSpeech}}</div>
+    </div>
+
+    <!-- Box 2: Audio listening clue -->
+    <div class="botanical-box botanical-audio-box">
+      <div class="botanical-ipa-pill">🎧 Listen carefully</div>
+      <div class="botanical-audio-divider"></div>
+      <div class="botanical-play-wrapper">
+        <div class="botanical-audio-main">{{WordAudioUsNormal}}</div>
+        <div class="botanical-audio-options">
+          <span class="botanical-audio-sub">{{WordAudioUsSlow}}</span>
+          <span class="botanical-audio-sub">{{ExampleAudioUsNormal}}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Spelling sentence with blank -->
+    <div class="botanical-example-section">
+      <p class="botanical-example-en">{{SpellingSentence}}</p>
+    </div>
+
+    <!-- Interactive spelling input -->
+    <div class="spelling-interactive-area tappable">
+      <input
+        type="text"
+        id="spelling-input"
+        name="spelling_answer"
+        class="spelling-input botanical-input tappable"
+        placeholder="Type the word here..."
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="none"
+        spellcheck="false"
+        inputmode="text"
+        enterkeyhint="done"
+      />
+      <button type="button" class="spelling-check-btn botanical-btn tappable" onclick="checkSpelling()">
+        Check Spelling
+      </button>
+    </div>
+
+    <div id="spelling-result" class="spelling-result"></div>
+
+    {{#CustomFrontSections}}
+    {{CustomFrontSections}}
+    {{/CustomFrontSections}}
+  </div>
+</div>
+${spellingScript}
+`;
+
+export const botanicalBackHtml = `
+<div class="botanical-wrapper">
+  <div class="botanical-card">
+    {{CardImage}}
+
+    <!-- Box 1: Word & Part of Speech -->
+    <div class="botanical-box botanical-word-box">
+      <h1 class="botanical-word">{{Word}}</h1>
+      <div class="botanical-pos">{{PartOfSpeech}}</div>
+    </div>
+
+    <!-- Box 2: Pronunciation & Audio -->
+    <div class="botanical-box botanical-audio-box">
+      <div class="botanical-ipa-pill">{{Phonetic}}</div>
+      <div class="botanical-audio-divider"></div>
+      <div class="botanical-play-wrapper">
+        <div class="botanical-audio-main">{{WordAudioUsNormal}}</div>
+        <div class="botanical-audio-options">
+          <span class="botanical-audio-sub">{{WordAudioUsSlow}}</span>
+          <span class="botanical-audio-sub">{{WordAudioUkNormal}}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Box 3: Persian Meaning -->
+    <div class="botanical-box botanical-meaning-box" dir="rtl">
+      <div class="botanical-meaning-text">{{Meaning}}</div>
+    </div>
+
+    <!-- English Definition -->
+    {{#EnglishDefinition}}
+    <div class="botanical-definition-section botanical-definition-box">
+      <p class="botanical-definition-text">{{EnglishDefinition}}</p>
+      <div class="botanical-section-divider"></div>
+    </div>
+    {{/EnglishDefinition}}
+
+    <!-- Example & Persian Translation -->
+    <div class="botanical-example-section botanical-example-box">
+      <p class="botanical-example-en">{{Example}}</p>
+      <p class="botanical-example-fa" dir="rtl">{{Translation}}</p>
+      <div class="botanical-example-audio-row">
+        {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}
+      </div>
+    </div>
+
+    <!-- Mnemonic / Memory Pill -->
+    <div class="botanical-mnemonic-container">
+      <div class="botanical-mnemonic-box">
+        <span class="botanical-mnemonic-text">{{Mnemonic}}</span>
+      </div>
+    </div>
+
+    {{#CustomBackSections}}
+    {{CustomBackSections}}
+    {{/CustomBackSections}}
+    {{^CustomBackSections}}
+    {{#CustomSections}}
+    {{CustomSections}}
+    {{/CustomSections}}
+    {{/CustomBackSections}}
+
+    {{#MainBoxStyles}}
+    {{MainBoxStyles}}
+    {{/MainBoxStyles}}
   </div>
 </div>
 `;
