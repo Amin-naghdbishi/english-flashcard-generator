@@ -1381,14 +1381,14 @@ async function startServer() {
           if (infoRes.success && infoRes.notes && infoRes.notes.length > 0) {
             const currentNote = infoRes.notes[0];
             const existingTags: string[] = currentNote.tags || [];
-            const defaultTags = ['flashcard-generator', effectiveCardType === 'spelling' ? 'spelling-exercise' : 'vocab-card'];
-            const targetTags = Array.from(new Set([...defaultTags, ...userTags.map((t: string) => t.trim()).filter(Boolean)]));
+            // Strictly preserve only user-specified tags without injecting automatic clutter tags
+            const targetTags = Array.from(new Set(userTags.map((t: string) => t.trim()).filter(Boolean)));
 
             const toAdd = targetTags.filter((t) => !existingTags.includes(t));
             if (toAdd.length > 0) {
               await callAnkiConnect(ankiUrl, 'addTags', { notes: [Number(noteId)], tags: toAdd.join(' ') });
             }
-            const toRemove = existingTags.filter((t) => !targetTags.includes(t) && !defaultTags.includes(t));
+            const toRemove = existingTags.filter((t) => !targetTags.includes(t));
             if (toRemove.length > 0) {
               await callAnkiConnect(ankiUrl, 'removeTags', { notes: [Number(noteId)], tags: toRemove.join(' ') });
             }

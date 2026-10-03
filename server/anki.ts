@@ -530,11 +530,11 @@ export async function createAnkiNote(
   };
 
   // 6. Add Note (IMPORTANT: allowDuplicate: true so user can create multiple cards for the same word with different meanings)
-  const defaultTags = ['flashcard-generator', effectiveCardType === 'spelling' ? 'spelling-exercise' : 'vocab-card'];
+  // Strictly preserve user-specified tags without injecting automatic clutter tags
   const userTags = Array.isArray(tags) && tags.length > 0
     ? tags
     : (Array.isArray(cardData.tags) && cardData.tags.length > 0 ? cardData.tags : []);
-  const mergedTags = Array.from(new Set([...defaultTags, ...userTags.map((t) => t.trim()).filter(Boolean)]));
+  const mergedTags = Array.from(new Set(userTags.map((t) => t.trim()).filter(Boolean)));
 
   const addRes = await callAnkiConnect(baseUrl, 'addNote', {
     note: {
@@ -854,6 +854,141 @@ export function parseMainBoxStyles(html?: string): any | undefined {
   return hasAny ? res : undefined;
 }
 
+export function detectThemeFromAnkiData(params: {
+  modelName?: string;
+  css?: string;
+  templatesHtml?: string;
+  fields?: Record<string, string>;
+}): ThemeId | null {
+  const modelName = (params.modelName || '').toLowerCase();
+  const css = params.css || '';
+  const templatesHtml = params.templatesHtml || '';
+  const fieldsCombined = Object.values(params.fields || {}).join(' ');
+
+  const allContent = `${modelName}\n${css}\n${templatesHtml}\n${fieldsCombined}`;
+  const allContentLower = allContent.toLowerCase();
+
+  const has = (re: RegExp) => re.test(allContentLower);
+
+  // 1. Explicit CSS Theme Headers (most authoritative when present)
+  if (/THEME 3:\s*DUO QUEST LIGHT/i.test(css) || /DUO QUEST LIGHT/i.test(css)) {
+    return 'comic-quest-light';
+  }
+  if (/THEME 3:\s*DUO QUEST DARK/i.test(css) || /DUO QUEST DARK/i.test(css)) {
+    return 'comic-quest-dark';
+  }
+  if (/THEME 5:\s*BOTANICAL SAGE/i.test(css) || /BOTANICAL SAGE \(LIGHT\)/i.test(css)) {
+    return 'botanical-light';
+  }
+  if (/THEME 6:\s*BOTANICAL SAGE/i.test(css) || /BOTANICAL SAGE \(DARK\)/i.test(css)) {
+    return 'botanical-dark';
+  }
+  if (/THEME 4:\s*INDEX NOTEBOOK LIGHT/i.test(css) || /INDEX NOTEBOOK LIGHT/i.test(css)) {
+    return 'comic-notebook-light';
+  }
+  if (/THEME 4:\s*INDEX NOTEBOOK DARK/i.test(css) || /INDEX NOTEBOOK DARK/i.test(css)) {
+    return 'comic-notebook-dark';
+  }
+  if (/THEME:\s*MINIMAL LIGHT/i.test(css) || /MINIMAL LIGHT/i.test(css)) {
+    return 'minimal-light';
+  }
+  if (/THEME:\s*MINIMAL DARK/i.test(css) || /MINIMAL DARK/i.test(css)) {
+    return 'minimal-dark';
+  }
+  if (/THEME 1:\s*HERO POP LIGHT/i.test(css) || /HERO POP LIGHT/i.test(css)) {
+    return 'comic-pop-light';
+  }
+  if (/THEME 1:\s*HERO POP DARK/i.test(css) || /HERO POP DARK/i.test(css)) {
+    return 'comic-pop-dark';
+  }
+
+  // 2. Specific Theme Template / HTML / CSS Classes / Selectors & Model Name Checks
+  // Duo Quest / Duolingo
+  if (
+    has(/theme-quest|quest-card|duo-quest|duolingo|quest-mnemonic-card|quest-meaning-banner|quest-tag-purple|quest-tag-blue|meaning-quest-label/) ||
+    modelName.includes('duo quest') ||
+    modelName.includes('duolingo') ||
+    modelName.includes('quest')
+  ) {
+    const isDark =
+      modelName.includes('dark') ||
+      /duo quest dark|duolingo dark|quest-dark/i.test(allContent) ||
+      /#0f172a|#1e293b/i.test(css);
+    return isDark ? 'comic-quest-dark' : 'comic-quest-light';
+  }
+
+  // Botanical Sage
+  if (
+    has(/theme-botanical|botanical-card|botanical-meaning-box|botanical-definition-box|botanical-example-box|botanical-custom-title/) ||
+    modelName.includes('botanical') ||
+    modelName.includes('sage')
+  ) {
+    const isDark =
+      modelName.includes('dark') ||
+      /botanical.*dark|theme-botanical-dark|theme 6/i.test(allContent) ||
+      /#1a201c|#19231a/i.test(css);
+    return isDark ? 'botanical-dark' : 'botanical-light';
+  }
+
+  // Index Notebook
+  if (
+    has(/theme-notebook|notebook-card|notebook-washi-mnemonic|notebook-highlighter-meaning|notebook-sticky-example|washi-title/) ||
+    modelName.includes('notebook')
+  ) {
+    const isDark =
+      modelName.includes('dark') ||
+      /notebook.*dark|theme-notebook-dark/i.test(allContent) ||
+      /#1e232a|#181c22/i.test(css);
+    return isDark ? 'comic-notebook-dark' : 'comic-notebook-light';
+  }
+
+  // Minimal
+  if (
+    has(/theme-minimal|minimal-card|minimal-mnemonic-block|minimal-meaning-block|minimal-definition-block/) ||
+    modelName.includes('minimal')
+  ) {
+    const isDark =
+      modelName.includes('dark') ||
+      /minimal.*dark|theme-minimal-dark/i.test(allContent);
+    return isDark ? 'minimal-dark' : 'minimal-light';
+  }
+
+  // Hero Pop / Comic Pop
+  if (
+    has(/theme-pop|hero-pop|comic-mnemonic-box|comic-word-hero-card|comic-meaning-box|comic-definition-box|comic-example-box/) ||
+    modelName.includes('hero pop') ||
+    modelName.includes('comic-pop') ||
+    modelName.includes('comic pop') ||
+    modelName.includes('hero')
+  ) {
+    const isDark =
+      modelName.includes('dark') ||
+      /hero pop dark|comic pop dark|theme-pop-dark/i.test(allContent) ||
+      /#0b0f19/i.test(css);
+    return isDark ? 'comic-pop-dark' : 'comic-pop-light';
+  }
+
+  // Legacy Manga / Arcade
+  if (modelName.includes('manga') || modelName.includes('arcade')) {
+    return modelName.includes('dark') ? 'comic-quest-dark' : 'comic-quest-light';
+  }
+
+  // Legacy Strip
+  if (modelName.includes('strip')) {
+    return modelName.includes('dark') ? 'comic-pop-dark' : 'comic-pop-light';
+  }
+
+  // Generic Light / Dark fallback from modelName if it has "Light" or "Dark"
+  if (modelName.includes('dark')) {
+    return 'comic-pop-dark';
+  }
+  if (modelName.includes('light')) {
+    return 'comic-pop-light';
+  }
+
+  return null;
+}
+
 export async function searchAnkiNotes(
   baseUrl: string = 'http://127.0.0.1:8765',
   query: string = '',
@@ -923,6 +1058,45 @@ export async function searchAnkiNotes(
         }
       }
     }
+  }
+
+  // Pre-fetch model styling & templates for all unique note models to accurately detect themes
+  const uniqueModelNames = Array.from(
+    new Set(rawNotes.map((n) => n.modelName).filter(Boolean))
+  ) as string[];
+
+  const modelMetadataMap = new Map<string, { css: string; templatesHtml: string }>();
+
+  if (uniqueModelNames.length > 0) {
+    await Promise.all(
+      uniqueModelNames.map(async (modelName) => {
+        try {
+          const [stylingRes, templatesRes] = await Promise.all([
+            callAnkiConnect(baseUrl, 'modelStyling', { modelName }),
+            callAnkiConnect(baseUrl, 'modelTemplates', { modelName }),
+          ]);
+
+          let css = '';
+          if (stylingRes.success && stylingRes.result) {
+            css =
+              typeof stylingRes.result === 'string'
+                ? stylingRes.result
+                : stylingRes.result.css || '';
+          }
+
+          let templatesHtml = '';
+          if (templatesRes.success && templatesRes.result && typeof templatesRes.result === 'object') {
+            templatesHtml = Object.values(templatesRes.result)
+              .map((t: any) => `${t.Front || ''} ${t.Back || ''}`)
+              .join(' ');
+          }
+
+          modelMetadataMap.set(modelName, { css, templatesHtml });
+        } catch (e) {
+          console.warn(`[Anki] Could not fetch styling/templates for model "${modelName}":`, e);
+        }
+      })
+    );
   }
 
   const formattedNotes = rawNotes.map((n) => {
@@ -997,6 +1171,15 @@ export async function searchAnkiNotes(
       cleanFieldsMap[k] = (v as any)?.value || '';
     }
 
+    // Inspect note model styling, templates, and note content to detect original theme
+    const modelMeta = modelMetadataMap.get(n.modelName);
+    const detectedTheme = detectThemeFromAnkiData({
+      modelName: n.modelName,
+      css: modelMeta?.css,
+      templatesHtml: modelMeta?.templatesHtml,
+      fields: cleanFieldsMap,
+    });
+
     const cardData: CardData = {
       word,
       phonetic,
@@ -1039,6 +1222,7 @@ export async function searchAnkiNotes(
       translationFa: translation,
       mnemonic,
       cardType,
+      detectedTheme: detectedTheme || undefined,
       fields: cleanFieldsMap,
       cardIds: n.cards || [],
       cardData,

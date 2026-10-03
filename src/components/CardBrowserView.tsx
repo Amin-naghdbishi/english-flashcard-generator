@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { AppSettings, AppTheme, CardData } from '../types';
+import { AppSettings, AppTheme, CardData, ThemeId } from '../types';
 import { searchAnkiNotes, updateAnkiNote, checkAnki, getAnkiDecks, getAnkiTags, openInAnki, AnkiBrowserNoteItem } from '../services/api';
 import { CardPreview } from './CardPreview';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
+import { THEME_GROUPS } from '../themes';
 import {
   Search,
   RotateCcw,
@@ -52,6 +53,9 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
   const [editingCard, setEditingCard] = useState<CardData | null>(null);
   const [originalCardJson, setOriginalCardJson] = useState<string>('');
   const [isDirty, setIsDirty] = useState<boolean>(false);
+
+  // Current active theme for editor / live preview
+  const [currentTheme, setCurrentTheme] = useState<ThemeId>(settings.theme || 'comic-pop-dark');
 
   // Save state
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -137,10 +141,13 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
           if (res.notes.length > 0) {
             // Select first card by default
             setSelectedIndex(0);
-            const firstCardData = { ...res.notes[0].cardData };
+            const firstNote = res.notes[0];
+            const firstCardData = { ...firstNote.cardData };
             setEditingCard(firstCardData);
             setOriginalCardJson(JSON.stringify(firstCardData));
             setIsDirty(false);
+            const initialTheme = firstNote.detectedTheme || settings.theme || 'comic-pop-dark';
+            setCurrentTheme(initialTheme);
           } else {
             setSelectedIndex(-1);
             setEditingCard(null);
@@ -161,7 +168,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
         setIsSearching(false);
       }
     },
-    [settings.anki.url]
+    [settings.anki.url, settings.theme]
   );
 
   // Safe navigation guard for unsaved changes
@@ -193,10 +200,18 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
         setOriginalCardJson(JSON.stringify(cardCopy));
         setIsDirty(false);
         setSaveSuccessMsg(null);
+        const targetTheme = target.detectedTheme || settings.theme || 'comic-pop-dark';
+        setCurrentTheme(targetTheme);
       }, target.word);
     },
-    [notes, selectedIndex, requestNavigation]
+    [notes, selectedIndex, requestNavigation, settings.theme]
   );
+
+  const handleThemeChange = useCallback((newTheme: ThemeId) => {
+    setCurrentTheme(newTheme);
+    setIsDirty(true);
+    setSaveSuccessMsg(null);
+  }, []);
 
   const handlePreviousCard = useCallback(() => {
     if (selectedIndex > 0) {
@@ -232,7 +247,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
       const res = await updateAnkiNote(
         selectedNote.noteId,
         editingCard,
-        settings.theme,
+        currentTheme,
         settings.anki.url,
         selectedNote.deckName
       );
@@ -253,8 +268,13 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
                   partOfSpeech: editingCard.partOfSpeech,
                   meaningFa: editingCard.meaningFa,
                   definitionEn: editingCard.definitionEn,
+                  phonetic: editingCard.phonetic,
+                  example: editingCard.example,
+                  translationFa: editingCard.translationFa,
+                  mnemonic: editingCard.mnemonic,
                   cardType: editingCard.cardType,
                   tags: editingCard.tags || n.tags,
+                  detectedTheme: currentTheme,
                   cardData: { ...editingCard },
                 }
               : n
@@ -423,24 +443,24 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
       </div>
 
       {/* Main Two-Pane Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1 items-start">
-        {/* LEFT PANE: Search & Text-Based Table (5 cols on lg) */}
+      <div className="flex flex-col lg:flex-row gap-3 flex-1 items-start min-w-0">
+        {/* LEFT PANE: Search & Text-Based Table (~1/6 width on desktop: 260px - 280px) */}
         <div
-          className={`lg:col-span-5 flex flex-col rounded-xl border shadow-xs overflow-hidden h-[750px] ${
+          className={`w-full lg:w-[260px] xl:w-[280px] shrink-0 flex flex-col rounded-xl border shadow-xs overflow-hidden h-[750px] ${
             isDark ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-zinc-200'
           }`}
         >
           {/* Search Box Header */}
-          <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 flex flex-col gap-2 bg-zinc-50/50 dark:bg-zinc-950/40">
-            <form onSubmit={handleSearchSubmit} className="relative flex items-center gap-1.5">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <div className="p-2.5 border-b border-zinc-200 dark:border-zinc-800 flex flex-col gap-1.5 bg-zinc-50/50 dark:bg-zinc-950/40">
+            <form onSubmit={handleSearchSubmit} className="relative flex items-center gap-1">
+              <div className="relative flex-1 min-w-0">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
                 <input
                   type="text"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="deck:English tag:B1 abandon..."
-                  className={`w-full pl-9 pr-8 py-2 text-xs sm:text-sm rounded-lg border transition-colors outline-none focus:ring-2 focus:ring-blue-500 font-mono ${
+                  placeholder="deck:English tag:B1..."
+                  className={`w-full pl-8 pr-7 py-1.5 text-xs rounded-lg border transition-colors outline-none focus:ring-2 focus:ring-blue-500 font-mono ${
                     isDark
                       ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500'
                       : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400'
@@ -452,57 +472,57 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
                     onClick={() => {
                       setSearchInput('');
                     }}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
                     title="Clear search"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-3 h-3" />
                   </button>
                 )}
               </div>
               <button
                 type="submit"
                 disabled={isSearching}
-                className="py-2 px-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors shrink-0"
+                className="py-1.5 px-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1 cursor-pointer shadow-xs transition-colors shrink-0"
+                title="Execute search"
               >
-                {isSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
-                <span>Search</span>
+                {isSearching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
               </button>
             </form>
 
             {/* Quick Filter Suggestion Chips */}
-            <div className="flex flex-wrap items-center gap-1 text-[11px] pt-1">
-              <span className="text-zinc-400 dark:text-zinc-500 text-[10px] font-semibold uppercase mr-1">
+            <div className="flex flex-wrap items-center gap-1 text-[10px] pt-0.5">
+              <span className="text-zinc-400 dark:text-zinc-500 text-[9px] font-semibold uppercase mr-0.5">
                 Quick:
               </span>
               {settings.anki.defaultDeck && (
                 <button
                   type="button"
                   onClick={() => handleQuickFilter(`deck:"${settings.anki.defaultDeck}"`)}
-                  className={`px-2 py-0.5 rounded-md border font-mono transition-colors cursor-pointer flex items-center gap-1 ${
+                  className={`px-1.5 py-0.5 rounded border font-mono transition-colors cursor-pointer flex items-center gap-0.5 truncate max-w-[130px] ${
                     isDark
                       ? 'bg-zinc-800/80 hover:bg-zinc-750 border-zinc-700 text-zinc-300'
                       : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-200 text-zinc-700'
                   }`}
-                  title="Filter by default deck"
+                  title={`Filter by default deck: ${settings.anki.defaultDeck}`}
                 >
-                  <Folder className="w-2.5 h-2.5 text-blue-500" />
-                  <span>{settings.anki.defaultDeck.split('::').pop()}</span>
+                  <Folder className="w-2.5 h-2.5 text-blue-500 shrink-0" />
+                  <span className="truncate">{settings.anki.defaultDeck.split('::').pop()}</span>
                 </button>
               )}
-              {availableTags.slice(0, 3).map((tag) => (
+              {availableTags.slice(0, 2).map((tag) => (
                 <button
                   key={tag}
                   type="button"
                   onClick={() => handleQuickFilter(`tag:"${tag}"`)}
-                  className={`px-2 py-0.5 rounded-md border font-mono transition-colors cursor-pointer flex items-center gap-1 ${
+                  className={`px-1.5 py-0.5 rounded border font-mono transition-colors cursor-pointer flex items-center gap-0.5 truncate max-w-[80px] ${
                     isDark
                       ? 'bg-zinc-800/80 hover:bg-zinc-750 border-zinc-700 text-zinc-300'
                       : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-200 text-zinc-700'
                   }`}
                   title={`Filter by tag ${tag}`}
                 >
-                  <Tag className="w-2.5 h-2.5 text-emerald-500" />
-                  <span>{tag}</span>
+                  <Tag className="w-2.5 h-2.5 text-emerald-500 shrink-0" />
+                  <span className="truncate">{tag}</span>
                 </button>
               ))}
               <button
@@ -511,41 +531,36 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
                   setSearchInput('');
                   executeSearch('');
                 }}
-                className={`px-2 py-0.5 rounded-md border font-mono transition-colors cursor-pointer text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 ${
+                className={`px-1.5 py-0.5 rounded border font-mono transition-colors cursor-pointer text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 ${
                   isDark ? 'bg-zinc-800/40 border-zinc-750' : 'bg-zinc-50 border-zinc-200'
                 }`}
               >
-                All Cards
+                All
               </button>
             </div>
           </div>
 
           {/* Search Result Status & Counter */}
           <div
-            className={`px-3 py-1.5 text-xs border-b flex items-center justify-between font-mono ${
+            className={`px-2.5 py-1 text-[11px] border-b flex items-center justify-between font-mono ${
               isDark ? 'bg-zinc-850/60 border-zinc-800 text-zinc-400' : 'bg-zinc-100/70 border-zinc-200 text-zinc-600'
             }`}
           >
             <span>
               {isSearching ? (
-                <span className="flex items-center gap-1.5 text-blue-500">
+                <span className="flex items-center gap-1 text-blue-500">
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  Searching AnkiConnect...
+                  Searching...
                 </span>
               ) : (
                 <span>
-                  Found <strong className="text-blue-500">{totalCount}</strong> cards
-                  {totalCount > notes.length && (
-                    <span className="text-[10px] text-zinc-400 ml-1 font-sans">
-                      (showing first {notes.length})
-                    </span>
-                  )}
+                  Found <strong className="text-blue-500">{totalCount}</strong>
                 </span>
               )}
             </span>
             {activeQuery && (
-              <span className="truncate max-w-[200px] text-[10px] text-zinc-400" title={activeQuery}>
-                Query: {activeQuery}
+              <span className="truncate max-w-[120px] text-[10px] text-zinc-400" title={activeQuery}>
+                {activeQuery}
               </span>
             )}
           </div>
@@ -554,7 +569,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
           <div className="flex-1 overflow-y-auto min-h-0 select-none divide-y divide-zinc-100 dark:divide-zinc-800/60">
             {/* Table Header */}
             <div
-              className={`sticky top-0 z-10 grid grid-cols-12 px-3 py-2 text-[11px] font-bold uppercase tracking-wider border-b ${
+              className={`sticky top-0 z-10 grid grid-cols-12 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider border-b ${
                 isDark
                   ? 'bg-zinc-900 border-zinc-800 text-zinc-400'
                   : 'bg-zinc-100/90 border-zinc-200 text-zinc-600 backdrop-blur-xs'
@@ -562,23 +577,23 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
             >
               <div className="col-span-3">Type</div>
               <div className="col-span-4">Deck</div>
-              <div className="col-span-5">Word / Term</div>
+              <div className="col-span-5">Word</div>
             </div>
 
             {/* Offline Error State */}
             {isAnkiConnected === false && (
-              <div className="p-6 text-center flex flex-col items-center justify-center gap-2 text-zinc-500">
-                <AlertTriangle className="w-8 h-8 text-amber-500" />
-                <p className="font-semibold text-sm text-zinc-800 dark:text-zinc-200">
-                  AnkiConnect is Offline
+              <div className="p-4 text-center flex flex-col items-center justify-center gap-1.5 text-zinc-500">
+                <AlertTriangle className="w-6 h-6 text-amber-500" />
+                <p className="font-semibold text-xs text-zinc-800 dark:text-zinc-200">
+                  AnkiConnect Offline
                 </p>
-                <p className="text-xs max-w-sm">
-                  Please ensure Anki is open on your computer and the AnkiConnect add-on is installed.
+                <p className="text-[10px] max-w-xs">
+                  Please ensure Anki is open with AnkiConnect.
                 </p>
                 <button
                   type="button"
                   onClick={() => executeSearch(searchInput)}
-                  className="mt-2 py-1.5 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium cursor-pointer"
+                  className="mt-1 py-1 px-2.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-medium cursor-pointer"
                 >
                   Retry Connection
                 </button>
@@ -587,26 +602,22 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
 
             {/* Search Syntax or Execution Error */}
             {searchError && (
-              <div className="p-4 m-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 text-xs flex flex-col gap-1">
-                <strong className="font-bold flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  Search Query Error
+              <div className="p-3 m-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 text-xs flex flex-col gap-1">
+                <strong className="font-bold flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  Query Error
                 </strong>
-                <span>{searchError}</span>
-                <span className="text-[10px] text-zinc-400 mt-1">
-                  Tip: Check search syntax. Example: <code className="text-blue-400">deck:English</code> or{' '}
-                  <code className="text-blue-400">tag:B1</code>.
-                </span>
+                <span className="text-[11px]">{searchError}</span>
               </div>
             )}
 
             {/* Empty State */}
             {!isSearching && !searchError && isAnkiConnected !== false && notes.length === 0 && (
-              <div className="p-8 text-center flex flex-col items-center justify-center gap-2 text-zinc-400">
-                <Search className="w-8 h-8 opacity-40" />
-                <p className="font-semibold text-sm text-zinc-700 dark:text-zinc-300">No cards found</p>
-                <p className="text-xs max-w-xs text-zinc-400">
-                  No notes match your search query in Anki. Try clearing the filter or searching for another term.
+              <div className="p-6 text-center flex flex-col items-center justify-center gap-1.5 text-zinc-400">
+                <Search className="w-6 h-6 opacity-40" />
+                <p className="font-semibold text-xs text-zinc-700 dark:text-zinc-300">No cards found</p>
+                <p className="text-[11px] max-w-xs text-zinc-400">
+                  No notes match your query.
                 </p>
                 <button
                   type="button"
@@ -614,7 +625,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
                     setSearchInput('');
                     executeSearch('');
                   }}
-                  className="mt-2 py-1 px-3 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+                  className="mt-1 py-0.5 px-2.5 text-[11px] rounded border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
                 >
                   Show All Cards
                 </button>
@@ -635,7 +646,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
                 <div
                   key={note.noteId}
                   onClick={() => handleSelectCard(index)}
-                  className={`grid grid-cols-12 px-3 py-2 text-xs transition-colors cursor-pointer items-center border-l-3 ${
+                  className={`grid grid-cols-12 px-2 py-1.5 text-xs transition-colors cursor-pointer items-center border-l-3 ${
                     isSelected
                       ? isDark
                         ? 'bg-blue-950/40 border-l-blue-500 text-white font-medium'
@@ -648,7 +659,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
                   {/* Type Column */}
                   <div className="col-span-3 truncate pr-1">
                     <span
-                      className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-mono capitalize ${
+                      className={`inline-block px-1 py-0.5 rounded text-[9px] font-mono leading-none capitalize ${
                         isSelected
                           ? 'bg-blue-500/20 text-blue-400 font-bold'
                           : isDark
@@ -663,7 +674,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
 
                   {/* Deck Column */}
                   <div
-                    className="col-span-4 truncate pr-2 text-zinc-500 dark:text-zinc-400 text-[11px]"
+                    className="col-span-4 truncate pr-1 text-zinc-500 dark:text-zinc-400 text-[10px]"
                     title={note.deckName}
                   >
                     {cleanDeck}
@@ -671,7 +682,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
 
                   {/* Word Column */}
                   <div
-                    className={`col-span-5 font-semibold truncate ${
+                    className={`col-span-5 font-semibold truncate text-xs ${
                       isSelected ? 'text-blue-500 dark:text-blue-400' : ''
                     }`}
                     title={note.word}
@@ -684,9 +695,9 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
           </div>
         </div>
 
-        {/* RIGHT PANE: Existing Card Editor (7 cols on lg) */}
+        {/* RIGHT PANE: Existing Card Editor (~5/6 width on desktop) */}
         <div
-          className={`lg:col-span-7 flex flex-col rounded-xl border shadow-xs overflow-hidden h-[750px] relative ${
+          className={`flex-1 min-w-0 w-full flex flex-col rounded-xl border shadow-xs overflow-hidden h-[750px] relative ${
             isDark ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-zinc-200'
           }`}
         >
@@ -716,6 +727,47 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {/* Theme Selector Dropdown */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium flex items-center gap-1">
+                      <Sliders className="w-3 h-3 text-zinc-400" />
+                      Theme:
+                    </span>
+                    <select
+                      value={currentTheme}
+                      onChange={(e) => handleThemeChange(e.target.value as ThemeId)}
+                      className={`text-xs py-1 px-2 rounded-md border font-medium cursor-pointer outline-none transition-colors ${
+                        isDark
+                          ? 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:border-zinc-600 focus:border-blue-500'
+                          : 'bg-white border-zinc-200 text-zinc-800 hover:border-zinc-300 focus:border-blue-500 shadow-2xs'
+                      }`}
+                      title="Card Theme / Template"
+                    >
+                      <optgroup label="Light Themes">
+                        {THEME_GROUPS.light.map((th) => (
+                          <option key={th.id} value={th.id}>
+                            {th.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Dark Themes">
+                        {THEME_GROUPS.dark.map((th) => (
+                          <option key={th.id} value={th.id}>
+                            {th.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    </select>
+                    {selectedNote.detectedTheme && selectedNote.detectedTheme === currentTheme && (
+                      <span
+                        className="text-[10px] text-emerald-500 font-mono hidden xl:inline"
+                        title="Theme detected from Anki note templates/CSS"
+                      >
+                        (detected)
+                      </span>
+                    )}
+                  </div>
+
                   {saveSuccessMsg && (
                     <span className="text-xs text-emerald-500 font-semibold flex items-center gap-1 animate-fade-in">
                       <CheckCircle2 className="w-3.5 h-3.5" />
@@ -748,7 +800,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
               <div className="flex-1 overflow-y-auto min-h-0 relative">
                 <CardPreview
                   cardData={editingCard}
-                  themeId={settings.theme}
+                  themeId={currentTheme}
                   emptyWordPlaceholder={selectedNote.word}
                   appTheme={isDark ? 'anki-dark' : 'anki-light'}
                   editable={true}

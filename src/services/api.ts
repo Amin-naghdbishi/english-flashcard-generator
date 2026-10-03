@@ -519,6 +519,7 @@ export interface AnkiBrowserNoteItem {
   translationFa?: string;
   mnemonic?: string;
   cardType?: CardType;
+  detectedTheme?: ThemeId;
   fields: Record<string, string>;
   cardIds: number[];
   cardData: CardData;
