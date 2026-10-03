@@ -39,7 +39,12 @@ import {
   ExternalLink,
   ChevronDown,
   Loader2,
+  Tag,
+  Tags,
+  Check,
+  RefreshCw,
 } from 'lucide-react';
+import { getAnkiTags } from '../services/api';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
 
@@ -380,6 +385,73 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
       [field]: value,
     }));
   };
+
+  // Tags editor state (Requirement 7)
+  const [isTagsOpen, setIsTagsOpen] = useState<boolean>(false);
+  const [availableAnkiTags, setAvailableAnkiTags] = useState<string[]>([]);
+  const [isLoadingTags, setIsLoadingTags] = useState<boolean>(false);
+  const [newTagInput, setNewTagInput] = useState<string>('');
+  const [tagFilterInput, setTagFilterInput] = useState<string>('');
+
+  const loadAnkiTags = useCallback(async () => {
+    setIsLoadingTags(true);
+    try {
+      const res = await getAnkiTags();
+      if (res.success && Array.isArray(res.tags)) {
+        setAvailableAnkiTags(res.tags);
+      }
+    } catch {
+      // Ignore if offline
+    } finally {
+      setIsLoadingTags(false);
+    }
+  }, []);
+
+  const handleAddTag = useCallback((tagName: string) => {
+    const clean = tagName.trim();
+    if (!clean) return;
+    handleUpdate((prev) => {
+      const current = prev.tags || [];
+      if (current.includes(clean)) return prev;
+      return {
+        ...prev,
+        tags: [...current, clean],
+      };
+    });
+    setNewTagInput('');
+  }, [handleUpdate]);
+
+  const handleRemoveTag = useCallback((tagName: string) => {
+    handleUpdate((prev) => {
+      const current = prev.tags || [];
+      return {
+        ...prev,
+        tags: current.filter((t) => t !== tagName),
+      };
+    });
+  }, [handleUpdate]);
+
+  const handleToggleTag = useCallback((tagName: string) => {
+    handleUpdate((prev) => {
+      const current = prev.tags || [];
+      if (current.includes(tagName)) {
+        return {
+          ...prev,
+          tags: current.filter((t) => t !== tagName),
+        };
+      }
+      return {
+        ...prev,
+        tags: [...current, tagName],
+      };
+    });
+  }, [handleUpdate]);
+
+  const filteredAnkiTags = useMemo(() => {
+    if (!tagFilterInput.trim()) return availableAnkiTags;
+    const q = tagFilterInput.trim().toLowerCase();
+    return availableAnkiTags.filter((t) => t.toLowerCase().includes(q));
+  }, [availableAnkiTags, tagFilterInput]);
 
   // Switch card type (normal <-> spelling) and ensure proper fields
   const handleToggleCardType = (newType: CardType) => {
@@ -1646,6 +1718,36 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             </button>
           )}
 
+          {/* Card Tags Button */}
+          <button
+            type="button"
+            onClick={() => {
+              const next = !isTagsOpen;
+              setIsTagsOpen(next);
+              if (next && availableAnkiTags.length === 0) {
+                loadAnkiTags();
+              }
+            }}
+            className={`px-2.5 py-1 text-xs font-semibold rounded border flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs ${
+              isTagsOpen || (internalCard.tags && internalCard.tags.length > 0)
+                ? isDark
+                  ? 'bg-purple-900/30 text-purple-300 border-purple-500/50'
+                  : 'bg-purple-50 text-purple-700 border-purple-300'
+                : isDark
+                ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700'
+                : 'bg-zinc-100 text-zinc-700 border-zinc-300 hover:bg-zinc-200'
+            }`}
+            title="Manage Anki tags for this card"
+          >
+            <Tags className="w-3.5 h-3.5" />
+            <span>Tags</span>
+            {internalCard.tags && internalCard.tags.length > 0 && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-600/40 text-purple-200 font-mono font-bold">
+                {internalCard.tags.length}
+              </span>
+            )}
+          </button>
+
           {/* Toggle Slide-out Editor Toolbar Button */}
           {editable && mode === 'edit' && (
             <button
@@ -1668,6 +1770,147 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
           )}
         </div>
       </div>
+
+      {/* Tags Popover / Management Drawer */}
+      {isTagsOpen && (
+        <div
+          className={`w-full p-3 rounded-lg border shadow-lg space-y-2.5 transition-all mb-1 ${
+            isDark ? 'bg-zinc-900 border-zinc-700 text-zinc-100' : 'bg-white border-zinc-300 text-zinc-900'
+          }`}
+        >
+          <div className="flex items-center justify-between pb-1.5 border-b border-zinc-700/50">
+            <div className="flex items-center gap-2 text-xs font-bold">
+              <Tags className="w-4 h-4 text-purple-400" />
+              <span>Card Tags</span>
+              <span className="text-[11px] text-zinc-400 font-normal">
+                (Assigned to Anki note)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={loadAnkiTags}
+                disabled={isLoadingTags}
+                className="text-zinc-400 hover:text-zinc-200 text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                title="Reload tags from Anki"
+              >
+                <RefreshCw className={`w-3 h-3 ${isLoadingTags ? 'animate-spin' : ''}`} />
+                <span className="text-[10px]">Refresh</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsTagsOpen(false)}
+                className="text-zinc-400 hover:text-zinc-200 text-xs p-1 cursor-pointer"
+                title="Close tags panel"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          {/* Current assigned tags list */}
+          <div className="flex flex-wrap items-center gap-1.5 min-h-[28px]">
+            {internalCard.tags && internalCard.tags.length > 0 ? (
+              internalCard.tags.map((t) => (
+                <span
+                  key={t}
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-medium bg-purple-500/20 text-purple-300 border border-purple-500/40"
+                >
+                  <Tag className="w-3 h-3" />
+                  <span>{t}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveTag(t)}
+                    className="text-purple-300 hover:text-rose-400 ml-1 cursor-pointer font-bold"
+                    title={`Remove tag "${t}"`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))
+            ) : (
+              <span className="text-xs text-zinc-500 italic">No custom tags assigned to this card yet.</span>
+            )}
+          </div>
+
+          {/* Input to type / create a new tag */}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Type new tag and press Enter..."
+              value={newTagInput}
+              onChange={(e) => setNewTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddTag(newTagInput);
+                }
+              }}
+              className={`flex-1 px-3 py-1.5 text-xs rounded border focus:outline-none focus:ring-1 focus:ring-purple-500 ${
+                isDark
+                  ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500'
+                  : 'bg-zinc-50 border-zinc-300 text-zinc-900 placeholder-zinc-400'
+              }`}
+            />
+            <button
+              type="button"
+              onClick={() => handleAddTag(newTagInput)}
+              disabled={!newTagInput.trim()}
+              className="px-3 py-1.5 text-xs font-semibold bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white rounded cursor-pointer transition-colors shrink-0"
+            >
+              + Add Tag
+            </button>
+          </div>
+
+          {/* Available tags from Anki */}
+          <div className="pt-2 border-t border-zinc-700/40 space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] text-zinc-400">
+              <span className="font-semibold">Available in Anki:</span>
+              {availableAnkiTags.length > 5 && (
+                <input
+                  type="text"
+                  placeholder="Filter available tags..."
+                  value={tagFilterInput}
+                  onChange={(e) => setTagFilterInput(e.target.value)}
+                  className={`w-36 px-2 py-0.5 text-[10px] rounded border ${
+                    isDark ? 'bg-zinc-800 border-zinc-700 text-zinc-200' : 'bg-zinc-100 border-zinc-300 text-zinc-800'
+                  }`}
+                />
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+              {filteredAnkiTags.length > 0 ? (
+                filteredAnkiTags.map((tag) => {
+                  const isAssigned = (internalCard.tags || []).includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => handleToggleTag(tag)}
+                      className={`px-2 py-0.5 text-[11px] rounded transition-colors cursor-pointer border flex items-center gap-1 ${
+                        isAssigned
+                          ? 'bg-purple-600 text-white border-purple-500 font-medium'
+                          : isDark
+                          ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
+                          : 'bg-zinc-100 text-zinc-700 border-zinc-200 hover:bg-zinc-200'
+                      }`}
+                      title={isAssigned ? `Remove tag "${tag}"` : `Assign tag "${tag}"`}
+                    >
+                      {isAssigned && <Check className="w-2.5 h-2.5" />}
+                      <span>{tag}</span>
+                    </button>
+                  );
+                })
+              ) : (
+                <span className="text-[11px] text-zinc-500 italic">
+                  {isLoadingTags ? 'Loading Anki tags...' : 'No tags found in Anki. (You can type and add a new tag above)'}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MAIN CONTENT CANVAS & RIGHT TOOLBAR */}
       <div className="w-full flex-1 flex flex-col xl:flex-row gap-3.5 xl:gap-4 min-h-0 min-w-0">

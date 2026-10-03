@@ -317,6 +317,11 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
   const handleStartCompletion = async (retryOnlyFailed: boolean = false) => {
     if (isProcessing || notes.length === 0) return;
 
+    if (settings.ai?.enabled === false) {
+      setScanError(t('completeByTag.aiRequiredNotice', 'Complete by Tag requires AI. Please enable AI in Settings.'));
+      return;
+    }
+
     abortControllerRef.current = false;
     setIsProcessing(true);
     setIsCancelled(false);
@@ -610,6 +615,24 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
             </p>
           </div>
 
+          {/* AI Disabled Notice Banner */}
+          {settings.ai?.enabled === false && (
+            <div className="mb-4 p-3.5 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800 text-xs rounded-lg shadow-xs flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <span className="font-bold block">
+                  {t('completeByTag.aiRequiredTitle', 'AI is Currently Disabled')}
+                </span>
+                <p className="text-[11px] leading-relaxed">
+                  {t(
+                    'completeByTag.aiRequiredNotice',
+                    'Complete by Tag uses AI to automatically generate missing phonetic, definitions, examples, and mnemonics for existing Anki notes. Because AI is currently turned off globally, completion is unavailable. You can turn AI back on anytime in Settings.'
+                  )}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Tag Selector & Scanner */}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-1.5">
@@ -759,12 +782,14 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                   <button
                     type="button"
                     onClick={() => handleStartCompletion(false)}
-                    disabled={needingCount === 0 && failedCount === 0}
+                    disabled={settings.ai?.enabled === false || (needingCount === 0 && failedCount === 0)}
                     className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors"
                   >
                     <Play className="w-4 h-4 fill-current" />
                     <span>
-                      {needingCount > 0
+                      {settings.ai?.enabled === false
+                        ? t('completeByTag.aiDisabledBtn', 'AI Disabled')
+                        : needingCount > 0
                         ? t('completeByTag.completeCardsBtn', { count: needingCount })
                         : t('completeByTag.allDone')}
                     </span>

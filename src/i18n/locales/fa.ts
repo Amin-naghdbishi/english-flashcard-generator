@@ -13,6 +13,7 @@ export const fa = {
     refreshStatus: 'بروزرسانی وضعیت سرویس‌ها',
     aiConnected: '{label}: متصل / آماده',
     aiDisconnected: '{label}: قطع / آفلاین',
+    aiDisabled: 'هوش مصنوعی غیرفعال است (حالت دستی)',
     aiChecking: '{label}: در حال بررسی...',
     ttsReady: '{label}: آماده / در دسترس',
     ttsDisconnected: '{label}: قطع / آفلاین',
@@ -77,6 +78,7 @@ export const fa = {
     actions: 'عملیات',
     status: 'وضعیت',
     clear: 'پاک کردن',
+    tags: 'برچسب‌ها (Tags)',
   },
 
   // Create Card Section
@@ -115,6 +117,8 @@ export const fa = {
     searching: 'در حال جستجو...',
     downloading: 'در حال دریافت تصویر...',
     generateCardBtn: 'تولید فلش‌کارت و ارسال به آنکی',
+    createCardManualBtn: 'ایجاد کارت (دستی)',
+    createCardDirectBtn: 'ایجاد کارت (کامل)',
     clearBtn: 'پاک‌سازی',
     clearTooltip: 'پاک‌سازی فرم و آماده‌سازی برای کارت جدید',
     generating: 'در حال تولید کارت و صوت با هوش مصنوعی...',
@@ -213,6 +217,9 @@ export const fa = {
     draftBadge: 'پیش‌نویس ({count} فیلد خالی)',
     completeNoteBadge: 'کارت کامل',
     alreadyComplete: 'از قبل کامل است',
+    aiRequiredTitle: 'هوش مصنوعی غیرفعال است',
+    aiRequiredNotice: 'قابلیت تکمیل با تگ نیازمند هوش مصنوعی است تا فیلدهای خالی را به صورت خودکار تولید کند. از آنجا که هوش مصنوعی در تنظیمات خاموش است، این بخش موقتاً غیرفعال است. می‌توانید هر زمان از بخش تنظیمات آن را روشن کنید.',
+    aiDisabledBtn: 'هوش مصنوعی غیرفعال است',
   },
 
   // Settings Section
@@ -264,6 +271,9 @@ export const fa = {
     // AI Providers
     ai: {
       providerTitle: 'انتخاب سرویس هوش مصنوعی',
+      globalToggleTitle: 'فعال‌سازی هوش مصنوعی',
+      globalToggleOnDesc: 'هوش مصنوعی برای پر کردن فیلدهای خالی، تلفظ، معنی، مثال و یادافزا استفاده می‌شود.',
+      globalToggleOffDesc: 'هوش مصنوعی کاملاً خاموش است. هیچ درخواستی به اولاما یا سرویس‌های ابری ارسال نمی‌شود و کارت‌ها بر اساس داده‌های ورودی دستی ساخته می‌شوند.',
       ollamaTitle: 'اولاما - Ollama (محلی / آفلاین)',
       ollamaDesc: 'اجرای مدل‌های هوش مصنوعی بدون نیاز به اینترنت و بدون کلید API.',
       geminiTitle: 'گوگل جمینای - Gemini (ابری)',

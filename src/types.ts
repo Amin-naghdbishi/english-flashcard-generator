@@ -64,6 +64,9 @@ export interface CardData {
   frontCustomBlocks?: CustomCardBlock[];
   backCustomBlocks?: CustomCardBlock[];
   customBlocks?: CustomCardBlock[];
+
+  // Note tags assigned in Anki
+  tags?: string[];
 }
 
 export interface CustomCardBlock {
@@ -112,12 +115,28 @@ export interface ManualOverrides {
   translationFa?: string;
   mnemonic?: string;
   cardType?: CardType;
+  spellingSentence?: string;
   imageBase64?: string;
   imageFileName?: string;
   needsPhoto?: boolean;
+  tags?: string[];
+  allowAi?: boolean;
   frontCustomBlocks?: CustomCardBlock[];
   backCustomBlocks?: CustomCardBlock[];
   customBlocks?: CustomCardBlock[];
+}
+
+export function isCardComplete(card?: Partial<CardData> | ManualOverrides | null): boolean {
+  if (!card) return false;
+  return Boolean(
+    card.word?.trim() &&
+    card.phonetic?.trim() &&
+    card.partOfSpeech?.trim() &&
+    card.meaningFa?.trim() &&
+    card.example?.trim() &&
+    card.translationFa?.trim() &&
+    card.mnemonic?.trim()
+  );
 }
 
 export type AppTheme = 'anki-light' | 'anki-dark';
@@ -171,6 +190,7 @@ export interface CustomAIProviderConfig {
 }
 
 export interface AIConfig {
+  enabled?: boolean;
   provider: AIProvider;
   ollama: OllamaConfig;
   gemini: GeminiConfig;
@@ -320,7 +340,7 @@ export interface BatchItem {
   deck?: string;
   status: 'idle' | 'waiting' | 'checking_duplicate' | 'generating_ai' | 'generating_audio' | 'creating_anki' | 'retrying' | 'success' | 'error' | 'duplicate';
   cardData?: CardData;
-  parsedFields?: Partial<CardData>;
+  parsedFields?: Partial<CardData> & { needsPhoto?: boolean; cardType?: CardType; tags?: string[]; allowAi?: boolean };
   error?: string;
   noteId?: number;
   isDuplicate?: boolean;

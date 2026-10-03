@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { CardData, ManualOverrides, AppSettings, StepLog, AnkiCardVerificationDetails, CardType, AppTheme, getFrontCustomBlocks, getBackCustomBlocks, getAllCustomBlocks } from '../types';
+import { CardData, ManualOverrides, AppSettings, StepLog, AnkiCardVerificationDetails, CardType, AppTheme, getFrontCustomBlocks, getBackCustomBlocks, getAllCustomBlocks, isCardComplete } from '../types';
 import { CardPreview } from './CardPreview';
 import { AudioPlayer } from './AudioPlayer';
 import { useAppTheme } from '../context/ThemeContext';
@@ -196,7 +196,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
         const res = await getAnkiDecks(settings.anki?.url);
         if (res.success && res.decks.length > 0) {
           setAvailableDecks(res.decks);
-          if (!res.decks.includes(deck)) {
+          if (!deck) {
             setDeck(res.decks[0]);
           }
         }
@@ -388,6 +388,8 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
         translationFa: editableCard?.translationFa || undefined,
         mnemonic: editableCard?.mnemonic || undefined,
         cardType,
+        tags: editableCard?.tags || [],
+        allowAi: settings.ai?.enabled !== false,
         imageBase64: editableCard?.imageBase64 || undefined,
         imageFileName: editableCard?.imageFileName || undefined,
         frontCustomBlocks: getFrontCustomBlocks(editableCard),
@@ -404,6 +406,8 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
         createInAnki: true,
         theme: settings.theme,
         url: settings.anki.url,
+        tags: editableCard?.tags || [],
+        allowAi: settings.ai?.enabled !== false,
         signal: abortCtrl.signal,
       });
 
@@ -563,6 +567,9 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
     return null;
   }, [editableCard, generatedCard, word, cardType, photoChoice]);
 
+  const isAiEnabled = settings.ai?.enabled !== false;
+  const isCardAlreadyComplete = useMemo(() => isCardComplete(previewDisplayCard), [previewDisplayCard]);
+
   return (
     <div className="w-full max-w-[1920px] mx-auto flex flex-col lg:flex-row gap-4 xl:gap-5 p-3 sm:p-5 min-w-0">
       {/* LEFT COLUMN: Creation Parameters & Pipeline Status */}
@@ -598,7 +605,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
                   {t('create.wordLabel')} <span className="text-rose-500">*</span>
                 </label>
                 <span className="text-[10px] text-zinc-500 font-mono">
-                  {settings.ai.provider.toUpperCase()} AI
+                  {settings.ai?.enabled === false ? 'AI OFF (MANUAL)' : `${settings.ai.provider.toUpperCase()} AI`}
                 </span>
               </div>
               <input
@@ -621,61 +628,44 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
               />
             </div>
 
-            {/* Target Deck Selection */}
+            {/* Target Deck Input (Directly type or pick deck) */}
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className={`text-xs font-semibold ${isDark ? 'text-zinc-200' : 'text-zinc-700'}`}>
                   {t('create.deckLabel')}
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setIsCustomDeck(!isCustomDeck)}
-                  className="text-[11px] text-blue-500 hover:text-blue-400 font-medium cursor-pointer"
-                >
-                  {isCustomDeck ? t('create.selectDeck') : t('create.customDeckToggle')}
-                </button>
+                {loadingDecks ? (
+                  <span className="text-[11px] text-zinc-400 flex items-center gap-1">
+                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                    <span>Loading decks...</span>
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-zinc-400 font-normal">
+                    Type deck name or pick
+                  </span>
+                )}
               </div>
 
-              {isCustomDeck ? (
+              <div className="relative">
                 <input
                   type="text"
+                  list="create-view-decks-list"
                   required
-                  placeholder={t('create.customDeckPlaceholder')}
+                  placeholder={t('create.customDeckPlaceholder') || 'Enter deck name (e.g. English::B1)'}
                   value={deck}
                   onChange={(e) => setDeck(e.target.value)}
                   className={`w-full p-2 border rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                     isDark
-                      ? 'bg-[#18181B] border-zinc-700 text-zinc-100'
-                      : 'bg-white border-zinc-300 text-zinc-900'
+                      ? 'bg-[#18181B] border-zinc-700 text-zinc-100 placeholder-zinc-500'
+                      : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400'
                   }`}
                 />
-              ) : (
-                <div className="relative">
-                  <select
-                    value={deck}
-                    onChange={(e) => setDeck(e.target.value)}
-                    disabled={loadingDecks}
-                    className={`w-full p-2 border rounded-md text-xs font-medium appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
-                      isDark
-                        ? 'bg-[#18181B] border-zinc-700 text-zinc-100'
-                        : 'bg-white border-zinc-300 text-zinc-900'
-                    }`}
-                  >
-                    {availableDecks.map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
-                  </select>
-                  <div
-                    className={`absolute ${
-                      isRTL ? 'left-3' : 'right-3'
-                    } top-3 pointer-events-none text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}
-                  >
-                    ▼
-                  </div>
-                </div>
-              )}
+                <datalist id="create-view-decks-list">
+                  {availableDecks.map((d) => (
+                    <option key={d} value={d} />
+                  ))}
+                </datalist>
+              </div>
             </div>
 
             {/* Card Type Selection */}
@@ -841,8 +831,22 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
                     disabled={testingAnkiOnly || !word.trim()}
                     className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Sparkles className="w-4 h-4" />
-                    <span>{t('create.generateCardBtn')}</span>
+                    {!isAiEnabled ? (
+                      <>
+                        <Plus className="w-4 h-4" />
+                        <span>{t('create.createCardManualBtn', 'Create Card (Manual)')}</span>
+                      </>
+                    ) : isCardAlreadyComplete ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>{t('create.createCardDirectBtn', 'Create Card (Complete)')}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        <span>{t('create.generateCardBtn')}</span>
+                      </>
+                    )}
                   </button>
                 )}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AppSettings, BatchItem, CardData, BatchFieldConfig, ManualOverrides, AppTheme, CardType } from '../types';
+import { AppSettings, BatchItem, CardData, BatchFieldConfig, ManualOverrides, AppTheme, CardType, isCardComplete } from '../types';
 import {
   runFullPipeline,
   getAnkiDecks,
@@ -40,6 +40,7 @@ import {
   Layers3,
   ArrowRight,
   ExternalLink,
+  Tag as TagIcon,
 } from 'lucide-react';
 
 interface BatchCardViewProps {
@@ -53,7 +54,16 @@ export interface BatchParsedResult {
   format: BatchFormatType;
   formatLabel: string;
   formatDescription: string;
-  items: Array<{ word: string; deck: string; parsedFields: Partial<CardData> & { needsPhoto?: boolean; cardType?: CardType } }>;
+  items: Array<{
+    word: string;
+    deck: string;
+    parsedFields: Partial<CardData> & {
+      needsPhoto?: boolean;
+      cardType?: CardType;
+      tags?: string[];
+      allowAi?: boolean;
+    };
+  }>;
 }
 
 const MAX_AUTO_RETRIES = 2; // Total 3 attempts (1 initial + 2 retries)
@@ -73,12 +83,15 @@ function batchItemToCardData(item: BatchItem | null): CardData | null {
     mnemonic: pf.mnemonic || 'Memory aid will be generated.',
     cardType: pf.cardType || 'normal',
     needsPhoto: pf.needsPhoto,
+    tags: pf.tags || [],
   };
 }
 
 const DEFAULT_SAMPLE_BATCH_TXT = `--
 Word=eraser
 Deck=English::B1
+Tag=stationery, vocabulary
+AI=false
 Phonetic=/ɪˈreɪzər/
 Part of Speech=noun
 Persian Meaning=پاک‌کن
@@ -90,6 +103,8 @@ Spelling=false
 --
 Word=abandon
 Deck=English::B1
+Tag=verbs, b1
+AI=true
 Phonetic=/əˈbændən/
 Part of Speech=verb
 Persian Meaning=رها کردن، ترک کردن
@@ -101,12 +116,14 @@ Spelling=true
 --
 Word=bank
 Deck=English::B1
+Tag=finance
 Persian Meaning=بانک (موسسه مالی)
 Photo=true
 Spelling=false
 --
 Word=bank
 Deck=English::B1
+Tag=nature
 Persian Meaning=ساحل رودخانه
 Photo=true
 Spelling=true
@@ -132,18 +149,24 @@ export function autoDetectAndParseBatchInput(
     : trimmed.split(/\r?\n\s*\r?\n/);
 
   const blocks = rawBlocks.map((b) => b.trim()).filter(Boolean);
-  const results: Array<{ word: string; deck: string; parsedFields: Partial<CardData> & { needsPhoto?: boolean; cardType?: CardType } }> = [];
+  const results: BatchParsedResult['items'] = [];
 
   for (const block of blocks) {
     const lines = block.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     const fields: Record<string, string> = {};
+    const tagsList: string[] = [];
 
     for (const line of lines) {
       const sepIndex = line.indexOf('=') !== -1 ? line.indexOf('=') : line.indexOf(':');
       if (sepIndex !== -1) {
         const rawKey = line.slice(0, sepIndex).trim().toLowerCase().replace(/[\s_-]/g, '');
         const val = line.slice(sepIndex + 1).trim();
-        fields[rawKey] = val;
+        if (rawKey === 'tag' || rawKey === 'tags') {
+          const splitTags = val.split(',').map((t) => t.trim()).filter(Boolean);
+          tagsList.push(...splitTags);
+        } else {
+          fields[rawKey] = val;
+        }
       } else if (!fields['word'] && line && !line.startsWith('--')) {
         fields['word'] = line.trim();
       }
@@ -179,8 +202,20 @@ export function autoDetectAndParseBatchInput(
       }
     }
 
+    let allowAi: boolean | undefined = undefined;
+    const aiRaw = fields['ai'] || fields['useai'] || fields['allowai'] || fields['enableai'];
+    if (aiRaw !== undefined) {
+      const aLow = aiRaw.trim().toLowerCase();
+      if (aLow === 'false' || aLow === 'no' || aLow === '0' || aLow === 'off') {
+        allowAi = false;
+      } else if (aLow === 'true' || aLow === 'yes' || aLow === '1' || aLow === 'on') {
+        allowAi = true;
+      }
+    }
+
     const deck = fields['deck'] || fields['deckname'] || fields['targetdeck'] || defaultDeck;
-    const parsedFields: Partial<CardData> & { needsPhoto?: boolean; cardType?: CardType } = {
+    const dedupedTags = Array.from(new Set(tagsList));
+    const parsedFields: BatchParsedResult['items'][0]['parsedFields'] = {
       word,
       phonetic: fields['phonetic'] || fields['ipa'] || fields['pronunciation'] || undefined,
       partOfSpeech: fields['partofspeech'] || fields['pos'] || fields['type'] || undefined,
@@ -190,6 +225,8 @@ export function autoDetectAndParseBatchInput(
       mnemonic: fields['memoryaid'] || fields['mnemonic'] || fields['aid'] || fields['code'] || undefined,
       needsPhoto,
       cardType,
+      tags: dedupedTags.length > 0 ? dedupedTags : undefined,
+      allowAi,
     };
 
     results.push({ word, deck, parsedFields });
@@ -377,17 +414,27 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
       return false;
     }
 
-    if (settings.ai.provider === 'ollama') {
-      const ollamaRes = await checkOllama(settings.ai.ollama.url);
-      if (!ollamaRes.connected) {
-        setPreflightError(`Ollama is offline at ${settings.ai.ollama.url}. Please start Ollama or switch to Gemini.`);
-        return false;
-      }
-    } else if (settings.ai.provider === 'gemini') {
-      const geminiRes = await checkGemini(settings.ai.gemini.apiKey, settings.ai.gemini.model);
-      if (!geminiRes.connected) {
-        setPreflightError(`Google Gemini is not reachable: ${geminiRes.error || 'Check API Key'}`);
-        return false;
+    const isGlobalAiDisabled = settings.ai?.enabled === false;
+    const anyItemNeedsAi =
+      !isGlobalAiDisabled &&
+      items.some((it) => {
+        if (it.parsedFields?.allowAi === false) return false;
+        return !isCardComplete(it.parsedFields);
+      });
+
+    if (anyItemNeedsAi) {
+      if (settings.ai.provider === 'ollama') {
+        const ollamaRes = await checkOllama(settings.ai.ollama.url);
+        if (!ollamaRes.connected) {
+          setPreflightError(`Ollama is offline at ${settings.ai.ollama.url}. Please start Ollama or switch to Gemini.`);
+          return false;
+        }
+      } else if (settings.ai.provider === 'gemini') {
+        const geminiRes = await checkGemini(settings.ai.gemini.apiKey, settings.ai.gemini.model);
+        if (!geminiRes.connected) {
+          setPreflightError(`Google Gemini is not reachable: ${geminiRes.error || 'Check API Key'}`);
+          return false;
+        }
       }
     }
 
@@ -414,6 +461,10 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
   ): Promise<{ success: boolean; cardData?: CardData; noteId?: number; error?: string }> => {
     let lastError = '';
 
+    const cardAllowAi = item.parsedFields?.allowAi !== false;
+    const cardTags = item.parsedFields?.tags || [];
+    const willUseAi = settings.ai?.enabled !== false && cardAllowAi && !isCardComplete(item.parsedFields);
+
     for (let attempt = 0; attempt <= MAX_AUTO_RETRIES; attempt++) {
       if (abortControllerRef.current) {
         return { success: false, error: 'Cancelled by user' };
@@ -435,7 +486,16 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
         await new Promise((resolve) => setTimeout(resolve, 600));
       } else {
         setItems((prev) =>
-          prev.map((it, idx) => (idx === index ? { ...it, status: 'generating_ai', error: undefined, retryCount: 0 } : it))
+          prev.map((it, idx) =>
+            idx === index
+              ? {
+                  ...it,
+                  status: willUseAi ? 'generating_ai' : 'creating_anki',
+                  error: undefined,
+                  retryCount: 0,
+                }
+              : it
+          )
         );
       }
 
@@ -465,11 +525,15 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
           manualOverrides: {
             ...customOverrides,
             cardType: effectiveCardType,
+            tags: cardTags,
+            allowAi: cardAllowAi,
           },
           cardType: effectiveCardType,
           createInAnki: true,
           theme: settings.theme,
           url: settings.anki.url,
+          tags: cardTags,
+          allowAi: cardAllowAi,
         });
 
         if (res.success && res.cardData) {
@@ -794,25 +858,27 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             </div>
 
             <div
-              className={`p-2.5 border rounded-md flex items-center justify-between gap-1 ${
+              className={`p-2.5 border rounded-md flex items-center justify-between gap-2 ${
                 isDark ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-zinc-200'
               }`}
             >
-              <label className="text-xs font-semibold">{t('common.deck')}:</label>
-              <select
+              <label className="text-xs font-semibold shrink-0">{t('common.deck')}:</label>
+              <input
+                type="text"
+                list="batch-view-decks-list"
                 value={deck}
                 onChange={(e) => setDeck(e.target.value)}
                 disabled={isProcessing}
-                className={`flex-1 text-xs font-medium px-1 py-0.5 focus:outline-none cursor-pointer ${
-                  isDark ? 'bg-zinc-900 text-zinc-100' : 'bg-white text-zinc-900'
+                placeholder="Type or pick deck"
+                className={`flex-1 min-w-0 text-xs font-medium px-2 py-1 rounded border focus:outline-none focus:ring-1 focus:ring-purple-500 ${
+                  isDark ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500' : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400'
                 }`}
-              >
+              />
+              <datalist id="batch-view-decks-list">
                 {availableDecks.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
+                  <option key={d} value={d} />
                 ))}
-              </select>
+              </datalist>
             </div>
           </div>
 
@@ -1138,7 +1204,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                     {/* Status Icon */}
                     {item.status === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
                     {item.status === 'error' && <XCircle className="w-4 h-4 text-rose-500 shrink-0" />}
-                    {(item.status === 'generating_ai' || item.status === 'retrying') && (
+                    {(item.status === 'generating_ai' || item.status === 'retrying' || item.status === 'creating_anki') && (
                       <Loader2 className="w-4 h-4 animate-spin text-purple-500 shrink-0" />
                     )}
                     {item.status === 'waiting' && <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />}
@@ -1147,6 +1213,31 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                     <span className={`font-semibold truncate ${isSelected ? 'text-purple-600 dark:text-purple-400' : ''}`}>
                       {item.word}
                     </span>
+
+                    {item.parsedFields?.allowAi === false && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 shrink-0" title="AI skipped for this card">
+                        AI: OFF
+                      </span>
+                    )}
+
+                    {isCardComplete(item.parsedFields) && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 shrink-0" title="All fields pre-filled">
+                        Complete
+                      </span>
+                    )}
+
+                    {item.parsedFields?.tags && item.parsedFields.tags.length > 0 && (
+                      <div className="hidden sm:flex items-center gap-1 overflow-hidden shrink-0">
+                        {item.parsedFields.tags.slice(0, 2).map((tg) => (
+                          <span key={tg} className="text-[9px] px-1 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 truncate max-w-[60px]">
+                            #{tg}
+                          </span>
+                        ))}
+                        {item.parsedFields.tags.length > 2 && (
+                          <span className="text-[9px] text-zinc-400">+{item.parsedFields.tags.length - 2}</span>
+                        )}
+                      </div>
+                    )}
 
                     {item.noteId && (
                       <span className="text-[10px] font-mono text-zinc-400">
@@ -1168,10 +1259,12 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                           ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
                           : item.status === 'error'
                           ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
+                          : item.status === 'creating_anki'
+                          ? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
                           : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
                       }`}
                     >
-                      {item.status}
+                      {item.status === 'creating_anki' ? 'creating' : item.status}
                     </span>
                   </div>
                 </div>

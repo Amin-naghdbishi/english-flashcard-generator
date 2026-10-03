@@ -58,7 +58,7 @@ export async function updateAnkiNote(
   const res = await fetch('/api/anki/update-note', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ noteId, cardData, themeId, url }),
+    body: JSON.stringify({ noteId, cardData, themeId, url, tags: cardData.tags }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -396,6 +396,7 @@ export async function createDirectAnkiNote(params: {
   theme?: ThemeId;
   cardType?: CardType;
   url?: string;
+  tags?: string[];
 }): Promise<{
   success: boolean;
   noteId?: number;
@@ -419,6 +420,8 @@ export async function runFullPipeline(params: {
   createInAnki?: boolean;
   theme?: ThemeId;
   url?: string;
+  tags?: string[];
+  allowAi?: boolean;
   signal?: AbortSignal;
 }): Promise<{
   success: boolean;

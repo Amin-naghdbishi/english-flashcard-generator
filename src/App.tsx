@@ -293,6 +293,14 @@ export default function App() {
     try {
       // 1. Check AI Provider
       const checkAiPromise = (async () => {
+        if (currentSettings.ai?.enabled === false) {
+          return {
+            connected: false,
+            state: 'disabled' as ServiceState,
+            label: 'AI: Off',
+          };
+        }
+
         let aiConnected = false;
         let aiLabel = 'Ollama';
 

@@ -5,7 +5,7 @@ import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
 
 export type NavTab = 'create' | 'batch' | 'complete-by-tag' | 'settings';
-export type ServiceState = 'connected' | 'checking' | 'disconnected';
+export type ServiceState = 'connected' | 'checking' | 'disconnected' | 'disabled';
 
 export interface ServiceIndicatorInfo {
   state?: ServiceState;
@@ -37,7 +37,13 @@ interface NavigationStripProps {
   onMouseLeave?: () => void;
 }
 
-function getIndicatorClasses(isChecking: boolean, isOnline: boolean): { dot: string; container: string } {
+function getIndicatorClasses(isChecking: boolean, isOnline: boolean, isDisabled: boolean = false): { dot: string; container: string } {
+  if (isDisabled) {
+    return {
+      dot: 'bg-zinc-400 dark:bg-zinc-500',
+      container: 'border-zinc-400/30 dark:border-zinc-600/30',
+    };
+  }
   if (isChecking) {
     return {
       dot: 'bg-amber-500 animate-pulse',
@@ -73,10 +79,13 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
   const isDark = (propTheme || themeContext.appTheme) === 'anki-dark';
 
   // AI state
-  const isAiChecking = status.ai.state === 'checking' || !!status.ai.checking;
-  const isAiOnline = status.ai.state === 'connected' || (!isAiChecking && !!status.ai.connected);
-  const aiClasses = getIndicatorClasses(isAiChecking, isAiOnline);
-  const aiTooltip = isAiChecking
+  const isAiDisabled = status.ai.state === 'disabled';
+  const isAiChecking = !isAiDisabled && (status.ai.state === 'checking' || !!status.ai.checking);
+  const isAiOnline = !isAiDisabled && (status.ai.state === 'connected' || (!isAiChecking && !!status.ai.connected));
+  const aiClasses = getIndicatorClasses(isAiChecking, isAiOnline, isAiDisabled);
+  const aiTooltip = isAiDisabled
+    ? t('nav.aiDisabled', 'AI is currently disabled (Manual mode)')
+    : isAiChecking
     ? t('nav.aiChecking', { label: status.ai.label || 'AI' })
     : isAiOnline
     ? t('nav.aiConnected', { label: status.ai.label || 'AI' })
@@ -211,7 +220,7 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
             title={aiTooltip}
           >
             <span className="hidden sm:inline font-semibold">
-              AI
+              {isAiDisabled ? 'AI: Off' : 'AI'}
             </span>
             <span className={`w-2 h-2 rounded-full transition-colors ${aiClasses.dot}`} />
           </div>

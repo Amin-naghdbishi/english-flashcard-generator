@@ -13,6 +13,7 @@ export const en = {
     refreshStatus: 'Refresh status indicators',
     aiConnected: '{label}: Connected / Available',
     aiDisconnected: '{label}: Disconnected / Offline',
+    aiDisabled: 'AI is disabled (Manual mode)',
     aiChecking: '{label}: Checking status...',
     ttsReady: '{label}: Ready / Available',
     ttsDisconnected: '{label}: Disconnected / Offline',
@@ -77,6 +78,7 @@ export const en = {
     actions: 'Actions',
     status: 'Status',
     clear: 'Clear',
+    tags: 'Tags',
   },
 
   // Create Card Section
@@ -115,6 +117,8 @@ export const en = {
     searching: 'Searching...',
     downloading: 'Downloading...',
     generateCardBtn: 'Generate Flashcard to Anki',
+    createCardManualBtn: 'Create Card (Manual)',
+    createCardDirectBtn: 'Create Card (Complete)',
     clearBtn: 'Clear',
     clearTooltip: 'Clear form and reset all inputs for next card',
     generating: 'Generating Card & Audio...',
@@ -213,6 +217,9 @@ export const en = {
     draftBadge: 'Draft ({count} missing)',
     completeNoteBadge: 'Complete Note',
     alreadyComplete: 'Already Complete',
+    aiRequiredTitle: 'AI is Currently Disabled',
+    aiRequiredNotice: 'Complete by Tag uses AI to automatically generate missing definitions, examples, and mnemonics for existing Anki notes. Because AI is currently turned off globally, completion is unavailable. You can turn AI back on anytime in Settings.',
+    aiDisabledBtn: 'AI Disabled',
   },
 
   // Settings Section
@@ -264,6 +271,9 @@ export const en = {
     // AI Providers
     ai: {
       providerTitle: 'Select AI Provider',
+      globalToggleTitle: 'Enable AI Card Generation',
+      globalToggleOnDesc: 'AI will generate missing phonetic, definitions, examples, and mnemonics using Ollama or Cloud AI.',
+      globalToggleOffDesc: 'AI is completely disabled. No Ollama/cloud calls will be made, and missing fields will not cause errors. Cards are created manually from supplied fields.',
       ollamaTitle: 'Ollama (Local / Offline)',
       ollamaDesc: 'Run private local LLMs without external API keys.',
       geminiTitle: 'Google Gemini (Cloud)',

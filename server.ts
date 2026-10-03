@@ -42,8 +42,9 @@ import {
   updateAnkiNoteFields,
   removeAnkiNoteTag,
   storeAnkiMediaFile,
+  callAnkiConnect,
 } from './server/anki';
-import { AppSettings, CardData, ManualOverrides, DiagnosticsReport, StepLog, ThemeId, CardType, CustomAIProviderConfig, CustomTTSProviderConfig, SmartImagesConfig, AIPromptsConfig, getFrontCustomBlocks, getBackCustomBlocks, getAllCustomBlocks } from './src/types';
+import { AppSettings, CardData, ManualOverrides, DiagnosticsReport, StepLog, ThemeId, CardType, CustomAIProviderConfig, CustomTTSProviderConfig, SmartImagesConfig, AIPromptsConfig, getFrontCustomBlocks, getBackCustomBlocks, getAllCustomBlocks, isCardComplete } from './src/types';
 import { THEMES, makeSpellingSentence, renderCustomBlocksHtml } from './src/themes';
 import { renderMarkdown } from './src/utils/markdown';
 
@@ -84,6 +85,7 @@ const SETTINGS_FILE = getSettingsFilePath();
 const defaultSettings: AppSettings = {
   appTheme: 'anki-light',
   ai: {
+    enabled: true,
     provider: 'ollama',
     ollama: {
       url: 'http://127.0.0.1:11434',
@@ -191,6 +193,7 @@ function normalizeSettings(raw: any): AppSettings {
 
   // Normalize AI config
   const ai = merged.ai || {};
+  const aiEnabled = typeof ai.enabled === 'boolean' ? ai.enabled : true;
   const provider = ai.provider || 'ollama';
   const ollamaUrl = ai.ollama?.url || ai.url || 'http://127.0.0.1:11434';
   const ollamaModel = ai.ollama?.model || ai.model || 'qwen3:4b';
@@ -202,6 +205,7 @@ function normalizeSettings(raw: any): AppSettings {
   const geminiTemp = typeof ai.gemini?.temperature === 'number' ? ai.gemini.temperature : 0.2;
 
   merged.ai = {
+    enabled: aiEnabled,
     provider,
     ollama: {
       url: ollamaUrl,
@@ -721,7 +725,7 @@ async function startServer() {
   });
 
   app.post('/api/anki/create-note', async (req, res) => {
-    const { cardData, deck, url, theme, cardType } = req.body;
+    const { cardData, deck, url, theme, cardType, tags } = req.body;
     const ankiUrl = url || appSettings.anki.url || 'http://127.0.0.1:8765';
     const targetDeck = deck || appSettings.anki.defaultDeck || 'English::B1';
     const selectedTheme: ThemeId = theme || appSettings.theme || 'comic-pop-dark';
@@ -736,7 +740,8 @@ async function startServer() {
       targetDeck,
       cardData,
       selectedTheme,
-      selectedType
+      selectedType,
+      tags || cardData?.tags
     );
     res.json(result);
   });
@@ -889,6 +894,13 @@ async function startServer() {
     const ankiUrl = url || appSettings.anki.url || 'http://127.0.0.1:8765';
     if (!noteId) {
       return res.status(400).json({ success: false, error: 'noteId is required' });
+    }
+
+    if (appSettings.ai.enabled === false) {
+      return res.status(400).json({
+        success: false,
+        error: 'AI is disabled in Settings. Complete by Tag requires AI to be enabled.',
+      });
     }
 
     // 1. Fetch current note info from Anki
@@ -1210,7 +1222,7 @@ async function startServer() {
   });
 
   app.post('/api/anki/update-note', async (req, res) => {
-    const { noteId, cardData, themeId, url } = req.body;
+    const { noteId, cardData, themeId, url, tags } = req.body;
     if (!noteId || !cardData) {
       return res.status(400).json({ success: false, error: 'noteId and cardData are required.' });
     }
@@ -1269,6 +1281,35 @@ async function startServer() {
       if (!updateRes.success) {
         return res.status(500).json({ success: false, error: updateRes.error });
       }
+
+      // 3. Synchronize tags if provided
+      const userTags: string[] | undefined = Array.isArray(tags)
+        ? tags
+        : (Array.isArray(cardData.tags) ? cardData.tags : undefined);
+
+      if (userTags !== undefined) {
+        try {
+          const infoRes = await getNotesInfo(ankiUrl, [Number(noteId)]);
+          if (infoRes.success && infoRes.notes && infoRes.notes.length > 0) {
+            const currentNote = infoRes.notes[0];
+            const existingTags: string[] = currentNote.tags || [];
+            const defaultTags = ['flashcard-generator', effectiveCardType === 'spelling' ? 'spelling-exercise' : 'vocab-card'];
+            const targetTags = Array.from(new Set([...defaultTags, ...userTags.map((t: string) => t.trim()).filter(Boolean)]));
+
+            const toAdd = targetTags.filter((t) => !existingTags.includes(t));
+            if (toAdd.length > 0) {
+              await callAnkiConnect(ankiUrl, 'addTags', { notes: [Number(noteId)], tags: toAdd.join(' ') });
+            }
+            const toRemove = existingTags.filter((t) => !targetTags.includes(t) && !defaultTags.includes(t));
+            if (toRemove.length > 0) {
+              await callAnkiConnect(ankiUrl, 'removeTags', { notes: [Number(noteId)], tags: toRemove.join(' ') });
+            }
+          }
+        } catch (tagErr) {
+          console.warn(`[Anki] Could not synchronize tags for note #${noteId}:`, tagErr);
+        }
+      }
+
       return res.json({ success: true, noteId: Number(noteId), updatedFields: Object.keys(fields) });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err?.message || 'Failed to update note' });
@@ -1287,7 +1328,15 @@ async function startServer() {
     ]);
 
     let aiStatus: any = { connected: false, message: 'Not checked' };
-    if (appSettings.ai.provider === 'gemini') {
+    const aiEnabled = appSettings.ai.enabled !== false;
+
+    if (!aiEnabled) {
+      aiStatus = {
+        connected: true,
+        status: 'ok',
+        message: 'AI is disabled in Settings (Manual Mode Active - No AI required)',
+      };
+    } else if (appSettings.ai.provider === 'gemini') {
       aiStatus = await checkGeminiConnection(appSettings.ai.gemini.apiKey, appSettings.ai.gemini.model);
     } else if (appSettings.ai.provider === 'ollama') {
       aiStatus = await checkOllamaConnection(appSettings.ai.ollama.url);
@@ -1309,8 +1358,8 @@ async function startServer() {
       ],
       ai: [
         {
-          name: `AI Provider (${appSettings.ai.provider.toUpperCase()})`,
-          status: aiStatus.connected ? 'ok' : 'error',
+          name: aiEnabled ? `AI Provider (${appSettings.ai.provider.toUpperCase()})` : 'AI Provider (OFF)',
+          status: !aiEnabled ? 'ok' : (aiStatus.connected ? 'ok' : 'error'),
           message: aiStatus.message || (aiStatus.connected ? 'Connected' : aiStatus.error || 'Failed'),
           timestamp: new Date().toISOString(),
         },
@@ -1347,7 +1396,7 @@ async function startServer() {
           timestamp: new Date().toISOString(),
         },
       ],
-      allPassed: (aiStatus.connected || false) && (appSettings.tts.provider === 'online' ? onlineTtsRes.connected : piperRes.connected) && ankiRes.connected,
+      allPassed: (!aiEnabled || aiStatus.connected || false) && (appSettings.tts.provider === 'online' ? onlineTtsRes.connected : piperRes.connected) && ankiRes.connected,
     };
 
     res.json(report);
@@ -1410,118 +1459,51 @@ async function startServer() {
       pushLog(3, 'Dictionary lookup', 'skipped', 'Using AI provider directly as configured.');
     }
 
-    // [4] AI Generation
+    // Extract tags
+    const cardTags: string[] = Array.isArray(req.body.tags)
+      ? req.body.tags
+      : (Array.isArray(cleanManualOverrides.tags) ? cleanManualOverrides.tags : []);
+
+    const globalAiEnabled = appSettings.ai.enabled !== false;
+    const cardAllowAi = req.body.allowAi !== false && req.body.ai !== false;
+
+    // Check completeness
+    const isComplete = isCardComplete({
+      word: cleanWord,
+      phonetic: mergedOverrides.phonetic,
+      partOfSpeech: mergedOverrides.partOfSpeech,
+      meaningFa: mergedOverrides.meaningFa,
+      example: mergedOverrides.example,
+      translationFa: mergedOverrides.translationFa,
+      mnemonic: mergedOverrides.mnemonic,
+    });
+
+    const shouldRunAi = globalAiEnabled && cardAllowAi && !isComplete;
+
+    // [4] AI Generation or Manual Direct Construction
     let cardData: CardData;
     const aiProvider = appSettings.ai.provider;
-    pushLog(4, 'AI data generated', 'pending', `Generating vocabulary with ${aiProvider.toUpperCase()}...`);
 
-    try {
-      // Clean manualOverrides: convert empty string properties to undefined
-      const cleanManualOverrides: Record<string, any> = {};
-      if (manualOverrides) {
-        for (const [k, v] of Object.entries(manualOverrides)) {
-          if (typeof v === 'string') {
-            const trimmed = v.trim();
-            if (trimmed) cleanManualOverrides[k] = trimmed;
-          } else if (v !== undefined && v !== null) {
-            cleanManualOverrides[k] = v;
-          }
-        }
+    if (!shouldRunAi) {
+      if (!globalAiEnabled) {
+        pushLog(4, 'AI data generated', 'skipped', 'AI is disabled globally in settings. Card created from supplied fields.');
+      } else if (!cardAllowAi) {
+        pushLog(4, 'AI data generated', 'skipped', 'AI is disabled for this card (AI=false). Card created from supplied fields.');
+      } else if (isComplete) {
+        pushLog(4, 'AI data generated', 'skipped', 'All card fields provided by user. AI generation intelligently skipped.');
       }
 
-      // If user provided a specific meaning, avoid injecting an unrelated dictionary example.
-      const userHasCustomMeaning = !!cleanManualOverrides.meaningFa;
-
-      // Merge overrides with dictionary data
-      const mergedOverrides: ManualOverrides = {
-        ...cleanManualOverrides,
-        phonetic: cleanManualOverrides.phonetic || dictData.phonetic,
-        partOfSpeech: cleanManualOverrides.partOfSpeech || dictData.partOfSpeech,
-        meaningFa: cleanManualOverrides.meaningFa || dictData.meaningFa,
-        example: cleanManualOverrides.example || (userHasCustomMeaning ? undefined : dictData.example),
+      cardData = {
+        word: cleanWord,
+        phonetic: mergedOverrides.phonetic || '',
+        partOfSpeech: mergedOverrides.partOfSpeech || '',
+        meaningFa: mergedOverrides.meaningFa || '',
+        example: mergedOverrides.example || '',
+        translationFa: mergedOverrides.translationFa || '',
+        mnemonic: mergedOverrides.mnemonic || '',
+        cardType: effectiveCardType,
+        tags: cardTags,
       };
-
-      if (aiProvider === 'gemini') {
-        const geminiRes = await generateWithGemini(
-          appSettings.ai.gemini.apiKey,
-          appSettings.ai.gemini.model,
-          cleanWord,
-          mergedOverrides,
-          appSettings.ai.gemini.temperature,
-          appSettings.aiPrompts
-        );
-        if (!geminiRes.success || !geminiRes.data) {
-          pushLog(4, 'AI data generated', 'error', geminiRes.error || 'Gemini generation failed');
-          return res.status(500).json({
-            success: false,
-            stage: 'ai_data_generated',
-            error: `Gemini Error: ${geminiRes.error}`,
-            logs,
-          });
-        }
-        cardData = geminiRes.data;
-        sourcesList.push(`Gemini (${appSettings.ai.gemini.model})`);
-      } else if (aiProvider === 'ollama') {
-        const ollamaRes = await generateWithOllama(
-          appSettings.ai.ollama.url,
-          appSettings.ai.ollama.model,
-          cleanWord,
-          mergedOverrides,
-          appSettings.ai.ollama.temperature,
-          appSettings.ai.ollama.contextLength,
-          appSettings.aiPrompts
-        );
-        if (!ollamaRes.success || !ollamaRes.data) {
-          pushLog(4, 'AI data generated', 'error', ollamaRes.error || 'Ollama generation failed');
-          return res.status(500).json({
-            success: false,
-            stage: 'ai_data_generated',
-            error: `Ollama Error: ${ollamaRes.error}`,
-            logs,
-          });
-        }
-        cardData = ollamaRes.data;
-        sourcesList.push(`Ollama (${appSettings.ai.ollama.model})`);
-      } else {
-        // Custom AI Provider (OpenRouter, DeepSeek, Groq, custom OpenAI-compatible endpoint)
-        const customConfig = appSettings.ai.customProviders?.find((p) => p.id === aiProvider) || appSettings.ai.customProviders?.[0];
-        if (!customConfig) {
-          const errMsg = `Custom AI provider "${aiProvider}" not found in configured providers.`;
-          pushLog(4, 'AI data generated', 'error', errMsg);
-          return res.status(400).json({ success: false, stage: 'ai_data_generated', error: errMsg, logs });
-        }
-
-        const customRes = await generateWithCustomAI(
-          customConfig,
-          cleanWord,
-          mergedOverrides,
-          customConfig.temperature || 0.2,
-          appSettings.aiPrompts
-        );
-
-        if (!customRes.success || !customRes.data) {
-          pushLog(4, 'AI data generated', 'error', customRes.error || 'Custom AI generation failed');
-          return res.status(500).json({
-            success: false,
-            stage: 'ai_data_generated',
-            error: `Custom AI Error: ${customRes.error}`,
-            logs,
-          });
-        }
-        cardData = customRes.data;
-        sourcesList.push(`Custom AI (${customConfig.name || customConfig.model})`);
-      }
-
-      // Explicit dictionary priority overrides
-      if (dictData.meaningFa && dictConfig.meaningFaSource === 'abadis') {
-        cardData.meaningFa = dictData.meaningFa;
-      }
-      if (dictData.example && dictConfig.exampleSource === 'freedict') {
-        cardData.example = dictData.example;
-      }
-      if (dictData.phonetic && dictConfig.definitionEnSource === 'freedict') {
-        cardData.phonetic = dictData.phonetic;
-      }
 
       // Preserve all manual user overrides strictly
       if (cleanManualOverrides.meaningFa) cardData.meaningFa = cleanManualOverrides.meaningFa;
@@ -1530,6 +1512,7 @@ async function startServer() {
       if (cleanManualOverrides.mnemonic) cardData.mnemonic = cleanManualOverrides.mnemonic;
       if (cleanManualOverrides.phonetic) cardData.phonetic = cleanManualOverrides.phonetic;
       if (cleanManualOverrides.partOfSpeech) cardData.partOfSpeech = cleanManualOverrides.partOfSpeech;
+
       // Preserve custom blocks on front and back
       const frontBlocks = getFrontCustomBlocks(cleanManualOverrides);
       const backBlocks = getBackCustomBlocks(cleanManualOverrides);
@@ -1546,24 +1529,139 @@ async function startServer() {
       // Attach Card Type and Spelling sentence
       cardData.cardType = effectiveCardType;
       if (effectiveCardType === 'spelling') {
-        cardData.spellingSentence = makeSpellingSentence(cardData.example, cardData.word);
+        cardData.spellingSentence = cleanManualOverrides.spellingSentence || (cardData.example ? makeSpellingSentence(cardData.example, cardData.word) : `Fill in the blank: ______`);
       }
+    } else {
+      pushLog(4, 'AI data generated', 'pending', `Generating vocabulary with ${aiProvider.toUpperCase()}...`);
 
-      pushLog(
-        4,
-        'AI data generated',
-        'success',
-        `Generated card data for "${cleanWord}" (POS: ${cardData.partOfSpeech}, IPA: ${cardData.phonetic})`,
-        `Meaning: ${cardData.meaningFa} | Sources: ${sourcesList.join(', ')}`
-      );
-    } catch (err: any) {
-      pushLog(4, 'AI data generated', 'error', `AI exception: ${err?.message}`);
-      return res.status(500).json({
-        success: false,
-        stage: 'ai_data_generated',
-        error: err?.message,
-        logs,
-      });
+      try {
+        if (aiProvider === 'gemini') {
+          const geminiRes = await generateWithGemini(
+            appSettings.ai.gemini.apiKey,
+            appSettings.ai.gemini.model,
+            cleanWord,
+            mergedOverrides,
+            appSettings.ai.gemini.temperature,
+            appSettings.aiPrompts
+          );
+          if (!geminiRes.success || !geminiRes.data) {
+            pushLog(4, 'AI data generated', 'error', geminiRes.error || 'Gemini generation failed');
+            return res.status(500).json({
+              success: false,
+              stage: 'ai_data_generated',
+              error: `Gemini Error: ${geminiRes.error}`,
+              logs,
+            });
+          }
+          cardData = geminiRes.data;
+          sourcesList.push(`Gemini (${appSettings.ai.gemini.model})`);
+        } else if (aiProvider === 'ollama') {
+          const ollamaRes = await generateWithOllama(
+            appSettings.ai.ollama.url,
+            appSettings.ai.ollama.model,
+            cleanWord,
+            mergedOverrides,
+            appSettings.ai.ollama.temperature,
+            appSettings.ai.ollama.contextLength,
+            appSettings.aiPrompts
+          );
+          if (!ollamaRes.success || !ollamaRes.data) {
+            pushLog(4, 'AI data generated', 'error', ollamaRes.error || 'Ollama generation failed');
+            return res.status(500).json({
+              success: false,
+              stage: 'ai_data_generated',
+              error: `Ollama Error: ${ollamaRes.error}`,
+              logs,
+            });
+          }
+          cardData = ollamaRes.data;
+          sourcesList.push(`Ollama (${appSettings.ai.ollama.model})`);
+        } else {
+          // Custom AI Provider (OpenRouter, DeepSeek, Groq, custom OpenAI-compatible endpoint)
+          const customConfig = appSettings.ai.customProviders?.find((p) => p.id === aiProvider) || appSettings.ai.customProviders?.[0];
+          if (!customConfig) {
+            const errMsg = `Custom AI provider "${aiProvider}" not found in configured providers.`;
+            pushLog(4, 'AI data generated', 'error', errMsg);
+            return res.status(400).json({ success: false, stage: 'ai_data_generated', error: errMsg, logs });
+          }
+
+          const customRes = await generateWithCustomAI(
+            customConfig,
+            cleanWord,
+            mergedOverrides,
+            customConfig.temperature || 0.2,
+            appSettings.aiPrompts
+          );
+
+          if (!customRes.success || !customRes.data) {
+            pushLog(4, 'AI data generated', 'error', customRes.error || 'Custom AI generation failed');
+            return res.status(500).json({
+              success: false,
+              stage: 'ai_data_generated',
+              error: `Custom AI Error: ${customRes.error}`,
+              logs,
+            });
+          }
+          cardData = customRes.data;
+          sourcesList.push(`Custom AI (${customConfig.name || customConfig.model})`);
+        }
+
+        // Explicit dictionary priority overrides
+        if (dictData.meaningFa && dictConfig.meaningFaSource === 'abadis') {
+          cardData.meaningFa = dictData.meaningFa;
+        }
+        if (dictData.example && dictConfig.exampleSource === 'freedict') {
+          cardData.example = dictData.example;
+        }
+        if (dictData.phonetic && dictConfig.definitionEnSource === 'freedict') {
+          cardData.phonetic = dictData.phonetic;
+        }
+
+        // Preserve all manual user overrides strictly
+        if (cleanManualOverrides.meaningFa) cardData.meaningFa = cleanManualOverrides.meaningFa;
+        if (cleanManualOverrides.example) cardData.example = cleanManualOverrides.example;
+        if (cleanManualOverrides.translationFa) cardData.translationFa = cleanManualOverrides.translationFa;
+        if (cleanManualOverrides.mnemonic) cardData.mnemonic = cleanManualOverrides.mnemonic;
+        if (cleanManualOverrides.phonetic) cardData.phonetic = cleanManualOverrides.phonetic;
+        if (cleanManualOverrides.partOfSpeech) cardData.partOfSpeech = cleanManualOverrides.partOfSpeech;
+        // Preserve custom blocks on front and back
+        const frontBlocks = getFrontCustomBlocks(cleanManualOverrides);
+        const backBlocks = getBackCustomBlocks(cleanManualOverrides);
+        if (frontBlocks.length > 0 || backBlocks.length > 0) {
+          cardData.frontCustomBlocks = frontBlocks;
+          cardData.backCustomBlocks = backBlocks;
+          cardData.customBlocks = [...frontBlocks, ...backBlocks];
+        } else if (cleanManualOverrides.customBlocks && Array.isArray(cleanManualOverrides.customBlocks)) {
+          cardData.customBlocks = cleanManualOverrides.customBlocks;
+          cardData.frontCustomBlocks = cleanManualOverrides.customBlocks.filter((b: any) => b.side === 'front');
+          cardData.backCustomBlocks = cleanManualOverrides.customBlocks.filter((b: any) => b.side === 'back' || !b.side);
+        }
+
+        // Attach Card Type and Spelling sentence
+        cardData.cardType = effectiveCardType;
+        if (effectiveCardType === 'spelling') {
+          cardData.spellingSentence = makeSpellingSentence(cardData.example, cardData.word);
+        }
+
+        // Attach tags
+        cardData.tags = cardTags;
+
+        pushLog(
+          4,
+          'AI data generated',
+          'success',
+          `Generated card data for "${cleanWord}" (POS: ${cardData.partOfSpeech}, IPA: ${cardData.phonetic})`,
+          `Meaning: ${cardData.meaningFa} | Sources: ${sourcesList.join(', ')}`
+        );
+      } catch (err: any) {
+        pushLog(4, 'AI data generated', 'error', `AI exception: ${err?.message}`);
+        return res.status(500).json({
+          success: false,
+          stage: 'ai_data_generated',
+          error: err?.message,
+          logs,
+        });
+      }
     }
 
     // [5] Smart Images (Manual Image Override, Automatic image evaluation, or explicit Photo Choice)
@@ -1596,11 +1694,15 @@ async function startServer() {
       } else if (explicitPhotoChoice === true || appSettings.smartImages.enabled) {
         try {
           const forceFetch = explicitPhotoChoice === true;
+          const imageConfig = {
+            ...appSettings.smartImages,
+            decisionProvider: globalAiEnabled ? appSettings.smartImages.decisionProvider : 'heuristic',
+          };
           const imgRes = await getSmartImage(
             cardData.word,
             cardData.partOfSpeech,
             cardData.meaningFa,
-            appSettings.smartImages,
+            imageConfig,
             appSettings,
             forceFetch
           );
@@ -1918,7 +2020,8 @@ async function startServer() {
       targetDeck,
       cardData,
       effectiveTheme,
-      effectiveCardType
+      effectiveCardType,
+      cardTags
     );
 
     if (!noteRes.success) {
@@ -1941,6 +2044,7 @@ async function startServer() {
       noteId: noteRes.noteId,
       deck: targetDeck,
       cardType: effectiveCardType,
+      tags: cardTags,
       logs,
     });
   });

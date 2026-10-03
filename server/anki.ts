@@ -378,7 +378,8 @@ export async function createAnkiNote(
   deckName: string,
   cardData: CardData,
   themeId: ThemeId = 'comic-pop-dark',
-  cardType: CardType = 'normal'
+  cardType: CardType = 'normal',
+  tags?: string[]
 ): Promise<{
   success: boolean;
   noteId?: number;
@@ -525,6 +526,12 @@ export async function createAnkiNote(
   };
 
   // 6. Add Note (IMPORTANT: allowDuplicate: true so user can create multiple cards for the same word with different meanings)
+  const defaultTags = ['flashcard-generator', effectiveCardType === 'spelling' ? 'spelling-exercise' : 'vocab-card'];
+  const userTags = Array.isArray(tags) && tags.length > 0
+    ? tags
+    : (Array.isArray(cardData.tags) && cardData.tags.length > 0 ? cardData.tags : []);
+  const mergedTags = Array.from(new Set([...defaultTags, ...userTags.map((t) => t.trim()).filter(Boolean)]));
+
   const addRes = await callAnkiConnect(baseUrl, 'addNote', {
     note: {
       deckName: targetDeck,
@@ -534,7 +541,7 @@ export async function createAnkiNote(
         allowDuplicate: true,
         duplicateScope: 'deck',
       },
-      tags: ['flashcard-generator', effectiveCardType === 'spelling' ? 'spelling-exercise' : 'vocab-card'],
+      tags: mergedTags,
     },
   });
 

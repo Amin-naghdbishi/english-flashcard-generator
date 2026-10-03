@@ -583,6 +583,65 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       {/* SUBTAB 1: AI PROVIDERS */}
       {activeSubTab === 'ai' && (
         <div className="space-y-6">
+          {/* Global AI Enabled Toggle Card */}
+          <div
+            className={`p-4 sm:p-5 rounded-lg border transition-all ${
+              form.ai?.enabled !== false
+                ? isDark
+                  ? 'bg-blue-950/20 border-blue-800 text-zinc-100'
+                  : 'bg-blue-50/60 border-blue-200 text-zinc-900'
+                : isDark
+                ? 'bg-zinc-900/60 border-zinc-700 text-zinc-300'
+                : 'bg-zinc-50 border-zinc-200 text-zinc-700'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <BrainCircuit className={`w-5 h-5 ${form.ai?.enabled !== false ? 'text-blue-500' : 'text-zinc-400'}`} />
+                  <span className="font-bold text-sm sm:text-base">
+                    {t('settings.ai.globalToggleTitle', 'Enable AI Card Generation')}
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                      form.ai?.enabled !== false
+                        ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
+                        : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-600'
+                    }`}
+                  >
+                    {form.ai?.enabled !== false ? 'AI ON' : 'AI OFF'}
+                  </span>
+                </div>
+                <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                  {form.ai?.enabled !== false
+                    ? t('settings.ai.globalToggleOnDesc', 'AI will generate missing phonetic, definitions, examples, and mnemonics using Ollama or Cloud AI.')
+                    : t('settings.ai.globalToggleOffDesc', 'AI is completely disabled. No Ollama/cloud calls will be made, and missing fields will not cause errors. Cards are created manually from supplied fields.')}
+                </p>
+              </div>
+
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={form.ai?.enabled !== false}
+                  onChange={(e) => {
+                    const newEnabled = e.target.checked;
+                    const updated = {
+                      ...form,
+                      ai: {
+                        ...form.ai,
+                        enabled: newEnabled,
+                      },
+                    };
+                    setForm(updated);
+                    onUpdateSettings(updated);
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-zinc-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-zinc-600 peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+          </div>
+
           {/* AI Prompts Jump Notice */}
           <div
             className={`p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
