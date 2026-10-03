@@ -24,7 +24,11 @@ if [ ! -f "$SCRIPT_DIR/flashcard-generator.png" ] || [ ! -f "$SCRIPT_DIR/flashca
 fi
 
 # 2. Build the web app and server bundle
-echo "Building production application bundle..."
+echo "Cleaning old builds and caches..."
+rm -rf "$ROOT_DIR/dist"
+rm -rf "$ROOT_DIR/node_modules/.vite"
+
+echo "Building production application bundle from current source..."
 cd "$ROOT_DIR"
 npm run build
 
@@ -36,7 +40,6 @@ mkdir -p "$APPDIR/usr/bin"
 mkdir -p "$APPDIR/usr/share/applications"
 mkdir -p "$APPDIR/usr/share/icons/hicolor/256x256/apps"
 mkdir -p "$APPDIR/usr/share/icons/hicolor/scalable/apps"
-mkdir -p "$APPDIR/usr/share/flashcard-generator/dist"
 mkdir -p "$APPDIR/usr/share/flashcard-generator/node_modules"
 
 # 4. Copy Desktop file, AppRun, and Icons
@@ -53,7 +56,8 @@ cp "$SCRIPT_DIR/flashcard-generator.svg" "$APPDIR/usr/share/icons/hicolor/scalab
 
 # 5. Copy built application distribution
 echo "Copying compiled dist files into AppDir..."
-cp -r "$ROOT_DIR/dist" "$APPDIR/usr/share/flashcard-generator/"
+rm -rf "$APPDIR/usr/share/flashcard-generator/dist"
+cp -r "$ROOT_DIR/dist" "$APPDIR/usr/share/flashcard-generator/dist"
 cp "$ROOT_DIR/package.json" "$APPDIR/usr/share/flashcard-generator/"
 
 # 7. Provide launcher in usr/bin

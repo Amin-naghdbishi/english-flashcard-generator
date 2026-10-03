@@ -233,7 +233,7 @@ function AppShell({
               </span>
             </div>
             <div className="text-xs font-medium opacity-80">
-              English Flashcard Generator • 12 Note Designs
+              English Flashcard Generator v1.1.2 • 12 Note Designs
             </div>
           </div>
         </footer>
