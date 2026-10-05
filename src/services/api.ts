@@ -508,6 +508,7 @@ export async function completeAnkiNote(params: {
 export interface AnkiBrowserNoteItem {
   noteId: number;
   modelName: string;
+  noteType?: string;
   deckName: string;
   tags: string[];
   word: string;

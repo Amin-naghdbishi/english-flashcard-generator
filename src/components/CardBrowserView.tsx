@@ -575,7 +575,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
                   : 'bg-zinc-100/90 border-zinc-200 text-zinc-600 backdrop-blur-xs'
               }`}
             >
-              <div className="col-span-3">Type</div>
+              <div className="col-span-3">Note Type</div>
               <div className="col-span-4">Deck</div>
               <div className="col-span-5">Word</div>
             </div>
@@ -635,10 +635,9 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
             {/* Rows Listing */}
             {notes.map((note, index) => {
               const isSelected = index === selectedIndex;
-              const typeLabel =
-                note.partOfSpeech ||
-                (note.cardType === 'spelling' ? 'spelling' : note.modelName.replace(/^AI Vocabulary\s*-?\s*/i, '').trim()) ||
-                'vocab';
+              const rawModel = note.modelName || note.noteType || 'Standard';
+              const cleanModel = rawModel.replace(/^AI Vocabulary\s*-\s*/i, '').trim() || rawModel;
+              const isSpelling = note.cardType === 'spelling';
 
               const cleanDeck = note.deckName.split('::').pop() || note.deckName;
 
@@ -656,19 +655,21 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
                       : 'border-l-transparent text-zinc-700 hover:bg-zinc-50'
                   }`}
                 >
-                  {/* Type Column */}
-                  <div className="col-span-3 truncate pr-1">
+                  {/* Note Type Column */}
+                  <div className="col-span-3 truncate pr-1 flex items-center">
                     <span
-                      className={`inline-block px-1 py-0.5 rounded text-[9px] font-mono leading-none capitalize ${
-                        isSelected
-                          ? 'bg-blue-500/20 text-blue-400 font-bold'
+                      className={`inline-block px-1 py-0.5 rounded text-[9px] font-mono leading-none truncate max-w-full ${
+                        isSpelling
+                          ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30 font-semibold'
+                          : isSelected
+                          ? 'bg-blue-500/20 text-blue-400 font-medium'
                           : isDark
-                          ? 'bg-zinc-800 text-zinc-400'
+                          ? 'bg-zinc-800 text-zinc-300'
                           : 'bg-zinc-200 text-zinc-700'
                       }`}
-                      title={typeLabel}
+                      title={`Note Type: ${rawModel} (${isSpelling ? 'Spelling' : 'Normal'})`}
                     >
-                      {typeLabel}
+                      {isSpelling ? `✍️ ${cleanModel}` : cleanModel}
                     </span>
                   </div>
 
@@ -709,7 +710,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
                   isDark ? 'bg-zinc-850/80 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
                 }`}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-bold text-sm text-zinc-800 dark:text-zinc-200">
                     {editingCard.word}
                   </span>
@@ -718,6 +719,22 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
                   </span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-500">
                     {selectedNote.deckName}
+                  </span>
+                  <span
+                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+                    title={`Anki Note Type: ${selectedNote.modelName || selectedNote.noteType || 'Standard'}`}
+                  >
+                    Type: {selectedNote.modelName || selectedNote.noteType || 'Standard'}
+                  </span>
+                  <span
+                    className={`text-[10px] font-medium px-2 py-0.5 rounded flex items-center gap-1 ${
+                      (editingCard.cardType || selectedNote.cardType) === 'spelling'
+                        ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30 font-semibold'
+                        : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    }`}
+                    title={`Card Mode: ${(editingCard.cardType || selectedNote.cardType) === 'spelling' ? 'Spelling Practice' : 'Normal Card'}`}
+                  >
+                    {(editingCard.cardType || selectedNote.cardType) === 'spelling' ? '✍️ Spelling' : '📖 Normal'}
                   </span>
                   {isDirty && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 font-semibold border border-amber-500/30">
@@ -801,6 +818,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
                 <CardPreview
                   cardData={editingCard}
                   themeId={currentTheme}
+                  cardType={editingCard.cardType || selectedNote.cardType || 'normal'}
                   emptyWordPlaceholder={selectedNote.word}
                   appTheme={isDark ? 'anki-dark' : 'anki-light'}
                   editable={true}

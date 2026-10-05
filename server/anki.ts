@@ -989,6 +989,46 @@ export function detectThemeFromAnkiData(params: {
   return null;
 }
 
+export interface AnkiModelMetadata {
+  modelName: string;
+  css: string;
+  templateNames: string[];
+  templates: Record<string, { Front: string; Back: string }>;
+  templatesHtml: string;
+  frontTemplatesHtml: string;
+  isSpelling: boolean;
+  fieldNames: string[];
+}
+
+export function isSpellingModel(
+  modelName: string,
+  templateNames: string[],
+  frontTemplatesHtml: string
+): boolean {
+  // 1. Model name contains (Spelling) or Spelling or Spell
+  if (/(\b|_|\(|-)spell(ing)?(\b|_|\)|-)/i.test(modelName)) {
+    return true;
+  }
+  // 2. Any template name in the model contains Spelling
+  if (templateNames.some((name) => /(\b|_|\(|-)spell(ing)?(\b|_|\)|-)/i.test(name))) {
+    return true;
+  }
+  // 3. Template Front HTML contains spelling interactive check elements or inputs
+  if (
+    /id=["']spelling-input["']/i.test(frontTemplatesHtml) ||
+    /checkSpelling\s*\(/i.test(frontTemplatesHtml) ||
+    /spelling-target-word/i.test(frontTemplatesHtml) ||
+    /spellingScript/i.test(frontTemplatesHtml) ||
+    /class=["'][^"']*spelling-card[^"']*["']/i.test(frontTemplatesHtml) ||
+    /class=["'][^"']*spelling-result[^"']*["']/i.test(frontTemplatesHtml) ||
+    /\{\{type:[^}]+\}\}/i.test(frontTemplatesHtml) ||
+    /<input[^>]*id=["']typeans["']/i.test(frontTemplatesHtml)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export async function searchAnkiNotes(
   baseUrl: string = 'http://127.0.0.1:8765',
   query: string = '',
@@ -1049,31 +1089,36 @@ export async function searchAnkiNotes(
   }
 
   const cardDeckMap = new Map<number, string>();
+  const cardInfoByCardId = new Map<number, any>();
   if (firstCardIds.length > 0) {
     const cardsInfoRes = await callAnkiConnect(baseUrl, 'cardsInfo', { cards: firstCardIds });
     if (cardsInfoRes.success && Array.isArray(cardsInfoRes.result)) {
       for (const c of cardsInfoRes.result) {
-        if (c.cardId && c.deckName) {
-          cardDeckMap.set(c.cardId, c.deckName);
+        if (c.cardId) {
+          cardInfoByCardId.set(c.cardId, c);
+          if (c.deckName) {
+            cardDeckMap.set(c.cardId, c.deckName);
+          }
         }
       }
     }
   }
 
-  // Pre-fetch model styling & templates for all unique note models to accurately detect themes
+  // Pre-fetch model styling & templates for all unique note models directly from AnkiConnect
   const uniqueModelNames = Array.from(
     new Set(rawNotes.map((n) => n.modelName).filter(Boolean))
   ) as string[];
 
-  const modelMetadataMap = new Map<string, { css: string; templatesHtml: string }>();
+  const modelMetadataMap = new Map<string, AnkiModelMetadata>();
 
   if (uniqueModelNames.length > 0) {
     await Promise.all(
       uniqueModelNames.map(async (modelName) => {
         try {
-          const [stylingRes, templatesRes] = await Promise.all([
+          const [stylingRes, templatesRes, fieldsRes] = await Promise.all([
             callAnkiConnect(baseUrl, 'modelStyling', { modelName }),
             callAnkiConnect(baseUrl, 'modelTemplates', { modelName }),
+            callAnkiConnect(baseUrl, 'modelFieldNames', { modelName }),
           ]);
 
           let css = '';
@@ -1084,14 +1129,38 @@ export async function searchAnkiNotes(
                 : stylingRes.result.css || '';
           }
 
+          let templateNames: string[] = [];
+          const templates: Record<string, { Front: string; Back: string }> = {};
           let templatesHtml = '';
+          let frontTemplatesHtml = '';
+
           if (templatesRes.success && templatesRes.result && typeof templatesRes.result === 'object') {
-            templatesHtml = Object.values(templatesRes.result)
-              .map((t: any) => `${t.Front || ''} ${t.Back || ''}`)
-              .join(' ');
+            templateNames = Object.keys(templatesRes.result);
+            for (const [tName, tDef] of Object.entries(templatesRes.result as Record<string, any>)) {
+              const front = tDef?.Front || '';
+              const back = tDef?.Back || '';
+              templates[tName] = { Front: front, Back: back };
+              frontTemplatesHtml += ` ${front}`;
+              templatesHtml += ` ${front} ${back}`;
+            }
           }
 
-          modelMetadataMap.set(modelName, { css, templatesHtml });
+          const fieldNames: string[] =
+            fieldsRes.success && Array.isArray(fieldsRes.result) ? fieldsRes.result : [];
+
+          // Multi-point detection directly from AnkiConnect model information
+          const isSpelling = isSpellingModel(modelName, templateNames, frontTemplatesHtml);
+
+          modelMetadataMap.set(modelName, {
+            modelName,
+            css,
+            templateNames,
+            templates,
+            templatesHtml,
+            frontTemplatesHtml,
+            isSpelling,
+            fieldNames,
+          });
         } catch (e) {
           console.warn(`[Anki] Could not fetch styling/templates for model "${modelName}":`, e);
         }
@@ -1122,15 +1191,57 @@ export async function searchAnkiNotes(
 
     const word = getVal('Word', 'word', 'Front', 'front', 'English', 'english', 'Term', 'term', 'Text', 'text') || `Note #${n.noteId}`;
     const meaning = getRawVal('Meaning', 'meaning', 'Persian Meaning', 'persianmeaning', 'Back', 'back', 'Translation', 'translation');
-    const definitionEn = getRawVal('EnglishDefinition', 'englishdefinition', 'Definition', 'definition', 'DefinitionEn', 'definitionen');
+    const definitionEn = getRawVal('EnglishDefinition', 'englishdefinition', 'Definition', 'definition', 'DefinitionEn', 'definitionen', 'Extra', 'extra');
     const phonetic = getVal('Phonetic', 'phonetic', 'IPA', 'ipa', 'Pronunciation', 'pronunciation');
-    const partOfSpeech = getVal('PartOfSpeech', 'partofspeech', 'Part of Speech', 'pos', 'POS', 'Type', 'type');
+    // Note: 'Type' / 'type' removed to avoid misinterpreting card type fields as part of speech
+    const partOfSpeech = getVal('PartOfSpeech', 'partofspeech', 'Part of Speech', 'pos', 'POS');
     const example = getRawVal('Example', 'example', 'Example Sentence', 'examplesentence', 'Sentence', 'sentence');
     const translation = getRawVal('Translation', 'translation', 'Example Translation', 'exampletranslation', 'Sentence Fa', 'sentencefa');
     const mnemonic = getRawVal('Mnemonic', 'mnemonic', 'Memory Aid', 'memoryaid', 'Aid', 'aid');
     const spellingSentence = getVal('SpellingSentence', 'spellingsentence');
-    const cardTypeRaw = getVal('CardType', 'cardtype');
-    const cardType: CardType = cardTypeRaw === 'spelling' || n.modelName?.includes('Spelling') ? 'spelling' : 'normal';
+
+    const firstCard = noteToFirstCard.get(n.noteId);
+    const cardInfo = firstCard ? cardInfoByCardId.get(firstCard) : undefined;
+    const modelMeta = modelMetadataMap.get(n.modelName);
+    const cardOrd = typeof cardInfo?.ord === 'number' ? cardInfo.ord : 0;
+    const cardTemplateName =
+      cardInfo?.cardTemplate ||
+      cardInfo?.template ||
+      (modelMeta?.templateNames && modelMeta.templateNames[cardOrd]) ||
+      '';
+    const specificTemplate = cardTemplateName && modelMeta?.templates ? modelMeta.templates[cardTemplateName] : undefined;
+    const specificFrontHtml = specificTemplate?.Front || '';
+
+    // Authoritative Note Type name directly from AnkiConnect
+    const actualNoteType = n.modelName || cardInfo?.modelName || 'Standard';
+
+    // Multi-point determination of Card Type (Normal vs Spelling)
+    let cardType: CardType = 'normal';
+    if (
+      specificFrontHtml &&
+      (
+        /id=["']spelling-input["']/i.test(specificFrontHtml) ||
+        /checkSpelling\s*\(/i.test(specificFrontHtml) ||
+        /spelling-target-word/i.test(specificFrontHtml) ||
+        /spellingScript/i.test(specificFrontHtml) ||
+        /class=["'][^"']*spelling-card[^"']*["']/i.test(specificFrontHtml) ||
+        /class=["'][^"']*spelling-result[^"']*["']/i.test(specificFrontHtml) ||
+        /\{\{type:[^}]+\}\}/i.test(specificFrontHtml) ||
+        /<input[^>]*id=["']typeans["']/i.test(specificFrontHtml)
+      )
+    ) {
+      cardType = 'spelling';
+    } else if (cardTemplateName && /(\b|_|\(|-)spell(ing)?(\b|_|\)|-)/i.test(cardTemplateName)) {
+      cardType = 'spelling';
+    } else if (actualNoteType && /(\b|_|\(|-)spell(ing)?(\b|_|\)|-)/i.test(actualNoteType)) {
+      cardType = 'spelling';
+    } else if (getVal('CardType', 'cardtype') === 'spelling') {
+      cardType = 'spelling';
+    } else if (modelMeta?.isSpelling && (!cardTemplateName || !/vocab|normal|card\s*1/i.test(cardTemplateName))) {
+      cardType = 'spelling';
+    } else {
+      cardType = 'normal';
+    }
 
     const cardImageRaw = getRawVal('CardImage', 'cardimage', 'Image', 'image', 'Picture', 'picture', 'Photo', 'photo');
     let imageFileName = '';
@@ -1147,7 +1258,6 @@ export async function searchAnkiNotes(
     const backCustomBlocks = parseCustomBlocksHtml(customBackRaw, 'back');
     const mainBoxStyles = parseMainBoxStyles(mainBoxStylesRaw);
 
-    const firstCard = noteToFirstCard.get(n.noteId);
     const deckName = firstCard ? (cardDeckMap.get(firstCard) || 'Default') : 'Default';
 
     const extractSound = (val: string) => {
@@ -1172,9 +1282,8 @@ export async function searchAnkiNotes(
     }
 
     // Inspect note model styling, templates, and note content to detect original theme
-    const modelMeta = modelMetadataMap.get(n.modelName);
     const detectedTheme = detectThemeFromAnkiData({
-      modelName: n.modelName,
+      modelName: actualNoteType,
       css: modelMeta?.css,
       templatesHtml: modelMeta?.templatesHtml,
       fields: cleanFieldsMap,
@@ -1190,6 +1299,8 @@ export async function searchAnkiNotes(
       translationFa: translation,
       mnemonic,
       cardType,
+      noteType: actualNoteType,
+      modelName: actualNoteType,
       spellingSentence,
       imageFileName,
       wordAudioUsNormalFileName,
@@ -1210,7 +1321,8 @@ export async function searchAnkiNotes(
 
     return {
       noteId: n.noteId,
-      modelName: n.modelName || '',
+      modelName: actualNoteType,
+      noteType: actualNoteType,
       deckName,
       tags: n.tags || [],
       word,

@@ -22,6 +22,8 @@ export interface CardData {
 
   // Card type & Spelling specific
   cardType?: CardType;
+  noteType?: string;
+  modelName?: string;
   spellingSentence?: string; // Sentence with ______ for the target word
 
   // Smart Images

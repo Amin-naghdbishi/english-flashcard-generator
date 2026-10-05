@@ -1249,14 +1249,20 @@ async function startServer() {
 
     try {
       // 1. Inspect existing note in Anki to determine note model name and ensure model has all fields and latest templates
+      let existingModelFieldNames: string[] = [];
       try {
         const infoRes = await getNotesInfo(ankiUrl, [Number(noteId)]);
         if (infoRes.success && infoRes.notes && infoRes.notes.length > 0) {
           const existingModelName = infoRes.notes[0].modelName;
           const detectedType: CardType = cardData.cardType || (existingModelName.includes('Spelling') ? 'spelling' : 'normal');
-          await ensureAnkiModel(ankiUrl, effectiveTheme, detectedType, existingModelName);
-        } else {
-          await ensureAnkiModel(ankiUrl, effectiveTheme, effectiveCardType);
+          // Only update/ensure model templates for AI Vocabulary models to avoid overwriting standard/custom note types
+          if (existingModelName && /^AI Vocabulary/i.test(existingModelName)) {
+            await ensureAnkiModel(ankiUrl, effectiveTheme, detectedType, existingModelName);
+          }
+          const fieldsRes = await callAnkiConnect(ankiUrl, 'modelFieldNames', { modelName: existingModelName });
+          if (fieldsRes.success && Array.isArray(fieldsRes.result)) {
+            existingModelFieldNames = fieldsRes.result;
+          }
         }
       } catch (mErr) {
         console.warn(`[Anki] Could not pre-verify model for note #${noteId}:`, mErr);
@@ -1352,7 +1358,32 @@ async function startServer() {
         fields.CardImage = `<img src="${cardData.imageFileName}" class="card-illustration" alt="${cardData.word}" />`;
       }
 
-      const updateRes = await updateAnkiNoteFields(ankiUrl, Number(noteId), fields);
+      // If note belongs to a model with specific fields (e.g. Basic, Cloze, or customized models),
+      // intelligently adapt fields and filter out fields not present on that model
+      let fieldsToUpdate: Record<string, string> = fields;
+      if (existingModelFieldNames.length > 0) {
+        if (!existingModelFieldNames.includes('Word') && existingModelFieldNames.includes('Front')) {
+          fields.Front = (cardData.word || '').trim();
+        }
+        if (!existingModelFieldNames.includes('Meaning') && existingModelFieldNames.includes('Back')) {
+          fields.Back = renderMarkdown((cardData.meaningFa || '').trim());
+        }
+        if (!existingModelFieldNames.includes('Word') && existingModelFieldNames.includes('Text')) {
+          fields.Text = (cardData.word || '').trim();
+        }
+        if (!existingModelFieldNames.includes('Meaning') && existingModelFieldNames.includes('Extra')) {
+          fields.Extra = renderMarkdown((cardData.meaningFa || '').trim());
+        }
+
+        fieldsToUpdate = {};
+        for (const [key, val] of Object.entries(fields)) {
+          if (existingModelFieldNames.includes(key)) {
+            fieldsToUpdate[key] = val;
+          }
+        }
+      }
+
+      const updateRes = await updateAnkiNoteFields(ankiUrl, Number(noteId), fieldsToUpdate);
       if (!updateRes.success) {
         return res.status(500).json({ success: false, error: updateRes.error });
       }
