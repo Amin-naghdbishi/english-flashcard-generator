@@ -559,7 +559,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   {t('settings.headerTitle')}
                 </span>
                 <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
-                  v1.1.5
+                  v1.1.6
                 </span>
               </div>
             )}
