@@ -84,6 +84,7 @@ import {
   Lightbulb,
   BrainCircuit,
   FileText,
+  PanelLeft,
 } from 'lucide-react';
 
 interface SettingsViewProps {
@@ -100,6 +101,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     'ai' | 'prompts' | 'tts' | 'dictionary' | 'smartImages' | 'defaultCard' | 'appearance' | 'anki' | 'diagnostics' | 'guide'
   >('ai');
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  // Collapsible sidebar state (like macOS / VS Code settings)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('anki_settings_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebarCollapse = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('anki_settings_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Prompt configuration states
   const [defaultPrompts, setDefaultPrompts] = useState<AIPromptsConfig>(DEFAULT_AI_PROMPTS);
@@ -506,82 +526,120 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       httpMethod: 'POST' as const,
     };
 
+  const categories = [
+    { id: 'ai', label: t('settings.tabs.ai'), icon: Cpu },
+    { id: 'prompts', label: t('settings.tabs.prompts'), icon: Sparkles },
+    { id: 'tts', label: t('settings.tabs.tts'), icon: Volume2 },
+    { id: 'dictionary', label: t('settings.tabs.dictionary'), icon: BookOpen },
+    { id: 'smartImages', label: t('settings.tabs.smartImages'), icon: ImageIcon },
+    { id: 'defaultCard', label: t('settings.tabs.defaultCard'), icon: CheckSquare },
+    { id: 'appearance', label: t('settings.tabs.appearance'), icon: Palette },
+    { id: 'anki', label: t('settings.tabs.anki'), icon: Bookmark },
+    { id: 'diagnostics', label: t('settings.tabs.diagnostics'), icon: Activity },
+    { id: 'guide', label: t('settings.tabs.guide'), icon: HelpCircle },
+  ];
+
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-6 min-w-0">
-      {/* Header with Save Button */}
-      <div
-        className={`p-4 sm:p-5 border rounded-lg shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
-          isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-        }`}
-      >
-        <div>
-          <h1 className="text-lg sm:text-xl font-bold tracking-tight flex items-center gap-2">
-            <Sliders className="w-5 h-5 text-blue-500" />
-            <span>{t('settings.headerTitle')}</span>
-            <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
-              v1.1.5
-            </span>
-          </h1>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {saveStatus && (
-            <span
-              className={`text-xs font-semibold px-3 py-1.5 rounded border ${
-                isDark
-                  ? 'bg-emerald-950 text-emerald-200 border-emerald-800'
-                  : 'bg-emerald-100 text-emerald-800 border-emerald-200'
-              }`}
-            >
-              {saveStatus}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={handleSave}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
-          >
-            <Save className="w-4 h-4" />
-            <span>{t('settings.saveBtn')}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Navigation Sub-Tabs */}
-      <div className={`flex flex-wrap gap-1.5 border-b pb-2 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
-        {[
-          { id: 'ai', label: t('settings.tabs.ai'), icon: Cpu },
-          { id: 'prompts', label: t('settings.tabs.prompts'), icon: Sparkles },
-          { id: 'tts', label: t('settings.tabs.tts'), icon: Volume2 },
-          { id: 'dictionary', label: t('settings.tabs.dictionary'), icon: BookOpen },
-          { id: 'smartImages', label: t('settings.tabs.smartImages'), icon: ImageIcon },
-          { id: 'defaultCard', label: t('settings.tabs.defaultCard'), icon: CheckSquare },
-          { id: 'appearance', label: t('settings.tabs.appearance'), icon: Palette },
-          { id: 'anki', label: t('settings.tabs.anki'), icon: Bookmark },
-          { id: 'diagnostics', label: t('settings.tabs.diagnostics'), icon: Activity },
-          { id: 'guide', label: t('settings.tabs.guide'), icon: HelpCircle },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeSubTab === tab.id;
-          return (
+    <div className="w-full max-w-[1680px] mx-auto px-4 sm:px-6 py-4 min-w-0">
+      <div className="flex flex-col md:flex-row gap-6 items-start min-w-0">
+        {/* LEFT SIDEBAR: Collapsible Categories (like macOS / VS Code settings) */}
+        <aside
+          className={`shrink-0 transition-all duration-200 flex flex-col rounded-xl border shadow-2xs overflow-hidden sticky top-16 ${
+            isSidebarCollapsed ? 'w-full md:w-16' : 'w-full md:w-64'
+          } ${
+            isDark ? 'bg-zinc-900/90 border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+          }`}
+        >
+          {/* Sidebar Top: Title & Collapse Toggle */}
+          <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2">
+            {!isSidebarCollapsed && (
+              <div className="flex items-center gap-2 min-w-0">
+                <Sliders className="w-4 h-4 text-blue-500 shrink-0" />
+                <span className="font-bold text-sm tracking-tight truncate">
+                  {t('settings.headerTitle')}
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                  v1.1.5
+                </span>
+              </div>
+            )}
             <button
-              key={tab.id}
               type="button"
-              onClick={() => setActiveSubTab(tab.id as any)}
-              className={`px-3 py-1.5 font-medium text-xs rounded-md flex items-center gap-1.5 transition-colors cursor-pointer ${
-                isActive
-                  ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                  : isDark
-                  ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-750'
-                  : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50'
+              onClick={toggleSidebarCollapse}
+              className={`p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer ${
+                isSidebarCollapsed ? 'mx-auto' : ''
               }`}
+              title={isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
             >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{tab.label}</span>
+              <PanelLeft className="w-4 h-4" />
             </button>
-          );
-        })}
-      </div>
+          </div>
+
+          {/* Categories Nav List */}
+          <nav className="p-2 space-y-1 overflow-y-auto max-h-[calc(100vh-220px)]">
+            {categories.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeSubTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveSubTab(tab.id as any)}
+                  className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    isActive
+                      ? 'bg-blue-600 text-white font-semibold shadow-2xs'
+                      : isDark
+                      ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+                      : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
+                  } ${isSidebarCollapsed ? 'justify-center px-2' : ''}`}
+                  title={tab.label}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  {!isSidebarCollapsed && <span className="truncate">{tab.label}</span>}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Sidebar Footer: Save Button & Status */}
+          <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 space-y-2 mt-auto">
+            {saveStatus && !isSidebarCollapsed && (
+              <span className="text-[11px] font-semibold text-emerald-500 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{saveStatus}</span>
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleSave}
+              className={`w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-lg shadow-2xs flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+                isSidebarCollapsed ? 'px-2' : 'px-3'
+              }`}
+              title={t('settings.saveBtn')}
+            >
+              <Save className="w-4 h-4 shrink-0" />
+              {!isSidebarCollapsed && <span>{t('settings.saveBtn')}</span>}
+            </button>
+          </div>
+        </aside>
+
+        {/* RIGHT PANEL: Selected Category Settings */}
+        <div className="flex-1 min-w-0 space-y-5">
+          {/* Active section header with title & save status */}
+          <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
+            <div className="flex items-center gap-2.5">
+              {React.createElement(categories.find(c => c.id === activeSubTab)?.icon || Sliders, { className: 'w-5 h-5 text-blue-500' })}
+              <h2 className="text-base sm:text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+                {categories.find(c => c.id === activeSubTab)?.label}
+              </h2>
+            </div>
+            {saveStatus && (
+              <span className="text-xs font-semibold text-emerald-500 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                {saveStatus}
+              </span>
+            )}
+          </div>
 
       {/* SUBTAB 1: AI PROVIDERS */}
       {activeSubTab === 'ai' && (
@@ -3513,6 +3571,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           </div>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 };
+

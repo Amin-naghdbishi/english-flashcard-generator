@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AppSettings, AppTheme, TaggedNoteItem, CardData } from '../types';
+import { AppSettings, AppTheme, TaggedNoteItem, CardData, ThemeId, CardType } from '../types';
 import { getAnkiTags, findNotesByTag, completeAnkiNote, checkAnki, updateAnkiNote, openInAnki } from '../services/api';
-import { CardPreview } from './CardPreview';
+import { UnifiedCardEditor } from './UnifiedCardEditor';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
+import { resolveThemeFromNoteType } from '../themes';
 import {
   Tag,
   Tags,
@@ -105,6 +106,42 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
   const [isSavingAllEdited, setIsSavingAllEdited] = useState<boolean>(false);
   const [saveActionMessage, setSaveActionMessage] = useState<string | null>(null);
   const [isShowingInAnki, setIsShowingInAnki] = useState<boolean>(false);
+
+  // Note Type & Card Theme selection
+  const defaultNoteType = settings.anki?.defaultNoteType || 'AI Vocabulary - Comic Pop (Dark) (Normal)';
+  const [selectedNoteType, setSelectedNoteType] = useState<string>(defaultNoteType);
+  const [selectedTheme, setSelectedTheme] = useState<ThemeId>(settings.theme || 'comic-pop-dark');
+
+  useEffect(() => {
+    if (selectedNoteForPreview?.modelName) {
+      setSelectedNoteType(selectedNoteForPreview.modelName);
+      setSelectedTheme(resolveThemeFromNoteType(selectedNoteForPreview.modelName, selectedTheme));
+    } else if (settings.anki?.defaultNoteType) {
+      setSelectedNoteType(settings.anki.defaultNoteType);
+    }
+  }, [selectedNoteForPreview?.modelName, settings.anki?.defaultNoteType]);
+
+  const handleNoteTypeChange = (newModelName: string) => {
+    setSelectedNoteType(newModelName);
+    const newTheme = resolveThemeFromNoteType(newModelName, selectedTheme);
+    setSelectedTheme(newTheme);
+    if (selectedNoteForPreview) {
+      setNotes((prev) =>
+        prev.map((item) =>
+          item.noteId === selectedNoteForPreview.noteId
+            ? {
+                ...item,
+                isEdited: true,
+                modelName: newModelName,
+                cardData: item.cardData
+                  ? { ...item.cardData, modelName: newModelName, noteType: newModelName }
+                  : undefined,
+              }
+            : item
+        )
+      );
+    }
+  };
 
   const isUserNavigatingRef = useRef<boolean>(false);
   const selectedNoteIdRef = useRef<number | null>(null);
@@ -597,14 +634,15 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
   const editedCount = notes.filter((n) => n.isEdited && n.noteId).length;
 
   return (
-    <div className="w-full max-w-[1920px] mx-auto flex flex-col lg:flex-row gap-4 xl:gap-5 p-3 sm:p-5 min-w-0">
-      {/* LEFT COLUMN: Controls, Tag Scanner, Batch Queue */}
-      <section className="w-full lg:w-[420px] xl:w-[440px] flex flex-col gap-4 shrink-0 min-w-0">
-        <div
-          className={`p-4 sm:p-5 border rounded-lg shadow-xs ${
-            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-          }`}
-        >
+    <div className="w-full max-w-[1680px] mx-auto px-4 sm:px-6 py-4 min-w-0">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* LEFT COLUMN: Controls, Tag Scanner, Batch Queue (5 cols / ~42%) */}
+        <div className="lg:col-span-5 flex flex-col space-y-4 min-w-0">
+          <div
+            className={`p-5 rounded-xl border shadow-2xs ${
+              isDark ? 'bg-zinc-900/90 border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+            }`}
+          >
           {/* Header */}
           <div className={`border-b pb-3 mb-4 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
             <h2 className="text-base sm:text-lg font-bold tracking-tight flex items-center gap-2">
@@ -1042,124 +1080,42 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
             </div>
           </div>
         )}
-      </section>
+      </div>
 
-      {/* RIGHT COLUMN: EXPANDED CARD PREVIEW & EDITOR PANEL (Requirement 2 & 7) */}
-      <section className="flex-1 flex flex-col min-h-[580px] min-w-0">
-        <div
-          className={`flex-1 border rounded-lg p-4 sm:p-5 relative overflow-hidden shadow-xs flex flex-col ${
-            isDark ? 'bg-[#1F1F23] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-          }`}
-        >
-          {/* Header over preview with selected word and status */}
-          <div className={`flex items-center justify-between pb-3 mb-3 border-b shrink-0 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
-            <div className="flex items-center gap-2">
-              <Eye className="w-4 h-4 text-blue-500" />
-              <span className="text-xs font-bold uppercase tracking-wider">
-                {t('completeByTag.livePreviewTitle')}
-              </span>
-              {selectedNoteForPreview && (
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                  isDark ? 'bg-zinc-800 text-blue-400' : 'bg-blue-50 text-blue-700'
-                }`}>
-                  {selectedNoteForPreview.word} (#{selectedNoteForPreview.noteId})
-                </span>
-              )}
-            </div>
-
-            {selectedNoteForPreview && (
-              <div className="text-xs flex items-center gap-2">
-                {selectedNoteForPreview.isEdited && (
-                  <span className="text-amber-500 font-bold flex items-center gap-1 text-[11px]">
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>Unsaved Changes</span>
-                  </span>
-                )}
-                {selectedNoteForPreview.status === 'success' ? (
-                  <span className="text-emerald-500 font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>{t('completeByTag.completedBadge')}</span>
-                  </span>
-                ) : selectedNoteForPreview.needsCompletion ? (
-                  <span className="text-amber-500 font-medium">
-                    {t('completeByTag.draftBadge', { count: selectedNoteForPreview.missingFields.length })}
-                  </span>
-                ) : (
-                  <span className="text-zinc-400">{t('completeByTag.completeNoteBadge')}</span>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* PREV / NEXT CARD NAVIGATION BAR (Requirement 1) */}
-          {notes.length > 0 && (
-            <div
-              className={`flex items-center justify-between gap-2 px-3 py-2 rounded-md mb-3 border text-xs ${
-                isDark ? 'bg-zinc-850/80 border-zinc-750 text-zinc-200' : 'bg-zinc-50 border-zinc-200 text-zinc-800'
-              }`}
-            >
-              <button
-                type="button"
-                onClick={handlePreviousNote}
-                disabled={previewIndex <= 0}
-                className={`py-1 px-2.5 rounded font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
-                  isDark ? 'hover:bg-zinc-750 text-zinc-200' : 'hover:bg-zinc-200 text-zinc-700'
-                }`}
-                title="Previous card (Ctrl+Left)"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                <span>Previous Card</span>
-              </button>
-
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">
-                  Card <span className="text-blue-500 font-bold">{previewIndex + 1}</span> of {notes.length}
-                </span>
-                {selectedNoteForPreview?.status === 'success' && (
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-400 font-semibold">
-                    ✓ Completed
-                  </span>
-                )}
-                {(selectedNoteForPreview?.status === 'generating_ai' || selectedNoteForPreview?.status === 'generating_audio') && (
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-400 font-semibold animate-pulse">
-                    Processing...
-                  </span>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={handleNextNote}
-                disabled={previewIndex < 0 || previewIndex >= notes.length - 1}
-                className={`py-1 px-2.5 rounded font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
-                  isDark ? 'hover:bg-zinc-750 text-zinc-200' : 'hover:bg-zinc-200 text-zinc-700'
-                }`}
-                title="Next card (Ctrl+Right)"
-              >
-                <span>Next Card</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-
-          <div className="relative z-10 w-full flex-1 flex flex-col min-w-0">
-            <CardPreview
-              cardData={previewCard}
-              themeId={settings.theme}
-              emptyWordPlaceholder={selectedNoteForPreview?.word || 'tag card'}
-              appTheme={isDark ? 'anki-dark' : 'anki-light'}
-              editable={true}
-              canSaveToAnki={Boolean(selectedNoteForPreview?.noteId)}
-              noteId={selectedNoteForPreview?.noteId}
-              onShowInAnki={handleShowInAnki}
-              isShowingInAnki={isShowingInAnki}
-              isSavingToAnki={isSavingCardToAnki}
-              onCardChange={handleCardChange}
-              onSaveToAnki={handleSaveSingleNoteToAnki}
-            />
-          </div>
+        {/* RIGHT COLUMN: Shared Unified Editor (7 cols / ~58%) */}
+        <div className="lg:col-span-7 flex flex-col min-w-0 sticky top-16">
+          <UnifiedCardEditor
+            cardData={previewCard}
+            emptyWordPlaceholder={selectedNoteForPreview?.word || 'tag card'}
+            themeId={selectedTheme}
+            cardType={previewCard?.cardType || (settings.defaultCard?.cardType as CardType) || 'normal'}
+            noteType={selectedNoteType}
+            onNoteTypeChange={handleNoteTypeChange}
+            deckName={selectedNoteForPreview?.deck}
+            noteId={selectedNoteForPreview?.noteId}
+            editable={true}
+            canSaveToAnki={Boolean(selectedNoteForPreview?.noteId)}
+            isSavingToAnki={isSavingCardToAnki}
+            onShowInAnki={handleShowInAnki}
+            isShowingInAnki={isShowingInAnki}
+            onCardChange={handleCardChange}
+            onSaveToAnki={handleSaveSingleNoteToAnki}
+            isDirty={Boolean(selectedNoteForPreview?.isEdited)}
+            saveSuccessMsg={saveActionMessage}
+            availableTags={availableTags}
+            ankiUrl={settings.anki?.url}
+            navigation={notes.length > 0 ? {
+              currentIndex: previewIndex,
+              totalCount: notes.length,
+              onPrevious: handlePreviousNote,
+              onNext: handleNextNote,
+              hasPrevious: previewIndex > 0,
+              hasNext: previewIndex < notes.length - 1,
+              itemNameLabel: 'Card',
+            } : undefined}
+          />
         </div>
-      </section>
+      </div>
     </div>
   );
 };

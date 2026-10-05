@@ -128,6 +128,17 @@ export interface CardPreviewProps {
   noteId?: number;
   onShowInAnki?: (noteId: number) => void;
   isShowingInAnki?: boolean;
+
+  // External control & unified editor integration
+  mode?: 'edit' | 'preview';
+  onModeChange?: (mode: 'edit' | 'preview') => void;
+  activeSide?: 'front' | 'back' | 'both';
+  onActiveSideChange?: (side: 'front' | 'back' | 'both') => void;
+  viewMode?: 'desktop' | 'mobile';
+  onViewModeChange?: (view: 'desktop' | 'mobile') => void;
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
+  hideTopToolbar?: boolean;
 }
 
 export const BOX_BG_PRESETS = [
@@ -388,16 +399,55 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
   noteId,
   onShowInAnki,
   isShowingInAnki = false,
+  mode: propMode,
+  onModeChange,
+  activeSide: propActiveSide,
+  onActiveSideChange,
+  viewMode: propViewMode,
+  onViewModeChange,
+  isSidebarOpen: propIsSidebarOpen,
+  onToggleSidebar,
+  hideTopToolbar = false,
 }) => {
   const themeContext = useAppTheme();
   const { t, isRTL } = useTranslation();
   const isDark = (propTheme || themeContext.appTheme) === 'anki-dark';
 
-  const [mode, setMode] = useState<'edit' | 'preview'>(editable ? 'edit' : 'preview');
-  const [activeSide, setActiveSide] = useState<'front' | 'back' | 'both'>('back');
-  const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
+  const [internalMode, setInternalMode] = useState<'edit' | 'preview'>(editable ? 'edit' : 'preview');
+  const [internalActiveSide, setInternalActiveSide] = useState<'front' | 'back' | 'both'>('back');
+  const [internalViewMode, setInternalViewMode] = useState<'desktop' | 'mobile'>('desktop');
   const [previewCardType, setPreviewCardType] = useState<CardType>(cardType);
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [internalIsSidebarOpen, setInternalIsSidebarOpen] = useState<boolean>(true);
+
+  const mode = propMode !== undefined ? propMode : internalMode;
+  const setMode = (m: 'edit' | 'preview') => {
+    setInternalMode(m);
+    onModeChange?.(m);
+  };
+
+  const activeSide = propActiveSide !== undefined ? propActiveSide : internalActiveSide;
+  const setActiveSide = (s: 'front' | 'back' | 'both') => {
+    setInternalActiveSide(s);
+    onActiveSideChange?.(s);
+  };
+
+  const viewMode = propViewMode !== undefined ? propViewMode : internalViewMode;
+  const setViewMode = (v: 'desktop' | 'mobile') => {
+    setInternalViewMode(v);
+    onViewModeChange?.(v);
+  };
+
+  const isSidebarOpen = propIsSidebarOpen !== undefined ? propIsSidebarOpen : internalIsSidebarOpen;
+  const setIsSidebarOpen = (val: boolean | ((prev: boolean) => boolean)) => {
+    const nextVal = typeof val === 'function' ? val(isSidebarOpen) : val;
+    setInternalIsSidebarOpen(nextVal);
+    onToggleSidebar?.();
+  };
+
+  useEffect(() => {
+    setPreviewCardType(cardType);
+  }, [cardType]);
+
   const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
   const [openAddBoxMenu, setOpenAddBoxMenu] = useState<'front' | 'back' | 'drawer' | null>(null);
 
@@ -2104,12 +2154,14 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
         }}
       />
 
-      {/* TOP BAR: Mode Switch, Theme Badge & View Toggles */}
-      <div
-        className={`flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b text-xs shrink-0 ${
-          isDark ? 'border-zinc-700' : 'border-zinc-200'
-        }`}
-      >
+      {/* TOP BAR & TAGS DRAWER (Skipped when hideTopToolbar is true) */}
+      {!hideTopToolbar && (
+        <>
+          <div
+            className={`flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b text-xs shrink-0 ${
+              isDark ? 'border-zinc-700' : 'border-zinc-200'
+            }`}
+          >
         {/* Left: Mode (Edit vs Preview) & Theme Badge */}
         <div className="flex items-center gap-2 flex-wrap">
           {editable && (
@@ -2519,6 +2571,8 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
 
       {/* MAIN CONTENT CANVAS & RIGHT TOOLBAR */}

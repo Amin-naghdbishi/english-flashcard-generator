@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { CardData, ManualOverrides, AppSettings, StepLog, AnkiCardVerificationDetails, CardType, AppTheme, getFrontCustomBlocks, getBackCustomBlocks, getAllCustomBlocks, isCardComplete } from '../types';
-import { CardPreview } from './CardPreview';
+import { CardData, ManualOverrides, AppSettings, StepLog, AnkiCardVerificationDetails, CardType, AppTheme, ThemeId, getFrontCustomBlocks, getBackCustomBlocks, getAllCustomBlocks, isCardComplete } from '../types';
+import { UnifiedCardEditor } from './UnifiedCardEditor';
 import { AudioPlayer } from './AudioPlayer';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
-import { makeSpellingSentence } from '../themes';
+import { makeSpellingSentence, resolveThemeFromNoteType } from '../themes';
 import {
   runFullPipeline,
   getAnkiDecks,
@@ -142,6 +142,34 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
 
   // Editable Card Data (updated directly by CardPreview editor)
   const [editableCard, setEditableCard] = useState<CardData | null>(null);
+
+  // Note Type & Card Theme selection (defaults to Settings)
+  const defaultNoteType = settings.anki?.defaultNoteType || 'AI Vocabulary - Comic Pop (Dark) (Normal)';
+  const [selectedNoteType, setSelectedNoteType] = useState<string>(defaultNoteType);
+  const [selectedTheme, setSelectedTheme] = useState<ThemeId>(settings.theme || 'comic-pop-dark');
+
+  useEffect(() => {
+    if (settings.anki?.defaultNoteType) {
+      setSelectedNoteType(settings.anki.defaultNoteType);
+    }
+  }, [settings.anki?.defaultNoteType]);
+
+  useEffect(() => {
+    if (settings.theme) {
+      setSelectedTheme(settings.theme);
+    }
+  }, [settings.theme]);
+
+  const handleNoteTypeChange = useCallback((newModelName: string) => {
+    setSelectedNoteType(newModelName);
+    const newTheme = resolveThemeFromNoteType(newModelName, selectedTheme);
+    setSelectedTheme(newTheme);
+    if (/(\b|_|\(|-)spell(ing)?(\b|_|\)|-)/i.test(newModelName)) {
+      setCardType('spelling');
+    } else if (/(\b|_|\(|-)normal(\b|_|\)|-)/i.test(newModelName)) {
+      setCardType('normal');
+    }
+  }, [selectedTheme]);
 
   // Online Image Search Dialog State
   const [showInternetPanel, setShowInternetPanel] = useState(false);
@@ -406,7 +434,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
         manualOverrides,
         cardType,
         createInAnki: true,
-        theme: settings.theme,
+        theme: selectedTheme,
         url: settings.anki.url,
         tags: editableCard?.tags || [],
         allowAi: settings.ai?.enabled !== false,
@@ -460,7 +488,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
     setIsUpdatingAnki(true);
     setAnkiActionMessage(null);
     try {
-      const res = await updateAnkiNote(createdNoteId, editableCard, settings.theme, settings.anki.url);
+      const res = await updateAnkiNote(createdNoteId, editableCard, selectedTheme, settings.anki.url, undefined, selectedNoteType);
       if (res.success) {
         setAnkiActionMessage(`✓ Note #${createdNoteId} successfully updated in Anki!`);
       } else {
@@ -574,15 +602,16 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
   const isCardAlreadyComplete = useMemo(() => isCardComplete(previewDisplayCard), [previewDisplayCard]);
 
   return (
-    <div className="w-full max-w-[1920px] mx-auto flex flex-col lg:flex-row gap-4 xl:gap-5 p-3 sm:p-5 min-w-0">
-      {/* LEFT COLUMN: Creation Parameters & Pipeline Status */}
-      <section className="w-full lg:w-[350px] xl:w-[375px] flex flex-col gap-4 shrink-0 min-w-0">
-        {/* Box 1: Build Flashcard Form */}
-        <div
-          className={`p-4 sm:p-5 border rounded-lg shadow-xs ${
-            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-          }`}
-        >
+    <div className="w-full max-w-[1680px] mx-auto px-4 sm:px-6 py-4 min-w-0">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* LEFT COLUMN: Creation Parameters & Pipeline Status (5 cols / ~42%) */}
+        <div className="lg:col-span-5 flex flex-col space-y-4 min-w-0">
+          {/* Box 1: Build Flashcard Form */}
+          <div
+            className={`p-5 rounded-xl border shadow-2xs ${
+              isDark ? 'bg-zinc-900/90 border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+            }`}
+          >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base sm:text-lg font-bold tracking-tight">{t('create.title')}</h2>
             <span
@@ -917,8 +946,8 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
 
         {/* Box 2: Pipeline Execution Box */}
         <div
-          className={`p-4 sm:p-5 border rounded-lg shadow-xs flex flex-col ${
-            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+          className={`p-5 rounded-xl border shadow-2xs flex flex-col ${
+            isDark ? 'bg-zinc-900/90 border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
           }`}
         >
           <div className="flex items-center justify-between mb-3">
@@ -1093,35 +1122,33 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
             </button>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* RIGHT COLUMN: Live Card Preview & Card Editor */}
-      <section className="flex-1 flex flex-col min-h-[580px] min-w-0">
-        <div
-          className={`flex-1 border rounded-lg p-2.5 sm:p-3.5 relative overflow-hidden shadow-xs flex flex-col ${
-            isDark ? 'bg-[#1F1F23] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-          }`}
-        >
-          <CardPreview
+        {/* RIGHT COLUMN: Unified Card Editor (7 cols / ~58%) */}
+        <div className="lg:col-span-7 flex flex-col min-w-0 sticky top-16">
+          <UnifiedCardEditor
             cardData={previewDisplayCard}
-            themeId={settings.theme}
-            cardType={cardType}
             emptyWordPlaceholder={word.trim() || 'Word'}
-            appTheme={isDark ? 'anki-dark' : 'anki-light'}
+            themeId={selectedTheme}
+            cardType={cardType}
+            noteType={selectedNoteType}
+            onNoteTypeChange={handleNoteTypeChange}
+            deckName={deck.trim()}
+            noteId={createdNoteId || undefined}
             editable={true}
             onCardChange={handleCardChange}
             onSaveToAnki={handleSaveToAnki}
             isSavingToAnki={isUpdatingAnki}
             canSaveToAnki={!!createdNoteId}
-            noteId={createdNoteId || undefined}
             onShowInAnki={handleOpenInAnki}
             isShowingInAnki={isOpeningInAnki}
             onOpenImageSearch={handleOpenInternetSearch}
             onUploadImage={handleLocalImageUpload}
             onRemoveImage={handleRemoveImage}
+            ankiUrl={settings.anki?.url}
           />
         </div>
-      </section>
+      </div>
 
       {/* ONLINE IMAGE SEARCH MODAL */}
       {showInternetPanel && (

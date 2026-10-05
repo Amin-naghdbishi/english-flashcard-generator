@@ -10,7 +10,7 @@ import {
   getAnkiModelNames,
   AnkiBrowserNoteItem,
 } from '../services/api';
-import { CardPreview } from './CardPreview';
+import { UnifiedCardEditor } from './UnifiedCardEditor';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
 import { THEME_GROUPS, resolveThemeFromNoteType } from '../themes';
@@ -531,11 +531,11 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
         </div>
       </div>
 
-      {/* Main Two-Pane Layout */}
-      <div className="flex flex-col lg:flex-row gap-3 flex-1 items-start min-w-0">
-        {/* LEFT PANE: Search & Text-Based Table (~1/6 width on desktop: 260px - 280px) */}
+      {/* Main Two-Pane Layout: Balanced 5:7 Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-1 min-w-0">
+        {/* LEFT PANE: Search & Text-Based Table (5 cols / ~42% width) */}
         <div
-          className={`w-full lg:w-[260px] xl:w-[280px] shrink-0 flex flex-col rounded-xl border shadow-xs overflow-hidden h-[750px] ${
+          className={`lg:col-span-5 w-full flex flex-col rounded-xl border shadow-2xs overflow-hidden h-[780px] ${
             isDark ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-zinc-200'
           }`}
         >
@@ -785,226 +785,50 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
           </div>
         </div>
 
-        {/* RIGHT PANE: Existing Card Editor (~5/6 width on desktop) */}
-        <div
-          className={`flex-1 min-w-0 w-full flex flex-col rounded-xl border shadow-xs overflow-hidden h-[750px] relative ${
-            isDark ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-zinc-200'
-          }`}
-        >
+        {/* RIGHT PANE: Unified Card Editor (7 cols / ~58% width) */}
+        <div className="lg:col-span-7 flex flex-col min-w-0 sticky top-16">
           {selectedNote && editingCard ? (
-            <div className="flex-1 flex flex-col h-full min-h-0">
-              {/* Card Header & Save Feedback Banner */}
-              <div
-                className={`px-3 py-2 border-b flex flex-wrap items-center justify-between gap-2 text-xs shrink-0 ${
-                  isDark ? 'bg-zinc-850/80 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
-                }`}
-              >
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-bold text-sm text-zinc-800 dark:text-zinc-200">
-                    {editingCard.word}
-                  </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-750 text-zinc-600 dark:text-zinc-400">
-                    Note #{selectedNote.noteId}
-                  </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-500">
-                    {selectedNote.deckName}
-                  </span>
-                  <span
-                    className={`text-[10px] font-medium px-2 py-0.5 rounded flex items-center gap-1 ${
-                      (editingCard.cardType || selectedNote.cardType) === 'spelling'
-                        ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30 font-semibold'
-                        : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                    }`}
-                    title={`Card Mode: ${(editingCard.cardType || selectedNote.cardType) === 'spelling' ? 'Spelling Practice' : 'Normal Card'}`}
-                  >
-                    {(editingCard.cardType || selectedNote.cardType) === 'spelling' ? '✍️ Spelling' : '📖 Normal'}
-                  </span>
-                  {isDirty && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 font-semibold border border-amber-500/30">
-                      Unsaved changes
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {/* Note Type Selector Dropdown */}
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium flex items-center gap-1">
-                      <Layers className="w-3.5 h-3.5 text-zinc-400" />
-                      Note Type:
-                    </span>
-                    <select
-                      value={currentNoteType}
-                      onChange={(e) => handleNoteTypeChange(e.target.value)}
-                      className={`text-xs py-1 px-2.5 rounded-md border font-medium cursor-pointer outline-none transition-colors max-w-[240px] truncate ${
-                        isDark
-                          ? 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:border-zinc-600 focus:border-blue-500'
-                          : 'bg-white border-zinc-200 text-zinc-800 hover:border-zinc-300 focus:border-blue-500 shadow-2xs'
-                      }`}
-                      title={`Active Note Type: ${currentNoteType || selectedNote.modelName || 'Standard'}`}
-                    >
-                      {/* Current card's note type if not in the lists */}
-                      {currentNoteType &&
-                        !ankiModelNames.includes(currentNoteType) &&
-                        !appThemeNoteTypes.some(
-                          (t) => t.value === currentNoteType || t.label === currentNoteType
-                        ) && (
-                          <optgroup label="Current Note Type">
-                            <option value={currentNoteType}>{currentNoteType}</option>
-                          </optgroup>
-                        )}
-
-                      {/* Anki Note Types */}
-                      {ankiModelNames.length > 0 && (
-                        <optgroup label="Anki Note Types">
-                          {ankiModelNames.map((name) => (
-                            <option key={name} value={name}>
-                              {name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-
-                      {/* Application Note Types / Themes */}
-                      <optgroup label="Application Note Types / Themes">
-                        {appThemeNoteTypes.map((item) => (
-                          <option key={item.value} value={item.value}>
-                            {item.label}
-                          </option>
-                        ))}
-                      </optgroup>
-                    </select>
-                    {selectedNote.modelName && selectedNote.modelName === currentNoteType && (
-                      <span
-                        className="text-[10px] text-emerald-500 font-mono hidden xl:inline"
-                        title="Initialized from existing Anki note modelName"
-                      >
-                        (detected)
-                      </span>
-                    )}
-                  </div>
-
-                  {saveSuccessMsg && (
-                    <span className="text-xs text-emerald-500 font-semibold flex items-center gap-1 animate-fade-in">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      {saveSuccessMsg}
-                    </span>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => handleShowInAnki(selectedNote.noteId)}
-                    disabled={isShowingInAnki}
-                    className={`py-1 px-2.5 rounded text-xs font-medium flex items-center gap-1 border transition-colors cursor-pointer ${
-                      isDark
-                        ? 'border-zinc-700 bg-zinc-800 hover:bg-zinc-750 text-zinc-200'
-                        : 'border-zinc-200 bg-white hover:bg-zinc-100 text-zinc-700'
-                    }`}
-                    title="Open note in Anki's Browser GUI"
-                  >
-                    {isShowingInAnki ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <ExternalLink className="w-3 h-3" />
-                    )}
-                    <span>Open in Anki</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Embedded Existing Card Editor */}
-              <div className="flex-1 overflow-y-auto min-h-0 relative">
-                <CardPreview
-                  cardData={editingCard}
-                  themeId={currentTheme}
-                  cardType={editingCard.cardType || selectedNote.cardType || 'normal'}
-                  emptyWordPlaceholder={selectedNote.word}
-                  appTheme={isDark ? 'anki-dark' : 'anki-light'}
-                  editable={true}
-                  canSaveToAnki={true}
-                  noteId={selectedNote.noteId}
-                  onShowInAnki={handleShowInAnki}
-                  isShowingInAnki={isShowingInAnki}
-                  isSavingToAnki={isSaving}
-                  onCardChange={handleCardChange}
-                  onSaveToAnki={handleSaveToAnki}
-                />
-              </div>
-
-              {/* Bottom Navigation & Save Controls Bar */}
-              <div
-                className={`p-2.5 sm:px-4 border-t flex flex-wrap items-center justify-between gap-3 shrink-0 ${
-                  isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
-                }`}
-              >
-                {/* Previous Button */}
-                <button
-                  type="button"
-                  onClick={handlePreviousCard}
-                  disabled={selectedIndex <= 0}
-                  className={`py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
-                    isDark
-                      ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-100 border border-zinc-700'
-                      : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 shadow-xs'
-                  }`}
-                  title="Previous Card (Ctrl+Left)"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>Previous</span>
-                </button>
-
-                {/* Save to Anki Button */}
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleSaveToAnki}
-                    disabled={isSaving}
-                    className={`py-1.5 px-4 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs ${
-                      isDirty
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                        : isDark
-                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-200 border border-zinc-700'
-                        : 'bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200'
-                    }`}
-                    title="Save changes to existing note in Anki (Ctrl+S)"
-                  >
-                    {isSaving ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Save className="w-3.5 h-3.5" />
-                    )}
-                    <span>Save to Anki</span>
-                  </button>
-
-                  {/* Card X / Y Indicator */}
-                  <span className="text-xs font-mono font-medium text-zinc-500 dark:text-zinc-400">
-                    Card <strong className="text-blue-500 font-bold">{selectedIndex + 1}</strong> / {notes.length}
-                  </span>
-                </div>
-
-                {/* Next Button */}
-                <button
-                  type="button"
-                  onClick={handleNextCard}
-                  disabled={selectedIndex < 0 || selectedIndex >= notes.length - 1}
-                  className={`py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
-                    isDark
-                      ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-100 border border-zinc-700'
-                      : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 shadow-xs'
-                  }`}
-                  title="Next Card (Ctrl+Right)"
-                >
-                  <span>Next</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+            <UnifiedCardEditor
+              cardData={editingCard}
+              noteId={selectedNote.noteId}
+              deckName={selectedNote.deckName}
+              noteType={currentNoteType}
+              onNoteTypeChange={handleNoteTypeChange}
+              availableNoteTypes={ankiModelNames}
+              isNoteTypeDetected={Boolean(selectedNote.modelName && selectedNote.modelName === currentNoteType)}
+              themeId={currentTheme}
+              cardType={editingCard.cardType || selectedNote.cardType || 'normal'}
+              emptyWordPlaceholder={selectedNote.word}
+              isDirty={isDirty}
+              saveSuccessMsg={saveSuccessMsg}
+              isSavingToAnki={isSaving}
+              canSaveToAnki={true}
+              onSaveToAnki={handleSaveToAnki}
+              onShowInAnki={handleShowInAnki}
+              isShowingInAnki={isShowingInAnki}
+              onCardChange={handleCardChange}
+              availableTags={availableTags}
+              ankiUrl={settings.anki.url}
+              navigation={{
+                currentIndex: selectedIndex,
+                totalCount: notes.length,
+                onPrevious: handlePreviousCard,
+                onNext: handleNextCard,
+                hasPrevious: selectedIndex > 0,
+                hasNext: selectedIndex < notes.length - 1,
+                itemNameLabel: 'Card',
+              }}
+            />
           ) : (
-            <div className="h-full flex flex-col items-center justify-center p-8 text-center text-zinc-400 gap-3">
-              <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
+            <div
+              className={`h-[780px] flex flex-col items-center justify-center p-8 text-center rounded-xl border shadow-2xs ${
+                isDark ? 'bg-zinc-900/80 border-zinc-800 text-zinc-400' : 'bg-white border-zinc-200 text-zinc-500'
+              }`}
+            >
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center mb-3">
                 <Search className="w-6 h-6" />
               </div>
-              <h2 className="text-base font-bold text-zinc-700 dark:text-zinc-200">
+              <h2 className="text-base font-bold text-zinc-800 dark:text-zinc-200 mb-1">
                 No Card Selected
               </h2>
               <p className="text-xs max-w-sm text-zinc-500 dark:text-zinc-400">

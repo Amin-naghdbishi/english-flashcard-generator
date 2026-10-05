@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AppSettings, BatchItem, CardData, BatchFieldConfig, ManualOverrides, AppTheme, CardType, isCardComplete } from '../types';
+import { AppSettings, BatchItem, CardData, BatchFieldConfig, ManualOverrides, AppTheme, CardType, ThemeId, isCardComplete } from '../types';
 import {
   runFullPipeline,
   getAnkiDecks,
@@ -11,9 +11,10 @@ import {
   updateAnkiNote,
   openInAnki,
 } from '../services/api';
-import { CardPreview } from './CardPreview';
+import { UnifiedCardEditor } from './UnifiedCardEditor';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
+import { resolveThemeFromNoteType } from '../themes';
 import {
   FileText,
   Upload,
@@ -276,6 +277,44 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
   const [isSavingAllEdited, setIsSavingAllEdited] = useState<boolean>(false);
   const [saveActionMessage, setSaveActionMessage] = useState<string | null>(null);
   const [isShowingInAnki, setIsShowingInAnki] = useState<boolean>(false);
+
+  // Note Type & Card Theme selection (defaults to Settings)
+  const defaultNoteType = settings.anki?.defaultNoteType || 'AI Vocabulary - Comic Pop (Dark) (Normal)';
+  const [selectedNoteType, setSelectedNoteType] = useState<string>(defaultNoteType);
+  const [selectedTheme, setSelectedTheme] = useState<ThemeId>(settings.theme || 'comic-pop-dark');
+
+  useEffect(() => {
+    if (settings.anki?.defaultNoteType) {
+      setSelectedNoteType(settings.anki.defaultNoteType);
+    }
+  }, [settings.anki?.defaultNoteType]);
+
+  useEffect(() => {
+    if (settings.theme) {
+      setSelectedTheme(settings.theme);
+    }
+  }, [settings.theme]);
+
+  const handleNoteTypeChange = (newModelName: string) => {
+    setSelectedNoteType(newModelName);
+    const newTheme = resolveThemeFromNoteType(newModelName, selectedTheme);
+    setSelectedTheme(newTheme);
+    if (selectedItemForPreview) {
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === selectedItemForPreview.id
+            ? {
+                ...item,
+                isEdited: true,
+                cardData: item.cardData
+                  ? { ...item.cardData, modelName: newModelName, noteType: newModelName }
+                  : undefined,
+              }
+            : item
+        )
+      );
+    }
+  };
 
   const isUserNavigatingRef = useRef<boolean>(false);
   const selectedItemIdRef = useRef<string | null>(null);
@@ -808,14 +847,15 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
   }, 0);
 
   return (
-    <div className="w-full max-w-[1920px] mx-auto flex flex-col lg:flex-row gap-4 xl:gap-5 p-3 sm:p-5 min-w-0">
-      {/* LEFT COLUMN: Controls, Upload TXT, Grouping, Queue */}
-      <section className="w-full lg:w-[420px] xl:w-[440px] flex flex-col gap-4 shrink-0 min-w-0">
-        <div
-          className={`p-4 sm:p-5 border rounded-lg shadow-xs ${
-            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-          }`}
-        >
+    <div className="w-full max-w-[1680px] mx-auto px-4 sm:px-6 py-4 min-w-0">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* LEFT COLUMN: Controls, Upload TXT, Grouping, Queue (5 cols / ~42%) */}
+        <div className="lg:col-span-5 flex flex-col space-y-4 min-w-0">
+          <div
+            className={`p-5 rounded-xl border shadow-2xs ${
+              isDark ? 'bg-zinc-900/90 border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+            }`}
+          >
           {/* Header & Simple Upload TXT Button (Requirement 1) */}
           <div className={`flex items-center justify-between border-b pb-3 mb-4 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
             <h2 className="text-base sm:text-lg font-bold tracking-tight flex items-center gap-2">
@@ -1282,122 +1322,42 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             })}
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* RIGHT COLUMN: EXPANDED CARD PREVIEW & EDITOR PANEL (Requirement 2 & 7) */}
-      <section className="flex-1 flex flex-col min-h-[580px] min-w-0">
-        <div
-          className={`flex-1 border rounded-lg p-4 sm:p-5 relative overflow-hidden shadow-xs flex flex-col ${
-            isDark ? 'bg-[#1F1F23] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-          }`}
-        >
-          <div className="flex items-center justify-between pb-2 mb-3 border-b border-zinc-200 dark:border-zinc-700/80">
-            <div className="flex items-center gap-2">
-              <Eye className="w-4 h-4 text-blue-500" />
-              <h3 className="text-sm font-bold">{t('batch.livePreviewTitle')}</h3>
-              {selectedItemForPreview && (
-                <span
-                  className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                    isDark ? 'bg-zinc-800 text-blue-400' : 'bg-blue-50 text-blue-700'
-                  }`}
-                >
-                  {selectedItemForPreview.word} {selectedItemForPreview.noteId ? `(#${selectedItemForPreview.noteId})` : ''}
-                </span>
-              )}
-            </div>
-
-            {selectedItemForPreview && (
-              <div className="text-xs flex items-center gap-2">
-                {selectedItemForPreview.isEdited && (
-                  <span className="text-amber-500 font-bold flex items-center gap-1 text-[11px]">
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>Unsaved Changes</span>
-                  </span>
-                )}
-                {selectedItemForPreview.status === 'success' ? (
-                  <span className="text-emerald-500 font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>{t('batch.createdInAnkiBadge')}</span>
-                  </span>
-                ) : (
-                  <span className="text-zinc-400">
-                    {t('batch.draftBadge', { deck: selectedItemForPreview.deck || deck })}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* PREV / NEXT CARD NAVIGATION BAR (Requirement 1) */}
-          {items.length > 0 && (
-            <div
-              className={`flex items-center justify-between gap-2 px-3 py-2 rounded-md mb-3 border text-xs ${
-                isDark ? 'bg-zinc-850/80 border-zinc-750 text-zinc-200' : 'bg-zinc-50 border-zinc-200 text-zinc-800'
-              }`}
-            >
-              <button
-                type="button"
-                onClick={handlePreviousCard}
-                disabled={previewIndex <= 0}
-                className={`py-1 px-2.5 rounded font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
-                  isDark ? 'hover:bg-zinc-750 text-zinc-200' : 'hover:bg-zinc-200 text-zinc-700'
-                }`}
-                title="Previous card (Ctrl+Left)"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                <span>Previous Card</span>
-              </button>
-
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">
-                  Card <span className="text-purple-500 font-bold">{previewIndex + 1}</span> of {items.length}
-                </span>
-                {selectedItemForPreview?.status === 'success' && (
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-400 font-semibold">
-                    ✓ In Anki
-                  </span>
-                )}
-                {selectedItemForPreview?.status === 'generating_ai' && (
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-500/15 text-purple-400 font-semibold animate-pulse">
-                    Generating...
-                  </span>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={handleNextCard}
-                disabled={previewIndex < 0 || previewIndex >= items.length - 1}
-                className={`py-1 px-2.5 rounded font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
-                  isDark ? 'hover:bg-zinc-750 text-zinc-200' : 'hover:bg-zinc-200 text-zinc-700'
-                }`}
-                title="Next card (Ctrl+Right)"
-              >
-                <span>Next Card</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-
-          {/* Full CardPreview & Editor Panel */}
-          <div className="relative z-10 w-full flex-1 flex flex-col min-w-0">
-            <CardPreview
-              cardData={previewCard}
-              themeId={settings.theme}
-              emptyWordPlaceholder={selectedItemForPreview?.word || items[0]?.word || 'batch card'}
-              appTheme={isDark ? 'anki-dark' : 'anki-light'}
-              editable={true}
-              canSaveToAnki={Boolean(selectedItemForPreview?.noteId)}
-              noteId={selectedItemForPreview?.noteId}
-              onShowInAnki={handleShowInAnki}
-              isShowingInAnki={isShowingInAnki}
-              isSavingToAnki={isSavingCardToAnki}
-              onCardChange={handleCardChange}
-              onSaveToAnki={handleSaveSingleCardToAnki}
-            />
-          </div>
+        {/* RIGHT COLUMN: Shared Unified Editor (7 cols / ~58%) */}
+        <div className="lg:col-span-7 flex flex-col min-w-0 sticky top-16">
+          <UnifiedCardEditor
+            cardData={previewCard}
+            emptyWordPlaceholder={selectedItemForPreview?.word || items[0]?.word || 'batch card'}
+            themeId={selectedTheme}
+            cardType={previewCard?.cardType || (settings.defaultCard?.cardType as CardType) || 'normal'}
+            noteType={selectedNoteType}
+            onNoteTypeChange={handleNoteTypeChange}
+            deckName={selectedItemForPreview?.deck || deck}
+            noteId={selectedItemForPreview?.noteId}
+            editable={true}
+            canSaveToAnki={Boolean(selectedItemForPreview?.noteId)}
+            isSavingToAnki={isSavingCardToAnki}
+            onShowInAnki={handleShowInAnki}
+            isShowingInAnki={isShowingInAnki}
+            onCardChange={handleCardChange}
+            onSaveToAnki={handleSaveSingleCardToAnki}
+            isDirty={Boolean(selectedItemForPreview?.isEdited)}
+            saveSuccessMsg={saveActionMessage}
+            availableTags={selectedItemForPreview?.parsedFields?.tags}
+            ankiUrl={settings.anki?.url}
+            navigation={items.length > 0 ? {
+              currentIndex: previewIndex,
+              totalCount: items.length,
+              onPrevious: handlePreviousCard,
+              onNext: handleNextCard,
+              hasPrevious: previewIndex > 0,
+              hasNext: previewIndex < items.length - 1,
+              itemNameLabel: 'Card',
+            } : undefined}
+          />
         </div>
-      </section>
+      </div>
     </div>
   );
 };
