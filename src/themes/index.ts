@@ -603,3 +603,32 @@ export const SHARED_CARD_CSS = `
   text-decoration: underline !important;
 }
 `;
+
+export function resolveThemeFromNoteType(
+  noteType: string = '',
+  fallbackTheme: ThemeId = 'comic-pop-dark'
+): ThemeId {
+  const lower = (noteType || '').toLowerCase();
+  if (lower.includes('duo quest') || lower.includes('duolingo') || lower.includes('quest')) {
+    return lower.includes('dark') ? 'comic-quest-dark' : 'comic-quest-light';
+  }
+  if (lower.includes('botanical') || lower.includes('sage')) {
+    return lower.includes('dark') ? 'botanical-dark' : 'botanical-light';
+  }
+  if (lower.includes('notebook') || lower.includes('index')) {
+    return lower.includes('dark') ? 'comic-notebook-dark' : 'comic-notebook-light';
+  }
+  if (lower.includes('minimal')) {
+    return lower.includes('dark') ? 'minimal-dark' : 'minimal-light';
+  }
+  if (lower.includes('hero pop') || lower.includes('comic-pop') || lower.includes('comic pop') || lower.includes('comic')) {
+    return lower.includes('light') ? 'comic-pop-light' : 'comic-pop-dark';
+  }
+  if (lower.includes('dark')) {
+    return 'comic-pop-dark';
+  }
+  if (lower.includes('light')) {
+    return 'comic-pop-light';
+  }
+  return fallbackTheme;
+}

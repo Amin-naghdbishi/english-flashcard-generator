@@ -44,6 +44,8 @@ import {
   storeAnkiMediaFile,
   searchAnkiNotes,
   callAnkiConnect,
+  getAnkiModelNames,
+  updateAnkiNoteModel,
 } from './server/anki';
 import { AppSettings, CardData, ManualOverrides, DiagnosticsReport, StepLog, ThemeId, CardType, CustomAIProviderConfig, CustomTTSProviderConfig, SmartImagesConfig, AIPromptsConfig, getFrontCustomBlocks, getBackCustomBlocks, getAllCustomBlocks, isCardComplete } from './src/types';
 import { THEMES, makeSpellingSentence, renderCustomBlocksHtml, renderMainBoxStyles } from './src/themes';
@@ -808,6 +810,12 @@ async function startServer() {
     res.json(result);
   });
 
+  app.get('/api/anki/model-names', async (req, res) => {
+    const url = (req.query.url as string) || appSettings.anki.url || 'http://127.0.0.1:8765';
+    const result = await getAnkiModelNames(url);
+    res.json(result);
+  });
+
   app.post('/api/anki/notes-by-tag', async (req, res) => {
     const { tag, url } = req.body;
     const ankiUrl = url || appSettings.anki.url || 'http://127.0.0.1:8765';
@@ -1239,7 +1247,7 @@ async function startServer() {
   });
 
   app.post('/api/anki/update-note', async (req, res) => {
-    const { noteId, cardData, themeId, url, tags, deck } = req.body;
+    const { noteId, cardData, themeId, url, tags, deck, modelName } = req.body;
     if (!noteId || !cardData) {
       return res.status(400).json({ success: false, error: 'noteId and cardData are required.' });
     }
@@ -1250,16 +1258,17 @@ async function startServer() {
     try {
       // 1. Inspect existing note in Anki to determine note model name and ensure model has all fields and latest templates
       let existingModelFieldNames: string[] = [];
+      let currentModelName = '';
       try {
         const infoRes = await getNotesInfo(ankiUrl, [Number(noteId)]);
         if (infoRes.success && infoRes.notes && infoRes.notes.length > 0) {
-          const existingModelName = infoRes.notes[0].modelName;
-          const detectedType: CardType = cardData.cardType || (existingModelName.includes('Spelling') ? 'spelling' : 'normal');
+          currentModelName = infoRes.notes[0].modelName || '';
+          const detectedType: CardType = cardData.cardType || (currentModelName.includes('Spelling') ? 'spelling' : 'normal');
           // Only update/ensure model templates for AI Vocabulary models to avoid overwriting standard/custom note types
-          if (existingModelName && /^AI Vocabulary/i.test(existingModelName)) {
-            await ensureAnkiModel(ankiUrl, effectiveTheme, detectedType, existingModelName);
+          if (currentModelName && /^AI Vocabulary/i.test(currentModelName)) {
+            await ensureAnkiModel(ankiUrl, effectiveTheme, detectedType, currentModelName);
           }
-          const fieldsRes = await callAnkiConnect(ankiUrl, 'modelFieldNames', { modelName: existingModelName });
+          const fieldsRes = await callAnkiConnect(ankiUrl, 'modelFieldNames', { modelName: currentModelName });
           if (fieldsRes.success && Array.isArray(fieldsRes.result)) {
             existingModelFieldNames = fieldsRes.result;
           }
@@ -1380,6 +1389,35 @@ async function startServer() {
           if (existingModelFieldNames.includes(key)) {
             fieldsToUpdate[key] = val;
           }
+        }
+      }
+
+      // If user changed the Note Type, update the note's model in Anki
+      const desiredModel = (modelName || cardData.modelName || cardData.noteType || '').trim();
+      if (desiredModel && currentModelName && desiredModel !== currentModelName) {
+        try {
+          if (/^AI Vocabulary/i.test(desiredModel)) {
+            await ensureAnkiModel(ankiUrl, effectiveTheme, effectiveCardType, desiredModel);
+          }
+          const targetFieldsRes = await callAnkiConnect(ankiUrl, 'modelFieldNames', { modelName: desiredModel });
+          if (targetFieldsRes.success && Array.isArray(targetFieldsRes.result)) {
+            existingModelFieldNames = targetFieldsRes.result;
+            // Re-filter fields for the new model
+            fieldsToUpdate = {};
+            for (const [key, val] of Object.entries(fields)) {
+              if (existingModelFieldNames.includes(key)) {
+                fieldsToUpdate[key] = val;
+              }
+            }
+          }
+          const modelUpdateRes = await updateAnkiNoteModel(ankiUrl, Number(noteId), desiredModel, fieldsToUpdate, tags);
+          if (modelUpdateRes.success) {
+            console.log(`[Anki] Changed note #${noteId} Note Type from "${currentModelName}" to "${desiredModel}"`);
+          } else {
+            console.warn(`[Anki] Note Type update via updateNoteModel:`, modelUpdateRes.error);
+          }
+        } catch (modelErr) {
+          console.warn(`[Anki] Error updating note model:`, modelErr);
         }
       }
 

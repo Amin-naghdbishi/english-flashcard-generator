@@ -1,10 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { AppSettings, AppTheme, CardData, ThemeId } from '../types';
-import { searchAnkiNotes, updateAnkiNote, checkAnki, getAnkiDecks, getAnkiTags, openInAnki, AnkiBrowserNoteItem } from '../services/api';
+import {
+  searchAnkiNotes,
+  updateAnkiNote,
+  checkAnki,
+  getAnkiDecks,
+  getAnkiTags,
+  openInAnki,
+  getAnkiModelNames,
+  AnkiBrowserNoteItem,
+} from '../services/api';
 import { CardPreview } from './CardPreview';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
-import { THEME_GROUPS } from '../themes';
+import { THEME_GROUPS, resolveThemeFromNoteType } from '../themes';
 import {
   Search,
   RotateCcw,
@@ -45,16 +54,18 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
   const [totalCount, setTotalCount] = useState<number>(0);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
 
-  // Available metadata for quick filter suggestions
+  // Available metadata for quick filter suggestions & Note Types
   const [availableDecks, setAvailableDecks] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [ankiModelNames, setAnkiModelNames] = useState<string[]>([]);
 
   // Current editing card in editor
   const [editingCard, setEditingCard] = useState<CardData | null>(null);
   const [originalCardJson, setOriginalCardJson] = useState<string>('');
   const [isDirty, setIsDirty] = useState<boolean>(false);
 
-  // Current active theme for editor / live preview
+  // Note Type & Theme source of truth for editor
+  const [currentNoteType, setCurrentNoteType] = useState<string>('');
   const [currentTheme, setCurrentTheme] = useState<ThemeId>(settings.theme || 'comic-pop-dark');
 
   // Save state
@@ -97,6 +108,12 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
           }
         });
 
+        getAnkiModelNames(settings.anki.url).then((res) => {
+          if (isMounted && res.success && Array.isArray(res.modelNames)) {
+            setAnkiModelNames(res.modelNames);
+          }
+        });
+
         // Run default search for the default deck or all cards
         const initialQuery = settings.anki.defaultDeck ? `deck:"${settings.anki.defaultDeck}"` : '';
         setSearchInput(initialQuery);
@@ -132,6 +149,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
           setEditingCard(null);
           setOriginalCardJson('');
           setIsDirty(false);
+          setCurrentNoteType('');
           setIsAnkiConnected(false);
         } else {
           setIsAnkiConnected(true);
@@ -146,13 +164,23 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
             setEditingCard(firstCardData);
             setOriginalCardJson(JSON.stringify(firstCardData));
             setIsDirty(false);
-            const initialTheme = firstNote.detectedTheme || settings.theme || 'comic-pop-dark';
+            const actualNoteType = firstNote.modelName || firstNote.noteType || 'Standard';
+            setCurrentNoteType(actualNoteType);
+            const initialTheme =
+              firstNote.detectedTheme ||
+              resolveThemeFromNoteType(actualNoteType, settings.theme || 'comic-pop-dark');
             setCurrentTheme(initialTheme);
+
+            const foundModels = Array.from(new Set(res.notes.map((n) => n.modelName).filter(Boolean)));
+            if (foundModels.length > 0) {
+              setAnkiModelNames((prev) => Array.from(new Set([...prev, ...foundModels])));
+            }
           } else {
             setSelectedIndex(-1);
             setEditingCard(null);
             setOriginalCardJson('');
             setIsDirty(false);
+            setCurrentNoteType('');
           }
         }
       } catch (err: any) {
@@ -200,11 +228,63 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
         setOriginalCardJson(JSON.stringify(cardCopy));
         setIsDirty(false);
         setSaveSuccessMsg(null);
-        const targetTheme = target.detectedTheme || settings.theme || 'comic-pop-dark';
+        const actualNoteType = target.modelName || target.noteType || 'Standard';
+        setCurrentNoteType(actualNoteType);
+        const targetTheme =
+          target.detectedTheme ||
+          resolveThemeFromNoteType(actualNoteType, settings.theme || 'comic-pop-dark');
         setCurrentTheme(targetTheme);
       }, target.word);
     },
     [notes, selectedIndex, requestNavigation, settings.theme]
+  );
+
+  const appThemeNoteTypes = useMemo(
+    () => [
+      { value: 'AI Vocabulary - Duo Quest (Light) (Normal)', label: 'Duo Quest (Light) [Duolingo]' },
+      { value: 'AI Vocabulary - Duo Quest (Dark) (Normal)', label: 'Duo Quest (Dark)' },
+      { value: 'AI Vocabulary - Hero Pop (Light) (Normal)', label: 'Hero Pop (Light)' },
+      { value: 'AI Vocabulary - Hero Pop (Dark) (Normal)', label: 'Hero Pop (Dark)' },
+      { value: 'AI Vocabulary - Index Notebook (Light) (Normal)', label: 'Index Notebook (Light)' },
+      { value: 'AI Vocabulary - Index Notebook (Dark) (Normal)', label: 'Index Notebook (Dark)' },
+      { value: 'AI Vocabulary - Botanical Sage (Light) (Normal)', label: 'Botanical Sage (Light)' },
+      { value: 'AI Vocabulary - Botanical Sage (Dark) (Normal)', label: 'Botanical Sage (Dark)' },
+      { value: 'AI Vocabulary - Minimal (Light) (Normal)', label: 'Minimal (Light)' },
+      { value: 'AI Vocabulary - Minimal (Dark) (Normal)', label: 'Minimal (Dark)' },
+    ],
+    []
+  );
+
+  const handleNoteTypeChange = useCallback(
+    (newModelName: string) => {
+      setCurrentNoteType(newModelName);
+
+      // Determine theme corresponding to the new note type
+      const newTheme = resolveThemeFromNoteType(newModelName, currentTheme);
+      setCurrentTheme(newTheme);
+
+      // Distinguish spelling vs normal if new model specifies it
+      let newCardType = editingCard?.cardType || selectedNote?.cardType || 'normal';
+      if (/(\b|_|\(|-)spell(ing)?(\b|_|\)|-)/i.test(newModelName)) {
+        newCardType = 'spelling';
+      } else if (/(\b|_|\(|-)normal(\b|_|\)|-)/i.test(newModelName)) {
+        newCardType = 'normal';
+      }
+
+      setEditingCard((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          modelName: newModelName,
+          noteType: newModelName,
+          cardType: newCardType,
+        };
+      });
+
+      setIsDirty(true);
+      setSaveSuccessMsg(null);
+    },
+    [currentTheme, editingCard, selectedNote]
   );
 
   const handleThemeChange = useCallback((newTheme: ThemeId) => {
@@ -244,17 +324,24 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
     setSaveSuccessMsg(null);
 
     try {
+      const cardToSave: CardData = {
+        ...editingCard,
+        modelName: currentNoteType || editingCard.modelName || selectedNote.modelName,
+        noteType: currentNoteType || editingCard.noteType || selectedNote.noteType,
+      };
+
       const res = await updateAnkiNote(
         selectedNote.noteId,
-        editingCard,
+        cardToSave,
         currentTheme,
         settings.anki.url,
-        selectedNote.deckName
+        selectedNote.deckName,
+        currentNoteType || selectedNote.modelName
       );
 
       if (res.success) {
         // Update snapshot and dirty flag
-        setOriginalCardJson(JSON.stringify(editingCard));
+        setOriginalCardJson(JSON.stringify(cardToSave));
         setIsDirty(false);
         setSaveSuccessMsg(`✓ Note #${selectedNote.noteId} saved successfully!`);
 
@@ -264,18 +351,20 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
             idx === selectedIndex
               ? {
                   ...n,
-                  word: editingCard.word,
-                  partOfSpeech: editingCard.partOfSpeech,
-                  meaningFa: editingCard.meaningFa,
-                  definitionEn: editingCard.definitionEn,
-                  phonetic: editingCard.phonetic,
-                  example: editingCard.example,
-                  translationFa: editingCard.translationFa,
-                  mnemonic: editingCard.mnemonic,
-                  cardType: editingCard.cardType,
-                  tags: editingCard.tags || n.tags,
+                  modelName: currentNoteType || n.modelName,
+                  noteType: currentNoteType || n.noteType,
+                  word: cardToSave.word,
+                  partOfSpeech: cardToSave.partOfSpeech,
+                  meaningFa: cardToSave.meaningFa,
+                  definitionEn: cardToSave.definitionEn,
+                  phonetic: cardToSave.phonetic,
+                  example: cardToSave.example,
+                  translationFa: cardToSave.translationFa,
+                  mnemonic: cardToSave.mnemonic,
+                  cardType: cardToSave.cardType,
+                  tags: cardToSave.tags || n.tags,
                   detectedTheme: currentTheme,
-                  cardData: { ...editingCard },
+                  cardData: { ...cardToSave },
                 }
               : n
           )
@@ -293,7 +382,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
     } finally {
       setIsSaving(false);
     }
-  }, [selectedNote, editingCard, settings.theme, settings.anki.url, selectedIndex]);
+  }, [selectedNote, editingCard, currentTheme, currentNoteType, settings.anki.url, selectedIndex]);
 
   // Modal actions
   const handleModalSaveAndContinue = async () => {
@@ -721,12 +810,6 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
                     {selectedNote.deckName}
                   </span>
                   <span
-                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
-                    title={`Anki Note Type: ${selectedNote.modelName || selectedNote.noteType || 'Standard'}`}
-                  >
-                    Type: {selectedNote.modelName || selectedNote.noteType || 'Standard'}
-                  </span>
-                  <span
                     className={`text-[10px] font-medium px-2 py-0.5 rounded flex items-center gap-1 ${
                       (editingCard.cardType || selectedNote.cardType) === 'spelling'
                         ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30 font-semibold'
@@ -744,41 +827,57 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* Theme Selector Dropdown */}
+                  {/* Note Type Selector Dropdown */}
                   <div className="flex items-center gap-1.5">
                     <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium flex items-center gap-1">
-                      <Sliders className="w-3 h-3 text-zinc-400" />
-                      Theme:
+                      <Layers className="w-3.5 h-3.5 text-zinc-400" />
+                      Note Type:
                     </span>
                     <select
-                      value={currentTheme}
-                      onChange={(e) => handleThemeChange(e.target.value as ThemeId)}
-                      className={`text-xs py-1 px-2 rounded-md border font-medium cursor-pointer outline-none transition-colors ${
+                      value={currentNoteType}
+                      onChange={(e) => handleNoteTypeChange(e.target.value)}
+                      className={`text-xs py-1 px-2.5 rounded-md border font-medium cursor-pointer outline-none transition-colors max-w-[240px] truncate ${
                         isDark
                           ? 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:border-zinc-600 focus:border-blue-500'
                           : 'bg-white border-zinc-200 text-zinc-800 hover:border-zinc-300 focus:border-blue-500 shadow-2xs'
                       }`}
-                      title="Card Theme / Template"
+                      title={`Active Note Type: ${currentNoteType || selectedNote.modelName || 'Standard'}`}
                     >
-                      <optgroup label="Light Themes">
-                        {THEME_GROUPS.light.map((th) => (
-                          <option key={th.id} value={th.id}>
-                            {th.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Dark Themes">
-                        {THEME_GROUPS.dark.map((th) => (
-                          <option key={th.id} value={th.id}>
-                            {th.name}
+                      {/* Current card's note type if not in the lists */}
+                      {currentNoteType &&
+                        !ankiModelNames.includes(currentNoteType) &&
+                        !appThemeNoteTypes.some(
+                          (t) => t.value === currentNoteType || t.label === currentNoteType
+                        ) && (
+                          <optgroup label="Current Note Type">
+                            <option value={currentNoteType}>{currentNoteType}</option>
+                          </optgroup>
+                        )}
+
+                      {/* Anki Note Types */}
+                      {ankiModelNames.length > 0 && (
+                        <optgroup label="Anki Note Types">
+                          {ankiModelNames.map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+
+                      {/* Application Note Types / Themes */}
+                      <optgroup label="Application Note Types / Themes">
+                        {appThemeNoteTypes.map((item) => (
+                          <option key={item.value} value={item.value}>
+                            {item.label}
                           </option>
                         ))}
                       </optgroup>
                     </select>
-                    {selectedNote.detectedTheme && selectedNote.detectedTheme === currentTheme && (
+                    {selectedNote.modelName && selectedNote.modelName === currentNoteType && (
                       <span
                         className="text-[10px] text-emerald-500 font-mono hidden xl:inline"
-                        title="Theme detected from Anki note templates/CSS"
+                        title="Initialized from existing Anki note modelName"
                       >
                         (detected)
                       </span>

@@ -54,12 +54,22 @@ export async function updateAnkiNote(
   cardData: CardData,
   themeId?: ThemeId,
   url?: string,
-  deck?: string
+  deck?: string,
+  modelName?: string
 ): Promise<{ success: boolean; noteId: number; error?: string }> {
+  const targetModel = modelName || cardData.modelName || cardData.noteType;
   const res = await fetch('/api/anki/update-note', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ noteId, cardData, themeId, url, tags: cardData.tags, deck }),
+    body: JSON.stringify({
+      noteId,
+      cardData,
+      themeId,
+      url,
+      tags: cardData.tags,
+      deck,
+      modelName: targetModel,
+    }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -543,4 +553,16 @@ export async function searchAnkiNotes(params: {
     body: JSON.stringify(params),
   });
   return res.json();
+}
+
+export async function getAnkiModelNames(
+  url?: string
+): Promise<{ success: boolean; modelNames: string[]; error?: string }> {
+  try {
+    const q = url ? `?url=${encodeURIComponent(url)}` : '';
+    const res = await fetch(`/api/anki/model-names${q}`);
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, modelNames: [], error: err.message };
+  }
 }

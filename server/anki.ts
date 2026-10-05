@@ -710,6 +710,38 @@ export async function updateAnkiNoteFields(
   return { success: false, error: res.error };
 }
 
+export async function updateAnkiNoteModel(
+  baseUrl: string = 'http://127.0.0.1:8765',
+  noteId: number,
+  modelName: string,
+  fields: Record<string, string>,
+  tags?: string[]
+): Promise<{ success: boolean; error?: string }> {
+  const noteParam: any = {
+    id: noteId,
+    modelName,
+    fields,
+  };
+  if (tags && Array.isArray(tags)) {
+    noteParam.tags = tags;
+  }
+  const res = await callAnkiConnect(baseUrl, 'updateNoteModel', { note: noteParam });
+  if (res.success) {
+    return { success: true };
+  }
+  return { success: false, error: res.error };
+}
+
+export async function getAnkiModelNames(
+  baseUrl: string = 'http://127.0.0.1:8765'
+): Promise<{ success: boolean; modelNames: string[]; error?: string }> {
+  const res = await callAnkiConnect(baseUrl, 'modelNames');
+  if (res.success && Array.isArray(res.result)) {
+    return { success: true, modelNames: res.result };
+  }
+  return { success: false, modelNames: [], error: res.error };
+}
+
 export async function removeAnkiNoteTag(
   baseUrl: string = 'http://127.0.0.1:8765',
   noteIds: number[],
