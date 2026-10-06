@@ -157,6 +157,31 @@ const css = `/* THEME: MINIMAL LIGHT - Clean, Distraction-Free Practical Theme *
   font-family: Tahoma, Vazirmatn, "Segoe UI", sans-serif !important;
 }
 
+.minimal-definition-block {
+  margin-bottom: 18px !important;
+  padding: 12px 14px !important;
+  background-color: #F1F5F9 !important;
+  border-left: 3px solid #64748B !important;
+  border-radius: 4px !important;
+}
+
+.minimal-definition-label {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #475569 !important;
+  margin-bottom: 4px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+.minimal-definition-text {
+  margin: 0 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #0F172A !important;
+  line-height: 1.5 !important;
+}
+
 .minimal-example-block {
   margin-bottom: 18px !important;
   padding: 14px 16px !important;

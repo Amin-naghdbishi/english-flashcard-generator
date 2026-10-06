@@ -551,6 +551,26 @@ export async function createAnkiNote(
       if (!validFieldNames.includes('Meaning') && validFieldNames.includes('Extra')) {
         fields.Extra = renderMarkdown((cardData.meaningFa || '').trim());
       }
+      if (!validFieldNames.includes('EnglishDefinition')) {
+        if (validFieldNames.includes('Definition')) {
+          fields.Definition = renderMarkdown((cardData.definitionEn || '').trim());
+        } else if (validFieldNames.includes('DefinitionEn')) {
+          fields.DefinitionEn = renderMarkdown((cardData.definitionEn || '').trim());
+        } else if (validFieldNames.includes('English_Definition')) {
+          fields.English_Definition = renderMarkdown((cardData.definitionEn || '').trim());
+        } else if (validFieldNames.includes('english_definition')) {
+          fields.english_definition = renderMarkdown((cardData.definitionEn || '').trim());
+        } else if (validFieldNames.includes('englishdefinition')) {
+          fields.englishdefinition = renderMarkdown((cardData.definitionEn || '').trim());
+        }
+      }
+      if (!validFieldNames.includes('Meaning')) {
+        if (validFieldNames.includes('PersianMeaning')) {
+          fields.PersianMeaning = renderMarkdown((cardData.meaningFa || '').trim());
+        } else if (validFieldNames.includes('Persian_Meaning')) {
+          fields.Persian_Meaning = renderMarkdown((cardData.meaningFa || '').trim());
+        }
+      }
       const frontBlocksHtml = renderCustomBlocksHtml(getFrontCustomBlocks(cardData), themeId);
       const backBlocksHtml = renderCustomBlocksHtml(getBackCustomBlocks(cardData), themeId);
       if (frontBlocksHtml && !validFieldNames.includes('CustomFrontSections') && validFieldNames.includes('Front')) {
@@ -1268,7 +1288,7 @@ export async function searchAnkiNotes(
 
     const word = getVal('Word', 'word', 'Front', 'front', 'English', 'english', 'Term', 'term', 'Text', 'text') || `Note #${n.noteId}`;
     const meaning = getRawVal('Meaning', 'meaning', 'Persian Meaning', 'persianmeaning', 'Back', 'back', 'Translation', 'translation');
-    const definitionEn = getRawVal('EnglishDefinition', 'englishdefinition', 'Definition', 'definition', 'DefinitionEn', 'definitionen', 'Extra', 'extra');
+    const definitionEn = getRawVal('EnglishDefinition', 'englishdefinition', 'English_Definition', 'english_definition', 'Definition', 'definition', 'DefinitionEn', 'definitionen', 'Extra', 'extra');
     const phonetic = getVal('Phonetic', 'phonetic', 'IPA', 'ipa', 'Pronunciation', 'pronunciation');
     // Note: 'Type' / 'type' removed to avoid misinterpreting card type fields as part of speech
     const partOfSpeech = getVal('PartOfSpeech', 'partofspeech', 'Part of Speech', 'pos', 'POS');

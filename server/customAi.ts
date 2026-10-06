@@ -232,10 +232,10 @@ export async function generateWithCustomAI(
       word: cleanWord,
       phonetic: manualOverrides.phonetic || parsed.phonetic || `/${cleanWord}/`,
       partOfSpeech: manualOverrides.partOfSpeech || parsed.partOfSpeech || 'word',
-      meaningFa: manualOverrides.meaningFa || parsed.meaningFa || '',
-      definitionEn: manualOverrides.definitionEn || parsed.definitionEn || '',
+      meaningFa: manualOverrides.meaningFa || parsed.meaningFa || parsed.meaning_fa || '',
+      definitionEn: manualOverrides.definitionEn || parsed.definitionEn || parsed.english_definition || parsed.englishDefinition || parsed.definition || '',
       example: manualOverrides.example || parsed.example || `This is an example for ${cleanWord}.`,
-      translationFa: manualOverrides.translationFa || parsed.translationFa || '',
+      translationFa: manualOverrides.translationFa || parsed.translationFa || parsed.translation_fa || '',
       mnemonic: manualOverrides.mnemonic || parsed.mnemonic || '',
     };
 

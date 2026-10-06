@@ -108,10 +108,10 @@ export async function generateWithGemini(
       word: (parsed.word || word).trim(),
       phonetic: (parsed.phonetic || '').trim(),
       partOfSpeech: (parsed.partOfSpeech || '').trim(),
-      meaningFa: (parsed.meaningFa || '').trim(),
-      definitionEn: (parsed.definitionEn || '').trim(),
+      meaningFa: (parsed.meaningFa || parsed.meaning_fa || '').trim(),
+      definitionEn: (parsed.definitionEn || parsed.english_definition || parsed.englishDefinition || parsed.definition || '').trim(),
       example: (parsed.example || '').trim(),
-      translationFa: (parsed.translationFa || '').trim(),
+      translationFa: (parsed.translationFa || parsed.translation_fa || '').trim(),
       mnemonic: (parsed.mnemonic || '').trim(),
     };
 

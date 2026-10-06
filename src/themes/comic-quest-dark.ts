@@ -181,6 +181,33 @@ const css = `/* THEME 3: DUO QUEST DARK */
   line-height: 1.4;
 }
 
+.quest-definition-card {
+  background-color: #0C4A6E;
+  border: 3px solid #000000;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 3px 0 #000000;
+}
+
+.quest-tag-blue {
+  font-size: 10px;
+  font-weight: 900;
+  color: #38BDF8;
+  display: block;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.quest-definition-text {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #F8FAFC;
+  line-height: 1.45;
+}
+
 .quest-example-card {
   background-color: #1E3A8A;
   border: 3px solid #000000;

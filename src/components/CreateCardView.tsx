@@ -984,7 +984,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowInternetPanel(false)}
-                className="px-4 py-1.5 text-xs font-semibold border rounded-md cursor-pointer hover:bg-zinc-800"
+                className="px-4 py-1.5 text-xs font-semibold border rounded-md cursor-pointer border-zinc-300 dark:border-zinc-750 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
               >
                 {t('common.cancel')}
               </button>

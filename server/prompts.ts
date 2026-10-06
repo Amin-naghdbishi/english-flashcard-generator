@@ -5,7 +5,7 @@ export const DEFAULT_AI_PROMPTS: AIPromptsConfig = {
 
   meaningGeneration: `Generate a concise, accurate, and natural Persian meaning/translation (معنی فارسی) for the target English word. Provide the most common and clear Persian equivalent, avoiding unnecessarily verbose explanations or rare archaic meanings.`,
 
-  definitionGeneration: `Generate a short, clear, and simple definition of the target English word in easy-to-understand English (1 to 2 sentences maximum). Explain the meaning in simple English for an English learner.`,
+  definitionGeneration: `Generate an explicit, simple, natural, learner-friendly, memorable, grammatically correct, and short English definition of the target English word (1 short sentence or phrase, e.g. for "fragile": "easy to break or damage"; for "reluctant": "not wanting to do something"). The definition MUST be written in plain, simple English, NOT Persian, and NOT complex dictionary language. Persian Meaning (meaningFa) and English Definition (definitionEn) are completely separate concepts.`,
 
   exampleGeneration: `Generate exactly one short, clear, and natural English sentence demonstrating the target English word in proper grammatical and contextual usage. The sentence should clearly illustrate the meaning of the word without being excessively complex.`,
 
@@ -149,8 +149,8 @@ Return a structured JSON object with these exact keys:
 - word: The target English word (preserve "${cleanWord}").
 - phonetic: Accurate IPA pronunciation between slashes (e.g. /.../).
 - partOfSpeech: Most common grammatical part of speech (noun, verb, adjective, etc.).
-- meaningFa: Concise, natural, and accurate Persian meaning.
-- definitionEn: Short, clear, and simple English definition explaining the meaning in easy-to-understand English.
+- meaningFa: Concise, natural, and accurate Persian meaning (معنی فارسی).
+- definitionEn: Simple, natural, learner-friendly, memorable short definition written in plain English (e.g. "not wanting to do something", NOT Persian).
 - example: Exactly one short, clear, natural English sentence illustrating the target word "${cleanWord}".
 - translationFa: Fluent and natural Persian translation of the example sentence.
 - mnemonic: The memory hook adhering to the guidelines above.

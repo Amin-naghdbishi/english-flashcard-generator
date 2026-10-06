@@ -157,6 +157,31 @@ const css = `/* THEME: MINIMAL DARK - Clean, Distraction-Free Practical Dark The
   font-family: Tahoma, Vazirmatn, "Segoe UI", sans-serif !important;
 }
 
+.minimal-definition-block {
+  margin-bottom: 18px !important;
+  padding: 12px 14px !important;
+  background-color: #18181B !important;
+  border-left: 3px solid #94A3B8 !important;
+  border-radius: 4px !important;
+}
+
+.minimal-definition-label {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #94A3B8 !important;
+  margin-bottom: 4px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+.minimal-definition-text {
+  margin: 0 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #F8FAFC !important;
+  line-height: 1.5 !important;
+}
+
 .minimal-example-block {
   margin-bottom: 18px !important;
   padding: 14px 16px !important;

@@ -250,6 +250,7 @@ const css = `/* THEME 1: HERO POP DARK */
 }
 
 .label-meaning { color: #34D399; }
+.label-definition { color: #60A5FA; }
 .label-example { color: #FB923C; }
 .label-memory { color: #C084FC; }
 
@@ -259,6 +260,23 @@ const css = `/* THEME 1: HERO POP DARK */
   font-weight: 900;
   color: #F8FAFC;
   line-height: 1.4;
+}
+
+.comic-definition-box {
+  background-color: #1E3A8A;
+  border: 2px solid #000000;
+  border-left: 6px solid #3B82F6;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  box-sizing: border-box;
+}
+
+.definition-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: #F8FAFC;
+  font-weight: 700;
 }
 
 .comic-example-box {

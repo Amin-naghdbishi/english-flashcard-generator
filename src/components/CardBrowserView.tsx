@@ -489,7 +489,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
   return (
     <div className="w-full min-h-[calc(100vh-3.5rem)] flex flex-col md:flex-row min-w-0">
       {/* LEFT COLUMN: 25% width - Minimal Search & Compact Table */}
-      <div className="w-full md:w-1/4 shrink-0 border-r border-zinc-200 dark:border-zinc-800 p-4 sm:p-5 min-w-0 flex flex-col select-none bg-white dark:bg-zinc-900">
+      <div className="w-full md:w-1/4 shrink-0 border-r border-zinc-200 dark:border-zinc-800 p-4 sm:p-5 min-w-0 flex flex-col select-none bg-[#F8FAFC] dark:bg-zinc-900">
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100">

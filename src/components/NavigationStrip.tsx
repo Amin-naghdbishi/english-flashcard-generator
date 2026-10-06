@@ -116,7 +116,7 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
   return (
     <header
       className={`w-full select-none fixed top-0 left-0 right-0 z-50 p-0 m-0 border-b transition-colors ${
-        isDark ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-zinc-200 shadow-xs'
+        isDark ? 'bg-[#18181B] border-zinc-800' : 'bg-[#F8FAFC] border-slate-200 shadow-xs'
       }`}
     >
       <div className="w-full flex items-center justify-between px-4 sm:px-6">
@@ -213,7 +213,7 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
           {/* 1. Anki Status */}
           <div
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
-              isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100 text-zinc-800'
+              isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-white border-slate-200 text-slate-800 shadow-2xs'
             } ${ankiClasses.container}`}
             title={ankiTooltip}
           >
@@ -226,7 +226,7 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
           {/* 2. AI Status */}
           <div
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
-              isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100 text-zinc-800'
+              isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-white border-slate-200 text-slate-800 shadow-2xs'
             } ${aiClasses.container}`}
             title={aiTooltip}
           >
@@ -239,7 +239,7 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
           {/* 3. TTS Status */}
           <div
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
-              isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100 text-zinc-800'
+              isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-white border-slate-200 text-slate-800 shadow-2xs'
             } ${ttsClasses.container}`}
             title={ttsTooltip}
           >
@@ -258,13 +258,11 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
             className={`p-1.5 rounded-md border transition-colors cursor-pointer ${
               isDark
                 ? 'border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
-                : 'border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 shadow-2xs'
             }`}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isGlobalChecking ? 'animate-spin text-blue-500' : ''}`} />
           </button>
-
-
 
           {/* Quick Anki Light / Anki Dark Theme Toggle */}
           <button
@@ -274,7 +272,7 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
             className={`p-1.5 rounded-md border text-xs font-medium flex items-center justify-center transition-colors cursor-pointer ${
               isDark
                 ? 'border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-700'
-                : 'border-zinc-300 bg-zinc-100 text-zinc-800 hover:bg-zinc-200'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100 shadow-2xs'
             }`}
           >
             {isDark ? (

@@ -168,6 +168,20 @@ const css = `/* THEME 4: INDEX NOTEBOOK DARK */
   margin-left: 6px;
 }
 
+.notebook-definition-note {
+  background-color: #0369A1;
+  border: 2px solid #38BDF8;
+  box-shadow: 3px 3px 0px rgba(0,0,0,0.5);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.sticky-pin {
+  font-size: 13px;
+  margin-right: 4px;
+  display: inline-block;
+}
+
 .notebook-sticky-example {
   background-color: #713F12;
   border: 2px solid #CA8A04;

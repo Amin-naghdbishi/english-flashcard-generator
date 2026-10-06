@@ -149,6 +149,7 @@ export interface ManualOverrides {
   backCustomBlocks?: CustomCardBlock[];
   customBlocks?: CustomCardBlock[];
   mainBoxStyles?: MainBoxCustomizations;
+  modelName?: string;
 }
 
 export function isCardComplete(card?: Partial<CardData> | ManualOverrides | null): boolean {

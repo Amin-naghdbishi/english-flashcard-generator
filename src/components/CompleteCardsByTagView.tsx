@@ -801,7 +801,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
             <button
               type="button"
               onClick={handleCancelProcessing}
-              className="w-full py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-xs rounded-none cursor-pointer"
+              className="w-full py-2 px-3 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-none cursor-pointer transition-colors"
             >
               Stop
             </button>

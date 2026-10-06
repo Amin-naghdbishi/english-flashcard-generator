@@ -386,6 +386,10 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
   const [activeSide, setActiveSide] = useState<'front' | 'back'>('back');
   const [activeMode, setActiveMode] = useState<CardType>(initialCardType);
 
+  // Selected Text Color and Highlight Color state for toolbar
+  const [selectedTextColor, setSelectedTextColor] = useState<string>('#EF4444');
+  const [selectedHighlightColor, setSelectedHighlightColor] = useState<string>('#FEF08A');
+
   // Sync activeMode whenever initialCardType prop changes
   useEffect(() => {
     if (initialCardType) {
@@ -859,6 +863,13 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
             color: inherit !important;
           }
 
+          .editor-canvas-wrapper.theme-is-light .quest-level-pill,
+          .editor-canvas-wrapper.theme-is-light .quest-btn,
+          .editor-canvas-wrapper.theme-is-light .hero-badge,
+          .editor-canvas-wrapper.theme-is-light .quest-level-pill .theme-editable-field {
+            color: #FFFFFF !important;
+          }
+
           /* Dark Card Theme Text Contrast */
           .editor-canvas-wrapper.theme-is-dark,
           .editor-canvas-wrapper.theme-is-dark .card,
@@ -875,16 +886,21 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
             color: inherit !important;
           }
 
-          /* Editable Field Hover and Focus Indicators */
-          .theme-editable-field {
-            transition: outline 0.15s ease;
-          }
-          .theme-editable-field:hover {
+          /* Editable Field - Completely remove unwanted borders/outlines while typing */
+          .theme-editable-field,
+          .theme-editable-field:hover,
+          .theme-editable-field:focus,
+          .theme-editable-field:focus-visible,
+          .theme-editable-field:active {
             outline: none !important;
+            box-shadow: none !important;
+            border-color: inherit;
           }
-          .theme-editable-field:focus {
-            outline: 1.5px solid rgba(59, 130, 246, 0.9) !important;
-            outline-offset: 2px !important;
+          [contenteditable]:focus,
+          [contenteditable]:focus-visible,
+          [contenteditable]:active {
+            outline: none !important;
+            box-shadow: none !important;
           }
           .theme-editable-field:empty::before {
             content: attr(data-placeholder);
@@ -1249,21 +1265,39 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
               U
             </button>
             <div className="h-3.5 w-px bg-zinc-300 dark:bg-zinc-700 mx-1" />
-            <div className="flex items-center gap-1 px-1">
-              <span className="text-[11px] font-semibold text-zinc-500">Color</span>
+            <div className="flex items-center gap-1.5 px-1">
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyVisualFormat('color', selectedTextColor)}
+                className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer px-1 py-0.5 rounded-none hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                title="Apply selected color to highlighted text"
+              >
+                Color
+              </button>
               <ColorSwatchPicker
                 label="Text Color"
-                defaultValue="#38BDF8"
-                onChange={(c) => applyVisualFormat('color', c)}
+                value={selectedTextColor}
+                defaultValue="#EF4444"
+                onChange={setSelectedTextColor}
                 align="right"
               />
             </div>
-            <div className="flex items-center gap-1 px-1">
-              <span className="text-[11px] font-semibold text-zinc-500">Highlight</span>
+            <div className="flex items-center gap-1.5 px-1">
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyVisualFormat('highlight', selectedHighlightColor)}
+                className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer px-1 py-0.5 rounded-none hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                title="Apply selected highlight to highlighted text"
+              >
+                Highlight
+              </button>
               <ColorSwatchPicker
                 label="Highlight"
+                value={selectedHighlightColor}
                 defaultValue="#FEF08A"
-                onChange={(c) => applyVisualFormat('highlight', c)}
+                onChange={setSelectedHighlightColor}
                 align="right"
               />
             </div>
@@ -2170,15 +2204,18 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                       />
                     </div>
 
-                    <div className="p-3 border border-black bg-white/80 my-2">
-                      <span className="font-bold text-xs block mb-1">ENGLISH DEFINITION</span>
+                    <div className="notebook-definition-note">
+                      <div className="sticky-header-row">
+                        <span className="sticky-pin">📌</span>
+                        <span className="sticky-title">Definition:</span>
+                      </div>
                       <ContentEditableField
                         value={cardData?.definitionEn || ''}
                         onChange={(val) => updateField('definitionEn', val)}
                         onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'definitionEn' })}
-                        placeholder="Definition..."
+                        placeholder="Simple memorable English definition..."
                         tagName="p"
-                        className="text-xs"
+                        className="sticky-text"
                       />
                     </div>
 
@@ -2387,16 +2424,17 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                       />
                     </div>
 
-                    <div className="botanical-box botanical-definition-box">
+                    <div className="botanical-definition-section botanical-definition-box mb-3">
                       <div className="botanical-definition-title font-bold text-xs mb-1">ENGLISH DEFINITION</div>
                       <ContentEditableField
                         value={cardData?.definitionEn || ''}
                         onChange={(val) => updateField('definitionEn', val)}
                         onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'definitionEn' })}
-                        placeholder="English definition..."
+                        placeholder="Simple memorable English definition..."
                         tagName="p"
-                        className="botanical-definition-en text-xs"
+                        className="botanical-definition-text text-sm"
                       />
+                      <div className="botanical-section-divider my-2" />
                     </div>
 
                     <div className="botanical-box botanical-example-box">
@@ -2605,14 +2643,14 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     </div>
 
                     <div className="minimal-definition-block">
-                      <div className="minimal-definition-label font-bold text-xs mb-1">ENGLISH DEFINITION</div>
+                      <div className="minimal-definition-label">English Definition</div>
                       <ContentEditableField
                         value={cardData?.definitionEn || ''}
                         onChange={(val) => updateField('definitionEn', val)}
                         onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'definitionEn' })}
-                        placeholder="Definition..."
+                        placeholder="Simple memorable English definition..."
                         tagName="p"
-                        className="minimal-definition-text text-xs"
+                        className="minimal-definition-text"
                       />
                     </div>
 

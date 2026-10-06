@@ -543,7 +543,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
         className={`shrink-0 transition-all duration-200 flex flex-col border-r border-zinc-200 dark:border-zinc-800 select-none ${
           isSidebarCollapsed ? 'w-full md:w-14' : 'w-full md:w-56'
         } ${
-          isDark ? 'bg-zinc-900 text-zinc-100' : 'bg-white text-zinc-900'
+          isDark ? 'bg-zinc-900 text-zinc-100' : 'bg-[#F8FAFC] text-zinc-900'
         }`}
       >
         {/* Sidebar Top: Title & Collapse Toggle */}

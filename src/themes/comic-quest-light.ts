@@ -76,7 +76,7 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
 .quest-points {
   font-size: 12px;
   font-weight: 900;
-  color: #EAB308;
+  color: #A16207;
   background-color: #FEF9C3;
   padding: 3px 8px;
   border-radius: 12px;
@@ -146,6 +146,7 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   display: block;
   margin-bottom: 6px;
   text-transform: uppercase;
+  color: #0F172A;
 }
 
 .dock-actions {
@@ -178,6 +179,33 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   font-weight: 900;
   color: #0F172A;
   line-height: 1.4;
+}
+
+.quest-definition-card {
+  background-color: #F0F9FF;
+  border: 3px solid #000000;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 3px 0 #000000;
+}
+
+.quest-tag-blue {
+  display: block;
+  font-size: 10px;
+  font-weight: 900;
+  color: #0284C7;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.quest-definition-text {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0F172A;
+  line-height: 1.45;
 }
 
 .quest-example-card {
