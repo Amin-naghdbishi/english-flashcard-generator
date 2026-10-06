@@ -87,6 +87,20 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
 
   // Settings for Tag Completion
   const [includeImage, setIncludeImage] = useState<boolean>(true);
+  const [showFieldConfig, setShowFieldConfig] = useState<boolean>(false);
+  const [fieldConfig, setFieldConfig] = useState<{
+    phonetic: boolean;
+    meaningFa: boolean;
+    definitionEn: boolean;
+    example: boolean;
+    mnemonic: boolean;
+  }>({
+    phonetic: true,
+    meaningFa: true,
+    definitionEn: true,
+    example: true,
+    mnemonic: true,
+  });
 
   // Processing state
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -634,430 +648,197 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
   const editedCount = notes.filter((n) => n.isEdited && n.noteId).length;
 
   return (
-    <div className="w-full max-w-[1680px] mx-auto px-4 sm:px-6 py-4 min-w-0">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* LEFT COLUMN: Controls, Tag Scanner, Batch Queue (5 cols / ~42%) */}
-        <div className="lg:col-span-5 flex flex-col space-y-4 min-w-0">
-          <div
-            className={`p-5 rounded-xl border shadow-2xs ${
-              isDark ? 'bg-zinc-900/90 border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-            }`}
-          >
-          {/* Header */}
-          <div className={`border-b pb-3 mb-4 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
-            <h2 className="text-base sm:text-lg font-bold tracking-tight flex items-center gap-2">
-              {t('completeByTag.title')}
-            </h2>
-            <p className={`text-xs mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-              {t('completeByTag.subtitle')}
-            </p>
+    <div className="w-full min-h-[calc(100vh-3.5rem)] flex flex-col md:flex-row min-w-0">
+      {/* LEFT COLUMN: 25% width - Minimal Tag Controls */}
+      <div className="w-full md:w-1/4 shrink-0 border-r border-zinc-200 dark:border-zinc-800 p-4 sm:p-5 min-w-0 flex flex-col select-none">
+        <h2 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mb-1">
+          Complete by Tag
+        </h2>
+
+        {/* Tag input - NO DECK SELECTOR HERE */}
+        <div className="space-y-1 mb-2">
+          <label className="text-xs font-semibold block text-zinc-700 dark:text-zinc-300">
+            Tag
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              list="complete-by-tag-tags-list"
+              value={selectedTag}
+              onChange={(e) => setSelectedTag(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleScanNotes();
+                }
+              }}
+              onBlur={() => {
+                if (selectedTag.trim() && !hasScanned) {
+                  handleScanNotes();
+                }
+              }}
+              disabled={isProcessing || isScanningNotes}
+              placeholder="B1"
+              className="w-full px-2.5 py-1.5 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600 focus:border-blue-500 bg-transparent text-xs font-medium rounded-none focus:outline-none transition-colors text-zinc-900 dark:text-zinc-100"
+            />
+            <datalist id="complete-by-tag-tags-list">
+              {availableTags.map((t) => (
+                <option key={t} value={t} />
+              ))}
+            </datalist>
           </div>
+        </div>
 
-          {/* AI Disabled Notice Banner */}
-          {settings.ai?.enabled === false && (
-            <div className="mb-4 p-3.5 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800 text-xs rounded-lg shadow-xs flex items-start gap-2.5">
-              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <span className="font-bold block">
-                  {t('completeByTag.aiRequiredTitle', 'AI is Currently Disabled')}
-                </span>
-                <p className="text-[11px] leading-relaxed">
-                  {t(
-                    'completeByTag.aiRequiredNotice',
-                    'Complete by Tag uses AI to automatically generate missing phonetic, definitions, examples, and mnemonics for existing Anki notes. Because AI is currently turned off globally, completion is unavailable. You can turn AI back on anytime in Settings.'
-                  )}
-                </p>
-              </div>
-            </div>
-          )}
+        <div className="text-xs text-zinc-500 mb-4">
+          {notes.length} cards
+        </div>
 
-          {/* Tag Selector & Scanner */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-semibold flex items-center gap-1.5">
-                <Tag className="w-3.5 h-3.5 text-blue-500" />
-                <span>{t('completeByTag.tagLabel')}</span>
-              </label>
-              <button
-                type="button"
-                onClick={loadTags}
-                disabled={isFetchingTags}
-                className="text-[11px] text-blue-500 hover:text-blue-400 font-medium flex items-center gap-1 cursor-pointer"
-                title={t('completeByTag.refreshTagsTooltip')}
-              >
-                <RefreshCw className={`w-3 h-3 ${isFetchingTags ? 'animate-spin' : ''}`} />
-                <span>{t('common.refresh')}</span>
-              </button>
-            </div>
+        {/* Field Settings: Collapsed by default */}
+        <div className="mb-4 pt-2 border-t border-zinc-200 dark:border-zinc-800 text-xs">
+          <button
+            type="button"
+            onClick={() => setShowFieldConfig(!showFieldConfig)}
+            className="w-full flex items-center justify-between py-1 font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer hover:text-blue-500"
+          >
+            <span>Field Settings</span>
+            <span className="text-[10px]">{showFieldConfig ? '▲' : '▼'}</span>
+          </button>
 
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <span className={`absolute ${isRTL ? 'right-2.5' : 'left-2.5'} top-2.5 text-zinc-400 text-xs`}>
-                  #
-                </span>
+          {showFieldConfig && (
+            <div className="space-y-1.5 pt-2 pl-1 text-xs text-zinc-600 dark:text-zinc-400">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
-                  type="text"
-                  value={selectedTag}
-                  onChange={(e) => setSelectedTag(e.target.value)}
-                  disabled={isProcessing || isScanningNotes}
-                  placeholder={t('completeByTag.tagPlaceholder')}
-                  className={`w-full text-xs font-medium ${isRTL ? 'pr-8 pl-3' : 'pl-8 pr-3'} py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                    isDark
-                      ? 'bg-zinc-900 border-zinc-700 text-zinc-100 placeholder:text-zinc-500'
-                      : 'bg-white border-zinc-300 text-zinc-900 placeholder:text-zinc-400'
-                  }`}
+                  type="checkbox"
+                  checked={fieldConfig.phonetic}
+                  onChange={(e) => setFieldConfig((prev) => ({ ...prev, phonetic: e.target.checked }))}
+                  className="w-3.5 h-3.5 rounded-none border border-zinc-400 dark:border-zinc-600 accent-blue-600"
                 />
-              </div>
-
-              <button
-                type="button"
-                onClick={handleScanNotes}
-                disabled={isScanningNotes || isProcessing || !selectedTag.trim()}
-                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors shrink-0"
-              >
-                {isScanningNotes ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>{t('completeByTag.scanning')}</span>
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-3.5 h-3.5" />
-                    <span>{t('completeByTag.scanBtn')}</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Quick Tag Pills */}
-            {availableTags.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5 max-h-24 overflow-y-auto py-1">
-                {availableTags.map((tTag) => (
-                  <button
-                    key={tTag}
-                    type="button"
-                    onClick={() => setSelectedTag(tTag)}
-                    disabled={isProcessing || isScanningNotes}
-                    className={`px-2 py-0.5 text-[11px] rounded border transition-colors cursor-pointer ${
-                      selectedTag === tTag
-                        ? 'bg-blue-600 text-white border-blue-600 font-semibold'
-                        : isDark
-                        ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700'
-                        : 'bg-zinc-100 text-zinc-700 border-zinc-200 hover:bg-zinc-200'
-                    }`}
-                  >
-                    #{tTag}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Option: Image Generation Toggle */}
-          <div
-            className={`p-3 border rounded-md mb-3 shadow-xs ${
-              isDark ? 'bg-zinc-900/60 border-zinc-700' : 'bg-zinc-50 border-zinc-200'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-blue-500" />
-                <div>
-                  <div className="text-xs font-semibold">{t('completeByTag.attachImageLabel')}</div>
-                  <div className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                    {t('completeByTag.attachImageDesc')}
-                  </div>
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={includeImage}
-                onChange={(e) => setIncludeImage(e.target.checked)}
-                disabled={isProcessing}
-                className="w-4 h-4 text-blue-600 rounded cursor-pointer"
-              />
-            </div>
-          </div>
-
-          {/* Error Message Display */}
-          {scanError && (
-            <div className="mb-3 p-3 bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800 text-xs flex items-center gap-2 font-medium shadow-xs rounded-md">
-              <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
-              <span>{scanError}</span>
-            </div>
-          )}
-
-          {/* Scanned Summary & Start Button */}
-          {hasScanned && (
-            <div className="space-y-3 mb-2">
-              <div
-                className={`p-3 border rounded-md text-xs space-y-1.5 shadow-xs ${
-                  isDark ? 'bg-zinc-900/80 border-zinc-700' : 'bg-zinc-50 border-zinc-200'
-                }`}
-              >
-                <div className="font-semibold flex items-center justify-between">
-                  <span>{t('completeByTag.inspectionTitle')}</span>
-                  <span className="font-mono text-[11px] text-zinc-400">#{selectedTag}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="flex justify-between items-center">
-                    <span className="text-zinc-500">{t('completeByTag.wordsFound')}</span>
-                    <span className="font-bold">{totalNotesCount}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-zinc-500">{t('completeByTag.needingCompletion')}</span>
-                    <span className="font-bold text-amber-500">{needingCount}</span>
-                  </div>
-                </div>
-                <p className={`text-[11px] pt-1 border-t ${isDark ? 'border-zinc-800 text-zinc-400' : 'border-zinc-200 text-zinc-500'}`}>
-                  {t('completeByTag.preservationNotice')}
-                </p>
-              </div>
-
-              {/* Start / Cancel / Retry Actions */}
-              {!isProcessing ? (
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleStartCompletion(false)}
-                    disabled={settings.ai?.enabled === false || (needingCount === 0 && failedCount === 0)}
-                    className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors"
-                  >
-                    <Play className="w-4 h-4 fill-current" />
-                    <span>
-                      {settings.ai?.enabled === false
-                        ? t('completeByTag.aiDisabledBtn', 'AI Disabled')
-                        : needingCount > 0
-                        ? t('completeByTag.completeCardsBtn', { count: needingCount })
-                        : t('completeByTag.allDone')}
-                    </span>
-                  </button>
-
-                  {failedCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => handleStartCompletion(true)}
-                      className="py-2.5 px-3 bg-red-600 hover:bg-red-700 text-white font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                      title="Retry failed cards"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>{t('completeByTag.retryFailedBtn', { count: failedCount })}</span>
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleCancelProcessing}
-                  className="w-full py-2.5 px-4 bg-zinc-800 hover:bg-zinc-750 text-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-100 border border-zinc-600 dark:border-zinc-700 font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
-                  title="Safely cancel tag processing"
-                >
-                  <Square className="w-3.5 h-3.5 fill-current opacity-75" />
-                  <span>
-                    Cancel Processing ({currentIndex + 1} of {notes.length})
-                  </span>
-                </button>
-              )}
-
-              {/* SAVE ALL EDITED NOTES BUTTON */}
-              {editedCount > 0 && (
-                <button
-                  type="button"
-                  onClick={handleSaveAllEditedNotes}
-                  disabled={isSavingAllEdited}
-                  className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors"
-                >
-                  {isSavingAllEdited ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Save className="w-4 h-4" />
-                  )}
-                  <span>
-                    {isSavingAllEdited
-                      ? t('completeByTag.savingEdited')
-                      : t('completeByTag.saveAllEditedBtn', { count: editedCount })}
-                  </span>
-                </button>
-              )}
-
-              {/* Feedback Message */}
-              {saveActionMessage && (
-                <div
-                  className={`p-2 rounded text-xs font-semibold flex items-center gap-1.5 ${
-                    saveActionMessage.startsWith('✓')
-                      ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-500/30'
-                      : 'bg-rose-50 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-500/30'
-                  }`}
-                >
-                  <span>{saveActionMessage}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Live Progress & Active Item Status while Processing */}
-          {isProcessing && (
-            <div className="mt-4 pt-3 border-t border-zinc-700/50">
-              <div className="flex justify-between items-center text-xs font-semibold mb-1">
-                <span className="flex items-center gap-1.5 text-blue-400">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>
-                    {t('completeByTag.processingProgress', { current: currentIndex + 1, total: notes.length })}
-                  </span>
-                </span>
-                <span>{progressPercent}%</span>
-              </div>
-
-              {/* Progress bar */}
-              <div className={`w-full h-2 rounded-full overflow-hidden ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`}>
-                <div
-                  className="h-full bg-blue-500 transition-all duration-200"
-                  style={{ width: `${progressPercent}%` }}
+                <span>Phonetic</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={fieldConfig.meaningFa}
+                  onChange={(e) => setFieldConfig((prev) => ({ ...prev, meaningFa: e.target.checked }))}
+                  className="w-3.5 h-3.5 rounded-none border border-zinc-400 dark:border-zinc-600 accent-blue-600"
                 />
-              </div>
-
-              {/* Currently processing word */}
-              {currentProcessingNote && (
-                <div className={`text-xs mt-2 font-medium flex items-center gap-1.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                  <span className="text-zinc-500">{t('batch.currentlyProcessing')}</span>
-                  <span className="font-bold text-blue-500">{currentProcessingNote.word}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Finished or Cancelled Banner */}
-          {isFinished && !isProcessing && (
-            <div className="mt-4 p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800 text-xs rounded-md shadow-xs space-y-1">
-              <div className="flex items-center gap-1.5 font-semibold">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                <span>{t('completeByTag.summaryTitle')}</span>
-              </div>
-              <p className="text-[11px]">
-                {completedCount} completed, {failedCount} failed, {skippedCount} already complete.
-                {failedCount > 0 && ` ${t('completeByTag.tagRetainedNotice', { tag: selectedTag })}`}
-              </p>
-            </div>
-          )}
-
-          {isCancelled && !isProcessing && (
-            <div className="mt-4 p-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 text-xs rounded-md shadow-xs space-y-1">
-              <div className="flex items-center gap-1.5 font-semibold">
-                <PauseCircle className="w-4 h-4 text-amber-500" />
-                <span>{t('completeByTag.cancelledTitle')}</span>
-              </div>
-              <p className="text-[11px]">
-                {t('completeByTag.cancelledDesc', { completed: completedCount, total: totalNotesCount })}
-              </p>
+                <span>Persian Meaning</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={fieldConfig.definitionEn}
+                  onChange={(e) => setFieldConfig((prev) => ({ ...prev, definitionEn: e.target.checked }))}
+                  className="w-3.5 h-3.5 rounded-none border border-zinc-400 dark:border-zinc-600 accent-blue-600"
+                />
+                <span>English Definition</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={fieldConfig.example}
+                  onChange={(e) => setFieldConfig((prev) => ({ ...prev, example: e.target.checked }))}
+                  className="w-3.5 h-3.5 rounded-none border border-zinc-400 dark:border-zinc-600 accent-blue-600"
+                />
+                <span>Example Sentence</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={fieldConfig.mnemonic}
+                  onChange={(e) => setFieldConfig((prev) => ({ ...prev, mnemonic: e.target.checked }))}
+                  className="w-3.5 h-3.5 rounded-none border border-zinc-400 dark:border-zinc-600 accent-blue-600"
+                />
+                <span>Mnemonic</span>
+              </label>
             </div>
           )}
         </div>
 
-        {/* Tagged Notes List / Queue (Available immediately as they complete!) */}
-        {hasScanned && (
-          <div
-            className={`border rounded-lg p-4 shadow-xs flex-1 flex flex-col min-h-[300px] ${
-              isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-            }`}
-          >
-            <div className={`flex items-center justify-between pb-2 mb-2 border-b text-xs ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
-              <h3 className="font-bold flex items-center gap-2">
-                <List className="w-4 h-4 text-zinc-400" />
-                <span>{t('completeByTag.queueTitle', { count: notes.length })}</span>
-              </h3>
-              {editedCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700">
-                  {editedCount} {t('completeByTag.editedBadge') || 'Edited'}
-                </span>
-              )}
-            </div>
+        {/* Generate Button */}
+        <div className="mb-4">
+          {isProcessing ? (
+            <button
+              type="button"
+              onClick={handleCancelProcessing}
+              className="w-full py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-xs rounded-none cursor-pointer"
+            >
+              Stop
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleStartCompletion(false)}
+              disabled={notes.length === 0 || isScanningNotes}
+              className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-xs rounded-none cursor-pointer transition-colors"
+            >
+              Generate
+            </button>
+          )}
+        </div>
 
-            <div className="flex-1 overflow-y-auto max-h-[420px] space-y-1.5 pr-1 text-xs">
-              {notes.map((n, idx) => {
-                const isSelected = selectedNoteForPreview?.noteId === n.noteId;
-                const isCurrentProcessing = currentIndex === idx;
-                const isSuccess = n.status === 'success';
-                const isFailed = n.status === 'error';
-                const isGenerating = n.status === 'generating_ai' || n.status === 'generating_audio';
-                const isRetrying = n.status === 'retrying';
-                const isWaiting = n.status === 'waiting';
+        <div className="my-2 border-t border-zinc-200 dark:border-zinc-800" />
+
+        {/* Progress Bar & Percentage */}
+        <div className="space-y-1.5 mb-4 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-zinc-700 dark:text-zinc-300">Progress</span>
+            <span className="font-mono text-zinc-500 font-medium">{progressPercent}%</span>
+          </div>
+          <div className="w-full h-2 bg-zinc-200 dark:bg-zinc-800 rounded-none overflow-hidden">
+            <div
+              className="h-full bg-blue-600 transition-all duration-300 rounded-none"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Words List */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
+            Words
+          </div>
+
+          <div className="flex-1 overflow-y-auto max-h-[350px] space-y-1 pr-1 text-xs border border-zinc-200 dark:border-zinc-800 p-1.5">
+            {notes.length === 0 ? (
+              <div className="text-zinc-400 text-xs py-4 text-center">
+                {isScanningNotes ? 'Scanning notes with tag...' : 'Enter a tag to scan cards'}
+              </div>
+            ) : (
+              notes.map((note, idx) => {
+                const isSelected = selectedNoteForPreview?.noteId === note.noteId;
+                const isCurrent = currentIndex === idx;
 
                 return (
                   <div
-                    key={n.noteId}
-                    onClick={() => handleSelectNote(n)}
-                    className={`p-2.5 rounded-md border flex items-center justify-between gap-2 cursor-pointer transition-colors ${
+                    key={note.noteId}
+                    onClick={() => handleSelectNote(note)}
+                    className={`px-2 py-1.5 flex items-center justify-between gap-2 cursor-pointer transition-colors ${
                       isSelected
-                        ? isDark
-                          ? 'bg-blue-950/40 border-blue-600'
-                          : 'bg-blue-50 border-blue-300'
-                        : isDark
-                        ? 'bg-zinc-850 hover:bg-zinc-800 border-zinc-750'
-                        : 'bg-white hover:bg-zinc-50 border-zinc-200'
+                        ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold'
+                        : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
                     }`}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`font-semibold truncate ${isSelected ? 'text-blue-500 dark:text-blue-400 font-bold' : ''}`}>
-                            {n.word}
-                          </span>
-                          <span className={`text-[10px] font-mono px-1 rounded ${
-                            isDark ? 'bg-zinc-800 text-zinc-400' : 'bg-zinc-100 text-zinc-500'
-                          }`}>
-                            #{n.noteId}
-                          </span>
-                          {n.isEdited && (
-                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
-                              {t('completeByTag.editedBadge') || 'Edited'}
-                            </span>
-                          )}
-                          {n.missingFields.length > 0 && !isSuccess && (
-                            <span className={`text-[10px] px-1.5 py-0.2 rounded border ${
-                              isDark ? 'bg-amber-950/50 text-amber-400 border-amber-800/80' : 'bg-amber-50 text-amber-700 border-amber-300'
-                            }`}>
-                              {t('completeByTag.missingCountBadge', { count: n.missingFields.length })}
-                            </span>
-                          )}
-                        </div>
-                        {n.error && (
-                          <span className="text-[11px] text-red-500 font-normal block truncate max-w-[220px]">
-                            {n.error}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                    <span className="truncate flex-1">
+                      {note.word || `Note #${note.noteId}`}
+                    </span>
 
-                    {/* Status & Preview Button */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      {isSuccess && (
-                        <span className="flex items-center gap-1 text-[11px] text-emerald-500 font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10">
-                          <CheckCircle2 className="w-3 h-3" />
-                          <span>{t('common.completed')}</span>
+                    {/* Status */}
+                    <div className="shrink-0 flex items-center gap-1.5">
+                      {note.status === 'success' && (
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold text-xs">
+                          ✓
                         </span>
                       )}
-                      {(isGenerating || isCurrentProcessing) && !isRetrying && (
-                        <span className="flex items-center gap-1 text-[11px] text-blue-400 font-medium px-1.5 py-0.5 rounded bg-blue-500/10">
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          <span>{t('common.processing')}</span>
+                      {(note.status === 'processing' || isCurrent) && (
+                        <span className="text-blue-600 dark:text-blue-400 font-bold text-xs">
+                          ...
                         </span>
                       )}
-                      {isRetrying && (
-                        <span className="flex items-center gap-1 text-[11px] text-amber-400 font-medium px-1.5 py-0.5 rounded bg-amber-500/10">
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          <span>{t('batch.retryAttemptBadge', { current: n.retryCount || 1, max: MAX_AUTO_RETRIES })}</span>
-                        </span>
-                      )}
-                      {isWaiting && (
-                        <span className="text-[11px] text-zinc-400 px-1.5 py-0.5 rounded bg-zinc-700/30">
-                          {t('common.waiting')}
-                        </span>
-                      )}
-                      {isFailed && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="flex items-center gap-1 text-[11px] text-red-500 font-semibold px-1.5 py-0.5 rounded bg-red-500/10">
-                            <XCircle className="w-3 h-3" />
-                            <span>{t('common.failed')}</span>
+                      {note.status === 'error' && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-rose-600 dark:text-rose-400 font-semibold text-[11px]">
+                            Error
                           </span>
                           <button
                             type="button"
@@ -1065,25 +846,28 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                               e.stopPropagation();
                               handleRetrySingle(idx);
                             }}
-                            disabled={isProcessing}
-                            className="p-1 bg-red-600 hover:bg-red-700 text-white rounded cursor-pointer transition-colors"
-                            title={t('common.retry')}
+                            className="text-[10px] underline text-blue-500 hover:text-blue-600 cursor-pointer"
                           >
-                            <RotateCcw className="w-3 h-3" />
+                            Retry
                           </button>
                         </div>
+                      )}
+                      {note.status !== 'success' && note.status !== 'error' && !isCurrent && note.status !== 'processing' && (
+                        <span className="text-zinc-400 font-mono text-[11px]">
+                          -
+                        </span>
                       )}
                     </div>
                   </div>
                 );
-              })}
-            </div>
+              })
+            )}
           </div>
-        )}
+        </div>
       </div>
+      {/* RIGHT COLUMN: 75% width - Shared Card Editor */}
+      <div className="w-full md:w-3/4 flex-1 min-w-0 p-4 sm:p-6 flex flex-col">
 
-        {/* RIGHT COLUMN: Shared Unified Editor (7 cols / ~58%) */}
-        <div className="lg:col-span-7 flex flex-col min-w-0 sticky top-16">
           <UnifiedCardEditor
             cardData={previewCard}
             emptyWordPlaceholder={selectedNoteForPreview?.word || 'tag card'}
@@ -1116,6 +900,5 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
           />
         </div>
       </div>
-    </div>
   );
 };

@@ -4,32 +4,29 @@ import {
   CardType,
   ThemeId,
   AppTheme,
+  CustomCardBlock,
+  getFrontCustomBlocks,
+  getBackCustomBlocks,
+  getAllCustomBlocks,
 } from '../types';
-import { CardPreview } from './CardPreview';
-import { THEMES, resolveThemeFromNoteType } from '../themes';
+import { THEMES, resolveThemeFromNoteType, makeSpellingSentence, getContrastTextColor, getHarmonizedBorder } from '../themes';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
 import { getAnkiTags, getAnkiModelNames } from '../services/api';
+import { applyHtmlFormattingToText, formatCardFieldHtml, HtmlToolbarAction } from '../utils/markdown';
 import {
-  Layers,
-  Tags,
+  Volume2,
   Save,
-  Edit3,
-  Eye,
-  ExternalLink,
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
-  Monitor,
-  Smartphone,
   CheckCircle2,
   X,
   Plus,
-  SlidersHorizontal,
-  MoreHorizontal,
-  RefreshCw,
-  Sparkles,
-  BookOpen,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Search,
+  Upload,
+  Trash2,
 } from 'lucide-react';
 
 export const APP_THEME_NOTE_TYPES = [
@@ -46,6 +43,120 @@ export const APP_THEME_NOTE_TYPES = [
   { value: 'AI Vocabulary - Minimal (Light) (Normal)', label: 'Minimal (Light)' },
   { value: 'AI Vocabulary - Minimal (Dark) (Normal)', label: 'Minimal (Dark)' },
 ];
+
+export const COLOR_PRESETS = [
+  { name: 'Slate Dark', hex: '#1E293B' },
+  { name: 'Indigo Deep', hex: '#1E1B4B' },
+  { name: 'Navy Blue', hex: '#1E3A8A' },
+  { name: 'Emerald Deep', hex: '#064E3B' },
+  { name: 'Forest Green', hex: '#14532D' },
+  { name: 'Amber Deep', hex: '#78350F' },
+  { name: 'Wine Dark', hex: '#881337' },
+  { name: 'Purple Royal', hex: '#581C87' },
+  { name: 'Warm Cream', hex: '#FEF3C7' },
+  { name: 'Sky Light', hex: '#E0F2FE' },
+  { name: 'Mint Light', hex: '#D1FAE5' },
+  { name: 'Rose Light', hex: '#FFE4E6' },
+  { name: 'Pure White', hex: '#FFFFFF' },
+  { name: 'Zinc Gray', hex: '#27272A' },
+  { name: 'Charcoal', hex: '#0F172A' },
+];
+
+export interface ColorSwatchPickerProps {
+  label: string;
+  value?: string;
+  defaultValue?: string;
+  onChange: (color: string) => void;
+}
+
+export const ColorSwatchPicker: React.FC<ColorSwatchPickerProps> = ({
+  label,
+  value,
+  defaultValue = '#1E293B',
+  onChange,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const currentColor = value || defaultValue;
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
+
+  return (
+    <div className="relative inline-block" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-4 h-4 rounded-none border border-zinc-400 dark:border-zinc-600 cursor-pointer block hover:scale-105 transition-transform"
+        style={{ backgroundColor: currentColor }}
+        title={`${label}: ${currentColor}`}
+      />
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 left-0 p-2.5 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 shadow-xl rounded-none w-52 space-y-2 select-none">
+          <div className="flex items-center justify-between text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+            <span>{label}</span>
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer text-xs"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <input
+              type="color"
+              value={currentColor.startsWith('#') && currentColor.length === 7 ? currentColor : '#1E293B'}
+              onChange={(e) => onChange(e.target.value)}
+              className="w-7 h-7 p-0 border border-zinc-300 dark:border-zinc-700 rounded-none cursor-pointer bg-transparent"
+            />
+            <input
+              type="text"
+              value={value || ''}
+              placeholder={defaultValue}
+              onChange={(e) => {
+                const val = e.target.value.trim();
+                if (!val) onChange(defaultValue);
+                else if (val.startsWith('#') || /^[0-9A-Fa-f]{1,6}$/.test(val)) {
+                  onChange(val.startsWith('#') ? val : `#${val}`);
+                }
+              }}
+              className="flex-1 px-1.5 py-1 text-xs font-mono border border-zinc-300 dark:border-zinc-700 bg-transparent text-zinc-900 dark:text-zinc-100 rounded-none uppercase focus:outline-none"
+              maxLength={7}
+            />
+          </div>
+
+          <div className="grid grid-cols-5 gap-1.5 pt-1 border-t border-zinc-200 dark:border-zinc-800">
+            {COLOR_PRESETS.map((p) => (
+              <button
+                key={p.hex}
+                type="button"
+                onClick={() => {
+                  onChange(p.hex);
+                  setIsOpen(false);
+                }}
+                className="w-5 h-5 rounded-none border border-black/20 hover:scale-110 cursor-pointer transition-transform"
+                style={{ backgroundColor: p.hex }}
+                title={`${p.name} (${p.hex})`}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export interface CardEditorNavigation {
   currentIndex: number;
@@ -85,21 +196,17 @@ export interface UnifiedCardEditorProps {
   isDirty?: boolean;
   saveSuccessMsg?: string | null;
 
-  // Image actions forwarded to CardPreview
+  // Image actions
   onOpenImageSearch?: () => void;
   onUploadImage?: (file: File) => void;
   onRemoveImage?: () => void;
 
-  // Navigation across multiple cards (Batch, Tag Completion, Card Browser)
+  // Navigation across multiple cards
   navigation?: CardEditorNavigation;
 
   // Anki Tags
   availableTags?: string[];
   ankiUrl?: string;
-
-  // Optional extra buttons/content
-  headerExtra?: React.ReactNode;
-  footerExtra?: React.ReactNode;
 }
 
 export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
@@ -129,32 +236,17 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
   navigation,
   availableTags: propAvailableTags,
   ankiUrl = 'http://127.0.0.1:8765',
-  headerExtra,
-  footerExtra,
 }) => {
   const themeContext = useAppTheme();
   const { t } = useTranslation();
   const isDark = (propAppTheme || themeContext.appTheme) === 'anki-dark';
 
-  // Internal editor view states
-  const [mode, setMode] = useState<'edit' | 'preview'>('edit');
-  const [activeSide, setActiveSide] = useState<'front' | 'back' | 'both'>('back');
-  const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  // Card view state
+  const [activeSide, setActiveSide] = useState<'front' | 'back'>('back');
+  const [activeMode, setActiveMode] = useState<CardType>(initialCardType);
+  const [isEditing, setIsEditing] = useState<boolean>(true);
 
-  // Active theme and card type
-  const [currentTheme, setCurrentTheme] = useState<ThemeId>(initialThemeId);
-  const [currentCardType, setCurrentCardType] = useState<CardType>(initialCardType);
-
-  useEffect(() => {
-    if (initialThemeId) setCurrentTheme(initialThemeId);
-  }, [initialThemeId]);
-
-  useEffect(() => {
-    if (initialCardType) setCurrentCardType(initialCardType);
-  }, [initialCardType]);
-
-  // Note Types loading
+  // Available Note Types
   const [ankiModelNames, setAnkiModelNames] = useState<string[]>(propAvailableNoteTypes || []);
   useEffect(() => {
     if (propAvailableNoteTypes && propAvailableNoteTypes.length > 0) {
@@ -168,63 +260,61 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
     }
   }, [propAvailableNoteTypes, ankiUrl]);
 
-  // Active Note Type
+  // Current note type
   const currentNoteType = propNoteType || cardData?.modelName || cardData?.noteType || 'AI Vocabulary - Comic Pop (Dark) (Normal)';
 
   const handleSelectNoteType = (newModelName: string) => {
     if (onNoteTypeChange) {
       onNoteTypeChange(newModelName);
     }
-
-    // Resolve matching theme
-    const resolvedTheme = resolveThemeFromNoteType(newModelName, currentTheme);
-    setCurrentTheme(resolvedTheme);
-
-    // Detect card type (normal vs spelling)
-    let detectedType = currentCardType;
+    // Detect spelling vs normal
+    let detectedMode = activeMode;
     if (/(\b|_|\(|-)spell(ing)?(\b|_|\)|-)/i.test(newModelName)) {
-      detectedType = 'spelling';
+      detectedMode = 'spelling';
     } else if (/(\b|_|\(|-)normal(\b|_|\)|-)/i.test(newModelName)) {
-      detectedType = 'normal';
+      detectedMode = 'normal';
     }
-    setCurrentCardType(detectedType);
+    setActiveMode(detectedMode);
 
     if (cardData && onCardChange) {
       onCardChange({
         ...cardData,
         modelName: newModelName,
         noteType: newModelName,
-        cardType: detectedType,
+        cardType: detectedMode,
       });
     }
   };
 
-  // Tags popover state & tags autocomplete
+  // Tags popup state & Anki tags
   const [isTagsOpen, setIsTagsOpen] = useState<boolean>(false);
-  const [availableAnkiTags, setAvailableAnkiTags] = useState<string[]>(propAvailableTags || []);
-  const [isLoadingTags, setIsLoadingTags] = useState<boolean>(false);
   const [newTagInput, setNewTagInput] = useState<string>('');
-  const tagsPopoverRef = useRef<HTMLDivElement>(null);
-
-  const fetchTags = useCallback(async () => {
-    setIsLoadingTags(true);
-    try {
-      const res = await getAnkiTags(ankiUrl);
-      if (res.success && Array.isArray(res.tags)) {
-        setAvailableAnkiTags(res.tags);
-      }
-    } catch (e) {
-      console.warn('Failed to load Anki tags:', e);
-    } finally {
-      setIsLoadingTags(false);
-    }
-  }, [ankiUrl]);
+  const [collectionTags, setCollectionTags] = useState<string[]>(propAvailableTags || []);
+  const tagsPopupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (propAvailableTags && propAvailableTags.length > 0) {
-      setAvailableAnkiTags(propAvailableTags);
+      setCollectionTags(propAvailableTags);
+    } else {
+      getAnkiTags(ankiUrl).then((res) => {
+        if (res.success && Array.isArray(res.tags)) {
+          setCollectionTags(res.tags);
+        }
+      });
     }
-  }, [propAvailableTags]);
+  }, [propAvailableTags, ankiUrl]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (tagsPopupRef.current && !tagsPopupRef.current.contains(event.target as Node)) {
+        setIsTagsOpen(false);
+      }
+    }
+    if (isTagsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isTagsOpen]);
 
   const activeTags = useMemo(() => {
     return cardData?.tags || [];
@@ -251,271 +341,260 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
     }
   };
 
-  // Close tags popover on click outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (tagsPopoverRef.current && !tagsPopoverRef.current.contains(event.target as Node)) {
-        setIsTagsOpen(false);
-      }
-    }
-    if (isTagsOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [isTagsOpen]);
+  // Text formatting Toolbar
+  const activeInputRef = useRef<{
+    element: HTMLInputElement | HTMLTextAreaElement;
+    fieldName: string;
+    blockId?: string;
+  } | null>(null);
 
-  // Overflow menu toggle
-  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsMenuOpen(false);
-      }
-    }
-    if (isMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [isMenuOpen]);
+  const applyFormat = (action: HtmlToolbarAction, extraValue?: string) => {
+    const active = activeInputRef.current;
+    if (!active || !active.element || !cardData || !onCardChange) return;
 
-  // Keyboard navigation shortcuts
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      const activeEl = document.activeElement;
-      const isInput =
-        activeEl?.tagName === 'INPUT' ||
-        activeEl?.tagName === 'TEXTAREA' ||
-        (activeEl as HTMLElement)?.isContentEditable;
+    const el = active.element;
+    const start = el.selectionStart || 0;
+    const end = el.selectionEnd || 0;
+    const fullText = el.value || '';
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-        if (canSaveToAnki && onSaveToAnki) {
-          e.preventDefault();
-          onSaveToAnki();
-        }
-      }
+    const { newText, newStart, newEnd } = applyHtmlFormattingToText(fullText, start, end, action, extraValue);
 
-      if (isInput) return;
-
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === 'ArrowLeft' && navigation?.hasPrevious) {
-          e.preventDefault();
-          navigation.onPrevious();
-        } else if (e.key === 'ArrowRight' && navigation?.hasNext) {
-          e.preventDefault();
-          navigation.onNext();
-        }
-      }
+    if (active.fieldName === 'customBlock' && active.blockId) {
+      const allBlocks = getAllCustomBlocks(cardData).map((b) =>
+        b.id === active.blockId ? { ...b, content: newText } : b
+      );
+      onCardChange({
+        ...cardData,
+        customBlocks: allBlocks,
+        frontCustomBlocks: allBlocks.filter((b) => b.side === 'front'),
+        backCustomBlocks: allBlocks.filter((b) => b.side === 'back' || !b.side),
+      });
+    } else {
+      onCardChange({
+        ...cardData,
+        [active.fieldName]: newText,
+      });
     }
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigation, canSaveToAnki, onSaveToAnki]);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(newStart, newEnd);
+    }, 0);
+  };
+
+  // Card update helper
+  const updateField = (field: keyof CardData, val: any) => {
+    if (!cardData || !onCardChange) return;
+    onCardChange({
+      ...cardData,
+      [field]: val,
+    });
+  };
+
+  // Custom Blocks on Front vs Back
+  const frontBlocks = useMemo(() => getFrontCustomBlocks(cardData), [cardData]);
+  const backBlocks = useMemo(() => getBackCustomBlocks(cardData), [cardData]);
+  const currentSideBlocks = activeSide === 'front' ? frontBlocks : backBlocks;
+
+  const handleAddBox = () => {
+    if (!cardData || !onCardChange) return;
+    const newBox: CustomCardBlock = {
+      id: `box_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      side: activeSide,
+      title: activeSide === 'front' ? 'Note / Hint' : 'Extra Note',
+      content: '',
+      color: isDark ? '#1E293B' : '#F1F5F9',
+      borderColor: isDark ? '#334155' : '#CBD5E1',
+      dir: 'auto',
+    };
+
+    const allBlocks = [...getAllCustomBlocks(cardData), newBox];
+    onCardChange({
+      ...cardData,
+      customBlocks: allBlocks,
+      frontCustomBlocks: allBlocks.filter((b) => b.side === 'front'),
+      backCustomBlocks: allBlocks.filter((b) => b.side === 'back' || !b.side),
+    });
+  };
+
+  const handleUpdateBox = (id: string, updates: Partial<CustomCardBlock>) => {
+    if (!cardData || !onCardChange) return;
+    const allBlocks = getAllCustomBlocks(cardData).map((b) =>
+      b.id === id ? { ...b, ...updates } : b
+    );
+    onCardChange({
+      ...cardData,
+      customBlocks: allBlocks,
+      frontCustomBlocks: allBlocks.filter((b) => b.side === 'front'),
+      backCustomBlocks: allBlocks.filter((b) => b.side === 'back' || !b.side),
+    });
+  };
+
+  const handleDeleteBox = (id: string) => {
+    if (!cardData || !onCardChange) return;
+    const allBlocks = getAllCustomBlocks(cardData).filter((b) => b.id !== id);
+    onCardChange({
+      ...cardData,
+      customBlocks: allBlocks,
+      frontCustomBlocks: allBlocks.filter((b) => b.side === 'front'),
+      backCustomBlocks: allBlocks.filter((b) => b.side === 'back' || !b.side),
+    });
+  };
+
+  // Card Background and Border Colors
+  const cardBgColor = cardData?.mainBoxStyles?.card?.bgColor || (isDark ? '#18181B' : '#FFFFFF');
+  const cardBorderColor = cardData?.mainBoxStyles?.card?.borderColor || (isDark ? '#27272A' : '#E4E4E7');
+
+  const setCardBg = (color: string) => {
+    if (!cardData || !onCardChange) return;
+    const currentStyles = cardData.mainBoxStyles || {};
+    onCardChange({
+      ...cardData,
+      mainBoxStyles: {
+        ...currentStyles,
+        card: {
+          ...currentStyles.card,
+          bgColor: color,
+        },
+      },
+    });
+  };
+
+  const setCardBorder = (color: string) => {
+    if (!cardData || !onCardChange) return;
+    const currentStyles = cardData.mainBoxStyles || {};
+    onCardChange({
+      ...cardData,
+      mainBoxStyles: {
+        ...currentStyles,
+        card: {
+          ...currentStyles.card,
+          borderColor: color,
+        },
+      },
+    });
+  };
+
+  // Spelling mode interactive check
+  const [userSpellingInput, setUserSpellingInput] = useState<string>('');
+  const [spellingStatus, setSpellingStatus] = useState<'idle' | 'correct' | 'incorrect'>('idle');
+
+  const handleCheckSpelling = () => {
+    const target = (cardData?.word || '').trim().toLowerCase();
+    const typed = userSpellingInput.trim().toLowerCase();
+    if (!typed) return;
+    if (typed === target) {
+      setSpellingStatus('correct');
+    } else {
+      setSpellingStatus('incorrect');
+    }
+  };
+
+  // Audio Play helper
+  const handlePlayAudio = (base64Audio?: string) => {
+    if (!base64Audio) return;
+    try {
+      const src = base64Audio.startsWith('data:') ? base64Audio : `data:audio/mp3;base64,${base64Audio}`;
+      const audio = new Audio(src);
+      audio.play().catch((e) => console.warn('Audio playback error:', e));
+    } catch (e) {
+      console.warn('Audio playback failed:', e);
+    }
+  };
 
   const displayWord = cardData?.word || emptyWordPlaceholder;
-  const isSpelling = currentCardType === 'spelling';
+  const spellingSentence = cardData?.spellingSentence || makeSpellingSentence(cardData?.example || '', cardData?.word || '');
 
   return (
-    <div
-      className={`w-full flex-1 flex flex-col rounded-xl border shadow-xs overflow-hidden min-w-0 transition-colors ${
-        isDark ? 'bg-zinc-900/90 border-zinc-800' : 'bg-white border-zinc-200 shadow-2xs'
-      }`}
-    >
+    <div className="w-full flex-1 flex flex-col min-w-0 select-text">
       {/* ======================================================== */}
-      {/* UNIFIED HEADER BAR: Metadata & Primary Controls         */}
+      {/* 6. EDITOR HEADER                                         */}
+      {/* Note Type                       Tags                      */}
+      {/* [ Duolingo Card ▼ ]            B1  vocabulary  +         */}
       {/* ======================================================== */}
-      <div
-        className={`px-3.5 py-2.5 border-b flex flex-wrap items-center justify-between gap-2.5 text-xs shrink-0 select-none ${
-          isDark ? 'bg-zinc-850/80 border-zinc-800' : 'bg-zinc-50/80 border-zinc-200'
-        }`}
-      >
-        {/* Left Section: Word Title, Identifiers, Mode Pill */}
-        <div className="flex items-center gap-2 flex-wrap min-w-0">
-          <span className="font-bold text-sm tracking-tight truncate max-w-[200px] text-zinc-900 dark:text-zinc-100">
-            {displayWord}
-          </span>
-
-          {noteId && (
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
-              Note #{noteId}
-            </span>
-          )}
-
-          {deckName && (
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 truncate max-w-[140px]">
-              {deckName}
-            </span>
-          )}
-
-          <span
-            className={`text-[10px] font-medium px-2 py-0.5 rounded flex items-center gap-1 ${
-              isSpelling
-                ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/25'
-                : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
-            }`}
-            title={`Card Mode: ${isSpelling ? 'Spelling Practice' : 'Normal Card'}`}
-          >
-            {isSpelling ? '✍️ Spelling' : '📖 Normal'}
-          </span>
-
-          {isDirty && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 font-semibold border border-amber-500/30 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-              Unsaved
-            </span>
-          )}
-
-          {saveSuccessMsg && (
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1 animate-fade-in">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              {saveSuccessMsg}
+      <div className="w-full flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800 text-xs">
+        {/* Left: Note Type */}
+        <div className="flex items-center gap-2 min-w-0">
+          <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 shrink-0">
+            Note Type
+          </label>
+          <div className="relative">
+            <select
+              value={currentNoteType}
+              onChange={(e) => handleSelectNoteType(e.target.value)}
+              className="px-2.5 py-1 text-xs font-medium border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-none cursor-pointer focus:outline-none focus:border-blue-500 hover:border-zinc-400 dark:hover:border-zinc-600"
+            >
+              {ankiModelNames.length > 0 ? (
+                ankiModelNames.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))
+              ) : (
+                APP_THEME_NOTE_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+          {isNoteTypeDetected && (
+            <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-none">
+              Detected
             </span>
           )}
         </div>
 
-        {/* Right Section: Note Type, Tags, Mode Switch, Actions */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Note Type Selector Dropdown */}
-          <div className="flex items-center gap-1">
-            <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium hidden md:flex items-center gap-1">
-              <Layers className="w-3.5 h-3.5 text-zinc-400" />
-              Note Type:
+        {/* Right: Tags & Save */}
+        <div className="flex items-center gap-3">
+          {/* Tags list + Add popup button */}
+          <div className="relative flex items-center gap-1.5" ref={tagsPopupRef}>
+            <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+              Tags
             </span>
-            <select
-              value={currentNoteType}
-              onChange={(e) => handleSelectNoteType(e.target.value)}
-              className={`text-xs py-1 px-2 rounded-md border font-medium cursor-pointer outline-none transition-colors max-w-[170px] sm:max-w-[210px] truncate ${
-                isDark
-                  ? 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:border-zinc-600 focus:border-blue-500'
-                  : 'bg-white border-zinc-300 text-zinc-800 hover:border-zinc-400 focus:border-blue-500 shadow-2xs'
-              }`}
-              title={`Active Note Type: ${currentNoteType}`}
-            >
-              {currentNoteType &&
-                !ankiModelNames.includes(currentNoteType) &&
-                !APP_THEME_NOTE_TYPES.some((t) => t.value === currentNoteType || t.label === currentNoteType) && (
-                  <optgroup label="Current Note Type">
-                    <option value={currentNoteType}>{currentNoteType}</option>
-                  </optgroup>
-                )}
-
-              {ankiModelNames.length > 0 && (
-                <optgroup label="Anki Note Types">
-                  {ankiModelNames.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-
-              <optgroup label="Application Note Types / Themes">
-                {APP_THEME_NOTE_TYPES.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-            {isNoteTypeDetected && (
-              <span
-                className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono hidden xl:inline"
-                title="Initialized from existing Anki note"
-              >
-                (detected)
-              </span>
-            )}
-          </div>
-
-          {/* Tags Popover Trigger */}
-          <div className="relative" ref={tagsPopoverRef}>
-            <button
-              type="button"
-              onClick={() => {
-                const next = !isTagsOpen;
-                setIsTagsOpen(next);
-                if (next && availableAnkiTags.length === 0) {
-                  fetchTags();
-                }
-              }}
-              className={`py-1 px-2 text-xs font-medium rounded-md border flex items-center gap-1.5 transition-colors cursor-pointer ${
-                isTagsOpen || activeTags.length > 0
-                  ? isDark
-                    ? 'bg-purple-950/40 text-purple-300 border-purple-500/40'
-                    : 'bg-purple-50 text-purple-700 border-purple-300'
-                  : isDark
-                  ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
-                  : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-100'
-              }`}
-              title="Manage tags for this card"
-            >
-              <Tags className="w-3.5 h-3.5" />
-              <span>Tags</span>
-              {activeTags.length > 0 && (
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-600/30 text-purple-700 dark:text-purple-200 font-mono font-bold">
-                  {activeTags.length}
+            <div className="flex items-center gap-1 flex-wrap">
+              {activeTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 rounded-none"
+                >
+                  <span>{tag}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveTag(tag)}
+                    className="hover:text-rose-500 cursor-pointer"
+                  >
+                    ×
+                  </button>
                 </span>
-              )}
-            </button>
+              ))}
 
-            {/* Tags Popover Content */}
-            {isTagsOpen && (
-              <div
-                className={`absolute right-0 mt-1.5 w-72 p-3 rounded-lg border shadow-xl z-50 space-y-2.5 ${
-                  isDark ? 'bg-zinc-900 border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-                }`}
+              <button
+                type="button"
+                onClick={() => setIsTagsOpen(!isTagsOpen)}
+                className="w-5 h-5 flex items-center justify-center border border-zinc-300 dark:border-zinc-700 hover:border-blue-500 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 rounded-none cursor-pointer"
+                title="Add or manage tags"
               >
-                <div className="flex items-center justify-between pb-1.5 border-b border-zinc-700/50">
-                  <div className="flex items-center gap-1.5 text-xs font-bold">
-                    <Tags className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Card Tags</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={fetchTags}
-                      disabled={isLoadingTags}
-                      className="text-zinc-400 hover:text-zinc-200 text-xs p-1"
-                      title="Refresh Anki tags"
-                    >
-                      <RefreshCw className={`w-3 h-3 ${isLoadingTags ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsTagsOpen(false)}
-                      className="text-zinc-400 hover:text-zinc-200 text-xs p-1"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* 14. Compact Tag Popup */}
+            {isTagsOpen && (
+              <div className="absolute right-0 top-7 z-50 p-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 shadow-xl rounded-none w-64 space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-semibold border-b border-zinc-200 dark:border-zinc-800 pb-1.5">
+                  <span>Tags</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsTagsOpen(false)}
+                    className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer text-xs"
+                  >
+                    ✕
+                  </button>
                 </div>
 
-                {/* Assigned tags */}
-                <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto">
-                  {activeTags.length === 0 ? (
-                    <span className="text-[11px] text-zinc-500 italic">No tags assigned yet</span>
-                  ) : (
-                    activeTags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-300 font-medium border border-purple-500/30"
-                      >
-                        <span>{tag}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveTag(tag)}
-                          className="hover:text-rose-400 cursor-pointer ml-0.5"
-                          title={`Remove tag ${tag}`}
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    ))
-                  )}
-                </div>
-
-                {/* Add new tag input */}
-                <div className="flex items-center gap-1.5 pt-1 border-t border-zinc-700/40">
+                <div className="flex items-center gap-1">
                   <input
                     type="text"
                     value={newTagInput}
@@ -526,43 +605,44 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                         handleAddTag(newTagInput);
                       }
                     }}
-                    placeholder="Add tag and hit Enter..."
-                    className={`flex-1 text-xs px-2 py-1 rounded border outline-none focus:ring-1 focus:ring-purple-500 ${
-                      isDark
-                        ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500'
-                        : 'bg-zinc-50 border-zinc-300 text-zinc-900 placeholder-zinc-400'
-                    }`}
+                    placeholder="Add tag..."
+                    className="flex-1 px-2 py-1 text-xs border border-zinc-300 dark:border-zinc-700 bg-transparent text-zinc-900 dark:text-zinc-100 rounded-none focus:outline-none focus:border-blue-500"
                   />
                   <button
                     type="button"
                     onClick={() => handleAddTag(newTagInput)}
-                    disabled={!newTagInput.trim()}
-                    className="px-2 py-1 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white rounded text-xs font-semibold cursor-pointer"
+                    className="px-2.5 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-none cursor-pointer"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    Add
                   </button>
                 </div>
 
-                {/* Autocomplete / Suggested Tags */}
-                {availableAnkiTags.length > 0 && (
-                  <div className="pt-1.5 border-t border-zinc-700/40 space-y-1">
-                    <span className="text-[10px] text-zinc-400 font-semibold block uppercase">
-                      From Anki Collection:
+                {collectionTags.length > 0 && (
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-semibold text-zinc-500 uppercase">
+                      Existing tags
                     </span>
-                    <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-                      {availableAnkiTags
-                        .filter((t) => !activeTags.includes(t))
-                        .slice(0, 8)
-                        .map((tag) => (
-                          <button
-                            key={tag}
-                            type="button"
-                            onClick={() => handleAddTag(tag)}
-                            className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 hover:bg-purple-600 hover:text-white transition-colors cursor-pointer text-zinc-700 dark:text-zinc-300"
+                    <div className="max-h-32 overflow-y-auto space-y-0.5 border border-zinc-200 dark:border-zinc-800 p-1">
+                      {collectionTags.slice(0, 30).map((t) => {
+                        const isSelected = activeTags.includes(t);
+                        return (
+                          <div
+                            key={t}
+                            onClick={() => {
+                              if (isSelected) handleRemoveTag(t);
+                              else handleAddTag(t);
+                            }}
+                            className={`px-1.5 py-0.5 text-xs flex items-center justify-between cursor-pointer ${
+                              isSelected
+                                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold'
+                                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                            }`}
                           >
-                            + {tag}
-                          </button>
-                        ))}
+                            <span>{t}</span>
+                            {isSelected && <span className="text-[10px]">✓</span>}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -570,303 +650,773 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
             )}
           </div>
 
-          {/* Edit / Preview Mode Switch */}
-          {editable && (
-            <div
-              className={`inline-flex border p-0.5 rounded-md ${
-                isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'
-              }`}
-            >
-              <button
-                type="button"
-                onClick={() => setMode('edit')}
-                className={`px-2.5 py-1 text-xs font-semibold rounded flex items-center gap-1 transition-colors cursor-pointer ${
-                  mode === 'edit'
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : isDark
-                    ? 'text-zinc-400 hover:text-white'
-                    : 'text-zinc-600 hover:text-zinc-900'
-                }`}
-                title="Editor Mode"
-              >
-                <Edit3 className="w-3 h-3" />
-                <span className="hidden sm:inline">Edit</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode('preview')}
-                className={`px-2.5 py-1 text-xs font-semibold rounded flex items-center gap-1 transition-colors cursor-pointer ${
-                  mode === 'preview'
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : isDark
-                    ? 'text-zinc-400 hover:text-white'
-                    : 'text-zinc-600 hover:text-zinc-900'
-                }`}
-                title="Live Anki Preview"
-              >
-                <Eye className="w-3 h-3" />
-                <span className="hidden sm:inline">Preview</span>
-              </button>
-            </div>
-          )}
-
-          {/* Front / Back / Both Toggle */}
-          <div
-            className={`inline-flex border p-0.5 rounded-md ${
-              isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'
-            }`}
-          >
+          {/* Primary Save Action */}
+          {onSaveToAnki && (
             <button
               type="button"
-              onClick={() => setActiveSide('front')}
-              className={`text-xs px-2 py-0.5 font-medium rounded transition-colors cursor-pointer ${
-                activeSide === 'front'
-                  ? isDark
-                    ? 'bg-zinc-100 text-zinc-900 font-semibold'
-                    : 'bg-zinc-900 text-white font-semibold'
-                  : isDark
-                  ? 'text-zinc-400 hover:bg-zinc-750'
-                  : 'text-zinc-600 hover:bg-zinc-100'
+              onClick={() => onSaveToAnki()}
+              disabled={isSavingToAnki || !canSaveToAnki}
+              className={`px-3 py-1 text-xs font-semibold rounded-none flex items-center gap-1.5 transition-colors cursor-pointer ${
+                canSaveToAnki
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed'
               }`}
             >
-              Front
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveSide('back')}
-              className={`text-xs px-2 py-0.5 font-medium rounded transition-colors cursor-pointer ${
-                activeSide === 'back'
-                  ? isDark
-                    ? 'bg-zinc-100 text-zinc-900 font-semibold'
-                    : 'bg-zinc-900 text-white font-semibold'
-                  : isDark
-                  ? 'text-zinc-400 hover:bg-zinc-750'
-                  : 'text-zinc-600 hover:bg-zinc-100'
-              }`}
-            >
-              Back
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveSide('both')}
-              className={`text-xs px-2 py-0.5 font-medium rounded transition-colors cursor-pointer ${
-                activeSide === 'both'
-                  ? isDark
-                    ? 'bg-zinc-100 text-zinc-900 font-semibold'
-                    : 'bg-zinc-900 text-white font-semibold'
-                  : isDark
-                  ? 'text-zinc-400 hover:bg-zinc-750'
-                  : 'text-zinc-600 hover:bg-zinc-100'
-              }`}
-            >
-              Both
-            </button>
-          </div>
-
-          {/* Primary Action: Save to Anki Button */}
-          {canSaveToAnki && onSaveToAnki && (
-            <button
-              type="button"
-              onClick={onSaveToAnki}
-              disabled={isSavingToAnki}
-              className="py-1 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-md shadow-2xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
-              title="Save changes to Anki collection (Ctrl+S)"
-            >
-              {isSavingToAnki ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              <span>{isSavingToAnki ? 'Saving...' : 'Save to Anki'}</span>
+              {isSavingToAnki ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save to Anki</span>
+                </>
+              )}
             </button>
           )}
 
-          {/* Secondary Actions Overflow Menu */}
-          <div className="relative" ref={menuRef}>
-            <button
-              type="button"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className={`p-1 text-xs rounded border transition-colors cursor-pointer ${
-                isMenuOpen
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : isDark
-                  ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-750'
-                  : 'bg-white border-zinc-300 text-zinc-700 hover:bg-zinc-100'
-              }`}
-              title="More Editor Options"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
-
-            {isMenuOpen && (
-              <div
-                className={`absolute right-0 mt-1.5 w-52 p-2 rounded-lg border shadow-xl z-50 space-y-1 ${
-                  isDark ? 'bg-zinc-900 border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-                }`}
-              >
-                {/* Desktop / Mobile view toggle */}
-                <div className="px-2 py-1.5 text-[11px] font-semibold text-zinc-400 uppercase border-b border-zinc-700/40">
-                  Preview Simulation
-                </div>
-                <div className="flex gap-1 p-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setViewMode('desktop');
-                      setIsMenuOpen(false);
-                    }}
-                    className={`flex-1 py-1 px-2 rounded text-xs flex items-center justify-center gap-1 ${
-                      viewMode === 'desktop'
-                        ? 'bg-blue-600 text-white font-semibold'
-                        : isDark
-                        ? 'hover:bg-zinc-800 text-zinc-300'
-                        : 'hover:bg-zinc-100 text-zinc-700'
-                    }`}
-                  >
-                    <Monitor className="w-3.5 h-3.5" />
-                    <span>Desktop</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setViewMode('mobile');
-                      setIsMenuOpen(false);
-                    }}
-                    className={`flex-1 py-1 px-2 rounded text-xs flex items-center justify-center gap-1 ${
-                      viewMode === 'mobile'
-                        ? 'bg-blue-600 text-white font-semibold'
-                        : isDark
-                        ? 'hover:bg-zinc-800 text-zinc-300'
-                        : 'hover:bg-zinc-100 text-zinc-700'
-                    }`}
-                  >
-                    <Smartphone className="w-3.5 h-3.5" />
-                    <span>Mobile</span>
-                  </button>
-                </div>
-
-                {/* Show in Anki GUI */}
-                {noteId && onShowInAnki && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onShowInAnki(noteId);
-                      setIsMenuOpen(false);
-                    }}
-                    disabled={isShowingInAnki}
-                    className="w-full text-left p-1.5 rounded flex items-center gap-2 hover:bg-zinc-800 dark:hover:bg-zinc-800 text-xs font-medium cursor-pointer"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Open in Anki GUI</span>
-                  </button>
-                )}
-
-                {/* Toggle Formatting Toolbar */}
-                {editable && mode === 'edit' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsSidebarOpen(!isSidebarOpen);
-                      setIsMenuOpen(false);
-                    }}
-                    className="w-full text-left p-1.5 rounded flex items-center gap-2 hover:bg-zinc-800 text-xs font-medium cursor-pointer"
-                  >
-                    <SlidersHorizontal className="w-3.5 h-3.5 text-purple-400" />
-                    <span>{isSidebarOpen ? 'Hide Tool Drawer' : 'Show Tool Drawer'}</span>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          {headerExtra}
+          {saveSuccessMsg && (
+            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>{saveSuccessMsg}</span>
+            </span>
+          )}
         </div>
       </div>
 
       {/* ======================================================== */}
-      {/* CARD CANVAS & EDITOR BODY                               */}
+      {/* 7. EDIT / PREVIEW CONTROLS                               */}
+      {/* Front     Back           Standard     Spelling          */}
       {/* ======================================================== */}
-      <div className="flex-1 overflow-y-auto min-h-0 relative p-2 sm:p-3">
-        <CardPreview
-          cardData={cardData}
-          themeId={currentTheme}
-          cardType={currentCardType}
-          emptyWordPlaceholder={displayWord}
-          appTheme={isDark ? 'anki-dark' : 'anki-light'}
-          editable={editable}
-          mode={mode}
-          onModeChange={setMode}
-          activeSide={activeSide}
-          onActiveSideChange={setActiveSide}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          isSidebarOpen={isSidebarOpen}
-          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-          hideTopToolbar={true}
-          canSaveToAnki={canSaveToAnki}
-          noteId={noteId}
-          onShowInAnki={onShowInAnki}
-          isShowingInAnki={isShowingInAnki}
-          isSavingToAnki={isSavingToAnki}
-          onCardChange={onCardChange}
-          onSaveToAnki={onSaveToAnki}
-          onOpenImageSearch={onOpenImageSearch}
-          onUploadImage={onUploadImage}
-          onRemoveImage={onRemoveImage}
-        />
+      <div className="flex flex-wrap items-center justify-between gap-3 py-2.5 border-b border-zinc-200 dark:border-zinc-800 text-xs">
+        {/* Front / Back Toggle */}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setActiveSide('front')}
+            className={`px-3 py-1 font-medium rounded-none border transition-colors cursor-pointer ${
+              activeSide === 'front'
+                ? 'bg-blue-600 text-white border-blue-600 font-semibold'
+                : 'border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+            }`}
+          >
+            Front
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSide('back')}
+            className={`px-3 py-1 font-medium rounded-none border transition-colors cursor-pointer ${
+              activeSide === 'back'
+                ? 'bg-blue-600 text-white border-blue-600 font-semibold'
+                : 'border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+            }`}
+          >
+            Back
+          </button>
+        </div>
+
+        {/* Standard / Spelling Mode */}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveMode('normal');
+              updateField('cardType', 'normal');
+            }}
+            className={`px-3 py-1 font-medium rounded-none border transition-colors cursor-pointer ${
+              activeMode === 'normal'
+                ? 'bg-blue-600 text-white border-blue-600 font-semibold'
+                : 'border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+            }`}
+          >
+            Standard
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveMode('spelling');
+              updateField('cardType', 'spelling');
+            }}
+            className={`px-3 py-1 font-medium rounded-none border transition-colors cursor-pointer ${
+              activeMode === 'spelling'
+                ? 'bg-blue-600 text-white border-blue-600 font-semibold'
+                : 'border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+            }`}
+          >
+            Spelling
+          </button>
+        </div>
+
+        {/* Edit / Preview Toggle */}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setIsEditing(true)}
+            className={`px-3 py-1 font-medium rounded-none border transition-colors cursor-pointer ${
+              isEditing
+                ? 'bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900 border-zinc-800 dark:border-zinc-200 font-semibold'
+                : 'border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+            }`}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsEditing(false)}
+            className={`px-3 py-1 font-medium rounded-none border transition-colors cursor-pointer ${
+              !isEditing
+                ? 'bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900 border-zinc-800 dark:border-zinc-200 font-semibold'
+                : 'border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+            }`}
+          >
+            Preview
+          </button>
+        </div>
       </div>
 
       {/* ======================================================== */}
-      {/* OPTIONAL BOTTOM NAVIGATION BAR                           */}
+      {/* 10. TOOLBAR & 9. CARD BG & BORDER COLORS                 */}
+      {/* BG ■   Border ■       B  I  U  Color ■  Highlight ■       */}
       {/* ======================================================== */}
-      {(navigation || footerExtra) && (
+      <div className="flex flex-wrap items-center justify-between gap-3 py-2 border-b border-zinc-200 dark:border-zinc-800 text-xs mb-4">
+        {/* Card Background and Border Controls */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-zinc-600 dark:text-zinc-400 text-xs">BG</span>
+            <ColorSwatchPicker
+              label="Card Background"
+              value={cardBgColor}
+              defaultValue={isDark ? '#18181B' : '#FFFFFF'}
+              onChange={setCardBg}
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-zinc-600 dark:text-zinc-400 text-xs">Border</span>
+            <ColorSwatchPicker
+              label="Card Border"
+              value={cardBorderColor}
+              defaultValue={isDark ? '#27272A' : '#E4E4E7'}
+              onChange={setCardBorder}
+            />
+          </div>
+        </div>
+
+        {/* Minimal Formatting Toolbar */}
+        <div className="flex items-center gap-1 border border-zinc-200 dark:border-zinc-800 px-1 py-0.5 bg-zinc-50 dark:bg-zinc-900 rounded-none">
+          <button
+            type="button"
+            onClick={() => applyFormat('bold')}
+            className="w-6 h-6 font-bold hover:bg-zinc-200 dark:hover:bg-zinc-800 flex items-center justify-center cursor-pointer rounded-none"
+            title="Bold (Ctrl+B)"
+          >
+            B
+          </button>
+          <button
+            type="button"
+            onClick={() => applyFormat('italic')}
+            className="w-6 h-6 italic font-serif hover:bg-zinc-200 dark:hover:bg-zinc-800 flex items-center justify-center cursor-pointer rounded-none"
+            title="Italic (Ctrl+I)"
+          >
+            I
+          </button>
+          <button
+            type="button"
+            onClick={() => applyFormat('underline')}
+            className="w-6 h-6 underline hover:bg-zinc-200 dark:hover:bg-zinc-800 flex items-center justify-center cursor-pointer rounded-none"
+            title="Underline (Ctrl+U)"
+          >
+            U
+          </button>
+
+          <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-700 mx-1" />
+
+          {/* Text Color */}
+          <div className="flex items-center gap-1 px-1">
+            <span className="text-[11px] font-semibold text-zinc-500">Color</span>
+            <ColorSwatchPicker
+              label="Text Color"
+              defaultValue="#38BDF8"
+              onChange={(c) => applyFormat('color', c)}
+            />
+          </div>
+
+          {/* Highlight */}
+          <div className="flex items-center gap-1 px-1">
+            <span className="text-[11px] font-semibold text-zinc-500">Highlight</span>
+            <ColorSwatchPicker
+              label="Highlight"
+              defaultValue="#FEF08A"
+              onChange={(c) => applyFormat('highlight', c)}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ======================================================== */}
+      {/* 8. CARD WORKSPACE                                        */}
+      {/* Sits directly in the workspace, no large enclosing frame */}
+      {/* ======================================================== */}
+      <div className="w-full flex-1 flex flex-col items-center justify-start min-h-0 py-2">
         <div
-          className={`px-3.5 py-2 border-t flex flex-wrap items-center justify-between gap-3 shrink-0 text-xs ${
-            isDark ? 'bg-zinc-850/80 border-zinc-800' : 'bg-zinc-50/80 border-zinc-200'
-          }`}
+          className="w-full max-w-2xl p-6 transition-all duration-150"
+          style={{
+            backgroundColor: cardBgColor,
+            borderColor: cardBorderColor,
+            borderWidth: '1.5px',
+            borderStyle: 'solid',
+          }}
         >
-          {navigation ? (
-            <>
-              <button
-                type="button"
-                onClick={navigation.onPrevious}
-                disabled={!navigation.hasPrevious}
-                className={`py-1.5 px-3 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
-                  isDark
-                    ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-100 border border-zinc-700'
-                    : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 shadow-2xs'
-                }`}
-                title="Previous card (Ctrl+Left)"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                <span>Previous</span>
-              </button>
+          {/* ========================================== */}
+          {/* FRONT SIDE RENDERING                      */}
+          {/* ========================================== */}
+          {activeSide === 'front' && (
+            <div className="space-y-4">
+              {activeMode === 'normal' ? (
+                /* Standard Front */
+                <div className="space-y-3">
+                  {/* Word Title */}
+                  <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={cardData?.word || ''}
+                        onChange={(e) => updateField('word', e.target.value)}
+                        onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'word' })}
+                        placeholder="Word"
+                        className="text-2xl font-black w-full bg-transparent border-0 focus:outline-none tracking-tight text-zinc-900 dark:text-zinc-100"
+                      />
+                    ) : (
+                      <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-100">
+                        {displayWord}
+                      </h1>
+                    )}
 
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-zinc-600 dark:text-zinc-400">
-                  {navigation.itemNameLabel || 'Card'} {navigation.currentIndex + 1} of {navigation.totalCount}
-                </span>
-                <span className="text-[10px] text-zinc-400 font-mono hidden sm:inline">
-                  (Ctrl+← / Ctrl+→)
-                </span>
+                    {/* Phonetic & Part of Speech */}
+                    <div className="flex items-center gap-2 mt-1">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={cardData?.phonetic || ''}
+                          onChange={(e) => updateField('phonetic', e.target.value)}
+                          onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'phonetic' })}
+                          placeholder="/IPA/"
+                          className="text-xs font-mono italic bg-transparent border-0 focus:outline-none text-zinc-500 w-32"
+                        />
+                      ) : (
+                        cardData?.phonetic && (
+                          <span className="text-xs font-mono italic text-zinc-500">{cardData.phonetic}</span>
+                        )
+                      )}
+
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={cardData?.partOfSpeech || ''}
+                          onChange={(e) => updateField('partOfSpeech', e.target.value)}
+                          onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' })}
+                          placeholder="part of speech"
+                          className="text-xs uppercase bg-transparent border-0 focus:outline-none text-blue-500 w-28 font-bold"
+                        />
+                      ) : (
+                        cardData?.partOfSpeech && (
+                          <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                            {cardData.partOfSpeech}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Audio Buttons (aligned on same horizontal line, no green circle outline) */}
+                  <div className="flex items-center gap-2 py-1">
+                    {cardData?.wordAudioUsNormalBase64 && (
+                      <button
+                        type="button"
+                        onClick={() => handlePlayAudio(cardData.wordAudioUsNormalBase64)}
+                        className="px-2.5 py-1 text-xs border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 cursor-pointer rounded-none"
+                      >
+                        <Volume2 className="w-3.5 h-3.5" />
+                        <span>US Normal</span>
+                      </button>
+                    )}
+                    {cardData?.wordAudioUsSlowBase64 && (
+                      <button
+                        type="button"
+                        onClick={() => handlePlayAudio(cardData.wordAudioUsSlowBase64)}
+                        className="px-2.5 py-1 text-xs border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 cursor-pointer rounded-none"
+                      >
+                        <Volume2 className="w-3.5 h-3.5" />
+                        <span>US Slow</span>
+                      </button>
+                    )}
+                    {cardData?.wordAudioUkNormalBase64 && (
+                      <button
+                        type="button"
+                        onClick={() => handlePlayAudio(cardData.wordAudioUkNormalBase64)}
+                        className="px-2.5 py-1 text-xs border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 cursor-pointer rounded-none"
+                      >
+                        <Volume2 className="w-3.5 h-3.5" />
+                        <span>UK Normal</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Smart Image (if present) */}
+                  {cardData?.imageBase64 && (
+                    <div className="my-2 border border-zinc-200 dark:border-zinc-800 p-2 flex flex-col items-center bg-black/5 dark:bg-white/5">
+                      <img
+                        src={cardData.imageBase64}
+                        alt={cardData.word}
+                        className="max-h-48 object-contain"
+                      />
+                      {isEditing && onRemoveImage && (
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            type="button"
+                            onClick={onRemoveImage}
+                            className="text-[11px] text-rose-500 hover:underline cursor-pointer"
+                          >
+                            Remove Image
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* 13. Spelling Mode Front */
+                <div className="space-y-4 text-center py-4">
+                  {/* Audio Buttons */}
+                  <div className="flex items-center justify-center gap-2">
+                    {cardData?.wordAudioUsNormalBase64 && (
+                      <button
+                        type="button"
+                        onClick={() => handlePlayAudio(cardData.wordAudioUsNormalBase64)}
+                        className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium flex items-center gap-1.5 cursor-pointer rounded-none"
+                      >
+                        <Volume2 className="w-4 h-4" />
+                        <span>Play Pronunciation</span>
+                      </button>
+                    )}
+                    {cardData?.wordAudioUsSlowBase64 && (
+                      <button
+                        type="button"
+                        onClick={() => handlePlayAudio(cardData.wordAudioUsSlowBase64)}
+                        className="px-2.5 py-1.5 text-xs border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 cursor-pointer rounded-none"
+                      >
+                        <Volume2 className="w-4 h-4" />
+                        <span>Slow</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Sentence with Blank */}
+                  <div className="text-base font-medium py-3 text-zinc-800 dark:text-zinc-200">
+                    {isEditing ? (
+                      <textarea
+                        rows={2}
+                        value={spellingSentence}
+                        onChange={(e) => updateField('spellingSentence', e.target.value)}
+                        onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'spellingSentence' })}
+                        className="w-full text-center bg-transparent border-b border-zinc-300 dark:border-zinc-700 focus:outline-none focus:border-blue-500 text-sm font-medium resize-none"
+                      />
+                    ) : (
+                      <span>{spellingSentence}</span>
+                    )}
+                  </div>
+
+                  {cardData?.phonetic && (
+                    <div className="text-xs font-mono text-zinc-500">
+                      {cardData.phonetic}
+                    </div>
+                  )}
+
+                  {/* Interactive Test Input */}
+                  <div className="pt-2 max-w-sm mx-auto flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={userSpellingInput}
+                      onChange={(e) => {
+                        setUserSpellingInput(e.target.value);
+                        setSpellingStatus('idle');
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleCheckSpelling();
+                        }
+                      }}
+                      placeholder="Type the spelling..."
+                      className="flex-1 px-3 py-1.5 text-sm border border-zinc-300 dark:border-zinc-700 bg-transparent rounded-none focus:outline-none focus:border-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCheckSpelling}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-none cursor-pointer"
+                    >
+                      Check
+                    </button>
+                  </div>
+
+                  {/* Spelling Result: Only correct word in green/red box */}
+                  {spellingStatus === 'correct' && (
+                    <div className="p-2 border border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-bold text-sm">
+                      {cardData?.word}
+                    </div>
+                  )}
+                  {spellingStatus === 'incorrect' && (
+                    <div className="p-2 border border-rose-500 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 font-bold text-sm">
+                      {cardData?.word}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 11. Front Custom Boxes */}
+              <div className="space-y-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+                {frontBlocks.map((blk) => {
+                  const boxBg = blk.color || (isDark ? '#1E293B' : '#F1F5F9');
+                  const boxBorder = blk.borderColor || blk.color || (isDark ? '#334155' : '#CBD5E1');
+                  const contrastText = getContrastTextColor(boxBg);
+
+                  return (
+                    <div
+                      key={blk.id}
+                      style={{ backgroundColor: boxBg, borderColor: boxBorder }}
+                      className="p-3 border rounded-none space-y-2 transition-colors"
+                    >
+                      <div className="flex items-center justify-between gap-2 border-b border-black/10 dark:border-white/10 pb-1.5">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={blk.title}
+                            onChange={(e) => handleUpdateBox(blk.id, { title: e.target.value })}
+                            placeholder="Title"
+                            className="font-bold text-xs bg-transparent border-0 focus:outline-none flex-1"
+                            style={{ color: contrastText }}
+                          />
+                        ) : (
+                          <span className="font-bold text-xs" style={{ color: contrastText }}>
+                            {blk.title}
+                          </span>
+                        )}
+
+                        {isEditing && (
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex items-center gap-1 text-[11px]" style={{ color: contrastText }}>
+                              <span className="opacity-80">BG</span>
+                              <ColorSwatchPicker
+                                label="Box BG"
+                                value={blk.color}
+                                defaultValue={isDark ? '#1E293B' : '#F1F5F9'}
+                                onChange={(c) => handleUpdateBox(blk.id, { color: c })}
+                              />
+                            </div>
+                            <div className="flex items-center gap-1 text-[11px]" style={{ color: contrastText }}>
+                              <span className="opacity-80">Border</span>
+                              <ColorSwatchPicker
+                                label="Box Border"
+                                value={blk.borderColor}
+                                defaultValue={blk.color || (isDark ? '#334155' : '#CBD5E1')}
+                                onChange={(c) => handleUpdateBox(blk.id, { borderColor: c })}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteBox(blk.id)}
+                              className="text-zinc-400 hover:text-rose-500 text-xs px-1 cursor-pointer"
+                              title="Delete Box"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {isEditing ? (
+                        <textarea
+                          rows={2}
+                          value={blk.content}
+                          onChange={(e) => handleUpdateBox(blk.id, { content: e.target.value })}
+                          onFocus={(e) =>
+                            (activeInputRef.current = {
+                              element: e.target,
+                              fieldName: 'customBlock',
+                              blockId: blk.id,
+                            })
+                          }
+                          placeholder="Content..."
+                          className="w-full text-xs bg-transparent border-0 focus:outline-none resize-y leading-relaxed"
+                          style={{ color: contrastText }}
+                        />
+                      ) : (
+                        <div
+                          className="text-xs leading-relaxed"
+                          style={{ color: contrastText }}
+                          dangerouslySetInnerHTML={{ __html: formatCardFieldHtml(blk.content) }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* + Add Box Button */}
+                {isEditing && (
+                  <button
+                    type="button"
+                    onClick={handleAddBox}
+                    className="w-full py-2 border border-dashed border-zinc-300 dark:border-zinc-700 hover:border-blue-500 text-zinc-600 dark:text-zinc-400 hover:text-blue-500 text-xs font-semibold rounded-none flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                  >
+                    + Add Box
+                  </button>
+                )}
               </div>
-
-              <button
-                type="button"
-                onClick={navigation.onNext}
-                disabled={!navigation.hasNext}
-                className={`py-1.5 px-3 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
-                  isDark
-                    ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-100 border border-zinc-700'
-                    : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 shadow-2xs'
-                }`}
-                title="Next card (Ctrl+Right)"
-              >
-                <span>Next</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </>
-          ) : (
-            <div />
+            </div>
           )}
 
-          {footerExtra && <div className="flex items-center gap-2">{footerExtra}</div>}
+          {/* ========================================== */}
+          {/* BACK SIDE RENDERING                       */}
+          {/* ========================================== */}
+          {activeSide === 'back' && (
+            <div className="space-y-4">
+              {/* Word & Phonetics Header */}
+              <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                <h2 className="text-xl font-black text-zinc-900 dark:text-zinc-100">
+                  {displayWord}
+                </h2>
+                {cardData?.phonetic && (
+                  <span className="text-xs font-mono italic text-zinc-500">{cardData.phonetic}</span>
+                )}
+              </div>
+
+              {/* Main Content Boxes: Meaning, Definition, Example */}
+              <div className="space-y-3">
+                {/* Persian Meaning Box */}
+                <div className="p-3 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850/60 rounded-none space-y-1">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                    Persian Meaning
+                  </div>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      dir="rtl"
+                      value={cardData?.meaningFa || ''}
+                      onChange={(e) => updateField('meaningFa', e.target.value)}
+                      onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'meaningFa' })}
+                      placeholder="معنی فارسی..."
+                      className="w-full bg-transparent border-0 focus:outline-none text-sm font-semibold text-zinc-900 dark:text-zinc-100"
+                    />
+                  ) : (
+                    <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100" dir="rtl">
+                      {cardData?.meaningFa || '-'}
+                    </div>
+                  )}
+                </div>
+
+                {/* English Definition Box */}
+                <div className="p-3 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850/60 rounded-none space-y-1">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                    English Definition
+                  </div>
+                  {isEditing ? (
+                    <textarea
+                      rows={2}
+                      value={cardData?.definitionEn || ''}
+                      onChange={(e) => updateField('definitionEn', e.target.value)}
+                      onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'definitionEn' })}
+                      placeholder="English definition..."
+                      className="w-full bg-transparent border-0 focus:outline-none text-xs leading-relaxed text-zinc-800 dark:text-zinc-200 resize-y"
+                    />
+                  ) : (
+                    <div
+                      className="text-xs leading-relaxed text-zinc-800 dark:text-zinc-200"
+                      dangerouslySetInnerHTML={{ __html: formatCardFieldHtml(cardData?.definitionEn) }}
+                    />
+                  )}
+                </div>
+
+                {/* Example Sentence Box */}
+                <div className="p-3 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850/60 rounded-none space-y-1">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                    Example Sentence
+                  </div>
+                  {isEditing ? (
+                    <div className="space-y-1.5">
+                      <textarea
+                        rows={2}
+                        value={cardData?.example || ''}
+                        onChange={(e) => updateField('example', e.target.value)}
+                        onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'example' })}
+                        placeholder="Example sentence..."
+                        className="w-full bg-transparent border-0 focus:outline-none text-xs leading-relaxed text-zinc-800 dark:text-zinc-200 resize-y"
+                      />
+                      <input
+                        type="text"
+                        dir="rtl"
+                        value={cardData?.translationFa || ''}
+                        onChange={(e) => updateField('translationFa', e.target.value)}
+                        onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'translationFa' })}
+                        placeholder="ترجمه مثال..."
+                        className="w-full bg-transparent border-0 focus:outline-none text-xs text-zinc-500"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <div
+                        className="text-xs leading-relaxed text-zinc-800 dark:text-zinc-200"
+                        dangerouslySetInnerHTML={{ __html: formatCardFieldHtml(cardData?.example) }}
+                      />
+                      {cardData?.translationFa && (
+                        <div className="text-xs text-zinc-500" dir="rtl">
+                          {cardData.translationFa}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 11. Back Custom Boxes */}
+              <div className="space-y-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+                {backBlocks.map((blk) => {
+                  const boxBg = blk.color || (isDark ? '#1E293B' : '#F1F5F9');
+                  const boxBorder = blk.borderColor || blk.color || (isDark ? '#334155' : '#CBD5E1');
+                  const contrastText = getContrastTextColor(boxBg);
+
+                  return (
+                    <div
+                      key={blk.id}
+                      style={{ backgroundColor: boxBg, borderColor: boxBorder }}
+                      className="p-3 border rounded-none space-y-2 transition-colors"
+                    >
+                      <div className="flex items-center justify-between gap-2 border-b border-black/10 dark:border-white/10 pb-1.5">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={blk.title}
+                            onChange={(e) => handleUpdateBox(blk.id, { title: e.target.value })}
+                            placeholder="Title"
+                            className="font-bold text-xs bg-transparent border-0 focus:outline-none flex-1"
+                            style={{ color: contrastText }}
+                          />
+                        ) : (
+                          <span className="font-bold text-xs" style={{ color: contrastText }}>
+                            {blk.title}
+                          </span>
+                        )}
+
+                        {isEditing && (
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex items-center gap-1 text-[11px]" style={{ color: contrastText }}>
+                              <span className="opacity-80">BG</span>
+                              <ColorSwatchPicker
+                                label="Box BG"
+                                value={blk.color}
+                                defaultValue={isDark ? '#1E293B' : '#F1F5F9'}
+                                onChange={(c) => handleUpdateBox(blk.id, { color: c })}
+                              />
+                            </div>
+                            <div className="flex items-center gap-1 text-[11px]" style={{ color: contrastText }}>
+                              <span className="opacity-80">Border</span>
+                              <ColorSwatchPicker
+                                label="Box Border"
+                                value={blk.borderColor}
+                                defaultValue={blk.color || (isDark ? '#334155' : '#CBD5E1')}
+                                onChange={(c) => handleUpdateBox(blk.id, { borderColor: c })}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteBox(blk.id)}
+                              className="text-zinc-400 hover:text-rose-500 text-xs px-1 cursor-pointer"
+                              title="Delete Box"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {isEditing ? (
+                        <textarea
+                          rows={2}
+                          value={blk.content}
+                          onChange={(e) => handleUpdateBox(blk.id, { content: e.target.value })}
+                          onFocus={(e) =>
+                            (activeInputRef.current = {
+                              element: e.target,
+                              fieldName: 'customBlock',
+                              blockId: blk.id,
+                            })
+                          }
+                          placeholder="Content..."
+                          className="w-full text-xs bg-transparent border-0 focus:outline-none resize-y leading-relaxed"
+                          style={{ color: contrastText }}
+                        />
+                      ) : (
+                        <div
+                          className="text-xs leading-relaxed"
+                          style={{ color: contrastText }}
+                          dangerouslySetInnerHTML={{ __html: formatCardFieldHtml(blk.content) }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* + Add Box Button */}
+                {isEditing && (
+                  <button
+                    type="button"
+                    onClick={handleAddBox}
+                    className="w-full py-2 border border-dashed border-zinc-300 dark:border-zinc-700 hover:border-blue-500 text-zinc-600 dark:text-zinc-400 hover:text-blue-500 text-xs font-semibold rounded-none flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                  >
+                    + Add Box
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ======================================================== */}
+      {/* OPTIONAL BOTTOM NAVIGATION                               */}
+      {/* ======================================================== */}
+      {navigation && navigation.totalCount > 1 && (
+        <div className="w-full flex items-center justify-between pt-3 border-t border-zinc-200 dark:border-zinc-800 text-xs select-none">
+          <button
+            type="button"
+            onClick={navigation.onPrevious}
+            disabled={!navigation.hasPrevious}
+            className={`px-3 py-1.5 border border-zinc-300 dark:border-zinc-700 rounded-none flex items-center gap-1 transition-colors cursor-pointer ${
+              navigation.hasPrevious
+                ? 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200'
+                : 'opacity-40 cursor-not-allowed text-zinc-400'
+            }`}
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+            <span>Previous</span>
+          </button>
+
+          <span className="font-mono text-xs text-zinc-500">
+            Card {navigation.currentIndex + 1} of {navigation.totalCount}
+          </span>
+
+          <button
+            type="button"
+            onClick={navigation.onNext}
+            disabled={!navigation.hasNext}
+            className={`px-3 py-1.5 border border-zinc-300 dark:border-zinc-700 rounded-none flex items-center gap-1 transition-colors cursor-pointer ${
+              navigation.hasNext
+                ? 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200'
+                : 'opacity-40 cursor-not-allowed text-zinc-400'
+            }`}
+          >
+            <span>Next</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
     </div>

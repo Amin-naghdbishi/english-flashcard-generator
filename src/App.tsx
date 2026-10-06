@@ -181,8 +181,8 @@ function AppShell({
           onMouseLeave={handleMouseLeave}
         />
 
-        {/* Main Content Body - Consistent top spacing ensures ZERO layout jumps/resizing */}
-        <main className={`flex-1 w-full min-w-0 ${isNavPinned ? 'pt-14' : 'pt-4 sm:pt-6'}`}>
+        {/* Main Content Body - Edge-to-edge layout */}
+        <main className="flex-1 w-full min-w-0 pt-14">
           <div className={currentTab === 'create' ? 'block' : 'hidden'}>
             <CreateCardView
               settings={settings}
@@ -222,29 +222,6 @@ function AppShell({
             />
           </div>
         </main>
-
-        {/* Desktop Footer */}
-        <footer
-          className={`w-full py-3 px-4 text-xs ${
-            isDark
-              ? 'border-t border-zinc-800 bg-[#1F1F23] text-zinc-400'
-              : 'border-t border-zinc-200 bg-white text-zinc-600'
-          }`}
-        >
-          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-                {t('common.pipeline')}:
-              </span>
-              <span className="font-mono text-xs opacity-80">
-                Word → AI ({settings.ai.provider}) → TTS ({settings.tts.provider}) → 12 Note Themes → AnkiConnect
-              </span>
-            </div>
-            <div className="text-xs font-medium opacity-80">
-              English Flashcard Generator v1.1.6
-            </div>
-          </div>
-        </footer>
       </div>
     </AppThemeProvider>
   );

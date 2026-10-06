@@ -125,7 +125,7 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
         isDark ? 'bg-[#1F1F23]/95 backdrop-blur-md border-zinc-800' : 'bg-white/95 backdrop-blur-md border-zinc-200 shadow-xs'
       }`}
     >
-      <div className="w-full max-w-7xl mx-auto flex items-center justify-between px-3 sm:px-6">
+      <div className="w-full flex items-center justify-between px-4 sm:px-6">
         {/* Navigation Tabs */}
         <nav className="flex items-center gap-1 sm:gap-2">
           <button

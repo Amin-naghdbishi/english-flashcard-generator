@@ -98,8 +98,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const { t, language, setLanguage, direction, setDirection, isRTL } = useTranslation();
   const [form, setForm] = useState<AppSettings>(settings);
   const [activeSubTab, setActiveSubTab] = useState<
-    'ai' | 'prompts' | 'tts' | 'dictionary' | 'smartImages' | 'defaultCard' | 'appearance' | 'anki' | 'diagnostics' | 'guide'
-  >('ai');
+    'general' | 'appearance' | 'ai' | 'tts' | 'anki' | 'prompts' | 'advanced'
+  >('general');
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
   // Collapsible sidebar state (like macOS / VS Code settings)
@@ -527,126 +527,684 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     };
 
   const categories = [
-    { id: 'ai', label: t('settings.tabs.ai'), icon: Cpu },
-    { id: 'prompts', label: t('settings.tabs.prompts'), icon: Sparkles },
-    { id: 'tts', label: t('settings.tabs.tts'), icon: Volume2 },
-    { id: 'dictionary', label: t('settings.tabs.dictionary'), icon: BookOpen },
-    { id: 'smartImages', label: t('settings.tabs.smartImages'), icon: ImageIcon },
-    { id: 'defaultCard', label: t('settings.tabs.defaultCard'), icon: CheckSquare },
-    { id: 'appearance', label: t('settings.tabs.appearance'), icon: Palette },
-    { id: 'anki', label: t('settings.tabs.anki'), icon: Bookmark },
-    { id: 'diagnostics', label: t('settings.tabs.diagnostics'), icon: Activity },
-    { id: 'guide', label: t('settings.tabs.guide'), icon: HelpCircle },
+    { id: 'general', label: t('settings.tabs.general', 'General'), icon: Sliders },
+    { id: 'appearance', label: t('settings.tabs.appearance', 'Appearance'), icon: Palette },
+    { id: 'ai', label: t('settings.tabs.ai', 'AI'), icon: Cpu },
+    { id: 'tts', label: t('settings.tabs.tts', 'TTS'), icon: Volume2 },
+    { id: 'anki', label: t('settings.tabs.anki', 'Anki'), icon: Bookmark },
+    { id: 'prompts', label: t('settings.tabs.prompts', 'Prompts'), icon: Sparkles },
+    { id: 'advanced', label: t('settings.tabs.advanced', 'Advanced'), icon: Activity },
   ];
 
   return (
-    <div className="w-full max-w-[1680px] mx-auto px-4 sm:px-6 py-4 min-w-0">
-      <div className="flex flex-col md:flex-row gap-6 items-start min-w-0">
-        {/* LEFT SIDEBAR: Collapsible Categories (like macOS / VS Code settings) */}
-        <aside
-          className={`shrink-0 transition-all duration-200 flex flex-col rounded-xl border shadow-2xs overflow-hidden sticky top-16 ${
-            isSidebarCollapsed ? 'w-full md:w-16' : 'w-full md:w-64'
-          } ${
-            isDark ? 'bg-zinc-900/90 border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-          }`}
-        >
-          {/* Sidebar Top: Title & Collapse Toggle */}
-          <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2">
-            {!isSidebarCollapsed && (
-              <div className="flex items-center gap-2 min-w-0">
-                <Sliders className="w-4 h-4 text-blue-500 shrink-0" />
-                <span className="font-bold text-sm tracking-tight truncate">
-                  {t('settings.headerTitle')}
-                </span>
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
-                  v1.1.6
-                </span>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={toggleSidebarCollapse}
-              className={`p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer ${
-                isSidebarCollapsed ? 'mx-auto' : ''
-              }`}
-              title={isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-            >
-              <PanelLeft className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Categories Nav List */}
-          <nav className="p-2 space-y-1 overflow-y-auto max-h-[calc(100vh-220px)]">
-            {categories.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeSubTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveSubTab(tab.id as any)}
-                  className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                    isActive
-                      ? 'bg-blue-600 text-white font-semibold shadow-2xs'
-                      : isDark
-                      ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
-                      : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
-                  } ${isSidebarCollapsed ? 'justify-center px-2' : ''}`}
-                  title={tab.label}
-                >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  {!isSidebarCollapsed && <span className="truncate">{tab.label}</span>}
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Sidebar Footer: Save Button & Status */}
-          <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 space-y-2 mt-auto">
-            {saveStatus && !isSidebarCollapsed && (
-              <span className="text-[11px] font-semibold text-emerald-500 flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>{saveStatus}</span>
+    <div className="w-full min-h-[calc(100vh-3.5rem)] flex flex-col md:flex-row min-w-0">
+      {/* LEFT SIDEBAR: Collapsible Categories */}
+      <aside
+        className={`shrink-0 transition-all duration-200 flex flex-col border-r border-zinc-200 dark:border-zinc-800 select-none ${
+          isSidebarCollapsed ? 'w-full md:w-14' : 'w-full md:w-56'
+        } ${
+          isDark ? 'bg-zinc-900 text-zinc-100' : 'bg-white text-zinc-900'
+        }`}
+      >
+        {/* Sidebar Top: Title & Collapse Toggle */}
+        <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2">
+          {!isSidebarCollapsed && (
+            <div className="flex items-center gap-2 min-w-0">
+              <Sliders className="w-4 h-4 text-blue-500 shrink-0" />
+              <span className="font-bold text-xs tracking-tight truncate">
+                {t('settings.headerTitle')}
               </span>
-            )}
-            <button
-              type="button"
-              onClick={handleSave}
-              className={`w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-lg shadow-2xs flex items-center justify-center gap-2 cursor-pointer transition-colors ${
-                isSidebarCollapsed ? 'px-2' : 'px-3'
-              }`}
-              title={t('settings.saveBtn')}
-            >
-              <Save className="w-4 h-4 shrink-0" />
-              {!isSidebarCollapsed && <span>{t('settings.saveBtn')}</span>}
-            </button>
-          </div>
-        </aside>
-
-        {/* RIGHT PANEL: Selected Category Settings */}
-        <div className="flex-1 min-w-0 space-y-5">
-          {/* Active section header with title & save status */}
-          <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
-            <div className="flex items-center gap-2.5">
-              {React.createElement(categories.find(c => c.id === activeSubTab)?.icon || Sliders, { className: 'w-5 h-5 text-blue-500' })}
-              <h2 className="text-base sm:text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-                {categories.find(c => c.id === activeSubTab)?.label}
-              </h2>
             </div>
-            {saveStatus && (
-              <span className="text-xs font-semibold text-emerald-500 flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                {saveStatus}
-              </span>
-            )}
+          )}
+          <button
+            type="button"
+            onClick={toggleSidebarCollapse}
+            className={`p-1.5 rounded-none hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer ${
+              isSidebarCollapsed ? 'mx-auto' : ''
+            }`}
+            title={isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+          >
+            <PanelLeft className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Categories Nav List */}
+        <nav className="p-1 space-y-0.5 overflow-y-auto flex-1">
+          {categories.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeSubTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveSubTab(tab.id as any)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors cursor-pointer rounded-none ${
+                  isActive
+                    ? 'bg-blue-600 text-white font-semibold'
+                    : isDark
+                    ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+                    : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
+                } ${isSidebarCollapsed ? 'justify-center px-1.5' : ''}`}
+                title={tab.label}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                {!isSidebarCollapsed && <span className="truncate">{tab.label}</span>}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Sidebar Footer: Save Button & Status */}
+        <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 space-y-2 mt-auto">
+          {saveStatus && !isSidebarCollapsed && (
+            <span className="text-[11px] font-semibold text-emerald-500 flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>{saveStatus}</span>
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={handleSave}
+            className={`w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-none flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+              isSidebarCollapsed ? 'px-1' : 'px-3'
+            }`}
+            title={t('settings.saveBtn')}
+          >
+            <Save className="w-3.5 h-3.5 shrink-0" />
+            {!isSidebarCollapsed && <span>{t('settings.saveBtn')}</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* RIGHT PANEL: Selected Category Settings */}
+      <div className="flex-1 min-w-0 p-4 sm:p-6 overflow-y-auto">
+        {/* Active section header with title & save status */}
+        <div className="flex items-center justify-between pb-3 mb-6 border-b border-zinc-200 dark:border-zinc-800">
+          <div className="flex items-center gap-2.5">
+            {React.createElement(categories.find(c => c.id === activeSubTab)?.icon || Sliders, { className: 'w-4 h-4 text-blue-500' })}
+            <h2 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100 uppercase">
+              {categories.find(c => c.id === activeSubTab)?.label}
+            </h2>
           </div>
+          {saveStatus && (
+            <span className="text-xs font-semibold text-emerald-500 flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              {saveStatus}
+            </span>
+          )}
+        </div>
 
       {/* SUBTAB 1: AI PROVIDERS */}
-      {activeSubTab === 'ai' && (
+            {/* 1. GENERAL */}
+      {activeSubTab === 'general' && (
+        <div className="space-y-6">
+          {/* 1. APPLICATION LANGUAGE SELECTOR */}
+          <div
+            className={`p-5 border rounded-none  ${
+              isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+            }`}
+          >
+            <h3 className="font-semibold text-sm uppercase mb-1 flex items-center gap-2">
+              <Languages className="w-4 h-4 text-blue-500" />
+              <span>{t('settings.appearance.languageTitle')}</span>
+            </h3>
+            <p className={`text-xs mb-3 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+              {t('settings.appearance.languageDesc')}
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Option 1: English */}
+              <button
+                type="button"
+                onClick={() => handleLanguageSelect('en')}
+                className={`p-3.5 border text-left cursor-pointer transition-all rounded-none ${
+                  language === 'en'
+                    ? 'bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-200 border-blue-600 dark:border-blue-500 font-semibold '
+                    : isDark
+                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold">{t('settings.appearance.langEnglish')}</span>
+                  {language === 'en' && (
+                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                      {t('settings.appearance.activeBadge')}
+                    </span>
+                  )}
+                </div>
+                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  {t('settings.appearance.langEnglishDesc')}
+                </div>
+              </button>
+
+              {/* Option 2: Persian (فارسی) */}
+              <button
+                type="button"
+                onClick={() => handleLanguageSelect('fa')}
+                className={`p-3.5 border text-left cursor-pointer transition-all rounded-none ${
+                  language === 'fa'
+                    ? 'bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-200 border-blue-600 dark:border-blue-500 font-semibold '
+                    : isDark
+                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold">{t('settings.appearance.langPersian')}</span>
+                  {language === 'fa' && (
+                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                      {t('settings.appearance.activeBadge')}
+                    </span>
+                  )}
+                </div>
+                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  {t('settings.appearance.langPersianDesc')}
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* 2. APPLICATION INTERFACE DIRECTION SELECTOR */}
+          <div
+            className={`p-5 border rounded-none  ${
+              isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+            }`}
+          >
+            <h3 className="font-semibold text-sm uppercase mb-1 flex items-center gap-2">
+              <ArrowLeftRight className="w-4 h-4 text-blue-500" />
+              <span>{t('settings.appearance.directionTitle')}</span>
+            </h3>
+            <p className={`text-xs mb-3 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+              {t('settings.appearance.directionDesc')}
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              {/* Option 1: Left-to-Right (LTR) */}
+              <button
+                type="button"
+                onClick={() => handleDirectionSelect('ltr')}
+                className={`p-3.5 border text-left cursor-pointer transition-all rounded-none ${
+                  direction === 'ltr'
+                    ? 'bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-200 border-blue-600 dark:border-blue-500 font-semibold '
+                    : isDark
+                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold">{t('settings.appearance.dirLTR')}</span>
+                  {direction === 'ltr' && (
+                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                      {t('settings.appearance.activeBadge')}
+                    </span>
+                  )}
+                </div>
+                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  {t('settings.appearance.dirLTRDesc')}
+                </div>
+              </button>
+
+              {/* Option 2: Right-to-Left (RTL) */}
+              <button
+                type="button"
+                onClick={() => handleDirectionSelect('rtl')}
+                className={`p-3.5 border text-left cursor-pointer transition-all rounded-none ${
+                  direction === 'rtl'
+                    ? 'bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-200 border-blue-600 dark:border-blue-500 font-semibold '
+                    : isDark
+                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold">{t('settings.appearance.dirRTL')}</span>
+                  {direction === 'rtl' && (
+                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                      {t('settings.appearance.activeBadge')}
+                    </span>
+                  )}
+                </div>
+                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  {t('settings.appearance.dirRTLDesc')}
+                </div>
+              </button>
+            </div>
+
+            <div className={`p-3 border rounded-none text-xs ${isDark ? 'bg-zinc-900/60 border-zinc-700 text-zinc-300' : 'bg-zinc-50 border-zinc-200 text-zinc-700'}`}>
+              <div className="font-semibold text-blue-500 mb-0.5">ℹ {t('settings.appearance.independentNoticeTitle')}</div>
+              <div>{t('settings.appearance.independentNoticeDesc')}</div>
+            </div>
+          </div>
+
+          <div
+          className={`p-5 border rounded-none  space-y-4 ${
+            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+          }`}
+        >
+          <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+            <h3 className="font-semibold text-sm uppercase">Default Card Creation Settings</h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                Default Card Type
+              </label>
+              <select
+                value={form.defaultCard?.cardType || 'normal'}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    defaultCard: { ...form.defaultCard, cardType: e.target.value as any },
+                  })
+                }
+                className={`w-full text-xs font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                  isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                }`}
+              >
+                <option value="normal">Normal Vocab Card</option>
+                <option value="spelling">Spelling Challenge Card</option>
+              </select>
+            </div>
+
+            <div>
+              <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                Default Deck
+              </label>
+              <input
+                type="text"
+                value={form.anki.defaultDeck || 'English::B1'}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    anki: { ...form.anki, defaultDeck: e.target.value },
+                  })
+                }
+                className={`w-full text-xs font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                }`}
+              />
+            </div>
+          </div>
+        </div>
+
+          <div
+          className={`p-5 border rounded-none  space-y-4 ${
+            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+          }`}
+        >
+          <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+            <h3 className="font-semibold text-sm uppercase">Dictionary Sources</h3>
+            <span className="text-xs text-zinc-500 font-medium">Automatic Fallback Engine</span>
+          </div>
+
+          <div className="space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.dictionaries?.abadis ?? true}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    dictionaries: { ...form.dictionaries, abadis: e.target.checked },
+                  })
+                }
+                className="w-4 h-4 accent-blue-600 rounded"
+              />
+              <div>
+                <span className="text-xs font-semibold block">Abadis Persian Dictionary (آبادیس)</span>
+                <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  Fetches verified Persian definitions and accurate phonetic transcriptions.
+                </span>
+              </div>
+            </label>
+
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.dictionaries?.freeDictionary ?? true}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    dictionaries: { ...form.dictionaries, freeDictionary: e.target.checked },
+                  })
+                }
+                className="w-4 h-4 accent-blue-600 rounded"
+              />
+              <div>
+                <span className="text-xs font-semibold block">FreeDictionary API (English IPA & POS)</span>
+                <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  Authoritative English phonetics, parts of speech, and sample sentences.
+                </span>
+              </div>
+            </label>
+          </div>
+
+          {/* Test Dictionary lookup */}
+          <div className={`pt-3 border-t space-y-2 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+            <label className={`block text-xs font-semibold uppercase ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+              Test Dictionary Lookup
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={dictTestWord}
+                onChange={(e) => setDictTestWord(e.target.value)}
+                placeholder="e.g. abandon, diligent"
+                className={`w-48 text-xs font-medium p-2 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                }`}
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  setTestingDict(true);
+                  const abRes = await lookupAbadisDict(dictTestWord);
+                  const freeRes = await lookupFreeDict(dictTestWord);
+                  setDictTestResult({ abadis: abRes, freeDictionary: freeRes });
+                  setTestingDict(false);
+                }}
+                disabled={testingDict || !dictTestWord.trim()}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-none flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <Zap className={`w-3.5 h-3.5 ${testingDict ? 'animate-spin' : ''}`} />
+                <span>Test Lookup</span>
+              </button>
+            </div>
+
+            {dictTestResult && (
+              <div className={`p-3 border rounded-none text-xs font-mono space-y-1 ${isDark ? 'bg-zinc-900 border-zinc-700 text-zinc-200' : 'bg-zinc-50 border-zinc-200 text-zinc-800'}`}>
+                <div>Abadis: {dictTestResult.abadis?.meaningFa || 'No match'}</div>
+                <div>FreeDict Phonetic: {dictTestResult.freeDictionary?.phonetic || 'None'}</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+          <div
+          className={`p-5 border rounded-none  space-y-4 ${
+            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+          }`}
+        >
+          <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+            <h3 className="font-semibold text-sm uppercase">Smart Image Search</h3>
+            <span className="text-xs text-zinc-500 font-medium">Automatic & Manual Photo Mode</span>
+          </div>
+
+          <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+            Images are retrieved via high-speed Unsplash & Wikimedia APIs with offline SVG fallback generation.
+          </p>
+
+          <div className="space-y-2">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.smartImages?.enabled ?? true}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    smartImages: { ...form.smartImages, enabled: e.target.checked },
+                  })
+                }
+                className="w-4 h-4 accent-blue-600 rounded"
+              />
+              <span className="text-xs font-semibold">Enable Smart Images System</span>
+            </label>
+          </div>
+
+          {/* Test Image Search */}
+          <div className={`pt-3 border-t space-y-2 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+            <label className={`block text-xs font-semibold uppercase ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+              Test Image Retrieval
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={imgTestWord}
+                onChange={(e) => setImgTestWord(e.target.value)}
+                placeholder="e.g. apple, bicycle"
+                className={`w-48 text-xs font-medium p-2 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
+                }`}
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  setTestingImg(true);
+                  const res = await testSmartImage(imgTestWord);
+                  setImgTestResult(res);
+                  setTestingImg(false);
+                }}
+                disabled={testingImg || !imgTestWord.trim()}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-none flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <Zap className={`w-3.5 h-3.5 ${testingImg ? 'animate-spin' : ''}`} />
+                <span>Search Image</span>
+              </button>
+            </div>
+
+            {imgTestResult && imgTestResult.imageUrl && (
+              <div className={`p-3 border rounded-none flex items-center gap-3 ${isDark ? 'bg-zinc-900 border-zinc-700' : 'bg-zinc-50 border-zinc-200'}`}>
+                <img src={imgTestResult.imageUrl} alt={imgTestWord} className="w-16 h-16 object-cover rounded border" />
+                <div className="text-xs">
+                  <span className="font-semibold block">Found Image: {imgTestWord}</span>
+                  <span className="text-zinc-500 text-[11px]">{imgTestResult.source}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        </div>
+      )}
+
+      {/* 2. APPEARANCE */}
+      {activeSubTab === 'appearance' && (
+        <div className="space-y-6">
+          {/* 3. APPLICATION UI THEME SELECTOR - ONLY ANKI LIGHT AND ANKI DARK */}
+          <div
+            className={`p-5 border rounded-none  ${
+              isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+            }`}
+          >
+            <h3 className="font-semibold text-sm uppercase mb-3 flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-blue-500" />
+              <span>{t('settings.appearance.appThemeTitle')}</span>
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Option 1: Anki Light */}
+              <button
+                type="button"
+                onClick={() => handleAppThemeSelect('anki-light')}
+                className={`p-3.5 border text-left cursor-pointer transition-all rounded-none ${
+                  !isDark
+                    ? 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold '
+                    : 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold">{t('settings.appearance.themeLight')}</span>
+                  {!isDark && (
+                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                      {t('settings.appearance.activeBadge')}
+                    </span>
+                  )}
+                </div>
+                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  {t('settings.appearance.themeLightDesc')}
+                </div>
+              </button>
+
+              {/* Option 2: Anki Dark */}
+              <button
+                type="button"
+                onClick={() => handleAppThemeSelect('anki-dark')}
+                className={`p-3.5 border text-left cursor-pointer transition-all rounded-none ${
+                  isDark
+                    ? 'bg-blue-950/40 text-blue-200 border-blue-500 font-semibold '
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold">{t('settings.appearance.themeDark')}</span>
+                  {isDark && (
+                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                      {t('settings.appearance.activeBadge')}
+                    </span>
+                  )}
+                </div>
+                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  {t('settings.appearance.themeDarkDesc')}
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* 4. FLASHCARD NOTE THEMES (8 Themes) */}
+          <div
+            className={`p-5 border rounded-none  ${
+              isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+            }`}
+          >
+            <h3 className="font-semibold text-sm uppercase mb-4 flex items-center gap-2">
+              <Palette className="w-4 h-4 text-blue-500" />
+              <span>{t('settings.appearance.cardThemesTitle')}</span>
+            </h3>
+
+            {/* Light Card Themes */}
+            <div className="mb-5">
+              <div className={`text-xs font-semibold uppercase mb-2 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                {t('settings.appearance.lightThemesCategory')}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {THEME_GROUPS.light.map((th) => {
+                  const isSelected = form.theme === th.id;
+                  return (
+                    <button
+                      key={th.id}
+                      type="button"
+                      onClick={() => setForm({ ...form, theme: th.id as ThemeId })}
+                      className={`p-3 border rounded-none text-left cursor-pointer transition-all ${
+                        isSelected
+                          ? isDark
+                            ? 'bg-blue-950/40 border-blue-500 text-white '
+                            : 'bg-blue-50 text-blue-950 border-blue-600 '
+                          : isDark
+                          ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold">{th.name}</span>
+                        {isSelected && (
+                          <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                            {t('settings.appearance.selectedBadge')}
+                          </span>
+                        )}
+                      </div>
+                      <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        {th.desc}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Dark Card Themes */}
+            <div>
+              <div className={`text-xs font-semibold uppercase mb-2 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                {t('settings.appearance.darkThemesCategory')}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {THEME_GROUPS.dark.map((th) => {
+                  const isSelected = form.theme === th.id;
+                  return (
+                    <button
+                      key={th.id}
+                      type="button"
+                      onClick={() => setForm({ ...form, theme: th.id as ThemeId })}
+                      className={`p-3 border rounded-none text-left cursor-pointer transition-all ${
+                        isSelected
+                          ? isDark
+                            ? 'bg-blue-950/40 border-blue-500 text-white '
+                            : 'bg-blue-50 text-blue-950 border-blue-600 '
+                          : isDark
+                          ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold">{th.name}</span>
+                        {isSelected && (
+                          <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
+                            {t('settings.appearance.selectedBadge')}
+                          </span>
+                        )}
+                      </div>
+                      <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        {th.desc}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Live Theme Preview Panel */}
+            <div className={`mt-6 pt-5 border-t ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-blue-500" />
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    {t('settings.appearance.liveThemePreview', { theme: THEMES[form.theme]?.name || form.theme })}
+                  </span>
+                </div>
+                <div className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  {t('settings.appearance.previewSubtitle')}
+                </div>
+              </div>
+
+              <div
+                className={`border rounded-none p-3 sm:p-5 relative overflow-hidden  ${
+                  isDark ? 'bg-[#18181B] border-zinc-700 text-zinc-100' : 'bg-zinc-100 border-zinc-200 text-zinc-900'
+                }`}
+              >
+                <CardPreview
+                  cardData={{
+                    word: 'wanderlust',
+                    phonetic: '/ˈwɑːn.dɚ.lʌst/',
+                    partOfSpeech: 'noun',
+                    meaningFa: 'اشتیاق شدید به سفر، گشت‌وگذار و کشف ناشناخته‌ها',
+                    example: 'Her wanderlust led her on an unforgettable backpacking journey across South America.',
+                    translationFa: 'اشتیاق شدید او به سفر باعث شد سفری فراموش‌نشدنی را در آمریکای جنوبی آغاز کند.',
+                    mnemonic: 'WANDER (گشت زدن) + LUST (میل شدید): میل و اشتیاق بی‌پایان به جهانگردی.',
+                    cardType: form.defaultCard?.cardType || 'normal',
+                    spellingSentence: 'Her ______ led her on an unforgettable backpacking journey across South America.',
+                    wordAudioUsNormalBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
+                    wordAudioUsSlowBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
+                    wordAudioUkNormalBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
+                    wordAudioUkSlowBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
+                    exampleAudioUsNormalBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
+                    exampleAudioUsSlowBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
+                  }}
+                  themeId={form.theme}
+                  emptyWordPlaceholder="wanderlust"
+                  appTheme={isDark ? 'anki-dark' : 'anki-light'}
+                  editable={false}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+{activeSubTab === 'ai' && (
         <div className="space-y-6">
           {/* Global AI Enabled Toggle Card */}
           <div
-            className={`p-4 sm:p-5 rounded-lg border transition-all ${
+            className={`p-4 sm:p-5 rounded-none border transition-all ${
               form.ai?.enabled !== false
                 ? isDark
                   ? 'bg-blue-950/20 border-blue-800 text-zinc-100'
@@ -705,7 +1263,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
           {/* AI Prompts Jump Notice */}
           <div
-            className={`p-3 rounded-lg border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+            className={`p-3 rounded-none border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
               isDark ? 'bg-blue-950/20 border-blue-800/50 text-blue-200' : 'bg-blue-50/80 border-blue-200 text-blue-900'
             }`}
           >
@@ -732,11 +1290,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             {/* Ollama Option */}
             <div
               onClick={() => setForm({ ...form, ai: { ...form.ai, provider: 'ollama' } })}
-              className={`p-4 border rounded-lg cursor-pointer transition-all ${
+              className={`p-4 border rounded-none cursor-pointer transition-all ${
                 form.ai.provider === 'ollama'
                   ? isDark
-                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
-                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
+                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold '
+                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold '
                   : isDark
                   ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
                   : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300'
@@ -760,11 +1318,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             {/* Gemini Option */}
             <div
               onClick={() => setForm({ ...form, ai: { ...form.ai, provider: 'gemini' } })}
-              className={`p-4 border rounded-lg cursor-pointer transition-all ${
+              className={`p-4 border rounded-none cursor-pointer transition-all ${
                 form.ai.provider === 'gemini'
                   ? isDark
-                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
-                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
+                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold '
+                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold '
                   : isDark
                   ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
                   : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300'
@@ -788,11 +1346,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             {/* Custom AI Option (9Router style) */}
             <div
               onClick={() => setForm({ ...form, ai: { ...form.ai, provider: 'custom' } })}
-              className={`p-4 border rounded-lg cursor-pointer transition-all ${
+              className={`p-4 border rounded-none cursor-pointer transition-all ${
                 form.ai.provider === 'custom' || (!['ollama', 'gemini'].includes(form.ai.provider))
                   ? isDark
-                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
-                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
+                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold '
+                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold '
                   : isDark
                   ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
                   : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300'
@@ -817,7 +1375,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           {/* OLLAMA CONFIGURATION */}
           {form.ai.provider === 'ollama' && (
             <div
-              className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+              className={`p-5 border rounded-none  space-y-4 ${
                 isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
               }`}
             >
@@ -855,7 +1413,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         },
                       })
                     }
-                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                       isDark
                         ? 'bg-zinc-800 text-zinc-100 border-zinc-700'
                         : 'bg-white text-zinc-900 border-zinc-300'
@@ -879,7 +1437,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         },
                       })
                     }
-                    className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                    className={`w-full text-xs font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
                       isDark
                         ? 'bg-zinc-800 text-zinc-100 border-zinc-700'
                         : 'bg-white text-zinc-900 border-zinc-300'
@@ -900,7 +1458,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               {/* Status report */}
               {ollamaStatus && (
                 <div
-                  className={`p-3 border rounded-md text-xs flex items-center justify-between ${
+                  className={`p-3 border rounded-none text-xs flex items-center justify-between ${
                     ollamaStatus.connected
                       ? isDark
                         ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
@@ -930,7 +1488,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           {/* GEMINI CONFIGURATION */}
           {form.ai.provider === 'gemini' && (
             <div
-              className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+              className={`p-5 border rounded-none  space-y-4 ${
                 isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
               }`}
             >
@@ -974,7 +1532,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       })
                     }
                     placeholder="AIzaSy..."
-                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                       isDark
                         ? 'bg-zinc-800 text-zinc-100 border-zinc-700'
                         : 'bg-white text-zinc-900 border-zinc-300'
@@ -998,7 +1556,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         },
                       })
                     }
-                    className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                    className={`w-full text-xs font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
                       isDark
                         ? 'bg-zinc-800 text-zinc-100 border-zinc-700'
                         : 'bg-white text-zinc-900 border-zinc-300'
@@ -1018,7 +1576,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
               {geminiStatus && (
                 <div
-                  className={`p-3 border rounded-md text-xs flex items-center justify-between ${
+                  className={`p-3 border rounded-none text-xs flex items-center justify-between ${
                     geminiStatus.connected
                       ? isDark
                         ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
@@ -1048,7 +1606,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           {/* CUSTOM AI PROVIDERS (9Router Flexibility) */}
           {(form.ai.provider === 'custom' || (!['ollama', 'gemini'].includes(form.ai.provider))) && (
             <div
-              className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+              className={`p-5 border rounded-none  space-y-4 ${
                 isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
               }`}
             >
@@ -1101,7 +1659,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                     onClick={() => setSelectedCustomAiId(prov.id)}
                     className={`px-3 py-1 text-xs font-medium rounded border flex items-center gap-1.5 cursor-pointer transition-colors ${
                       selectedCustomAiId === prov.id
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                        ? 'bg-blue-600 text-white border-blue-600 '
                         : isDark
                         ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
                         : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
@@ -1125,7 +1683,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       );
                       setForm({ ...form, ai: { ...form.ai, customProviders: updated } });
                     }}
-                    className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    className={`w-full text-xs font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                       isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
                     }`}
                   />
@@ -1143,7 +1701,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       setForm({ ...form, ai: { ...form.ai, customProviders: updated } });
                     }}
                     placeholder="https://openrouter.ai/api/v1"
-                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                       isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
                     }`}
                   />
@@ -1170,7 +1728,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       setForm({ ...form, ai: { ...form.ai, customProviders: updated } });
                     }}
                     placeholder="sk-..."
-                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                       isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
                     }`}
                   />
@@ -1189,7 +1747,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         setForm({ ...form, ai: { ...form.ai, customProviders: updated } });
                       }}
                       placeholder="e.g. meta-llama/llama-3.3-70b-instruct"
-                      className={`flex-1 text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                      className={`flex-1 text-xs font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                         isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
                       }`}
                     />
@@ -1217,7 +1775,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   type="button"
                   onClick={() => handleTestCustomAi(activeCustomAiConfig)}
                   disabled={testingCustomAi}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-none flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
                   <Zap className={`w-3.5 h-3.5 ${testingCustomAi ? 'animate-spin' : ''}`} />
                   <span>Test Connection</span>
@@ -1248,7 +1806,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               {/* Custom AI Test Result Banner */}
               {customAiTestResult && (
                 <div
-                  className={`p-3 border rounded-md text-xs space-y-1 ${
+                  className={`p-3 border rounded-none text-xs space-y-1 ${
                     customAiTestResult.connected
                       ? isDark
                         ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
@@ -1298,718 +1856,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       )}
 
       {/* SUBTAB 2: AI DEFAULT PROMPTS */}
-      {activeSubTab === 'prompts' && (
-        <div className="space-y-6">
-          {/* Header Bar */}
-          <div
-            className={`p-4 border rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <div
-                className={`p-2.5 rounded-lg shrink-0 ${
-                  isDark
-                    ? 'bg-purple-950/60 text-purple-400 border border-purple-800/40'
-                    : 'bg-purple-50 text-purple-600 border border-purple-200'
-                }`}
-              >
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className={`text-base font-bold flex items-center gap-2 ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
-                  <span>{t('settings.prompts.title')}</span>
-                </h3>
-                <p className={`text-xs mt-1 max-w-2xl ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  {t('settings.prompts.subtitle')}
-                </p>
-              </div>
-            </div>
 
-            {/* Top Action Buttons */}
-            <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
-              <button
-                type="button"
-                onClick={() => setShowRestoreModal(true)}
-                disabled={isRestoringPrompts}
-                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs rounded-md shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
-                title={t('settings.prompts.restoreConfirmMsg')}
-              >
-                <RotateCcw className={`w-3.5 h-3.5 ${isRestoringPrompts ? 'animate-spin' : ''}`} />
-                <span>{isRestoringPrompts ? t('settings.prompts.restoringDefaults') : t('settings.prompts.restoreDefaultsBtn')}</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveCustomPrompts}
-                disabled={isSavingPrompts}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-md shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
-              >
-                <Save className={`w-3.5 h-3.5 ${isSavingPrompts ? 'animate-spin' : ''}`} />
-                <span>{isSavingPrompts ? t('settings.prompts.saving') : t('settings.prompts.saveBtn')}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Feedback Status */}
-          {promptSaveStatus && (
-            <div
-              className={`p-3 rounded-lg border text-xs font-medium flex items-center gap-2 transition-all ${
-                promptSaveStatus.toLowerCase().includes('error')
-                  ? isDark
-                    ? 'bg-rose-950/40 text-rose-200 border-rose-800'
-                    : 'bg-rose-50 text-rose-800 border-rose-200'
-                  : isDark
-                  ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
-                  : 'bg-emerald-50 text-emerald-900 border-emerald-200'
-              }`}
-            >
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
-              <span>{promptSaveStatus}</span>
-            </div>
-          )}
-
-          {/* Centralized Architecture Info Notice */}
-          <div
-            className={`p-4 rounded-lg border text-xs ${
-              isDark ? 'bg-zinc-850/60 border-zinc-700/80 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'
-            }`}
-          >
-            <div className="flex items-center gap-2 font-semibold mb-1 text-blue-600 dark:text-blue-400">
-              <BrainCircuit className="w-4 h-4" />
-              <span>{t('settings.prompts.howItWorksTitle')}</span>
-            </div>
-            <p className="leading-relaxed opacity-90">
-              {t('settings.prompts.howItWorksDesc')}
-            </p>
-          </div>
-
-          {/* Prompt 1: Meaning Generation */}
-          <div
-            className={`p-5 border rounded-xl space-y-3 transition-all ${
-              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
-            }`}
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <div className={`p-1.5 rounded-md ${isDark ? 'bg-zinc-800 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
-                  <Languages className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
-                    {t('settings.prompts.meaningTitle')}
-                  </h4>
-                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                    {t('settings.prompts.meaningDesc')}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 self-end sm:self-center">
-                {isPromptModified('meaningGeneration') ? (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
-                    {t('settings.prompts.customizedBadge')}
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
-                    {t('settings.prompts.defaultBadge')}
-                  </span>
-                )}
-                {isPromptModified('meaningGeneration') && (
-                  <button
-                    type="button"
-                    onClick={() => handleResetSinglePrompt('meaningGeneration')}
-                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
-                      isDark
-                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
-                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
-                    }`}
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>{t('settings.prompts.revertPromptBtn')}</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <textarea
-              rows={4}
-              value={currentPrompts.meaningGeneration}
-              onChange={(e) => handlePromptChange('meaningGeneration', e.target.value)}
-              className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
-                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
-              }`}
-            />
-          </div>
-
-          {/* Prompt: English Definition Generation */}
-          <div
-            className={`p-5 border rounded-xl space-y-3 transition-all ${
-              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
-            }`}
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <div className={`p-1.5 rounded-md ${isDark ? 'bg-zinc-800 text-teal-400' : 'bg-teal-50 text-teal-600'}`}>
-                  <BookOpen className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
-                    {t('settings.prompts.definitionTitle')}
-                  </h4>
-                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                    {t('settings.prompts.definitionDesc')}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 self-end sm:self-center">
-                {isPromptModified('definitionGeneration') ? (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
-                    {t('settings.prompts.customizedBadge')}
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
-                    {t('settings.prompts.defaultBadge')}
-                  </span>
-                )}
-                {isPromptModified('definitionGeneration') && (
-                  <button
-                    type="button"
-                    onClick={() => handleResetSinglePrompt('definitionGeneration')}
-                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
-                      isDark
-                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
-                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
-                    }`}
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>{t('settings.prompts.revertPromptBtn')}</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <textarea
-              rows={4}
-              value={currentPrompts.definitionGeneration || ''}
-              onChange={(e) => handlePromptChange('definitionGeneration', e.target.value)}
-              className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
-                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
-              }`}
-            />
-          </div>
-
-          {/* Prompt 2: Example Generation */}
-          <div
-            className={`p-5 border rounded-xl space-y-3 transition-all ${
-              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
-            }`}
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <div className={`p-1.5 rounded-md ${isDark ? 'bg-zinc-800 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>
-                  <FileText className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
-                    {t('settings.prompts.exampleTitle')}
-                  </h4>
-                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                    {t('settings.prompts.exampleDesc')}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 self-end sm:self-center">
-                {isPromptModified('exampleGeneration') ? (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
-                    {t('settings.prompts.customizedBadge')}
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
-                    {t('settings.prompts.defaultBadge')}
-                  </span>
-                )}
-                {isPromptModified('exampleGeneration') && (
-                  <button
-                    type="button"
-                    onClick={() => handleResetSinglePrompt('exampleGeneration')}
-                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
-                      isDark
-                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
-                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
-                    }`}
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>{t('settings.prompts.revertPromptBtn')}</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <textarea
-              rows={4}
-              value={currentPrompts.exampleGeneration}
-              onChange={(e) => handlePromptChange('exampleGeneration', e.target.value)}
-              className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
-                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
-              }`}
-            />
-          </div>
-
-          {/* Prompt 3: Example Translation */}
-          <div
-            className={`p-5 border rounded-xl space-y-3 transition-all ${
-              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
-            }`}
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <div className={`p-1.5 rounded-md ${isDark ? 'bg-zinc-800 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
-                  <ArrowLeftRight className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
-                    {t('settings.prompts.translationTitle')}
-                  </h4>
-                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                    {t('settings.prompts.translationDesc')}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 self-end sm:self-center">
-                {isPromptModified('exampleTranslation') ? (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
-                    {t('settings.prompts.customizedBadge')}
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
-                    {t('settings.prompts.defaultBadge')}
-                  </span>
-                )}
-                {isPromptModified('exampleTranslation') && (
-                  <button
-                    type="button"
-                    onClick={() => handleResetSinglePrompt('exampleTranslation')}
-                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
-                      isDark
-                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
-                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
-                    }`}
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>{t('settings.prompts.revertPromptBtn')}</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <textarea
-              rows={4}
-              value={currentPrompts.exampleTranslation}
-              onChange={(e) => handlePromptChange('exampleTranslation', e.target.value)}
-              className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
-                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
-              }`}
-            />
-          </div>
-
-          {/* Prompt 4: Memory Hook (Highlighted Card with Root Decomposition) */}
-          <div
-            className={`p-5 border-2 rounded-xl space-y-3 transition-all ${
-              isDark
-                ? 'bg-[#27272A] border-blue-500/60 shadow-lg shadow-blue-950/20'
-                : 'bg-white border-blue-400 shadow-md shadow-blue-100/50'
-            }`}
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <div className={`p-1.5 rounded-md ${isDark ? 'bg-blue-950/80 text-blue-400' : 'bg-blue-100 text-blue-700'}`}>
-                  <Lightbulb className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
-                      {t('settings.prompts.memoryHookTitle')}
-                    </h4>
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-500/20 text-blue-500 border border-blue-500/30">
-                      Root & Decomposition
-                    </span>
-                  </div>
-                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                    {t('settings.prompts.memoryHookDesc')}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 self-end sm:self-center">
-                {isPromptModified('memoryHook') ? (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
-                    {t('settings.prompts.customizedBadge')}
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
-                    {t('settings.prompts.defaultBadge')}
-                  </span>
-                )}
-                {isPromptModified('memoryHook') && (
-                  <button
-                    type="button"
-                    onClick={() => handleResetSinglePrompt('memoryHook')}
-                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
-                      isDark
-                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
-                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
-                    }`}
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>{t('settings.prompts.revertPromptBtn')}</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Memory Hook Decomposition Guideline Hint Box */}
-            <div
-              className={`p-3 rounded-lg border text-[11px] leading-relaxed ${
-                isDark ? 'bg-blue-950/20 border-blue-800/40 text-blue-200' : 'bg-blue-50/70 border-blue-200 text-blue-900'
-              }`}
-            >
-              <div className="font-semibold mb-0.5">💡 Decomposition Example:</div>
-              <div>
-                <strong>readability → read + ability:</strong> Explain that <code>read</code> = خواندن, <code>ability</code> = توانایی, and <code>readability</code> = قابلیت خوانده‌شدن.
-              </div>
-              <div className="mt-1 opacity-90 text-[10px]">
-                Intelligent adaptation: Words with natural morphemes are decomposed into familiar parts. Base words without natural components (e.g. apple, chair) receive natural memorable associations without artificial splitting.
-              </div>
-            </div>
-
-            <textarea
-              rows={9}
-              value={currentPrompts.memoryHook}
-              onChange={(e) => handlePromptChange('memoryHook', e.target.value)}
-              className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed resize-y ${
-                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
-              }`}
-            />
-          </div>
-
-          {/* Prompt 5: Missing-Field Completion */}
-          <div
-            className={`p-5 border rounded-xl space-y-3 transition-all ${
-              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
-            }`}
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <div className={`p-1.5 rounded-md ${isDark ? 'bg-zinc-800 text-amber-400' : 'bg-amber-50 text-amber-600'}`}>
-                  <CheckSquare className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
-                    {t('settings.prompts.completionTitle')}
-                  </h4>
-                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                    {t('settings.prompts.completionDesc')}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 self-end sm:self-center">
-                {isPromptModified('missingFieldCompletion') ? (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
-                    {t('settings.prompts.customizedBadge')}
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
-                    {t('settings.prompts.defaultBadge')}
-                  </span>
-                )}
-                {isPromptModified('missingFieldCompletion') && (
-                  <button
-                    type="button"
-                    onClick={() => handleResetSinglePrompt('missingFieldCompletion')}
-                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
-                      isDark
-                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
-                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
-                    }`}
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>{t('settings.prompts.revertPromptBtn')}</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <textarea
-              rows={6}
-              value={currentPrompts.missingFieldCompletion}
-              onChange={(e) => handlePromptChange('missingFieldCompletion', e.target.value)}
-              className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
-                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
-              }`}
-            />
-          </div>
-
-          {/* Section: Other AI-Generated Content */}
-          <div className="pt-2">
-            <h4 className={`text-sm font-bold mb-1 ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>
-              {t('settings.prompts.otherTitle')}
-            </h4>
-            <p className={`text-xs mb-4 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-              {t('settings.prompts.otherDesc')}
-            </p>
-
-            <div className="space-y-4">
-              {/* Prompt 6: System Role & Persona */}
-              <div
-                className={`p-5 border rounded-xl space-y-3 transition-all ${
-                  isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
-                }`}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className={`p-1.5 rounded-md ${isDark ? 'bg-zinc-800 text-purple-400' : 'bg-purple-50 text-purple-600'}`}>
-                      <Cpu className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h5 className={`text-xs font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
-                        {t('settings.prompts.systemRoleTitle')}
-                      </h5>
-                      <p className={`text-[11px] mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                        {t('settings.prompts.systemRoleDesc')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 self-end sm:self-center">
-                    {isPromptModified('systemRole') ? (
-                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
-                        {t('settings.prompts.customizedBadge')}
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
-                        {t('settings.prompts.defaultBadge')}
-                      </span>
-                    )}
-                    {isPromptModified('systemRole') && (
-                      <button
-                        type="button"
-                        onClick={() => handleResetSinglePrompt('systemRole')}
-                        className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
-                          isDark
-                            ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
-                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
-                        }`}
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>{t('settings.prompts.revertPromptBtn')}</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <textarea
-                  rows={3}
-                  value={currentPrompts.systemRole}
-                  onChange={(e) => handlePromptChange('systemRole', e.target.value)}
-                  className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
-                    isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
-                  }`}
-                />
-              </div>
-
-              {/* Prompt 7: Phonetic & POS */}
-              <div
-                className={`p-5 border rounded-xl space-y-3 transition-all ${
-                  isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
-                }`}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className={`p-1.5 rounded-md ${isDark ? 'bg-zinc-800 text-teal-400' : 'bg-teal-50 text-teal-600'}`}>
-                      <Volume2 className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h5 className={`text-xs font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
-                        {t('settings.prompts.phoneticAndPosTitle')}
-                      </h5>
-                      <p className={`text-[11px] mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                        {t('settings.prompts.phoneticAndPosDesc')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 self-end sm:self-center">
-                    {isPromptModified('phoneticAndPos') ? (
-                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
-                        {t('settings.prompts.customizedBadge')}
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
-                        {t('settings.prompts.defaultBadge')}
-                      </span>
-                    )}
-                    {isPromptModified('phoneticAndPos') && (
-                      <button
-                        type="button"
-                        onClick={() => handleResetSinglePrompt('phoneticAndPos')}
-                        className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
-                          isDark
-                            ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
-                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
-                        }`}
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>{t('settings.prompts.revertPromptBtn')}</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <textarea
-                  rows={3}
-                  value={currentPrompts.phoneticAndPos}
-                  onChange={(e) => handlePromptChange('phoneticAndPos', e.target.value)}
-                  className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
-                    isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
-                  }`}
-                />
-              </div>
-
-              {/* Prompt 8: Smart Image Decision */}
-              <div
-                className={`p-5 border rounded-xl space-y-3 transition-all ${
-                  isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 shadow-xs'
-                }`}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className={`p-1.5 rounded-md ${isDark ? 'bg-zinc-800 text-amber-400' : 'bg-amber-50 text-amber-600'}`}>
-                      <ImageIcon className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h5 className={`text-xs font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
-                        {t('settings.prompts.smartImageTitle')}
-                      </h5>
-                      <p className={`text-[11px] mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                        {t('settings.prompts.smartImageDesc')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 self-end sm:self-center">
-                    {isPromptModified('smartImageDecision') ? (
-                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
-                        {t('settings.prompts.customizedBadge')}
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
-                        {t('settings.prompts.defaultBadge')}
-                      </span>
-                    )}
-                    {isPromptModified('smartImageDecision') && (
-                      <button
-                        type="button"
-                        onClick={() => handleResetSinglePrompt('smartImageDecision')}
-                        className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
-                          isDark
-                            ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
-                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
-                        }`}
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>{t('settings.prompts.revertPromptBtn')}</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <textarea
-                  rows={4}
-                  value={currentPrompts.smartImageDecision}
-                  onChange={(e) => handlePromptChange('smartImageDecision', e.target.value)}
-                  className={`w-full p-3 text-xs font-mono rounded-lg border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
-                    isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
-                  }`}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Action Buttons */}
-          <div className="flex items-center justify-between pt-4 border-t border-zinc-200 dark:border-zinc-700">
-            <button
-              type="button"
-              onClick={() => setShowRestoreModal(true)}
-              disabled={isRestoringPrompts}
-              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs rounded-md shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
-            >
-              <RotateCcw className={`w-3.5 h-3.5 ${isRestoringPrompts ? 'animate-spin' : ''}`} />
-              <span>{isRestoringPrompts ? t('settings.prompts.restoringDefaults') : t('settings.prompts.restoreDefaultsBtn')}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSaveCustomPrompts}
-              disabled={isSavingPrompts}
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-md shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
-            >
-              <Save className={`w-3.5 h-3.5 ${isSavingPrompts ? 'animate-spin' : ''}`} />
-              <span>{isSavingPrompts ? t('settings.prompts.saving') : t('settings.prompts.saveBtn')}</span>
-            </button>
-          </div>
-
-          {/* Restore Defaults Confirmation Modal */}
-          {showRestoreModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-              <div
-                className={`max-w-md w-full p-6 rounded-xl border shadow-xl ${
-                  isDark ? 'bg-zinc-900 border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-                }`}
-              >
-                <div className="flex items-center gap-3 text-amber-500 mb-3">
-                  <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                    <AlertTriangle className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-base font-bold">{t('settings.prompts.restoreConfirmTitle')}</h3>
-                </div>
-                <p className={`text-xs leading-relaxed mb-6 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
-                  {t('settings.prompts.restoreConfirmMsg')}
-                </p>
-                <div className="flex items-center justify-end gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setShowRestoreModal(false)}
-                    className={`px-4 py-2 rounded-md text-xs font-semibold border cursor-pointer transition-colors ${
-                      isDark
-                        ? 'bg-zinc-800 hover:bg-zinc-750 border-zinc-700 text-zinc-300'
-                        : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-300 text-zinc-700'
-                    }`}
-                  >
-                    {t('settings.prompts.cancelBtn')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleRestoreAllPrompts}
-                    disabled={isRestoringPrompts}
-                    className="px-4 py-2 rounded-md text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-                  >
-                    <RotateCcw className={`w-3.5 h-3.5 ${isRestoringPrompts ? 'animate-spin' : ''}`} />
-                    <span>{isRestoringPrompts ? t('settings.prompts.restoringDefaults') : t('settings.prompts.confirmRestoreBtn')}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* SUBTAB 2: TTS */}
-      {activeSubTab === 'tts' && (
+{activeSubTab === 'tts' && (
         <div className="space-y-6">
           {/* TTS Provider Selection */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div
               onClick={() => setForm({ ...form, tts: { ...form.tts, provider: 'piper' } })}
-              className={`p-4 border rounded-lg cursor-pointer transition-all ${
+              className={`p-4 border rounded-none cursor-pointer transition-all ${
                 form.tts.provider === 'piper'
                   ? isDark
-                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
-                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
+                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold '
+                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold '
                   : isDark
                   ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
                   : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300'
@@ -2032,11 +1890,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
             <div
               onClick={() => setForm({ ...form, tts: { ...form.tts, provider: 'online' } })}
-              className={`p-4 border rounded-lg cursor-pointer transition-all ${
+              className={`p-4 border rounded-none cursor-pointer transition-all ${
                 form.tts.provider === 'online'
                   ? isDark
-                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
-                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
+                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold '
+                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold '
                   : isDark
                   ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
                   : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300'
@@ -2059,11 +1917,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
             <div
               onClick={() => setForm({ ...form, tts: { ...form.tts, provider: 'custom' } })}
-              className={`p-4 border rounded-lg cursor-pointer transition-all ${
+              className={`p-4 border rounded-none cursor-pointer transition-all ${
                 form.tts.provider === 'custom' || (!['piper', 'online'].includes(form.tts.provider))
                   ? isDark
-                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold shadow-xs'
-                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
+                    ? 'bg-zinc-800 text-white border-blue-500 font-semibold '
+                    : 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold '
                   : isDark
                   ? 'bg-[#27272A] text-zinc-300 border-zinc-700 hover:border-zinc-600'
                   : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300'
@@ -2088,7 +1946,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           {/* PIPER CONFIG */}
           {form.tts.provider === 'piper' && (
             <div
-              className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+              className={`p-5 border rounded-none  space-y-4 ${
                 isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
               }`}
             >
@@ -2140,7 +1998,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
               {/* PIPER SYSTEMD SERVICE CONTROL PANEL */}
               <div
-                className={`p-4 border rounded-md space-y-3 ${
+                className={`p-4 border rounded-none space-y-3 ${
                   isDark ? 'bg-zinc-800/80 border-zinc-750' : 'bg-zinc-50 border-zinc-200'
                 }`}
               >
@@ -2184,7 +2042,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         type="button"
                         onClick={() => handleControlPiperService('stop')}
                         disabled={togglingService}
-                        className={`px-3 py-1 text-xs font-semibold rounded-md border flex items-center gap-1.5 cursor-pointer transition-colors ${
+                        className={`px-3 py-1 text-xs font-semibold rounded-none border flex items-center gap-1.5 cursor-pointer transition-colors ${
                           isDark
                             ? 'bg-rose-950/60 text-rose-300 border-rose-800 hover:bg-rose-900/60'
                             : 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100'
@@ -2203,7 +2061,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         type="button"
                         onClick={() => handleControlPiperService('start')}
                         disabled={togglingService}
-                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-none flex items-center gap-1.5 cursor-pointer transition-colors"
                         title="Start systemd user service (systemctl --user start piper.service)"
                       >
                         {togglingService ? (
@@ -2244,7 +2102,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                     value={form.tts.endpoint}
                     onChange={(e) => setForm({ ...form, tts: { ...form.tts, endpoint: e.target.value } })}
                     placeholder="http://127.0.0.1:5000"
-                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                       isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
                     }`}
                   />
@@ -2257,7 +2115,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   <select
                     value={form.tts.americanVoice}
                     onChange={(e) => setForm({ ...form, tts: { ...form.tts, americanVoice: e.target.value } })}
-                    className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                    className={`w-full text-xs font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
                       isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
                     }`}
                   >
@@ -2279,7 +2137,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   <select
                     value={form.tts.britishVoice}
                     onChange={(e) => setForm({ ...form, tts: { ...form.tts, britishVoice: e.target.value } })}
-                    className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                    className={`w-full text-xs font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
                       isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
                     }`}
                   >
@@ -2298,7 +2156,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               {/* DIAGNOSTIC RESULTS */}
               {piperDiag && (
                 <div
-                  className={`p-3 border rounded-md text-xs space-y-2 ${
+                  className={`p-3 border rounded-none text-xs space-y-2 ${
                     piperDiag.ready
                       ? isDark
                         ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
@@ -2341,7 +2199,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           {/* ONLINE TTS CONFIG */}
           {form.tts.provider === 'online' && (
             <div
-              className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+              className={`p-5 border rounded-none  space-y-4 ${
                 isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
               }`}
             >
@@ -2372,7 +2230,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
               {onlineTtsDiag && (
                 <div
-                  className={`p-3 border rounded-md text-xs space-y-1.5 ${
+                  className={`p-3 border rounded-none text-xs space-y-1.5 ${
                     onlineTtsDiag.success
                       ? isDark
                         ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
@@ -2399,7 +2257,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           {/* CUSTOM TTS CONFIG */}
           {(form.tts.provider === 'custom' || (!['piper', 'online'].includes(form.tts.provider))) && (
             <div
-              className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+              className={`p-5 border rounded-none  space-y-4 ${
                 isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
               }`}
             >
@@ -2409,7 +2267,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   type="button"
                   onClick={() => handleTestCustomTts(activeCustomTtsConfig)}
                   disabled={testingCustomTts}
-                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-none flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
                   <Zap className={`w-3.5 h-3.5 ${testingCustomTts ? 'animate-spin' : ''}`} />
                   <span>Test Custom TTS</span>
@@ -2429,7 +2287,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
                     }}
                     placeholder="https://api.openai.com/v1/audio/speech"
-                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                       isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
                     }`}
                   />
@@ -2456,7 +2314,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
                     }}
                     placeholder="sk-..."
-                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    className={`w-full text-xs font-mono font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                       isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
                     }`}
                   />
@@ -2474,7 +2332,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
                     }}
                     placeholder="alloy, nova, shimmer, echo"
-                    className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    className={`w-full text-xs font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                       isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
                     }`}
                   />
@@ -2492,7 +2350,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       setForm({ ...form, tts: { ...form.tts, customProviders: updated } });
                     }}
                     placeholder="tts-1, tts-1-hd"
-                    className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    className={`w-full text-xs font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                       isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
                     }`}
                   />
@@ -2501,7 +2359,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
               {customTtsTestResult && (
                 <div
-                  className={`p-3 border rounded-md text-xs space-y-1.5 ${
+                  className={`p-3 border rounded-none text-xs space-y-1.5 ${
                     customTtsTestResult.success
                       ? isDark
                         ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
@@ -2527,7 +2385,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
           {/* AUDIO GENERATION VARIANTS WITH INDEPENDENT SPEED CONTROLS */}
           <div
-            className={`p-5 border rounded-lg shadow-xs space-y-5 ${
+            className={`p-5 border rounded-none  space-y-5 ${
               isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
             }`}
           >
@@ -2542,7 +2400,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Word Pronunciation Group */}
-              <div className={`p-4 border rounded-lg space-y-3.5 ${isDark ? 'bg-zinc-800/60 border-zinc-700' : 'bg-zinc-50 border-zinc-200'}`}>
+              <div className={`p-4 border rounded-none space-y-3.5 ${isDark ? 'bg-zinc-800/60 border-zinc-700' : 'bg-zinc-50 border-zinc-200'}`}>
                 <div className="flex items-center gap-2">
                   <Volume2 className="w-4 h-4 text-blue-500" />
                   <span className="text-xs font-bold uppercase tracking-wider">Word Pronunciation</span>
@@ -2675,7 +2533,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
               </div>
 
               {/* Example Sentence Group */}
-              <div className={`p-4 border rounded-lg space-y-3.5 ${isDark ? 'bg-zinc-800/60 border-zinc-700' : 'bg-zinc-50 border-zinc-200'}`}>
+              <div className={`p-4 border rounded-none space-y-3.5 ${isDark ? 'bg-zinc-800/60 border-zinc-700' : 'bg-zinc-50 border-zinc-200'}`}>
                 <div className="flex items-center gap-2">
                   <Volume2 className="w-4 h-4 text-emerald-500" />
                   <span className="text-xs font-bold uppercase tracking-wider">Example Sentence Audio</span>
@@ -2812,578 +2670,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       )}
 
       {/* SUBTAB 3: DICTIONARIES */}
-      {activeSubTab === 'dictionary' && (
+
+{activeSubTab === 'anki' && (
         <div
-          className={`p-5 border rounded-lg shadow-xs space-y-4 ${
-            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-          }`}
-        >
-          <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
-            <h3 className="font-semibold text-sm uppercase">Dictionary Sources</h3>
-            <span className="text-xs text-zinc-500 font-medium">Automatic Fallback Engine</span>
-          </div>
-
-          <div className="space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.dictionaries?.abadis ?? true}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    dictionaries: { ...form.dictionaries, abadis: e.target.checked },
-                  })
-                }
-                className="w-4 h-4 accent-blue-600 rounded"
-              />
-              <div>
-                <span className="text-xs font-semibold block">Abadis Persian Dictionary (آبادیس)</span>
-                <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  Fetches verified Persian definitions and accurate phonetic transcriptions.
-                </span>
-              </div>
-            </label>
-
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.dictionaries?.freeDictionary ?? true}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    dictionaries: { ...form.dictionaries, freeDictionary: e.target.checked },
-                  })
-                }
-                className="w-4 h-4 accent-blue-600 rounded"
-              />
-              <div>
-                <span className="text-xs font-semibold block">FreeDictionary API (English IPA & POS)</span>
-                <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  Authoritative English phonetics, parts of speech, and sample sentences.
-                </span>
-              </div>
-            </label>
-          </div>
-
-          {/* Test Dictionary lookup */}
-          <div className={`pt-3 border-t space-y-2 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
-            <label className={`block text-xs font-semibold uppercase ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-              Test Dictionary Lookup
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={dictTestWord}
-                onChange={(e) => setDictTestWord(e.target.value)}
-                placeholder="e.g. abandon, diligent"
-                className={`w-48 text-xs font-medium p-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                  isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
-                }`}
-              />
-              <button
-                type="button"
-                onClick={async () => {
-                  setTestingDict(true);
-                  const abRes = await lookupAbadisDict(dictTestWord);
-                  const freeRes = await lookupFreeDict(dictTestWord);
-                  setDictTestResult({ abadis: abRes, freeDictionary: freeRes });
-                  setTestingDict(false);
-                }}
-                disabled={testingDict || !dictTestWord.trim()}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-              >
-                <Zap className={`w-3.5 h-3.5 ${testingDict ? 'animate-spin' : ''}`} />
-                <span>Test Lookup</span>
-              </button>
-            </div>
-
-            {dictTestResult && (
-              <div className={`p-3 border rounded-md text-xs font-mono space-y-1 ${isDark ? 'bg-zinc-900 border-zinc-700 text-zinc-200' : 'bg-zinc-50 border-zinc-200 text-zinc-800'}`}>
-                <div>Abadis: {dictTestResult.abadis?.meaningFa || 'No match'}</div>
-                <div>FreeDict Phonetic: {dictTestResult.freeDictionary?.phonetic || 'None'}</div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* SUBTAB 4: SMART IMAGES */}
-      {activeSubTab === 'smartImages' && (
-        <div
-          className={`p-5 border rounded-lg shadow-xs space-y-4 ${
-            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-          }`}
-        >
-          <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
-            <h3 className="font-semibold text-sm uppercase">Smart Image Search</h3>
-            <span className="text-xs text-zinc-500 font-medium">Automatic & Manual Photo Mode</span>
-          </div>
-
-          <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-            Images are retrieved via high-speed Unsplash & Wikimedia APIs with offline SVG fallback generation.
-          </p>
-
-          <div className="space-y-2">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.smartImages?.enabled ?? true}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    smartImages: { ...form.smartImages, enabled: e.target.checked },
-                  })
-                }
-                className="w-4 h-4 accent-blue-600 rounded"
-              />
-              <span className="text-xs font-semibold">Enable Smart Images System</span>
-            </label>
-          </div>
-
-          {/* Test Image Search */}
-          <div className={`pt-3 border-t space-y-2 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
-            <label className={`block text-xs font-semibold uppercase ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-              Test Image Retrieval
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={imgTestWord}
-                onChange={(e) => setImgTestWord(e.target.value)}
-                placeholder="e.g. apple, bicycle"
-                className={`w-48 text-xs font-medium p-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                  isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
-                }`}
-              />
-              <button
-                type="button"
-                onClick={async () => {
-                  setTestingImg(true);
-                  const res = await testSmartImage(imgTestWord);
-                  setImgTestResult(res);
-                  setTestingImg(false);
-                }}
-                disabled={testingImg || !imgTestWord.trim()}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-              >
-                <Zap className={`w-3.5 h-3.5 ${testingImg ? 'animate-spin' : ''}`} />
-                <span>Search Image</span>
-              </button>
-            </div>
-
-            {imgTestResult && imgTestResult.imageUrl && (
-              <div className={`p-3 border rounded-md flex items-center gap-3 ${isDark ? 'bg-zinc-900 border-zinc-700' : 'bg-zinc-50 border-zinc-200'}`}>
-                <img src={imgTestResult.imageUrl} alt={imgTestWord} className="w-16 h-16 object-cover rounded border" />
-                <div className="text-xs">
-                  <span className="font-semibold block">Found Image: {imgTestWord}</span>
-                  <span className="text-zinc-500 text-[11px]">{imgTestResult.source}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* SUBTAB 5: DEFAULT CARD CONFIG */}
-      {activeSubTab === 'defaultCard' && (
-        <div
-          className={`p-5 border rounded-lg shadow-xs space-y-4 ${
-            isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-          }`}
-        >
-          <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
-            <h3 className="font-semibold text-sm uppercase">Default Card Creation Settings</h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                Default Card Type
-              </label>
-              <select
-                value={form.defaultCard?.cardType || 'normal'}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    defaultCard: { ...form.defaultCard, cardType: e.target.value as any },
-                  })
-                }
-                className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
-                  isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
-                }`}
-              >
-                <option value="normal">Normal Vocab Card</option>
-                <option value="spelling">Spelling Challenge Card</option>
-              </select>
-            </div>
-
-            <div>
-              <label className={`block text-xs font-semibold uppercase mb-1 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                Default Deck
-              </label>
-              <input
-                type="text"
-                value={form.anki.defaultDeck || 'English::B1'}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    anki: { ...form.anki, defaultDeck: e.target.value },
-                  })
-                }
-                className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                  isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
-                }`}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SUBTAB 6: APPEARANCE & THEMES */}
-      {activeSubTab === 'appearance' && (
-        <div className="space-y-6">
-          {/* 1. APPLICATION LANGUAGE SELECTOR */}
-          <div
-            className={`p-5 border rounded-lg shadow-xs ${
-              isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-            }`}
-          >
-            <h3 className="font-semibold text-sm uppercase mb-1 flex items-center gap-2">
-              <Languages className="w-4 h-4 text-blue-500" />
-              <span>{t('settings.appearance.languageTitle')}</span>
-            </h3>
-            <p className={`text-xs mb-3 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-              {t('settings.appearance.languageDesc')}
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Option 1: English */}
-              <button
-                type="button"
-                onClick={() => handleLanguageSelect('en')}
-                className={`p-3.5 border text-left cursor-pointer transition-all rounded-md ${
-                  language === 'en'
-                    ? 'bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-200 border-blue-600 dark:border-blue-500 font-semibold shadow-xs'
-                    : isDark
-                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
-                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold">{t('settings.appearance.langEnglish')}</span>
-                  {language === 'en' && (
-                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
-                      {t('settings.appearance.activeBadge')}
-                    </span>
-                  )}
-                </div>
-                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  {t('settings.appearance.langEnglishDesc')}
-                </div>
-              </button>
-
-              {/* Option 2: Persian (فارسی) */}
-              <button
-                type="button"
-                onClick={() => handleLanguageSelect('fa')}
-                className={`p-3.5 border text-left cursor-pointer transition-all rounded-md ${
-                  language === 'fa'
-                    ? 'bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-200 border-blue-600 dark:border-blue-500 font-semibold shadow-xs'
-                    : isDark
-                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
-                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold">{t('settings.appearance.langPersian')}</span>
-                  {language === 'fa' && (
-                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
-                      {t('settings.appearance.activeBadge')}
-                    </span>
-                  )}
-                </div>
-                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  {t('settings.appearance.langPersianDesc')}
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* 2. APPLICATION INTERFACE DIRECTION SELECTOR */}
-          <div
-            className={`p-5 border rounded-lg shadow-xs ${
-              isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-            }`}
-          >
-            <h3 className="font-semibold text-sm uppercase mb-1 flex items-center gap-2">
-              <ArrowLeftRight className="w-4 h-4 text-blue-500" />
-              <span>{t('settings.appearance.directionTitle')}</span>
-            </h3>
-            <p className={`text-xs mb-3 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-              {t('settings.appearance.directionDesc')}
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-              {/* Option 1: Left-to-Right (LTR) */}
-              <button
-                type="button"
-                onClick={() => handleDirectionSelect('ltr')}
-                className={`p-3.5 border text-left cursor-pointer transition-all rounded-md ${
-                  direction === 'ltr'
-                    ? 'bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-200 border-blue-600 dark:border-blue-500 font-semibold shadow-xs'
-                    : isDark
-                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
-                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold">{t('settings.appearance.dirLTR')}</span>
-                  {direction === 'ltr' && (
-                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
-                      {t('settings.appearance.activeBadge')}
-                    </span>
-                  )}
-                </div>
-                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  {t('settings.appearance.dirLTRDesc')}
-                </div>
-              </button>
-
-              {/* Option 2: Right-to-Left (RTL) */}
-              <button
-                type="button"
-                onClick={() => handleDirectionSelect('rtl')}
-                className={`p-3.5 border text-left cursor-pointer transition-all rounded-md ${
-                  direction === 'rtl'
-                    ? 'bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-200 border-blue-600 dark:border-blue-500 font-semibold shadow-xs'
-                    : isDark
-                    ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
-                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold">{t('settings.appearance.dirRTL')}</span>
-                  {direction === 'rtl' && (
-                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
-                      {t('settings.appearance.activeBadge')}
-                    </span>
-                  )}
-                </div>
-                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  {t('settings.appearance.dirRTLDesc')}
-                </div>
-              </button>
-            </div>
-
-            <div className={`p-3 border rounded-md text-xs ${isDark ? 'bg-zinc-900/60 border-zinc-700 text-zinc-300' : 'bg-zinc-50 border-zinc-200 text-zinc-700'}`}>
-              <div className="font-semibold text-blue-500 mb-0.5">ℹ {t('settings.appearance.independentNoticeTitle')}</div>
-              <div>{t('settings.appearance.independentNoticeDesc')}</div>
-            </div>
-          </div>
-
-          {/* 3. APPLICATION UI THEME SELECTOR - ONLY ANKI LIGHT AND ANKI DARK */}
-          <div
-            className={`p-5 border rounded-lg shadow-xs ${
-              isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-            }`}
-          >
-            <h3 className="font-semibold text-sm uppercase mb-3 flex items-center gap-2">
-              <Sliders className="w-4 h-4 text-blue-500" />
-              <span>{t('settings.appearance.appThemeTitle')}</span>
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Option 1: Anki Light */}
-              <button
-                type="button"
-                onClick={() => handleAppThemeSelect('anki-light')}
-                className={`p-3.5 border text-left cursor-pointer transition-all rounded-md ${
-                  !isDark
-                    ? 'bg-blue-50/70 text-blue-950 border-blue-600 font-semibold shadow-xs'
-                    : 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold">{t('settings.appearance.themeLight')}</span>
-                  {!isDark && (
-                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
-                      {t('settings.appearance.activeBadge')}
-                    </span>
-                  )}
-                </div>
-                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  {t('settings.appearance.themeLightDesc')}
-                </div>
-              </button>
-
-              {/* Option 2: Anki Dark */}
-              <button
-                type="button"
-                onClick={() => handleAppThemeSelect('anki-dark')}
-                className={`p-3.5 border text-left cursor-pointer transition-all rounded-md ${
-                  isDark
-                    ? 'bg-blue-950/40 text-blue-200 border-blue-500 font-semibold shadow-xs'
-                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold">{t('settings.appearance.themeDark')}</span>
-                  {isDark && (
-                    <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
-                      {t('settings.appearance.activeBadge')}
-                    </span>
-                  )}
-                </div>
-                <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  {t('settings.appearance.themeDarkDesc')}
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* 4. FLASHCARD NOTE THEMES (8 Themes) */}
-          <div
-            className={`p-5 border rounded-lg shadow-xs ${
-              isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-            }`}
-          >
-            <h3 className="font-semibold text-sm uppercase mb-4 flex items-center gap-2">
-              <Palette className="w-4 h-4 text-blue-500" />
-              <span>{t('settings.appearance.cardThemesTitle')}</span>
-            </h3>
-
-            {/* Light Card Themes */}
-            <div className="mb-5">
-              <div className={`text-xs font-semibold uppercase mb-2 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                {t('settings.appearance.lightThemesCategory')}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {THEME_GROUPS.light.map((th) => {
-                  const isSelected = form.theme === th.id;
-                  return (
-                    <button
-                      key={th.id}
-                      type="button"
-                      onClick={() => setForm({ ...form, theme: th.id as ThemeId })}
-                      className={`p-3 border rounded-md text-left cursor-pointer transition-all ${
-                        isSelected
-                          ? isDark
-                            ? 'bg-blue-950/40 border-blue-500 text-white shadow-xs'
-                            : 'bg-blue-50 text-blue-950 border-blue-600 shadow-xs'
-                          : isDark
-                          ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
-                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold">{th.name}</span>
-                        {isSelected && (
-                          <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
-                            {t('settings.appearance.selectedBadge')}
-                          </span>
-                        )}
-                      </div>
-                      <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                        {th.desc}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Dark Card Themes */}
-            <div>
-              <div className={`text-xs font-semibold uppercase mb-2 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                {t('settings.appearance.darkThemesCategory')}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {THEME_GROUPS.dark.map((th) => {
-                  const isSelected = form.theme === th.id;
-                  return (
-                    <button
-                      key={th.id}
-                      type="button"
-                      onClick={() => setForm({ ...form, theme: th.id as ThemeId })}
-                      className={`p-3 border rounded-md text-left cursor-pointer transition-all ${
-                        isSelected
-                          ? isDark
-                            ? 'bg-blue-950/40 border-blue-500 text-white shadow-xs'
-                            : 'bg-blue-50 text-blue-950 border-blue-600 shadow-xs'
-                          : isDark
-                          ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
-                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold">{th.name}</span>
-                        {isSelected && (
-                          <span className="text-[10px] font-semibold bg-blue-600 text-white px-1.5 py-0.5 rounded">
-                            {t('settings.appearance.selectedBadge')}
-                          </span>
-                        )}
-                      </div>
-                      <div className={`text-[11px] mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                        {th.desc}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Live Theme Preview Panel */}
-            <div className={`mt-6 pt-5 border-t ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <div className="flex items-center gap-2">
-                  <Eye className="w-4 h-4 text-blue-500" />
-                  <span className="text-xs font-bold uppercase tracking-wider">
-                    {t('settings.appearance.liveThemePreview', { theme: THEMES[form.theme]?.name || form.theme })}
-                  </span>
-                </div>
-                <div className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  {t('settings.appearance.previewSubtitle')}
-                </div>
-              </div>
-
-              <div
-                className={`border rounded-lg p-3 sm:p-5 relative overflow-hidden shadow-xs ${
-                  isDark ? 'bg-[#18181B] border-zinc-700 text-zinc-100' : 'bg-zinc-100 border-zinc-200 text-zinc-900'
-                }`}
-              >
-                <CardPreview
-                  cardData={{
-                    word: 'wanderlust',
-                    phonetic: '/ˈwɑːn.dɚ.lʌst/',
-                    partOfSpeech: 'noun',
-                    meaningFa: 'اشتیاق شدید به سفر، گشت‌وگذار و کشف ناشناخته‌ها',
-                    example: 'Her wanderlust led her on an unforgettable backpacking journey across South America.',
-                    translationFa: 'اشتیاق شدید او به سفر باعث شد سفری فراموش‌نشدنی را در آمریکای جنوبی آغاز کند.',
-                    mnemonic: 'WANDER (گشت زدن) + LUST (میل شدید): میل و اشتیاق بی‌پایان به جهانگردی.',
-                    cardType: form.defaultCard?.cardType || 'normal',
-                    spellingSentence: 'Her ______ led her on an unforgettable backpacking journey across South America.',
-                    wordAudioUsNormalBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
-                    wordAudioUsSlowBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
-                    wordAudioUkNormalBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
-                    wordAudioUkSlowBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
-                    exampleAudioUsNormalBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
-                    exampleAudioUsSlowBase64: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=',
-                  }}
-                  themeId={form.theme}
-                  emptyWordPlaceholder="wanderlust"
-                  appTheme={isDark ? 'anki-dark' : 'anki-light'}
-                  editable={false}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SUBTAB 7: ANKI */}
-      {activeSubTab === 'anki' && (
-        <div
-          className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+          className={`p-5 border rounded-none  space-y-4 ${
             isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
           }`}
         >
@@ -3412,7 +2702,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 type="text"
                 value={form.anki.url}
                 onChange={(e) => setForm({ ...form, ai: form.ai, anki: { ...form.anki, url: e.target.value } })}
-                className={`w-full text-xs font-mono font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                className={`w-full text-xs font-mono font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                   isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
                 }`}
               />
@@ -3426,7 +2716,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 type="text"
                 value={form.anki.defaultDeck}
                 onChange={(e) => setForm({ ...form, anki: { ...form.anki, defaultDeck: e.target.value } })}
-                className={`w-full text-xs font-medium p-2.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                className={`w-full text-xs font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
                   isDark ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-white text-zinc-900 border-zinc-300'
                 }`}
               />
@@ -3438,7 +2728,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             <button
               type="button"
               onClick={handleSyncAnkiModel}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-none flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               <Bookmark className="w-3.5 h-3.5" />
               <span>Sync Note Model to Anki</span>
@@ -3452,7 +2742,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
           {ankiStatus && (
             <div
-              className={`p-3 border rounded-md text-xs flex items-center justify-between ${
+              className={`p-3 border rounded-none text-xs flex items-center justify-between ${
                 ankiStatus.connected
                   ? isDark
                     ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
@@ -3480,9 +2770,714 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       )}
 
       {/* SUBTAB 8: DIAGNOSTICS */}
-      {activeSubTab === 'diagnostics' && (
-        <div
-          className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+
+{activeSubTab === 'prompts' && (
+        <div className="space-y-6">
+          {/* Header Bar */}
+          <div
+            className={`p-4 border rounded-none flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 '
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`p-2.5 rounded-none shrink-0 ${
+                  isDark
+                    ? 'bg-purple-950/60 text-purple-400 border border-purple-800/40'
+                    : 'bg-purple-50 text-purple-600 border border-purple-200'
+                }`}
+              >
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className={`text-base font-bold flex items-center gap-2 ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                  <span>{t('settings.prompts.title')}</span>
+                </h3>
+                <p className={`text-xs mt-1 max-w-2xl ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  {t('settings.prompts.subtitle')}
+                </p>
+              </div>
+            </div>
+
+            {/* Top Action Buttons */}
+            <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+              <button
+                type="button"
+                onClick={() => setShowRestoreModal(true)}
+                disabled={isRestoringPrompts}
+                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs rounded-none flex items-center gap-2 cursor-pointer transition-colors"
+                title={t('settings.prompts.restoreConfirmMsg')}
+              >
+                <RotateCcw className={`w-3.5 h-3.5 ${isRestoringPrompts ? 'animate-spin' : ''}`} />
+                <span>{isRestoringPrompts ? t('settings.prompts.restoringDefaults') : t('settings.prompts.restoreDefaultsBtn')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCustomPrompts}
+                disabled={isSavingPrompts}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-none flex items-center gap-2 cursor-pointer transition-colors"
+              >
+                <Save className={`w-3.5 h-3.5 ${isSavingPrompts ? 'animate-spin' : ''}`} />
+                <span>{isSavingPrompts ? t('settings.prompts.saving') : t('settings.prompts.saveBtn')}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Feedback Status */}
+          {promptSaveStatus && (
+            <div
+              className={`p-3 rounded-none border text-xs font-medium flex items-center gap-2 transition-all ${
+                promptSaveStatus.toLowerCase().includes('error')
+                  ? isDark
+                    ? 'bg-rose-950/40 text-rose-200 border-rose-800'
+                    : 'bg-rose-50 text-rose-800 border-rose-200'
+                  : isDark
+                  ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800'
+                  : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+              <span>{promptSaveStatus}</span>
+            </div>
+          )}
+
+          {/* Centralized Architecture Info Notice */}
+          <div
+            className={`p-4 rounded-none border text-xs ${
+              isDark ? 'bg-zinc-850/60 border-zinc-700/80 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+            }`}
+          >
+            <div className="flex items-center gap-2 font-semibold mb-1 text-blue-600 dark:text-blue-400">
+              <BrainCircuit className="w-4 h-4" />
+              <span>{t('settings.prompts.howItWorksTitle')}</span>
+            </div>
+            <p className="leading-relaxed opacity-90">
+              {t('settings.prompts.howItWorksDesc')}
+            </p>
+          </div>
+
+          {/* Prompt 1: Meaning Generation */}
+          <div
+            className={`p-5 border rounded-none space-y-3 transition-all ${
+              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 '
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-1.5 rounded-none ${isDark ? 'bg-zinc-800 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
+                  <Languages className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                    {t('settings.prompts.meaningTitle')}
+                  </h4>
+                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                    {t('settings.prompts.meaningDesc')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                {isPromptModified('meaningGeneration') ? (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                    {t('settings.prompts.customizedBadge')}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                    {t('settings.prompts.defaultBadge')}
+                  </span>
+                )}
+                {isPromptModified('meaningGeneration') && (
+                  <button
+                    type="button"
+                    onClick={() => handleResetSinglePrompt('meaningGeneration')}
+                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                    }`}
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>{t('settings.prompts.revertPromptBtn')}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <textarea
+              rows={4}
+              value={currentPrompts.meaningGeneration}
+              onChange={(e) => handlePromptChange('meaningGeneration', e.target.value)}
+              className={`w-full p-3 text-xs font-mono rounded-none border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
+                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+              }`}
+            />
+          </div>
+
+          {/* Prompt: English Definition Generation */}
+          <div
+            className={`p-5 border rounded-none space-y-3 transition-all ${
+              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 '
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-1.5 rounded-none ${isDark ? 'bg-zinc-800 text-teal-400' : 'bg-teal-50 text-teal-600'}`}>
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                    {t('settings.prompts.definitionTitle')}
+                  </h4>
+                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                    {t('settings.prompts.definitionDesc')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                {isPromptModified('definitionGeneration') ? (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                    {t('settings.prompts.customizedBadge')}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                    {t('settings.prompts.defaultBadge')}
+                  </span>
+                )}
+                {isPromptModified('definitionGeneration') && (
+                  <button
+                    type="button"
+                    onClick={() => handleResetSinglePrompt('definitionGeneration')}
+                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                    }`}
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>{t('settings.prompts.revertPromptBtn')}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <textarea
+              rows={4}
+              value={currentPrompts.definitionGeneration || ''}
+              onChange={(e) => handlePromptChange('definitionGeneration', e.target.value)}
+              className={`w-full p-3 text-xs font-mono rounded-none border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
+                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+              }`}
+            />
+          </div>
+
+          {/* Prompt 2: Example Generation */}
+          <div
+            className={`p-5 border rounded-none space-y-3 transition-all ${
+              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 '
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-1.5 rounded-none ${isDark ? 'bg-zinc-800 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                    {t('settings.prompts.exampleTitle')}
+                  </h4>
+                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                    {t('settings.prompts.exampleDesc')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                {isPromptModified('exampleGeneration') ? (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                    {t('settings.prompts.customizedBadge')}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                    {t('settings.prompts.defaultBadge')}
+                  </span>
+                )}
+                {isPromptModified('exampleGeneration') && (
+                  <button
+                    type="button"
+                    onClick={() => handleResetSinglePrompt('exampleGeneration')}
+                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                    }`}
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>{t('settings.prompts.revertPromptBtn')}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <textarea
+              rows={4}
+              value={currentPrompts.exampleGeneration}
+              onChange={(e) => handlePromptChange('exampleGeneration', e.target.value)}
+              className={`w-full p-3 text-xs font-mono rounded-none border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
+                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+              }`}
+            />
+          </div>
+
+          {/* Prompt 3: Example Translation */}
+          <div
+            className={`p-5 border rounded-none space-y-3 transition-all ${
+              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 '
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-1.5 rounded-none ${isDark ? 'bg-zinc-800 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
+                  <ArrowLeftRight className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                    {t('settings.prompts.translationTitle')}
+                  </h4>
+                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                    {t('settings.prompts.translationDesc')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                {isPromptModified('exampleTranslation') ? (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                    {t('settings.prompts.customizedBadge')}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                    {t('settings.prompts.defaultBadge')}
+                  </span>
+                )}
+                {isPromptModified('exampleTranslation') && (
+                  <button
+                    type="button"
+                    onClick={() => handleResetSinglePrompt('exampleTranslation')}
+                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                    }`}
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>{t('settings.prompts.revertPromptBtn')}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <textarea
+              rows={4}
+              value={currentPrompts.exampleTranslation}
+              onChange={(e) => handlePromptChange('exampleTranslation', e.target.value)}
+              className={`w-full p-3 text-xs font-mono rounded-none border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
+                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+              }`}
+            />
+          </div>
+
+          {/* Prompt 4: Memory Hook (Highlighted Card with Root Decomposition) */}
+          <div
+            className={`p-5 border-2 rounded-none space-y-3 transition-all ${
+              isDark
+                ? 'bg-[#27272A] border-blue-500/60  shadow-blue-950/20'
+                : 'bg-white border-blue-400  shadow-blue-100/50'
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-1.5 rounded-none ${isDark ? 'bg-blue-950/80 text-blue-400' : 'bg-blue-100 text-blue-700'}`}>
+                  <Lightbulb className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                      {t('settings.prompts.memoryHookTitle')}
+                    </h4>
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-500/20 text-blue-500 border border-blue-500/30">
+                      Root & Decomposition
+                    </span>
+                  </div>
+                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                    {t('settings.prompts.memoryHookDesc')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                {isPromptModified('memoryHook') ? (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                    {t('settings.prompts.customizedBadge')}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                    {t('settings.prompts.defaultBadge')}
+                  </span>
+                )}
+                {isPromptModified('memoryHook') && (
+                  <button
+                    type="button"
+                    onClick={() => handleResetSinglePrompt('memoryHook')}
+                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                    }`}
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>{t('settings.prompts.revertPromptBtn')}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Memory Hook Decomposition Guideline Hint Box */}
+            <div
+              className={`p-3 rounded-none border text-[11px] leading-relaxed ${
+                isDark ? 'bg-blue-950/20 border-blue-800/40 text-blue-200' : 'bg-blue-50/70 border-blue-200 text-blue-900'
+              }`}
+            >
+              <div className="font-semibold mb-0.5">💡 Decomposition Example:</div>
+              <div>
+                <strong>readability → read + ability:</strong> Explain that <code>read</code> = خواندن, <code>ability</code> = توانایی, and <code>readability</code> = قابلیت خوانده‌شدن.
+              </div>
+              <div className="mt-1 opacity-90 text-[10px]">
+                Intelligent adaptation: Words with natural morphemes are decomposed into familiar parts. Base words without natural components (e.g. apple, chair) receive natural memorable associations without artificial splitting.
+              </div>
+            </div>
+
+            <textarea
+              rows={9}
+              value={currentPrompts.memoryHook}
+              onChange={(e) => handlePromptChange('memoryHook', e.target.value)}
+              className={`w-full p-3 text-xs font-mono rounded-none border focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed resize-y ${
+                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+              }`}
+            />
+          </div>
+
+          {/* Prompt 5: Missing-Field Completion */}
+          <div
+            className={`p-5 border rounded-none space-y-3 transition-all ${
+              isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 '
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-1.5 rounded-none ${isDark ? 'bg-zinc-800 text-amber-400' : 'bg-amber-50 text-amber-600'}`}>
+                  <CheckSquare className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className={`text-sm font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                    {t('settings.prompts.completionTitle')}
+                  </h4>
+                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                    {t('settings.prompts.completionDesc')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                {isPromptModified('missingFieldCompletion') ? (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                    {t('settings.prompts.customizedBadge')}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                    {t('settings.prompts.defaultBadge')}
+                  </span>
+                )}
+                {isPromptModified('missingFieldCompletion') && (
+                  <button
+                    type="button"
+                    onClick={() => handleResetSinglePrompt('missingFieldCompletion')}
+                    className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                    }`}
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>{t('settings.prompts.revertPromptBtn')}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <textarea
+              rows={6}
+              value={currentPrompts.missingFieldCompletion}
+              onChange={(e) => handlePromptChange('missingFieldCompletion', e.target.value)}
+              className={`w-full p-3 text-xs font-mono rounded-none border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
+                isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+              }`}
+            />
+          </div>
+
+          {/* Section: Other AI-Generated Content */}
+          <div className="pt-2">
+            <h4 className={`text-sm font-bold mb-1 ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>
+              {t('settings.prompts.otherTitle')}
+            </h4>
+            <p className={`text-xs mb-4 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+              {t('settings.prompts.otherDesc')}
+            </p>
+
+            <div className="space-y-4">
+              {/* Prompt 6: System Role & Persona */}
+              <div
+                className={`p-5 border rounded-none space-y-3 transition-all ${
+                  isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 '
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`p-1.5 rounded-none ${isDark ? 'bg-zinc-800 text-purple-400' : 'bg-purple-50 text-purple-600'}`}>
+                      <Cpu className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h5 className={`text-xs font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                        {t('settings.prompts.systemRoleTitle')}
+                      </h5>
+                      <p className={`text-[11px] mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        {t('settings.prompts.systemRoleDesc')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    {isPromptModified('systemRole') ? (
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                        {t('settings.prompts.customizedBadge')}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                        {t('settings.prompts.defaultBadge')}
+                      </span>
+                    )}
+                    {isPromptModified('systemRole') && (
+                      <button
+                        type="button"
+                        onClick={() => handleResetSinglePrompt('systemRole')}
+                        className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                          isDark
+                            ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                        }`}
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>{t('settings.prompts.revertPromptBtn')}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <textarea
+                  rows={3}
+                  value={currentPrompts.systemRole}
+                  onChange={(e) => handlePromptChange('systemRole', e.target.value)}
+                  className={`w-full p-3 text-xs font-mono rounded-none border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
+                    isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+                  }`}
+                />
+              </div>
+
+              {/* Prompt 7: Phonetic & POS */}
+              <div
+                className={`p-5 border rounded-none space-y-3 transition-all ${
+                  isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 '
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`p-1.5 rounded-none ${isDark ? 'bg-zinc-800 text-teal-400' : 'bg-teal-50 text-teal-600'}`}>
+                      <Volume2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h5 className={`text-xs font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                        {t('settings.prompts.phoneticAndPosTitle')}
+                      </h5>
+                      <p className={`text-[11px] mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        {t('settings.prompts.phoneticAndPosDesc')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    {isPromptModified('phoneticAndPos') ? (
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                        {t('settings.prompts.customizedBadge')}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                        {t('settings.prompts.defaultBadge')}
+                      </span>
+                    )}
+                    {isPromptModified('phoneticAndPos') && (
+                      <button
+                        type="button"
+                        onClick={() => handleResetSinglePrompt('phoneticAndPos')}
+                        className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                          isDark
+                            ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                        }`}
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>{t('settings.prompts.revertPromptBtn')}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <textarea
+                  rows={3}
+                  value={currentPrompts.phoneticAndPos}
+                  onChange={(e) => handlePromptChange('phoneticAndPos', e.target.value)}
+                  className={`w-full p-3 text-xs font-mono rounded-none border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
+                    isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+                  }`}
+                />
+              </div>
+
+              {/* Prompt 8: Smart Image Decision */}
+              <div
+                className={`p-5 border rounded-none space-y-3 transition-all ${
+                  isDark ? 'bg-[#27272A] border-zinc-700' : 'bg-white border-zinc-200 '
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`p-1.5 rounded-none ${isDark ? 'bg-zinc-800 text-amber-400' : 'bg-amber-50 text-amber-600'}`}>
+                      <ImageIcon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h5 className={`text-xs font-bold ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                        {t('settings.prompts.smartImageTitle')}
+                      </h5>
+                      <p className={`text-[11px] mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        {t('settings.prompts.smartImageDesc')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    {isPromptModified('smartImageDecision') ? (
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                        {t('settings.prompts.customizedBadge')}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                        {t('settings.prompts.defaultBadge')}
+                      </span>
+                    )}
+                    {isPromptModified('smartImageDecision') && (
+                      <button
+                        type="button"
+                        onClick={() => handleResetSinglePrompt('smartImageDecision')}
+                        className={`px-2.5 py-1 text-xs rounded border flex items-center gap-1 cursor-pointer transition-colors ${
+                          isDark
+                            ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300 border-zinc-700'
+                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                        }`}
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>{t('settings.prompts.revertPromptBtn')}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <textarea
+                  rows={4}
+                  value={currentPrompts.smartImageDecision}
+                  onChange={(e) => handlePromptChange('smartImageDecision', e.target.value)}
+                  className={`w-full p-3 text-xs font-mono rounded-none border focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y ${
+                    isDark ? 'bg-zinc-900 text-zinc-100 border-zinc-700' : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+                  }`}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Action Buttons */}
+          <div className="flex items-center justify-between pt-4 border-t border-zinc-200 dark:border-zinc-700">
+            <button
+              type="button"
+              onClick={() => setShowRestoreModal(true)}
+              disabled={isRestoringPrompts}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs rounded-none flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 ${isRestoringPrompts ? 'animate-spin' : ''}`} />
+              <span>{isRestoringPrompts ? t('settings.prompts.restoringDefaults') : t('settings.prompts.restoreDefaultsBtn')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSaveCustomPrompts}
+              disabled={isSavingPrompts}
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-none flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <Save className={`w-3.5 h-3.5 ${isSavingPrompts ? 'animate-spin' : ''}`} />
+              <span>{isSavingPrompts ? t('settings.prompts.saving') : t('settings.prompts.saveBtn')}</span>
+            </button>
+          </div>
+
+          {/* Restore Defaults Confirmation Modal */}
+          {showRestoreModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+              <div
+                className={`max-w-md w-full p-6 rounded-none border  ${
+                  isDark ? 'bg-zinc-900 border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+                }`}
+              >
+                <div className="flex items-center gap-3 text-amber-500 mb-3">
+                  <div className="p-2 rounded-none bg-amber-500/10 border border-amber-500/20">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-base font-bold">{t('settings.prompts.restoreConfirmTitle')}</h3>
+                </div>
+                <p className={`text-xs leading-relaxed mb-6 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                  {t('settings.prompts.restoreConfirmMsg')}
+                </p>
+                <div className="flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowRestoreModal(false)}
+                    className={`px-4 py-2 rounded-none text-xs font-semibold border cursor-pointer transition-colors ${
+                      isDark
+                        ? 'bg-zinc-800 hover:bg-zinc-750 border-zinc-700 text-zinc-300'
+                        : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-300 text-zinc-700'
+                    }`}
+                  >
+                    {t('settings.prompts.cancelBtn')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRestoreAllPrompts}
+                    disabled={isRestoringPrompts}
+                    className="px-4 py-2 rounded-none text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isRestoringPrompts ? 'animate-spin' : ''}`} />
+                    <span>{isRestoringPrompts ? t('settings.prompts.restoringDefaults') : t('settings.prompts.confirmRestoreBtn')}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SUBTAB 2: TTS */}
+
+      {/* 7. ADVANCED */}
+      {activeSubTab === 'advanced' && (
+        <div className="space-y-6">
+          <div
+          className={`p-5 border rounded-none  space-y-4 ${
             isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
           }`}
         >
@@ -3497,7 +3492,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 setRunningDiag(false);
               }}
               disabled={runningDiag}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-md shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-none flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               <Activity className={`w-3.5 h-3.5 ${runningDiag ? 'animate-spin' : ''}`} />
               <span>Run Full System Diagnostic</span>
@@ -3506,7 +3501,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
           {fullReport && (
             <div className="space-y-3 text-xs">
-              <div className={`p-3 border rounded-md ${isDark ? 'bg-zinc-900 border-zinc-700' : 'bg-zinc-50 border-zinc-200'}`}>
+              <div className={`p-3 border rounded-none ${isDark ? 'bg-zinc-900 border-zinc-700' : 'bg-zinc-50 border-zinc-200'}`}>
                 <div className="font-semibold uppercase mb-1">System Status Overview</div>
                 <div>Status: <span className="font-semibold uppercase">{fullReport.status}</span></div>
                 <div>Timestamp: {fullReport.timestamp}</div>
@@ -3516,7 +3511,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 {Object.entries(fullReport.services).map(([srv, info]: [string, any]) => (
                   <div
                     key={srv}
-                    className={`p-3 border rounded-md ${
+                    className={`p-3 border rounded-none ${
                       info.connected || info.ready
                         ? isDark
                           ? 'bg-emerald-950/20 border-emerald-900 text-emerald-200'
@@ -3534,12 +3529,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             </div>
           )}
         </div>
-      )}
 
-      {/* SUBTAB 9: GUIDE */}
-      {activeSubTab === 'guide' && (
-        <div
-          className={`p-5 border rounded-lg shadow-xs space-y-4 ${
+          <div
+          className={`p-5 border rounded-none  space-y-4 ${
             isDark ? 'bg-[#27272A] border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
           }`}
         >
@@ -3570,8 +3562,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             </div>
           </div>
         </div>
-      )}
         </div>
+      )}
       </div>
     </div>
   );

@@ -602,376 +602,183 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
   const isCardAlreadyComplete = useMemo(() => isCardComplete(previewDisplayCard), [previewDisplayCard]);
 
   return (
-    <div className="w-full max-w-[1680px] mx-auto px-4 sm:px-6 py-4 min-w-0">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* LEFT COLUMN: Creation Parameters & Pipeline Status (5 cols / ~42%) */}
-        <div className="lg:col-span-5 flex flex-col space-y-4 min-w-0">
-          {/* Box 1: Build Flashcard Form */}
-          <div
-            className={`p-5 rounded-xl border shadow-2xs ${
-              isDark ? 'bg-zinc-900/90 border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-            }`}
-          >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base sm:text-lg font-bold tracking-tight">{t('create.title')}</h2>
-            <span
-              className={`text-[11px] font-semibold px-2 py-0.5 rounded border ${
-                isDark ? 'bg-zinc-800 text-zinc-300 border-zinc-700' : 'bg-zinc-100 text-zinc-700 border-zinc-200'
-              }`}
+    <div className="w-full min-h-[calc(100vh-3.5rem)] flex flex-col md:flex-row min-w-0">
+      {/* LEFT COLUMN: 25% width - Minimal Creation Controls */}
+      <div className="w-full md:w-1/4 shrink-0 border-r border-zinc-200 dark:border-zinc-800 p-4 sm:p-5 min-w-0 flex flex-col select-none">
+        <h2 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mb-4">
+          Generate Single Flashcard
+        </h2>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleCreate();
+          }}
+          className="space-y-4"
+        >
+          {/* Word Input */}
+          <div>
+            <label className="text-xs font-semibold block mb-1 text-zinc-700 dark:text-zinc-300">
+              Word
+            </label>
+            <input
+              type="text"
+              required
+              autoFocus
+              disabled={isGenerating || testingAnkiOnly}
+              placeholder="Enter word..."
+              value={word}
+              onChange={(e) => {
+                const newWord = e.target.value;
+                setWord(newWord);
+                setEditableCard((prev) => (prev ? { ...prev, word: newWord } : null));
+              }}
+              className="w-full px-2.5 py-1.5 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600 focus:border-blue-500 bg-transparent text-sm font-semibold rounded-none focus:outline-none transition-colors text-zinc-900 dark:text-zinc-100"
+            />
+          </div>
+
+          {/* Target Deck Input (with autocomplete & Tab/Enter selection) */}
+          <div>
+            <label className="text-xs font-semibold block mb-1 text-zinc-700 dark:text-zinc-300">
+              Deck
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                list="create-view-decks-list"
+                required
+                placeholder="English::B1"
+                value={deck}
+                onChange={(e) => setDeck(e.target.value)}
+                className="w-full px-2.5 py-1.5 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600 focus:border-blue-500 bg-transparent text-xs font-medium rounded-none focus:outline-none transition-colors text-zinc-900 dark:text-zinc-100"
+              />
+              <datalist id="create-view-decks-list">
+                {availableDecks.map((d) => (
+                  <option key={d} value={d} />
+                ))}
+              </datalist>
+            </div>
+          </div>
+
+          {/* Card Mode: Only □ Standard and □ Spelling */}
+          <div>
+            <label className="text-xs font-semibold block mb-1.5 text-zinc-700 dark:text-zinc-300">
+              Card Mode
+            </label>
+            <div className="space-y-1.5 text-xs">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={cardType === 'normal'}
+                  onChange={() => setCardType('normal')}
+                  className="w-3.5 h-3.5 rounded-none border border-zinc-400 dark:border-zinc-600 accent-blue-600 cursor-pointer"
+                />
+                <span className={cardType === 'normal' ? 'font-semibold text-zinc-900 dark:text-zinc-100' : 'text-zinc-600 dark:text-zinc-400'}>
+                  Standard
+                </span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={cardType === 'spelling'}
+                  onChange={() => setCardType('spelling')}
+                  className="w-3.5 h-3.5 rounded-none border border-zinc-400 dark:border-zinc-600 accent-blue-600 cursor-pointer"
+                />
+                <span className={cardType === 'spelling' ? 'font-semibold text-zinc-900 dark:text-zinc-100' : 'text-zinc-600 dark:text-zinc-400'}>
+                  Spelling
+                </span>
+              </label>
+            </div>
+          </div>
+
+          {/* Image: Only □ Yes and □ No */}
+          <div>
+            <label className="text-xs font-semibold block mb-1.5 text-zinc-700 dark:text-zinc-300">
+              Image
+            </label>
+            <div className="space-y-1.5 text-xs">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={photoChoice === 'yes'}
+                  onChange={() => setPhotoChoice('yes')}
+                  className="w-3.5 h-3.5 rounded-none border border-zinc-400 dark:border-zinc-600 accent-blue-600 cursor-pointer"
+                />
+                <span className={photoChoice === 'yes' ? 'font-semibold text-zinc-900 dark:text-zinc-100' : 'text-zinc-600 dark:text-zinc-400'}>
+                  Yes
+                </span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={photoChoice === 'no'}
+                  onChange={() => setPhotoChoice('no')}
+                  className="w-3.5 h-3.5 rounded-none border border-zinc-400 dark:border-zinc-600 accent-blue-600 cursor-pointer"
+                />
+                <span className={photoChoice === 'no' ? 'font-semibold text-zinc-900 dark:text-zinc-100' : 'text-zinc-600 dark:text-zinc-400'}>
+                  No
+                </span>
+              </label>
+            </div>
+          </div>
+
+          {/* Duplicate notice if detected */}
+          {duplicateWarning && duplicateWarning.isDup && (
+            <div className="p-2 border border-amber-400 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 text-xs space-y-1 rounded-none">
+              <div className="font-bold">Duplicate card detected in Anki</div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setDuplicateWarning(null)}
+                  className="px-2 py-0.5 border border-zinc-300 dark:border-zinc-700 rounded-none text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCreate(true)}
+                  className="px-2 py-0.5 bg-blue-600 text-white rounded-none text-xs font-bold"
+                >
+                  Create Anyway
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Buttons: [ Generate ] [ Clear ] */}
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              type="submit"
+              disabled={isGenerating || testingAnkiOnly || !word.trim()}
+              className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-xs rounded-none cursor-pointer transition-colors shadow-none"
             >
-              Single Card
+              {isGenerating ? 'Generating...' : 'Generate'}
+            </button>
+            <button
+              type="button"
+              onClick={handleClearForm}
+              disabled={isGenerating || testingAnkiOnly || (!word.trim() && !editableCard)}
+              className="py-2 px-3 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium text-xs rounded-none cursor-pointer transition-colors disabled:opacity-40"
+            >
+              Clear
+            </button>
+          </div>
+        </form>
+
+        <div className="my-5 border-t border-zinc-200 dark:border-zinc-800" />
+
+        {/* Progress: Keep it extremely simple */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-zinc-700 dark:text-zinc-300">Progress</span>
+            <span className="font-mono text-zinc-500 font-medium">
+              {activeStepNumber === 14 ? '100%' : `${Math.round(Math.max(0, (activeStepNumber / 14) * 100))}%`}
             </span>
           </div>
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleCreate();
-            }}
-            className="space-y-4"
-          >
-            {/* Word Input */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className={`text-xs font-semibold ${isDark ? 'text-zinc-200' : 'text-zinc-700'}`}>
-                  {t('create.wordLabel')} <span className="text-rose-500">*</span>
-                </label>
-                <span className="text-[10px] text-zinc-500 font-mono">
-                  {settings.ai?.enabled === false ? 'AI OFF (MANUAL)' : `${settings.ai.provider.toUpperCase()} AI`}
-                </span>
-              </div>
-              <input
-                type="text"
-                required
-                autoFocus
-                disabled={isGenerating || testingAnkiOnly}
-                placeholder={t('create.wordPlaceholder')}
-                value={word}
-                onChange={(e) => {
-                  const newWord = e.target.value;
-                  setWord(newWord);
-                  setEditableCard((prev) => (prev ? { ...prev, word: newWord } : null));
-                }}
-                className={`w-full p-2.5 border rounded-md text-sm font-semibold tracking-wide focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  isDark
-                    ? 'bg-[#18181B] border-zinc-700 text-zinc-100 placeholder-zinc-500'
-                    : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400'
-                }`}
-              />
-            </div>
-
-            {/* Target Deck Input (Directly type or pick deck) */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className={`text-xs font-semibold ${isDark ? 'text-zinc-200' : 'text-zinc-700'}`}>
-                  {t('create.deckLabel')}
-                </label>
-                {loadingDecks ? (
-                  <span className="text-[11px] text-zinc-400 flex items-center gap-1">
-                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                    <span>Loading decks...</span>
-                  </span>
-                ) : (
-                  <span className="text-[11px] text-zinc-400 font-normal">
-                    Type deck name or pick
-                  </span>
-                )}
-              </div>
-
-              <div className="relative">
-                <input
-                  type="text"
-                  list="create-view-decks-list"
-                  required
-                  placeholder={t('create.customDeckPlaceholder') || 'Enter deck name (e.g. English::B1)'}
-                  value={deck}
-                  onChange={(e) => setDeck(e.target.value)}
-                  className={`w-full p-2 border rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                    isDark
-                      ? 'bg-[#18181B] border-zinc-700 text-zinc-100 placeholder-zinc-500'
-                      : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400'
-                  }`}
-                />
-                <datalist id="create-view-decks-list">
-                  {availableDecks.map((d) => (
-                    <option key={d} value={d} />
-                  ))}
-                </datalist>
-              </div>
-            </div>
-
-            {/* Card Type Selection */}
-            <div>
-              <label className={`text-xs font-semibold block mb-1.5 ${isDark ? 'text-zinc-200' : 'text-zinc-700'}`}>
-                {t('create.cardTypeLabel')}
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setCardType('normal')}
-                  className={`p-2.5 border rounded-lg text-left transition-all cursor-pointer ${
-                    cardType === 'normal'
-                      ? isDark
-                        ? 'border-blue-500 bg-blue-950/30 ring-1 ring-blue-500'
-                        : 'border-blue-600 bg-blue-50 ring-1 ring-blue-600'
-                      : isDark
-                      ? 'border-zinc-700 bg-zinc-850 hover:bg-zinc-800'
-                      : 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-xs font-bold text-blue-500">{t('create.typeNormalTitle')}</span>
-                    {cardType === 'normal' && <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />}
-                  </div>
-                  <p className="text-[10px] text-zinc-500 leading-tight">
-                    Standard front & back vocabulary card
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setCardType('spelling')}
-                  className={`p-2.5 border rounded-lg text-left transition-all cursor-pointer ${
-                    cardType === 'spelling'
-                      ? isDark
-                        ? 'border-purple-500 bg-purple-950/30 ring-1 ring-purple-500'
-                        : 'border-purple-600 bg-purple-50 ring-1 ring-purple-600'
-                      : isDark
-                      ? 'border-zinc-700 bg-zinc-850 hover:bg-zinc-800'
-                      : 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-xs font-bold text-purple-500">{t('create.typeSpellingTitle')}</span>
-                    {cardType === 'spelling' && <CheckCircle2 className="w-3.5 h-3.5 text-purple-500" />}
-                  </div>
-                  <p className="text-[10px] text-zinc-500 leading-tight">
-                    Interactive keyboard spelling challenge
-                  </p>
-                </button>
-              </div>
-            </div>
-
-            {/* Smart Image Choice */}
-            <div>
-              <label className={`text-xs font-semibold block mb-1.5 ${isDark ? 'text-zinc-200' : 'text-zinc-700'}`}>
-                {t('create.smartImageChoiceLabel')}
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPhotoChoice('yes')}
-                  className={`p-2 border rounded-md text-center transition-all text-xs font-semibold cursor-pointer ${
-                    photoChoice === 'yes'
-                      ? isDark
-                        ? 'border-emerald-500 bg-emerald-950/30 text-emerald-300 ring-1 ring-emerald-500'
-                        : 'border-emerald-600 bg-emerald-50 text-emerald-800 ring-1 ring-emerald-600'
-                      : isDark
-                      ? 'border-zinc-700 bg-zinc-850 text-zinc-400'
-                      : 'border-zinc-200 bg-zinc-50 text-zinc-600'
-                  }`}
-                >
-                  🖼️ {t('create.smartImageYes')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPhotoChoice('no')}
-                  className={`p-2 border rounded-md text-center transition-all text-xs font-semibold cursor-pointer ${
-                    photoChoice === 'no'
-                      ? isDark
-                        ? 'border-zinc-500 bg-zinc-800 text-zinc-200 ring-1 ring-zinc-500'
-                        : 'border-zinc-400 bg-zinc-100 text-zinc-800 ring-1 ring-zinc-400'
-                      : isDark
-                      ? 'border-zinc-700 bg-zinc-850 text-zinc-400'
-                      : 'border-zinc-200 bg-zinc-50 text-zinc-600'
-                  }`}
-                >
-                  🚫 {t('create.smartImageNo')}
-                </button>
-              </div>
-            </div>
-
-            {/* Duplicate Notice */}
-            {duplicateWarning && duplicateWarning.isDup && (
-              <div
-                className={`p-3 border rounded-lg text-xs flex flex-col gap-2 shadow-xs ${
-                  isDark
-                    ? 'bg-amber-950/40 text-amber-200 border-amber-800'
-                    : 'bg-amber-50 text-amber-900 border-amber-200'
-                }`}
-              >
-                <div className="flex items-center gap-1.5 font-bold">
-                  <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
-                  <span>{t('create.duplicateWarning', { deck, noteId: duplicateWarning.noteIds[0] || '' })}</span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setDuplicateWarning(null)}
-                    className={`flex-1 px-3 py-1.5 font-medium border rounded-md text-xs cursor-pointer ${
-                      isDark
-                        ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-750'
-                        : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
-                    }`}
-                  >
-                    {t('common.cancel')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCreate(true)}
-                    className="flex-1 px-3 py-1.5 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 text-xs cursor-pointer shadow-xs"
-                  >
-                    {t('common.yes')}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Error Notice */}
-            {errorMessage && (
-              <div
-                className={`p-3 border rounded-lg text-xs flex flex-col gap-1 shadow-xs ${
-                  isDark
-                    ? 'bg-rose-950/40 text-rose-200 border-rose-800'
-                    : 'bg-rose-50 text-rose-800 border-rose-200'
-                }`}
-              >
-                <span className="font-semibold uppercase tracking-wider flex items-center gap-1">
-                  <XCircle className="w-4 h-4 shrink-0 text-rose-500" /> {t('create.stageError')}{' '}
-                  {failedStage || 'Execution'}
-                </span>
-                <p className="text-xs">{errorMessage}</p>
-              </div>
-            )}
-
-            {/* Action Buttons: Generate, Cancel, Update, Show in Anki, Clear */}
-            <div className="flex flex-col gap-2 pt-1">
-              <div className="flex items-center gap-2">
-                {isGenerating ? (
-                  <button
-                    type="button"
-                    onClick={handleCancelGeneration}
-                    className="flex-1 py-2.5 px-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-100 border border-zinc-600 dark:border-zinc-700 font-semibold text-xs rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
-                    title="Cancel card generation"
-                  >
-                    <Square className="w-3.5 h-3.5 fill-current opacity-75" />
-                    <span>Cancel</span>
-                  </button>
-                ) : (
-                  <button
-                    type="submit"
-                    disabled={testingAnkiOnly || !word.trim()}
-                    className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-md shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {!isAiEnabled ? (
-                      <>
-                        <Plus className="w-4 h-4" />
-                        <span>{t('create.createCardManualBtn', 'Create Card (Manual)')}</span>
-                      </>
-                    ) : isCardAlreadyComplete ? (
-                      <>
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>{t('create.createCardDirectBtn', 'Create Card (Complete)')}</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4" />
-                        <span>{t('create.generateCardBtn')}</span>
-                      </>
-                    )}
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleClearForm}
-                  disabled={isGenerating || testingAnkiOnly || (!word.trim() && !editableCard)}
-                  className={`py-2.5 px-3.5 border rounded-md font-medium text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0 ${
-                    isDark
-                      ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-300'
-                      : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-300 text-zinc-700'
-                  }`}
-                  title="Clear form to create another card"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>{t('common.clear')}</span>
-                </button>
-              </div>
-
-              {/* Direct "Update Note in Anki" and "Show in Anki" buttons when note exists */}
-              {createdNoteId && (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleSaveToAnki}
-                    disabled={isUpdatingAnki}
-                    className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-md shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
-                  >
-                    {isUpdatingAnki ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Updating Note #{createdNoteId}...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Update Note in Anki</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleOpenInAnki(createdNoteId)}
-                    disabled={isOpeningInAnki}
-                    className={`py-2 px-3 border rounded-md text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shrink-0 ${
-                      isDark
-                        ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-blue-400'
-                        : 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700'
-                    }`}
-                    title={`Open Note #${createdNoteId} in Anki Browser GUI`}
-                  >
-                    {isOpeningInAnki ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    )}
-                    <span>Show in Anki</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </form>
-        </div>
-
-        {/* Box 2: Pipeline Execution Box */}
-        <div
-          className={`p-5 rounded-xl border shadow-2xs flex flex-col ${
-            isDark ? 'bg-zinc-900/90 border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-              {t('create.pipelineProgress')}
-            </h3>
-            {isGenerating && (
-              <span className="text-[11px] text-blue-500 font-semibold flex items-center gap-1">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                {t('create.step')} {activeStepNumber}/14
-              </span>
-            )}
-            {!isGenerating && activeStepNumber === 14 && (
-              <span className="text-[11px] text-emerald-500 font-bold flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                {t('create.completed')}
-              </span>
-            )}
-          </div>
-
-          {/* Stepper Progress Bar */}
-          <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden mb-4">
+          <div className="w-full h-2 bg-zinc-200 dark:bg-zinc-800 rounded-none overflow-hidden">
             <div
-              className={`h-full transition-all duration-300 ${
+              className={`h-full transition-all duration-300 rounded-none ${
                 activeStepNumber === -1
                   ? 'bg-rose-500 w-full'
                   : activeStepNumber === 14
@@ -989,165 +796,41 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
             />
           </div>
 
-          {/* Stepper List of Logs */}
-          <div className="space-y-1.5 text-xs max-h-48 overflow-y-auto mb-3 pr-1">
-            {DEFAULT_STEPS.map((st) => {
-              const matchedLog = executionLogs.find((l) => l.step === st.step);
-              let icon = <span className="w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-700" />;
-              let textColor = 'text-zinc-400 dark:text-zinc-500';
-
-              if (matchedLog) {
-                if (matchedLog.status === 'success') {
-                  icon = <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />;
-                  textColor = 'text-zinc-700 dark:text-zinc-200 font-medium';
-                } else if (matchedLog.status === 'error') {
-                  icon = <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />;
-                  textColor = 'text-rose-500 font-semibold';
-                } else if (matchedLog.status === 'running') {
-                  icon = <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500 shrink-0" />;
-                  textColor = 'text-blue-500 font-semibold';
-                }
-              } else if (isGenerating && activeStepNumber === st.step) {
-                icon = <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500 shrink-0" />;
-                textColor = 'text-blue-500 font-semibold';
-              }
-
-              return (
-                <div key={st.step} className="flex items-center gap-2 text-xs py-0.5">
-                  <div className="w-4 flex items-center justify-center">{icon}</div>
-                  <span className={`text-[11px] truncate ${textColor}`}>{st.name}</span>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Verification Banner */}
-          {verificationDetails && (
-            <div
-              className={`p-3 border rounded-md text-xs mb-3 space-y-1.5 ${
-                verificationDetails.isVerified
-                  ? isDark
-                    ? 'bg-emerald-950/30 border-emerald-800 text-emerald-200'
-                    : 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                  : isDark
-                  ? 'bg-rose-950/30 border-rose-800 text-rose-200'
-                  : 'bg-rose-50 border-rose-200 text-rose-900'
-              }`}
-            >
-              <div className="flex items-center justify-between font-bold">
-                <span className="flex items-center gap-1.5">
-                  {verificationDetails.isVerified ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                  ) : (
-                    <XCircle className="w-4 h-4 text-rose-500" />
-                  )}
-                  <span>
-                    {verificationDetails.isVerified
-                      ? t('create.verifiedInAnki')
-                      : t('create.verificationFailed')}
-                  </span>
-                </span>
-                <span className="text-[10px] font-mono opacity-80">
-                  Note #{verificationDetails.noteId}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-1 text-[11px] pt-1">
-                <div>
-                  <span className="opacity-70">{t('create.deck')}:</span>{' '}
-                  <span className="font-semibold">{verificationDetails.actualDeck}</span>
-                </div>
-                <div>
-                  <span className="opacity-70">{t('create.cardsCreated')}:</span>{' '}
-                  <span className="font-semibold">{verificationDetails.cardsCount}</span>
-                </div>
-              </div>
-
-              {/* Anki Actions: Open in GUI, Re-verify */}
-              <div className="flex items-center gap-2 pt-1 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => handleOpenInAnki(verificationDetails.noteId)}
-                  disabled={isOpeningInAnki}
-                  className={`px-2 py-1 text-[10px] font-bold rounded border flex items-center gap-1 cursor-pointer transition-colors ${
-                    isDark
-                      ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border-zinc-700'
-                      : 'bg-white hover:bg-zinc-50 text-zinc-900 border-zinc-300'
-                  }`}
-                  title="Open this card in the Anki Desktop Browser window"
-                >
-                  <ExternalLink className="w-3 h-3 text-blue-500" />
-                  <span>{isOpeningInAnki ? 'Opening...' : t('create.openInAnki')}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleReverifyNote(verificationDetails.noteId)}
-                  disabled={isReverifying}
-                  className={`px-2 py-1 text-[10px] font-medium rounded border flex items-center gap-1 cursor-pointer transition-colors ${
-                    isDark
-                      ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700'
-                      : 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-300'
-                  }`}
-                  title="Re-query AnkiConnect to verify note and cards existence"
-                >
-                  <RotateCcw className={`w-3 h-3 ${isReverifying ? 'animate-spin' : ''}`} />
-                  <span>{isReverifying ? 'Verifying...' : t('create.reverifyNote')}</span>
-                </button>
-              </div>
-
-              {ankiActionMessage && (
-                <p className="text-[10px] text-blue-400 dark:text-blue-300 pt-1 font-mono">
-                  {ankiActionMessage}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Test Card Button (Direct AnkiConnect Diagnostic) */}
-          <div className="mt-auto pt-2 border-t border-zinc-200 dark:border-zinc-700/60 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={handleRunAnkiTest}
-              disabled={isGenerating || testingAnkiOnly}
-              className={`text-xs font-semibold px-2.5 py-1 rounded border flex items-center gap-1.5 cursor-pointer transition-colors ${
-                isDark
-                  ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700'
-                  : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-300'
-              }`}
-              title="Test AnkiConnect note creation directly without calling AI or TTS"
-            >
-              <Zap className="w-3.5 h-3.5 text-amber-500" />
-              <span>{testingAnkiOnly ? 'Testing Anki...' : t('create.testCardBtn')}</span>
-            </button>
+          <div className="text-[11px] text-zinc-500 truncate">
+            {isGenerating
+              ? (executionLogs[executionLogs.length - 1]?.name || 'Creating card...')
+              : errorMessage
+              ? `Error: ${errorMessage}`
+              : activeStepNumber === 14
+              ? 'Card created successfully'
+              : 'Idle'}
           </div>
         </div>
       </div>
 
-        {/* RIGHT COLUMN: Unified Card Editor (7 cols / ~58%) */}
-        <div className="lg:col-span-7 flex flex-col min-w-0 sticky top-16">
-          <UnifiedCardEditor
-            cardData={previewDisplayCard}
-            emptyWordPlaceholder={word.trim() || 'Word'}
-            themeId={selectedTheme}
-            cardType={cardType}
-            noteType={selectedNoteType}
-            onNoteTypeChange={handleNoteTypeChange}
-            deckName={deck.trim()}
-            noteId={createdNoteId || undefined}
-            editable={true}
-            onCardChange={handleCardChange}
-            onSaveToAnki={handleSaveToAnki}
-            isSavingToAnki={isUpdatingAnki}
-            canSaveToAnki={!!createdNoteId}
-            onShowInAnki={handleOpenInAnki}
-            isShowingInAnki={isOpeningInAnki}
-            onOpenImageSearch={handleOpenInternetSearch}
-            onUploadImage={handleLocalImageUpload}
-            onRemoveImage={handleRemoveImage}
-            ankiUrl={settings.anki?.url}
-          />
-        </div>
+      {/* RIGHT COLUMN: 75% width - Shared Card Editor */}
+      <div className="w-full md:w-3/4 flex-1 min-w-0 p-4 sm:p-6 flex flex-col">
+        <UnifiedCardEditor
+          cardData={previewDisplayCard}
+          emptyWordPlaceholder={word.trim() || 'Word'}
+          themeId={selectedTheme}
+          cardType={cardType}
+          noteType={selectedNoteType}
+          onNoteTypeChange={handleNoteTypeChange}
+          deckName={deck.trim()}
+          noteId={createdNoteId || undefined}
+          editable={true}
+          onCardChange={handleCardChange}
+          onSaveToAnki={handleSaveToAnki}
+          isSavingToAnki={isUpdatingAnki}
+          canSaveToAnki={!!createdNoteId}
+          onShowInAnki={handleOpenInAnki}
+          isShowingInAnki={isOpeningInAnki}
+          onOpenImageSearch={handleOpenInternetSearch}
+          onUploadImage={handleLocalImageUpload}
+          onRemoveImage={handleRemoveImage}
+          ankiUrl={settings.anki?.url}
+        />
       </div>
 
       {/* ONLINE IMAGE SEARCH MODAL */}
