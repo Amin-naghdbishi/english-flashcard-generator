@@ -115,14 +115,8 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
 
   return (
     <header
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      className={`w-full select-none fixed top-0 left-0 right-0 z-50 p-0 m-0 border-b transition-all duration-300 ease-out transform ${
-        isVisible
-          ? 'translate-y-0 opacity-100 shadow-md pointer-events-auto'
-          : '-translate-y-full opacity-0 pointer-events-none'
-      } ${
-        isDark ? 'bg-[#1F1F23]/95 backdrop-blur-md border-zinc-800' : 'bg-white/95 backdrop-blur-md border-zinc-200 shadow-xs'
+      className={`w-full select-none fixed top-0 left-0 right-0 z-50 p-0 m-0 border-b transition-colors ${
+        isDark ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-zinc-200 shadow-xs'
       }`}
     >
       <div className="w-full flex items-center justify-between px-4 sm:px-6">
@@ -270,25 +264,7 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
             <RefreshCw className={`w-3.5 h-3.5 ${isGlobalChecking ? 'animate-spin text-blue-500' : ''}`} />
           </button>
 
-          {/* Pin / Auto-Hide Toggle */}
-          {onTogglePin && (
-            <button
-              type="button"
-              onClick={onTogglePin}
-              title={isPinned ? t('nav.unpinToolbar') : t('nav.pinToolbar')}
-              className={`p-1.5 rounded-md border text-xs font-medium flex items-center justify-center transition-colors cursor-pointer ${
-                isPinned
-                  ? isDark
-                    ? 'border-blue-500/60 bg-blue-950/40 text-blue-400 font-semibold'
-                    : 'border-blue-300 bg-blue-50 text-blue-700 font-semibold'
-                  : isDark
-                  ? 'border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
-                  : 'border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
-              }`}
-            >
-              {isPinned ? <Pin className="w-3.5 h-3.5 fill-current" /> : <PinOff className="w-3.5 h-3.5" />}
-            </button>
-          )}
+
 
           {/* Quick Anki Light / Anki Dark Theme Toggle */}
           <button

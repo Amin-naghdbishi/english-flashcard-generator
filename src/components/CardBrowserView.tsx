@@ -474,7 +474,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
   return (
     <div className="w-full min-h-[calc(100vh-3.5rem)] flex flex-col md:flex-row min-w-0">
       {/* LEFT COLUMN: 25% width - Minimal Search & Compact Table */}
-      <div className="w-full md:w-1/4 shrink-0 border-r border-zinc-200 dark:border-zinc-800 p-4 sm:p-5 min-w-0 flex flex-col select-none">
+      <div className="w-full md:w-1/4 shrink-0 border-r border-zinc-200 dark:border-zinc-800 p-4 sm:p-5 min-w-0 flex flex-col select-none bg-white dark:bg-zinc-900">
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
@@ -496,7 +496,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
               type="button"
               onClick={() => executeSearch(searchInput)}
               disabled={isSearching}
-              className="p-1 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600 rounded-none text-zinc-600 dark:text-zinc-300 cursor-pointer"
+              className="p-1 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 rounded-none text-zinc-700 dark:text-zinc-300 cursor-pointer"
               title="Refresh search results"
             >
               <RefreshCw className={`w-3 h-3 ${isSearching ? 'animate-spin' : ''}`} />
@@ -513,13 +513,13 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="deck:English tag:B1..."
-                className="w-full px-2.5 py-1.5 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600 focus:border-blue-500 bg-transparent text-xs font-medium rounded-none focus:outline-none transition-colors text-zinc-900 dark:text-zinc-100 font-mono"
+                className="w-full px-2.5 py-1.5 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600 focus:border-blue-600 dark:focus:border-blue-500 bg-white dark:bg-zinc-800 text-xs font-medium rounded-none focus:outline-none transition-colors text-zinc-900 dark:text-zinc-100 font-mono"
               />
               {searchInput && (
                 <button
                   type="button"
                   onClick={() => setSearchInput('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
                   title="Clear search"
                 >
                   <X className="w-3 h-3" />
@@ -538,14 +538,14 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
         </div>
 
         {/* Quick chips / card count */}
-        <div className="flex items-center justify-between text-xs text-zinc-500 mb-3">
-          <span>{totalCount} cards</span>
+        <div className="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400 mb-3">
+          <span className="font-medium">{totalCount} cards</span>
           <div className="flex items-center gap-1 text-[10px]">
             {settings.anki.defaultDeck && (
               <button
                 type="button"
                 onClick={() => handleQuickFilter(`deck:"${settings.anki.defaultDeck}"`)}
-                className="px-1.5 py-0.5 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 text-zinc-600 dark:text-zinc-300 rounded-none cursor-pointer truncate max-w-[100px]"
+                className="px-1.5 py-0.5 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-none cursor-pointer truncate max-w-[100px]"
                 title={settings.anki.defaultDeck}
               >
                 {settings.anki.defaultDeck.split('::').pop()}
@@ -557,7 +557,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
                 setSearchInput('');
                 executeSearch('');
               }}
-              className="px-1.5 py-0.5 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 text-zinc-500 rounded-none cursor-pointer"
+              className="px-1.5 py-0.5 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-none cursor-pointer"
             >
               All
             </button>
@@ -565,9 +565,9 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
         </div>
 
         {/* Compact Column Table */}
-        <div className="flex-1 flex flex-col min-h-0 border border-zinc-200 dark:border-zinc-800">
+        <div className="flex-1 flex flex-col min-h-0 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
           {/* Table Header: Word | Deck | Note Type | Tags */}
-          <div className="grid grid-cols-12 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400">
+          <div className="grid grid-cols-12 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-750 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
             <div className="col-span-4 truncate">Word</div>
             <div className="col-span-3 truncate">Deck</div>
             <div className="col-span-3 truncate">Note Type</div>
@@ -575,19 +575,19 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
           </div>
 
           {/* Table Body */}
-          <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-zinc-100 dark:divide-zinc-850">
+          <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-zinc-200 dark:divide-zinc-800">
             {isSearching ? (
-              <div className="p-4 text-center text-xs text-zinc-400 flex items-center justify-center gap-1.5">
+              <div className="p-4 text-center text-xs text-zinc-500 dark:text-zinc-400 flex items-center justify-center gap-1.5">
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
                 <span>Searching cards...</span>
               </div>
             ) : searchError ? (
-              <div className="p-3 text-xs text-rose-500">
+              <div className="p-3 text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/20">
                 <p className="font-semibold">Query Error</p>
                 <p className="text-[11px] mt-0.5">{searchError}</p>
               </div>
             ) : notes.length === 0 ? (
-              <div className="p-4 text-center text-xs text-zinc-400">
+              <div className="p-4 text-center text-xs text-zinc-500 dark:text-zinc-400">
                 No cards found
               </div>
             ) : (
@@ -604,27 +604,27 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
                     onClick={() => handleSelectCard(index)}
                     className={`grid grid-cols-12 px-2 py-1.5 text-xs transition-colors cursor-pointer items-center border-l-2 ${
                       isSelected
-                        ? 'bg-blue-50 dark:bg-blue-950/40 border-l-blue-600 text-blue-600 dark:text-blue-400 font-semibold'
-                        : 'border-l-transparent text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-850'
+                        ? 'bg-blue-50 dark:bg-blue-950/60 border-l-blue-600 dark:border-l-blue-500 text-blue-900 dark:text-blue-200 font-semibold'
+                        : 'border-l-transparent text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                     }`}
                   >
                     {/* Word */}
-                    <div className="col-span-4 truncate pr-1 font-medium" title={note.word}>
+                    <div className={`col-span-4 truncate pr-1 font-semibold ${isSelected ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-900 dark:text-zinc-100'}`} title={note.word}>
                       {note.word}
                     </div>
 
                     {/* Deck */}
-                    <div className="col-span-3 truncate pr-1 text-zinc-500 dark:text-zinc-400 text-[11px]" title={note.deckName}>
+                    <div className="col-span-3 truncate pr-1 text-zinc-600 dark:text-zinc-400 text-[11px]" title={note.deckName}>
                       {cleanDeck}
                     </div>
 
                     {/* Note Type */}
-                    <div className="col-span-3 truncate pr-1 text-zinc-500 dark:text-zinc-400 text-[10px]" title={rawModel}>
+                    <div className="col-span-3 truncate pr-1 text-zinc-600 dark:text-zinc-400 text-[10px]" title={rawModel}>
                       {cleanModel}
                     </div>
 
                     {/* Tags */}
-                    <div className="col-span-2 truncate text-zinc-400 dark:text-zinc-500 text-[10px]" title={tagsStr}>
+                    <div className="col-span-2 truncate text-zinc-500 dark:text-zinc-400 text-[10px]" title={tagsStr}>
                       {tagsStr}
                     </div>
                   </div>
@@ -636,7 +636,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
       </div>
 
       {/* RIGHT COLUMN: 75% width - Shared Card Editor */}
-      <div className="w-full md:w-3/4 flex-1 min-w-0 p-4 sm:p-6 flex flex-col">
+      <div className="w-full md:w-3/4 flex-1 min-w-0 p-4 sm:p-6 flex flex-col bg-zinc-50 dark:bg-zinc-950">
         {selectedNote && editingCard ? (
           <UnifiedCardEditor
             cardData={editingCard}

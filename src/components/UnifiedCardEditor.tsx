@@ -9,24 +9,29 @@ import {
   getBackCustomBlocks,
   getAllCustomBlocks,
 } from '../types';
-import { THEMES, resolveThemeFromNoteType, makeSpellingSentence, getContrastTextColor, getHarmonizedBorder } from '../themes';
+import {
+  THEMES,
+  resolveThemeFromNoteType,
+  makeSpellingSentence,
+  getContrastTextColor,
+  getHarmonizedBorder,
+  SHARED_CARD_CSS,
+  getThemeCardClasses,
+  isRTLText,
+} from '../themes';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
 import { getAnkiTags, getAnkiModelNames } from '../services/api';
-import { applyHtmlFormattingToText, formatCardFieldHtml, HtmlToolbarAction } from '../utils/markdown';
+import { applyHtmlFormattingToText, HtmlToolbarAction } from '../utils/markdown';
 import {
   Volume2,
   Save,
   CheckCircle2,
-  X,
   Plus,
   Loader2,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
   Search,
-  Upload,
-  Trash2,
 } from 'lucide-react';
 
 export const APP_THEME_NOTE_TYPES = [
@@ -209,6 +214,68 @@ export interface UnifiedCardEditorProps {
   ankiUrl?: string;
 }
 
+/**
+ * Auto-resizing textarea that inherits exact typography from its theme container
+ * and grows dynamically without any text clipping.
+ */
+const AutoResizingTextarea: React.FC<{
+  value: string;
+  onChange: (val: string) => void;
+  onFocus?: (el: HTMLTextAreaElement) => void;
+  placeholder?: string;
+  className?: string;
+  style?: React.CSSProperties;
+  dir?: 'rtl' | 'ltr' | 'auto';
+  rows?: number;
+}> = ({
+  value,
+  onChange,
+  onFocus,
+  placeholder = '',
+  className = '',
+  style = {},
+  dir,
+  rows = 1,
+}) => {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  const resize = useCallback(() => {
+    if (ref.current) {
+      ref.current.style.height = 'auto';
+      ref.current.style.height = `${ref.current.scrollHeight}px`;
+    }
+  }, []);
+
+  useEffect(() => {
+    resize();
+  }, [value, resize]);
+
+  return (
+    <textarea
+      ref={ref}
+      rows={rows}
+      dir={dir}
+      value={value}
+      onChange={(e) => {
+        onChange(e.target.value);
+        resize();
+      }}
+      onInput={resize}
+      onFocus={(e) => {
+        resize();
+        if (onFocus) onFocus(e.target);
+      }}
+      placeholder={placeholder}
+      className={`theme-inline-editable ${className}`}
+      style={{
+        ...style,
+        resize: 'none',
+        overflow: 'hidden',
+      }}
+    />
+  );
+};
+
 export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
   cardData,
   emptyWordPlaceholder = 'Word',
@@ -244,7 +311,6 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
   // Card view state
   const [activeSide, setActiveSide] = useState<'front' | 'back'>('back');
   const [activeMode, setActiveMode] = useState<CardType>(initialCardType);
-  const [isEditing, setIsEditing] = useState<boolean>(true);
 
   // Available Note Types
   const [ankiModelNames, setAnkiModelNames] = useState<string[]>(propAvailableNoteTypes || []);
@@ -260,14 +326,20 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
     }
   }, [propAvailableNoteTypes, ankiUrl]);
 
-  // Current note type
+  // Current note type & resolved theme definition
   const currentNoteType = propNoteType || cardData?.modelName || cardData?.noteType || 'AI Vocabulary - Comic Pop (Dark) (Normal)';
+
+  const activeThemeId = useMemo(() => {
+    return resolveThemeFromNoteType(currentNoteType, (initialThemeId as ThemeId) || 'comic-pop-dark');
+  }, [currentNoteType, initialThemeId]);
+
+  const theme = THEMES[activeThemeId] || THEMES['comic-pop-dark'];
+  const themeClasses = useMemo(() => getThemeCardClasses(activeThemeId), [activeThemeId]);
 
   const handleSelectNoteType = (newModelName: string) => {
     if (onNoteTypeChange) {
       onNoteTypeChange(newModelName);
     }
-    // Detect spelling vs normal
     let detectedMode = activeMode;
     if (/(\b|_|\(|-)spell(ing)?(\b|_|\)|-)/i.test(newModelName)) {
       detectedMode = 'spelling';
@@ -401,7 +473,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
     const newBox: CustomCardBlock = {
       id: `box_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       side: activeSide,
-      title: activeSide === 'front' ? 'Note / Hint' : 'Extra Note',
+      title: activeSide === 'front' ? 'Note / Context' : 'Extra Note',
       content: '',
       color: isDark ? '#1E293B' : '#F1F5F9',
       borderColor: isDark ? '#334155' : '#CBD5E1',
@@ -441,9 +513,9 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
     });
   };
 
-  // Card Background and Border Colors
-  const cardBgColor = cardData?.mainBoxStyles?.card?.bgColor || (isDark ? '#18181B' : '#FFFFFF');
-  const cardBorderColor = cardData?.mainBoxStyles?.card?.borderColor || (isDark ? '#27272A' : '#E4E4E7');
+  // Card Background and Border Colors (MainBoxStyles)
+  const cardCustomBg = cardData?.mainBoxStyles?.card?.bgColor;
+  const cardCustomBorder = cardData?.mainBoxStyles?.card?.borderColor;
 
   const setCardBg = (color: string) => {
     if (!cardData || !onCardChange) return;
@@ -502,20 +574,87 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
     }
   };
 
-  const displayWord = cardData?.word || emptyWordPlaceholder;
   const spellingSentence = cardData?.spellingSentence || makeSpellingSentence(cardData?.example || '', cardData?.word || '');
+
+  // Theme family detection
+  const isQuest = activeThemeId.includes('quest') || activeThemeId.includes('manga') || activeThemeId.includes('arcade');
+  const isPop = activeThemeId.includes('pop') || activeThemeId.includes('strip') || activeThemeId === 'comic-light' || activeThemeId === 'comic-dark';
+  const isNotebook = activeThemeId.includes('notebook');
+  const isBotanical = activeThemeId.includes('botanical');
+  const isMinimal = activeThemeId.includes('minimal');
 
   return (
     <div className="w-full flex-1 flex flex-col min-w-0 select-text">
+      {/* Dynamic Theme CSS Injection */}
+      <style key={activeThemeId}>
+        {`
+          ${theme.css}
+          ${SHARED_CARD_CSS}
+
+          /* Editor canvas adaptations */
+          .editor-canvas-wrapper .card {
+            min-height: auto !important;
+            height: auto !important;
+            box-sizing: border-box !important;
+          }
+          .editor-canvas-wrapper .comic-card-wrapper,
+          .editor-canvas-wrapper .botanical-wrapper,
+          .editor-canvas-wrapper .minimal-card-wrapper {
+            min-height: auto !important;
+            height: auto !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+          }
+          .editor-canvas-wrapper .quest-card,
+          .editor-canvas-wrapper .comic-card,
+          .editor-canvas-wrapper .notebook-sheet,
+          .editor-canvas-wrapper .botanical-card,
+          .editor-canvas-wrapper .minimal-card {
+            min-height: auto !important;
+            height: auto !important;
+            box-sizing: border-box !important;
+          }
+
+          /* Seamless in-place editable fields that dynamically grow */
+          .theme-inline-editable {
+            background: transparent !important;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            resize: none !important;
+            overflow: hidden !important;
+            color: inherit !important;
+            font-family: inherit !important;
+            font-size: inherit !important;
+            font-weight: inherit !important;
+            line-height: inherit !important;
+            letter-spacing: inherit !important;
+            text-align: inherit !important;
+            transition: outline 0.15s ease;
+          }
+          .theme-inline-editable:hover {
+            outline: 1px dashed rgba(59, 130, 246, 0.45) !important;
+            outline-offset: 2px !important;
+          }
+          .theme-inline-editable:focus {
+            outline: 1.5px solid rgba(59, 130, 246, 0.9) !important;
+            outline-offset: 2px !important;
+          }
+        `}
+      </style>
+
       {/* ======================================================== */}
-      {/* 6. EDITOR HEADER                                         */}
-      {/* Note Type                       Tags                      */}
-      {/* [ Duolingo Card ▼ ]            B1  vocabulary  +         */}
+      {/* 1. EDITOR HEADER                                         */}
+      {/* Note Type                       Tags         Save         */}
       {/* ======================================================== */}
       <div className="w-full flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800 text-xs">
         {/* Left: Note Type */}
         <div className="flex items-center gap-2 min-w-0">
-          <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 shrink-0">
+          <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 shrink-0">
             Note Type
           </label>
           <div className="relative">
@@ -540,7 +679,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
             </select>
           </div>
           {isNoteTypeDetected && (
-            <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-none">
+            <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-none font-semibold">
               Detected
             </span>
           )}
@@ -550,20 +689,20 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
         <div className="flex items-center gap-3">
           {/* Tags list + Add popup button */}
           <div className="relative flex items-center gap-1.5" ref={tagsPopupRef}>
-            <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+            <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
               Tags
             </span>
             <div className="flex items-center gap-1 flex-wrap">
               {activeTags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 rounded-none"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 rounded-none font-medium"
                 >
                   <span>{tag}</span>
                   <button
                     type="button"
                     onClick={() => handleRemoveTag(tag)}
-                    className="hover:text-rose-500 cursor-pointer"
+                    className="hover:text-rose-500 cursor-pointer ml-0.5"
                   >
                     ×
                   </button>
@@ -580,10 +719,10 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
               </button>
             </div>
 
-            {/* 14. Compact Tag Popup */}
+            {/* Tag Popup */}
             {isTagsOpen && (
               <div className="absolute right-0 top-7 z-50 p-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 shadow-xl rounded-none w-64 space-y-2.5">
-                <div className="flex items-center justify-between text-xs font-semibold border-b border-zinc-200 dark:border-zinc-800 pb-1.5">
+                <div className="flex items-center justify-between text-xs font-semibold border-b border-zinc-200 dark:border-zinc-800 pb-1.5 text-zinc-800 dark:text-zinc-200">
                   <span>Tags</span>
                   <button
                     type="button"
@@ -606,7 +745,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                       }
                     }}
                     placeholder="Add tag..."
-                    className="flex-1 px-2 py-1 text-xs border border-zinc-300 dark:border-zinc-700 bg-transparent text-zinc-900 dark:text-zinc-100 rounded-none focus:outline-none focus:border-blue-500"
+                    className="flex-1 px-2 py-1 text-xs border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-none focus:outline-none focus:border-blue-500"
                   />
                   <button
                     type="button"
@@ -686,695 +825,1555 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
       </div>
 
       {/* ======================================================== */}
-      {/* 7. EDIT / PREVIEW CONTROLS                               */}
-      {/* Front     Back           Standard     Spelling          */}
+      {/* 2. CARD SIDE & FORMATTING CONTROLS                       */}
+      {/* Front   Back    |  Standard   Spelling  |  BG ■  Border ■   */}
       {/* ======================================================== */}
       <div className="flex flex-wrap items-center justify-between gap-3 py-2.5 border-b border-zinc-200 dark:border-zinc-800 text-xs">
-        {/* Front / Back Toggle */}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setActiveSide('front')}
-            className={`px-3 py-1 font-medium rounded-none border transition-colors cursor-pointer ${
-              activeSide === 'front'
-                ? 'bg-blue-600 text-white border-blue-600 font-semibold'
-                : 'border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
-            }`}
-          >
-            Front
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSide('back')}
-            className={`px-3 py-1 font-medium rounded-none border transition-colors cursor-pointer ${
-              activeSide === 'back'
-                ? 'bg-blue-600 text-white border-blue-600 font-semibold'
-                : 'border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
-            }`}
-          >
-            Back
-          </button>
-        </div>
-
-        {/* Standard / Spelling Mode */}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveMode('normal');
-              updateField('cardType', 'normal');
-            }}
-            className={`px-3 py-1 font-medium rounded-none border transition-colors cursor-pointer ${
-              activeMode === 'normal'
-                ? 'bg-blue-600 text-white border-blue-600 font-semibold'
-                : 'border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
-            }`}
-          >
-            Standard
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveMode('spelling');
-              updateField('cardType', 'spelling');
-            }}
-            className={`px-3 py-1 font-medium rounded-none border transition-colors cursor-pointer ${
-              activeMode === 'spelling'
-                ? 'bg-blue-600 text-white border-blue-600 font-semibold'
-                : 'border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
-            }`}
-          >
-            Spelling
-          </button>
-        </div>
-
-        {/* Edit / Preview Toggle */}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setIsEditing(true)}
-            className={`px-3 py-1 font-medium rounded-none border transition-colors cursor-pointer ${
-              isEditing
-                ? 'bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900 border-zinc-800 dark:border-zinc-200 font-semibold'
-                : 'border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
-            }`}
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsEditing(false)}
-            className={`px-3 py-1 font-medium rounded-none border transition-colors cursor-pointer ${
-              !isEditing
-                ? 'bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900 border-zinc-800 dark:border-zinc-200 font-semibold'
-                : 'border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
-            }`}
-          >
-            Preview
-          </button>
-        </div>
-      </div>
-
-      {/* ======================================================== */}
-      {/* 10. TOOLBAR & 9. CARD BG & BORDER COLORS                 */}
-      {/* BG ■   Border ■       B  I  U  Color ■  Highlight ■       */}
-      {/* ======================================================== */}
-      <div className="flex flex-wrap items-center justify-between gap-3 py-2 border-b border-zinc-200 dark:border-zinc-800 text-xs mb-4">
-        {/* Card Background and Border Controls */}
+        {/* Front / Back Toggle & Standard / Spelling Toggle */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-zinc-600 dark:text-zinc-400 text-xs">BG</span>
-            <ColorSwatchPicker
-              label="Card Background"
-              value={cardBgColor}
-              defaultValue={isDark ? '#18181B' : '#FFFFFF'}
-              onChange={setCardBg}
-            />
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setActiveSide('front')}
+              className={`px-3 py-1 font-medium rounded-none border transition-colors cursor-pointer ${
+                activeSide === 'front'
+                  ? 'bg-blue-600 text-white border-blue-600 font-semibold'
+                  : 'border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+              }`}
+            >
+              Front
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveSide('back')}
+              className={`px-3 py-1 font-medium rounded-none border transition-colors cursor-pointer ${
+                activeSide === 'back'
+                  ? 'bg-blue-600 text-white border-blue-600 font-semibold'
+                  : 'border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+              }`}
+            >
+              Back
+            </button>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-zinc-600 dark:text-zinc-400 text-xs">Border</span>
-            <ColorSwatchPicker
-              label="Card Border"
-              value={cardBorderColor}
-              defaultValue={isDark ? '#27272A' : '#E4E4E7'}
-              onChange={setCardBorder}
-            />
+
+          <div className="h-4 w-px bg-zinc-300 dark:border-zinc-700" />
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveMode('normal');
+                updateField('cardType', 'normal');
+              }}
+              className={`px-3 py-1 font-medium rounded-none border transition-colors cursor-pointer ${
+                activeMode === 'normal'
+                  ? 'bg-blue-600 text-white border-blue-600 font-semibold'
+                  : 'border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+              }`}
+            >
+              Standard
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveMode('spelling');
+                updateField('cardType', 'spelling');
+              }}
+              className={`px-3 py-1 font-medium rounded-none border transition-colors cursor-pointer ${
+                activeMode === 'spelling'
+                  ? 'bg-blue-600 text-white border-blue-600 font-semibold'
+                  : 'border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+              }`}
+            >
+              Spelling
+            </button>
           </div>
         </div>
 
-        {/* Minimal Formatting Toolbar */}
-        <div className="flex items-center gap-1 border border-zinc-200 dark:border-zinc-800 px-1 py-0.5 bg-zinc-50 dark:bg-zinc-900 rounded-none">
-          <button
-            type="button"
-            onClick={() => applyFormat('bold')}
-            className="w-6 h-6 font-bold hover:bg-zinc-200 dark:hover:bg-zinc-800 flex items-center justify-center cursor-pointer rounded-none"
-            title="Bold (Ctrl+B)"
-          >
-            B
-          </button>
-          <button
-            type="button"
-            onClick={() => applyFormat('italic')}
-            className="w-6 h-6 italic font-serif hover:bg-zinc-200 dark:hover:bg-zinc-800 flex items-center justify-center cursor-pointer rounded-none"
-            title="Italic (Ctrl+I)"
-          >
-            I
-          </button>
-          <button
-            type="button"
-            onClick={() => applyFormat('underline')}
-            className="w-6 h-6 underline hover:bg-zinc-200 dark:hover:bg-zinc-800 flex items-center justify-center cursor-pointer rounded-none"
-            title="Underline (Ctrl+U)"
-          >
-            U
-          </button>
-
-          <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-700 mx-1" />
-
-          {/* Text Color */}
-          <div className="flex items-center gap-1 px-1">
-            <span className="text-[11px] font-semibold text-zinc-500">Color</span>
-            <ColorSwatchPicker
-              label="Text Color"
-              defaultValue="#38BDF8"
-              onChange={(c) => applyFormat('color', c)}
-            />
+        {/* Card Background / Border and Formatting Toolbar */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1">
+              <span className="font-semibold text-zinc-600 dark:text-zinc-400 text-xs">BG</span>
+              <ColorSwatchPicker
+                label="Card BG"
+                value={cardCustomBg}
+                defaultValue={isDark ? '#18181B' : '#FFFFFF'}
+                onChange={setCardBg}
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="font-semibold text-zinc-600 dark:text-zinc-400 text-xs">Border</span>
+              <ColorSwatchPicker
+                label="Card Border"
+                value={cardCustomBorder}
+                defaultValue={isDark ? '#27272A' : '#E4E4E7'}
+                onChange={setCardBorder}
+              />
+            </div>
           </div>
 
-          {/* Highlight */}
-          <div className="flex items-center gap-1 px-1">
-            <span className="text-[11px] font-semibold text-zinc-500">Highlight</span>
-            <ColorSwatchPicker
-              label="Highlight"
-              defaultValue="#FEF08A"
-              onChange={(c) => applyFormat('highlight', c)}
-            />
+          {/* Minimal Rich Text Formatting Toolbar */}
+          <div className="flex items-center gap-0.5 border border-zinc-200 dark:border-zinc-800 px-1 py-0.5 bg-white dark:bg-zinc-900 rounded-none">
+            <button
+              type="button"
+              onClick={() => applyFormat('bold')}
+              className="w-6 h-6 font-bold hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center justify-center cursor-pointer rounded-none"
+              title="Bold"
+            >
+              B
+            </button>
+            <button
+              type="button"
+              onClick={() => applyFormat('italic')}
+              className="w-6 h-6 italic font-serif hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center justify-center cursor-pointer rounded-none"
+              title="Italic"
+            >
+              I
+            </button>
+            <button
+              type="button"
+              onClick={() => applyFormat('underline')}
+              className="w-6 h-6 underline hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center justify-center cursor-pointer rounded-none"
+              title="Underline"
+            >
+              U
+            </button>
+            <div className="h-3.5 w-px bg-zinc-300 dark:bg-zinc-700 mx-1" />
+            <div className="flex items-center gap-1 px-1">
+              <span className="text-[11px] font-semibold text-zinc-500">Color</span>
+              <ColorSwatchPicker
+                label="Text Color"
+                defaultValue="#38BDF8"
+                onChange={(c) => applyFormat('color', c)}
+              />
+            </div>
+            <div className="flex items-center gap-1 px-1">
+              <span className="text-[11px] font-semibold text-zinc-500">Highlight</span>
+              <ColorSwatchPicker
+                label="Highlight"
+                defaultValue="#FEF08A"
+                onChange={(c) => applyFormat('highlight', c)}
+              />
+            </div>
           </div>
         </div>
       </div>
 
       {/* ======================================================== */}
-      {/* 8. CARD WORKSPACE                                        */}
-      {/* Sits directly in the workspace, no large enclosing frame */}
+      {/* 3. WORKSPACE CANVAS: REAL THEME CARD PREVIEW & EDITOR    */}
+      {/* Directly renders the exact theme layout & CSS            */}
       {/* ======================================================== */}
-      <div className="w-full flex-1 flex flex-col items-center justify-start min-h-0 py-2">
+      <div className="w-full flex-1 flex flex-col items-center justify-start min-h-0 py-4 px-2 sm:px-4 bg-zinc-100/60 dark:bg-zinc-950/60 overflow-y-auto">
         <div
-          className="w-full max-w-2xl p-6 transition-all duration-150"
+          className="editor-canvas-wrapper w-full max-w-2xl transition-all duration-150"
           style={{
-            backgroundColor: cardBgColor,
-            borderColor: cardBorderColor,
-            borderWidth: '1.5px',
-            borderStyle: 'solid',
+            ...(cardCustomBg ? { backgroundColor: cardCustomBg } : {}),
+            ...(cardCustomBorder ? { borderColor: cardCustomBorder, borderStyle: 'solid', borderWidth: '2px' } : {}),
           }}
         >
-          {/* ========================================== */}
-          {/* FRONT SIDE RENDERING                      */}
-          {/* ========================================== */}
-          {activeSide === 'front' && (
-            <div className="space-y-4">
-              {activeMode === 'normal' ? (
-                /* Standard Front */
-                <div className="space-y-3">
-                  {/* Word Title */}
-                  <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={cardData?.word || ''}
-                        onChange={(e) => updateField('word', e.target.value)}
-                        onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'word' })}
-                        placeholder="Word"
-                        className="text-2xl font-black w-full bg-transparent border-0 focus:outline-none tracking-tight text-zinc-900 dark:text-zinc-100"
-                      />
+          {/* ====================================================== */}
+          {/* THEME A: DUOLINGO (Duo Quest Light & Dark)             */}
+          {/* ====================================================== */}
+          {isQuest && (
+            <div className={`comic-card-wrapper theme-quest`}>
+              <div className={`quest-card ${activeMode === 'spelling' ? 'spelling-quest' : ''}`}>
+                {/* 1. Quest Top Bar */}
+                <div className="quest-top-bar">
+                  <div className={`quest-level-pill ${activeMode === 'spelling' ? 'pill-spelling' : ''} flex items-center gap-1`}>
+                    {activeMode === 'spelling' ? (
+                      <span>SPELLING EXERCISE</span>
                     ) : (
-                      <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-100">
-                        {displayWord}
-                      </h1>
-                    )}
-
-                    {/* Phonetic & Part of Speech */}
-                    <div className="flex items-center gap-2 mt-1">
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={cardData?.phonetic || ''}
-                          onChange={(e) => updateField('phonetic', e.target.value)}
-                          onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'phonetic' })}
-                          placeholder="/IPA/"
-                          className="text-xs font-mono italic bg-transparent border-0 focus:outline-none text-zinc-500 w-32"
-                        />
-                      ) : (
-                        cardData?.phonetic && (
-                          <span className="text-xs font-mono italic text-zinc-500">{cardData.phonetic}</span>
-                        )
-                      )}
-
-                      {isEditing ? (
+                      <>
+                        <span>LEVEL 1 •</span>
                         <input
                           type="text"
                           value={cardData?.partOfSpeech || ''}
                           onChange={(e) => updateField('partOfSpeech', e.target.value)}
                           onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' })}
-                          placeholder="part of speech"
-                          className="text-xs uppercase bg-transparent border-0 focus:outline-none text-blue-500 w-28 font-bold"
+                          placeholder="POS"
+                          className="bg-transparent border-none outline-none font-black text-inherit uppercase w-16"
                         />
-                      ) : (
-                        cardData?.partOfSpeech && (
-                          <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
-                            {cardData.partOfSpeech}
-                          </span>
-                        )
+                      </>
+                    )}
+                  </div>
+                  <div className="quest-points">
+                    {activeMode === 'spelling' ? '★ 20 XP' : '★ 10 XP'}
+                  </div>
+                </div>
+
+                {/* 2. Illustration */}
+                {cardData?.imageBase64 ? (
+                  <div className="relative group mb-3">
+                    <img
+                      src={cardData.imageBase64}
+                      alt={cardData.word}
+                      className="card-illustration"
+                    />
+                    {onRemoveImage && (
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={onRemoveImage}
+                          className="px-2 py-1 text-[11px] bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer rounded"
+                        >
+                          Remove Image
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  onOpenImageSearch && (
+                    <div className="flex justify-end mb-2">
+                      <button
+                        type="button"
+                        onClick={onOpenImageSearch}
+                        className="text-[11px] font-bold text-zinc-500 hover:text-blue-500 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Search className="w-3 h-3" />
+                        <span>+ Add Image</span>
+                      </button>
+                    </div>
+                  )
+                )}
+
+                {/* 3. Normal Mode Front */}
+                {activeSide === 'front' && activeMode === 'normal' && (
+                  <>
+                    <div className="quest-hero">
+                      <AutoResizingTextarea
+                        value={cardData?.word || ''}
+                        onChange={(val) => updateField('word', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'word' })}
+                        placeholder={emptyWordPlaceholder}
+                        className="quest-word text-center"
+                      />
+                      <input
+                        type="text"
+                        value={cardData?.phonetic || ''}
+                        onChange={(e) => updateField('phonetic', e.target.value)}
+                        onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'phonetic' })}
+                        placeholder="/IPA/"
+                        className="quest-ipa text-center bg-transparent border-none outline-none w-full"
+                      />
+                    </div>
+
+                    <div className="quest-sound-dock">
+                      <div className="sound-card us-card">
+                        <span className="dock-flag">🇺🇸 American</span>
+                        <div className="dock-actions">
+                          {cardData?.wordAudioUsNormalBase64 && (
+                            <button
+                              type="button"
+                              onClick={() => handlePlayAudio(cardData.wordAudioUsNormalBase64)}
+                              className="px-2.5 py-1 text-xs font-black bg-[#58CC02] hover:bg-[#46A302] text-white rounded-lg border-2 border-black shadow-[0_2px_0_#000] flex items-center gap-1 cursor-pointer"
+                            >
+                              <Volume2 className="w-3.5 h-3.5" />
+                              <span>Normal</span>
+                            </button>
+                          )}
+                          {cardData?.wordAudioUsSlowBase64 && (
+                            <button
+                              type="button"
+                              onClick={() => handlePlayAudio(cardData.wordAudioUsSlowBase64)}
+                              className="px-2 py-1 text-xs font-bold bg-white hover:bg-zinc-100 text-zinc-800 rounded-lg border-2 border-black shadow-[0_2px_0_#000] flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>🐢 Slow</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="sound-card uk-card">
+                        <span className="dock-flag">🇬🇧 British</span>
+                        <div className="dock-actions">
+                          {cardData?.wordAudioUkNormalBase64 && (
+                            <button
+                              type="button"
+                              onClick={() => handlePlayAudio(cardData.wordAudioUkNormalBase64)}
+                              className="px-2.5 py-1 text-xs font-black bg-[#38BDF8] hover:bg-[#0284C7] text-white rounded-lg border-2 border-black shadow-[0_2px_0_#000] flex items-center gap-1 cursor-pointer"
+                            >
+                              <Volume2 className="w-3.5 h-3.5" />
+                              <span>Normal</span>
+                            </button>
+                          )}
+                          {cardData?.wordAudioUkSlowBase64 && (
+                            <button
+                              type="button"
+                              onClick={() => handlePlayAudio(cardData.wordAudioUkSlowBase64)}
+                              className="px-2 py-1 text-xs font-bold bg-white hover:bg-zinc-100 text-zinc-800 rounded-lg border-2 border-black shadow-[0_2px_0_#000] flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>🐢 Slow</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="quest-example-card">
+                      <div className="example-quest-header">
+                        <span className="quest-tag">SENTENCE CHALLENGE</span>
+                      </div>
+                      <AutoResizingTextarea
+                        value={cardData?.example || ''}
+                        onChange={(val) => updateField('example', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                        placeholder="Context / Example Sentence..."
+                        className="quest-sentence"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* 4. Spelling Mode Front */}
+                {activeSide === 'front' && activeMode === 'spelling' && (
+                  <>
+                    <div className="quest-prompt-center">
+                      <div className="quest-instruction">Listen and type the missing word:</div>
+                      <AutoResizingTextarea
+                        value={spellingSentence}
+                        onChange={(val) => updateField('spellingSentence', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'spellingSentence' })}
+                        placeholder="Listen and fill in the missing word..."
+                        className="quest-fill-sentence text-center"
+                      />
+                    </div>
+
+                    <div className="quest-sound-dock-compact">
+                      <span className="sound-label font-bold text-zinc-700 dark:text-zinc-300">🔊 Pronunciation:</span>
+                      {cardData?.wordAudioUsNormalBase64 && (
+                        <button
+                          type="button"
+                          onClick={() => handlePlayAudio(cardData.wordAudioUsNormalBase64)}
+                          className="px-2.5 py-1 text-xs font-bold bg-[#58CC02] hover:bg-[#46A302] text-white rounded-lg border-2 border-black shadow-[0_2px_0_#000] cursor-pointer"
+                        >
+                          US Normal
+                        </button>
+                      )}
+                      {cardData?.wordAudioUsSlowBase64 && (
+                        <button
+                          type="button"
+                          onClick={() => handlePlayAudio(cardData.wordAudioUsSlowBase64)}
+                          className="px-2 py-1 text-xs font-bold bg-white text-zinc-800 rounded-lg border-2 border-black shadow-[0_2px_0_#000] cursor-pointer"
+                        >
+                          🐢 Slow
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="spelling-interactive-area my-3 flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="text"
+                        value={userSpellingInput}
+                        onChange={(e) => {
+                          setUserSpellingInput(e.target.value);
+                          setSpellingStatus('idle');
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleCheckSpelling();
+                          }
+                        }}
+                        placeholder="Type answer here..."
+                        className="quest-input flex-1 px-3 py-2 border-3 border-black text-base font-black rounded-xl bg-white text-zinc-900"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCheckSpelling}
+                        className="quest-btn cursor-pointer font-black"
+                      >
+                        CHECK ANSWER
+                      </button>
+                    </div>
+
+                    {spellingStatus === 'correct' && (
+                      <div className="p-3 my-2 border-3 border-black bg-[#DCFCE7] text-[#15803D] font-black text-center rounded-xl shadow-[0_3px_0_#000]">
+                        ✓ EXCELLENT! {cardData?.word}
+                      </div>
+                    )}
+                    {spellingStatus === 'incorrect' && (
+                      <div className="p-3 my-2 border-3 border-black bg-[#FFE4E6] text-[#BE123C] font-black text-center rounded-xl shadow-[0_3px_0_#000]">
+                        ✕ TARGET WORD: {cardData?.word}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* 5. Back Side (Both Normal & Spelling) */}
+                {activeSide === 'back' && (
+                  <>
+                    <div className="quest-hero">
+                      <AutoResizingTextarea
+                        value={cardData?.word || ''}
+                        onChange={(val) => updateField('word', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'word' })}
+                        placeholder={emptyWordPlaceholder}
+                        className="quest-word text-center"
+                      />
+                      <input
+                        type="text"
+                        value={cardData?.phonetic || ''}
+                        onChange={(e) => updateField('phonetic', e.target.value)}
+                        onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'phonetic' })}
+                        placeholder="/IPA/"
+                        className="quest-ipa text-center bg-transparent border-none outline-none w-full"
+                      />
+                    </div>
+
+                    <div className="quest-sound-dock">
+                      <div className="sound-card us-card">
+                        <span className="dock-flag">🇺🇸 American</span>
+                        <div className="dock-actions">
+                          {cardData?.wordAudioUsNormalBase64 && (
+                            <button
+                              type="button"
+                              onClick={() => handlePlayAudio(cardData.wordAudioUsNormalBase64)}
+                              className="px-2.5 py-1 text-xs font-black bg-[#58CC02] hover:bg-[#46A302] text-white rounded-lg border-2 border-black shadow-[0_2px_0_#000] flex items-center gap-1 cursor-pointer"
+                            >
+                              <Volume2 className="w-3.5 h-3.5" />
+                              <span>Normal</span>
+                            </button>
+                          )}
+                          {cardData?.wordAudioUsSlowBase64 && (
+                            <button
+                              type="button"
+                              onClick={() => handlePlayAudio(cardData.wordAudioUsSlowBase64)}
+                              className="px-2 py-1 text-xs font-bold bg-white hover:bg-zinc-100 text-zinc-800 rounded-lg border-2 border-black shadow-[0_2px_0_#000] flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>🐢 Slow</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="sound-card uk-card">
+                        <span className="dock-flag">🇬🇧 British</span>
+                        <div className="dock-actions">
+                          {cardData?.wordAudioUkNormalBase64 && (
+                            <button
+                              type="button"
+                              onClick={() => handlePlayAudio(cardData.wordAudioUkNormalBase64)}
+                              className="px-2.5 py-1 text-xs font-black bg-[#38BDF8] hover:bg-[#0284C7] text-white rounded-lg border-2 border-black shadow-[0_2px_0_#000] flex items-center gap-1 cursor-pointer"
+                            >
+                              <Volume2 className="w-3.5 h-3.5" />
+                              <span>Normal</span>
+                            </button>
+                          )}
+                          {cardData?.wordAudioUkSlowBase64 && (
+                            <button
+                              type="button"
+                              onClick={() => handlePlayAudio(cardData.wordAudioUkSlowBase64)}
+                              className="px-2 py-1 text-xs font-bold bg-white hover:bg-zinc-100 text-zinc-800 rounded-lg border-2 border-black shadow-[0_2px_0_#000] flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>🐢 Slow</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Persian Meaning Banner */}
+                    <div className="quest-meaning-banner">
+                      <span className="meaning-quest-label">PERSIAN MEANING</span>
+                      <AutoResizingTextarea
+                        value={cardData?.meaningFa || ''}
+                        onChange={(val) => updateField('meaningFa', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'meaningFa' })}
+                        placeholder="معنی فارسی..."
+                        dir="rtl"
+                        className="quest-meaning-fa"
+                      />
+                    </div>
+
+                    {/* English Definition Card */}
+                    <div className="quest-definition-card">
+                      <span className="quest-tag-blue">ENGLISH DEFINITION</span>
+                      <AutoResizingTextarea
+                        value={cardData?.definitionEn || ''}
+                        onChange={(val) => updateField('definitionEn', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'definitionEn' })}
+                        placeholder="English definition..."
+                        className="quest-definition-text"
+                      />
+                    </div>
+
+                    {/* Example & Translation Card */}
+                    <div className="quest-example-card">
+                      <div className="example-quest-header">
+                        <span className="quest-tag">EXAMPLE & TRANSLATION</span>
+                      </div>
+                      <AutoResizingTextarea
+                        value={cardData?.example || ''}
+                        onChange={(val) => updateField('example', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                        placeholder="Example sentence..."
+                        className="quest-sentence"
+                      />
+                      <AutoResizingTextarea
+                        value={cardData?.translationFa || ''}
+                        onChange={(val) => updateField('translationFa', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'translationFa' })}
+                        placeholder="ترجمه مثال..."
+                        dir="rtl"
+                        className="quest-translation-fa"
+                      />
+                    </div>
+
+                    {/* Memory Hook Mnemonic Card */}
+                    <div className="quest-mnemonic-card">
+                      <span className="quest-tag-purple">💡 MEMORY HOOK</span>
+                      <AutoResizingTextarea
+                        value={cardData?.mnemonic || ''}
+                        onChange={(val) => updateField('mnemonic', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'mnemonic' })}
+                        placeholder="کد یادسپاری یا نکته طلایی..."
+                        className="quest-mnemonic"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* 6. Custom Blocks (Front or Back) */}
+                {currentSideBlocks.map((blk) => (
+                  <div
+                    key={blk.id}
+                    className="quest-mnemonic-card custom-card-block relative group mt-3"
+                    style={{
+                      backgroundColor: blk.color,
+                      borderColor: blk.borderColor,
+                      boxShadow: `0 3px 0 ${blk.borderColor || '#000'}`,
+                      color: getContrastTextColor(blk.color),
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2 border-b border-black/10 dark:border-white/10 pb-1 mb-2">
+                      <input
+                        type="text"
+                        value={blk.title}
+                        onChange={(e) => handleUpdateBox(blk.id, { title: e.target.value })}
+                        placeholder="Box Title..."
+                        className="font-black text-xs uppercase bg-transparent border-none outline-none flex-1 text-inherit"
+                      />
+                      <div className="flex items-center gap-2">
+                        <ColorSwatchPicker
+                          label="Box BG"
+                          value={blk.color}
+                          defaultValue={isDark ? '#1E293B' : '#FAF5FF'}
+                          onChange={(c) => handleUpdateBox(blk.id, { color: c })}
+                        />
+                        <ColorSwatchPicker
+                          label="Box Border"
+                          value={blk.borderColor}
+                          defaultValue={blk.color || (isDark ? '#334155' : '#000000')}
+                          onChange={(c) => handleUpdateBox(blk.id, { borderColor: c })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBox(blk.id)}
+                          className="text-inherit opacity-60 hover:opacity-100 hover:text-rose-500 text-xs px-1 cursor-pointer font-bold"
+                          title="Delete Box"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                    <AutoResizingTextarea
+                      value={blk.content}
+                      onChange={(val) => handleUpdateBox(blk.id, { content: val })}
+                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'customBlock', blockId: blk.id })}
+                      placeholder="Custom notes or details..."
+                      dir={blk.dir || (isRTLText(blk.content) ? 'rtl' : 'ltr')}
+                      style={{ color: getContrastTextColor(blk.color) }}
+                      className="quest-mnemonic"
+                    />
+                  </div>
+                ))}
+
+                {/* 7. Add Box Button */}
+                <button
+                  type="button"
+                  onClick={handleAddBox}
+                  className="w-full mt-3 py-2.5 bg-white hover:bg-zinc-50 text-zinc-800 font-extrabold text-xs rounded-xl border-3 border-black shadow-[0_3px_0_#000] flex items-center justify-center gap-1 cursor-pointer transition-transform active:translate-y-0.5"
+                >
+                  <Plus className="w-4 h-4 text-[#58CC02]" />
+                  <span>Add Box ({activeSide === 'front' ? 'Front' : 'Back'})</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ====================================================== */}
+          {/* THEME B: HERO POP / COMIC POP (Light & Dark)           */}
+          {/* ====================================================== */}
+          {isPop && (
+            <div className={`comic-card-wrapper theme-pop`}>
+              <div className={`comic-card ${activeMode === 'spelling' ? 'spelling-card' : ''}`}>
+                {/* Header */}
+                <div className="card-hero-header">
+                  <span className={`hero-badge ${activeMode === 'spelling' ? 'badge-spelling' : ''}`}>
+                    {activeMode === 'spelling' ? '🎯 SPELLING CHALLENGE' : '💥 VOCABULARY'}
+                  </span>
+                  <input
+                    type="text"
+                    value={cardData?.partOfSpeech || ''}
+                    onChange={(e) => updateField('partOfSpeech', e.target.value)}
+                    onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' })}
+                    placeholder="POS"
+                    className="comic-badge badge-pos bg-transparent border-2 border-black uppercase font-black w-20 text-center"
+                  />
+                </div>
+
+                {/* Illustration */}
+                {cardData?.imageBase64 ? (
+                  <div className="relative group mb-3">
+                    <img src={cardData.imageBase64} alt={cardData.word} className="card-illustration" />
+                    {onRemoveImage && (
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={onRemoveImage}
+                          className="px-2 py-1 text-[11px] bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer"
+                        >
+                          Remove Image
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  onOpenImageSearch && (
+                    <div className="flex justify-end mb-2">
+                      <button
+                        type="button"
+                        onClick={onOpenImageSearch}
+                        className="text-[11px] font-bold text-zinc-500 hover:text-blue-500 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Search className="w-3 h-3" />
+                        <span>+ Add Image</span>
+                      </button>
+                    </div>
+                  )
+                )}
+
+                {/* Word Section */}
+                <div className="comic-word-section">
+                  <div className="comic-title-row">
+                    <AutoResizingTextarea
+                      value={cardData?.word || ''}
+                      onChange={(val) => updateField('word', val)}
+                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'word' })}
+                      placeholder={emptyWordPlaceholder}
+                      className="comic-title"
+                    />
+                  </div>
+                  <div className="comic-badges-row">
+                    <input
+                      type="text"
+                      value={cardData?.phonetic || ''}
+                      onChange={(e) => updateField('phonetic', e.target.value)}
+                      onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'phonetic' })}
+                      placeholder="/IPA/"
+                      className="comic-badge badge-ipa bg-white text-black font-mono font-bold"
+                    />
+                  </div>
+                </div>
+
+                {/* Audio Box */}
+                <div className="comic-pronunciation-box">
+                  <div className="audio-region region-us">
+                    <div className="audio-region-title font-bold text-xs">🇺🇸 American English</div>
+                    <div className="audio-buttons-row flex gap-2 mt-1">
+                      {cardData?.wordAudioUsNormalBase64 && (
+                        <button
+                          type="button"
+                          onClick={() => handlePlayAudio(cardData.wordAudioUsNormalBase64)}
+                          className="px-2 py-0.5 text-xs font-bold bg-white border border-black hover:bg-zinc-100 cursor-pointer text-black"
+                        >
+                          Normal
+                        </button>
+                      )}
+                      {cardData?.wordAudioUsSlowBase64 && (
+                        <button
+                          type="button"
+                          onClick={() => handlePlayAudio(cardData.wordAudioUsSlowBase64)}
+                          className="px-2 py-0.5 text-xs font-bold bg-white border border-black hover:bg-zinc-100 cursor-pointer text-black"
+                        >
+                          Slow
+                        </button>
                       )}
                     </div>
                   </div>
+                  <div className="audio-region region-uk">
+                    <div className="audio-region-title font-bold text-xs">🇬🇧 British English</div>
+                    <div className="audio-buttons-row flex gap-2 mt-1">
+                      {cardData?.wordAudioUkNormalBase64 && (
+                        <button
+                          type="button"
+                          onClick={() => handlePlayAudio(cardData.wordAudioUkNormalBase64)}
+                          className="px-2 py-0.5 text-xs font-bold bg-white border border-black hover:bg-zinc-100 cursor-pointer text-black"
+                        >
+                          Normal
+                        </button>
+                      )}
+                      {cardData?.wordAudioUkSlowBase64 && (
+                        <button
+                          type="button"
+                          onClick={() => handlePlayAudio(cardData.wordAudioUkSlowBase64)}
+                          className="px-2 py-0.5 text-xs font-bold bg-white border border-black hover:bg-zinc-100 cursor-pointer text-black"
+                        >
+                          Slow
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
-                  {/* Audio Buttons (aligned on same horizontal line, no green circle outline) */}
-                  <div className="flex items-center gap-2 py-1">
+                {/* Normal Front Hint */}
+                {activeSide === 'front' && activeMode === 'normal' && (
+                  <div className="comic-hint-box">
+                    <span className="hint-label">💡 CONTEXT / EXAMPLE</span>
+                    <AutoResizingTextarea
+                      value={cardData?.example || ''}
+                      onChange={(val) => updateField('example', val)}
+                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                      placeholder="Example sentence..."
+                      className="comic-example-en"
+                    />
+                  </div>
+                )}
+
+                {/* Spelling Front */}
+                {activeSide === 'front' && activeMode === 'spelling' && (
+                  <div className="spelling-prompt-box">
+                    <div className="spelling-prompt-title">LISTEN & FILL IN THE MISSING WORD:</div>
+                    <AutoResizingTextarea
+                      value={spellingSentence}
+                      onChange={(val) => updateField('spellingSentence', val)}
+                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'spellingSentence' })}
+                      placeholder="Missing word sentence..."
+                      className="spelling-sentence"
+                    />
+                    <div className="spelling-interactive-area my-3 flex gap-2">
+                      <input
+                        type="text"
+                        value={userSpellingInput}
+                        onChange={(e) => {
+                          setUserSpellingInput(e.target.value);
+                          setSpellingStatus('idle');
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleCheckSpelling();
+                          }
+                        }}
+                        placeholder="Type spelling answer..."
+                        className="spelling-input flex-1 px-3 py-1.5 border-2 border-black text-sm font-bold bg-white text-black"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCheckSpelling}
+                        className="spelling-check-btn px-3 py-1.5 bg-[#FF4B4B] text-white font-black border-2 border-black shadow-[2px_2px_0_#000] cursor-pointer"
+                      >
+                        CHECK
+                      </button>
+                    </div>
+                    {spellingStatus === 'correct' && (
+                      <div className="p-2 border-2 border-black bg-emerald-100 text-emerald-900 font-black text-center">
+                        ✓ CORRECT: {cardData?.word}
+                      </div>
+                    )}
+                    {spellingStatus === 'incorrect' && (
+                      <div className="p-2 border-2 border-black bg-rose-100 text-rose-900 font-black text-center">
+                        ✕ TARGET: {cardData?.word}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Back Side */}
+                {activeSide === 'back' && (
+                  <>
+                    <div className="comic-divider"></div>
+
+                    <div className="comic-meaning-box">
+                      <span className="box-label label-meaning">📖 PERSIAN MEANING</span>
+                      <AutoResizingTextarea
+                        value={cardData?.meaningFa || ''}
+                        onChange={(val) => updateField('meaningFa', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'meaningFa' })}
+                        placeholder="معنی فارسی..."
+                        dir="rtl"
+                        className="meaning-text"
+                      />
+                    </div>
+
+                    <div className="comic-definition-box">
+                      <span className="box-label label-definition">📖 ENGLISH DEFINITION</span>
+                      <AutoResizingTextarea
+                        value={cardData?.definitionEn || ''}
+                        onChange={(val) => updateField('definitionEn', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'definitionEn' })}
+                        placeholder="English definition..."
+                        className="definition-text"
+                      />
+                    </div>
+
+                    <div className="comic-example-box">
+                      <div className="example-header">
+                        <span className="box-label label-example">💬 EXAMPLE SENTENCE</span>
+                      </div>
+                      <AutoResizingTextarea
+                        value={cardData?.example || ''}
+                        onChange={(val) => updateField('example', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                        placeholder="Example sentence..."
+                        className="example-en"
+                      />
+                      <AutoResizingTextarea
+                        value={cardData?.translationFa || ''}
+                        onChange={(val) => updateField('translationFa', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'translationFa' })}
+                        placeholder="ترجمه مثال..."
+                        dir="rtl"
+                        className="example-fa"
+                      />
+                    </div>
+
+                    <div className="comic-mnemonic-box">
+                      <span className="box-label label-memory">🧠 MEMORY AID / MNEMONIC</span>
+                      <AutoResizingTextarea
+                        value={cardData?.mnemonic || ''}
+                        onChange={(val) => updateField('mnemonic', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'mnemonic' })}
+                        placeholder="کد یادسپاری..."
+                        className="mnemonic-text"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Custom Blocks */}
+                {currentSideBlocks.map((blk) => (
+                  <div
+                    key={blk.id}
+                    className="comic-mnemonic-box custom-card-block relative group mt-3"
+                    style={{
+                      backgroundColor: blk.color,
+                      borderColor: blk.borderColor,
+                      borderLeftColor: blk.borderColor,
+                      color: getContrastTextColor(blk.color),
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2 border-b border-black/10 dark:border-white/10 pb-1 mb-2">
+                      <input
+                        type="text"
+                        value={blk.title}
+                        onChange={(e) => handleUpdateBox(blk.id, { title: e.target.value })}
+                        placeholder="Box Title..."
+                        className="font-black text-xs uppercase bg-transparent border-none outline-none flex-1 text-inherit"
+                      />
+                      <div className="flex items-center gap-2">
+                        <ColorSwatchPicker
+                          label="Box BG"
+                          value={blk.color}
+                          defaultValue={isDark ? '#1E293B' : '#F1F5F9'}
+                          onChange={(c) => handleUpdateBox(blk.id, { color: c })}
+                        />
+                        <ColorSwatchPicker
+                          label="Box Border"
+                          value={blk.borderColor}
+                          defaultValue={blk.color || (isDark ? '#334155' : '#CBD5E1')}
+                          onChange={(c) => handleUpdateBox(blk.id, { borderColor: c })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBox(blk.id)}
+                          className="text-inherit opacity-60 hover:opacity-100 hover:text-rose-500 text-xs px-1 cursor-pointer font-bold"
+                          title="Delete Box"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                    <AutoResizingTextarea
+                      value={blk.content}
+                      onChange={(val) => handleUpdateBox(blk.id, { content: val })}
+                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'customBlock', blockId: blk.id })}
+                      placeholder="Notes / Content..."
+                      dir={blk.dir || (isRTLText(blk.content) ? 'rtl' : 'ltr')}
+                      style={{ color: getContrastTextColor(blk.color) }}
+                      className="custom-block-content"
+                    />
+                  </div>
+                ))}
+
+                {/* Add Box Button */}
+                <button
+                  type="button"
+                  onClick={handleAddBox}
+                  className="w-full mt-3 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-black text-xs border-2 border-black shadow-[2px_2px_0_#000] flex items-center justify-center gap-1 cursor-pointer uppercase"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Add Box ({activeSide === 'front' ? 'Front' : 'Back'})</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ====================================================== */}
+          {/* THEME C: INDEX NOTEBOOK (Light & Dark)                 */}
+          {/* ====================================================== */}
+          {isNotebook && (
+            <div className={`comic-card-wrapper theme-notebook`}>
+              <div className="notebook-sheet relative">
+                <div className="notebook-holes">
+                  <span className="hole"></span>
+                  <span className="hole"></span>
+                  <span className="hole"></span>
+                </div>
+                <div className={`notebook-tab-pos ${activeMode === 'spelling' ? 'tab-spelling' : ''}`}>
+                  <input
+                    type="text"
+                    value={cardData?.partOfSpeech || (activeMode === 'spelling' ? 'SPELLING' : 'POS')}
+                    onChange={(e) => updateField('partOfSpeech', e.target.value)}
+                    onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' })}
+                    className="bg-transparent border-none outline-none font-black text-inherit uppercase w-20 text-center"
+                  />
+                </div>
+
+                {cardData?.imageBase64 && (
+                  <img src={cardData.imageBase64} alt={cardData.word} className="card-illustration" />
+                )}
+
+                <div className="notebook-header">
+                  <AutoResizingTextarea
+                    value={cardData?.word || ''}
+                    onChange={(val) => updateField('word', val)}
+                    onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'word' })}
+                    placeholder={emptyWordPlaceholder}
+                    className="notebook-word"
+                  />
+                  <input
+                    type="text"
+                    value={cardData?.phonetic || ''}
+                    onChange={(e) => updateField('phonetic', e.target.value)}
+                    onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'phonetic' })}
+                    placeholder="/IPA/"
+                    className="notebook-tape-ipa"
+                  />
+                </div>
+
+                <div className="notebook-margin-line"></div>
+
+                {/* Tape audio strip */}
+                <div className="notebook-audio-strip">
+                  <div className="tape-clip us-tape">
+                    <span>🇺🇸 US:</span>
                     {cardData?.wordAudioUsNormalBase64 && (
                       <button
                         type="button"
                         onClick={() => handlePlayAudio(cardData.wordAudioUsNormalBase64)}
-                        className="px-2.5 py-1 text-xs border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 cursor-pointer rounded-none"
+                        className="px-2 py-0.5 text-xs font-bold border border-black bg-white hover:bg-zinc-100 cursor-pointer text-black"
                       >
-                        <Volume2 className="w-3.5 h-3.5" />
-                        <span>US Normal</span>
+                        Play
                       </button>
                     )}
-                    {cardData?.wordAudioUsSlowBase64 && (
+                  </div>
+                  <div className="tape-clip uk-tape">
+                    <span>🇬🇧 UK:</span>
+                    {cardData?.wordAudioUkNormalBase64 && (
                       <button
                         type="button"
-                        onClick={() => handlePlayAudio(cardData.wordAudioUsSlowBase64)}
-                        className="px-2.5 py-1 text-xs border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 cursor-pointer rounded-none"
+                        onClick={() => handlePlayAudio(cardData.wordAudioUkNormalBase64)}
+                        className="px-2 py-0.5 text-xs font-bold border border-black bg-white hover:bg-zinc-100 cursor-pointer text-black"
+                      >
+                        Play
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {activeSide === 'front' && activeMode === 'normal' && (
+                  <div className="notebook-sticky-example">
+                    <span className="sticky-title font-bold text-xs block mb-1">CONTEXT</span>
+                    <AutoResizingTextarea
+                      value={cardData?.example || ''}
+                      onChange={(val) => updateField('example', val)}
+                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                      placeholder="Context sentence..."
+                      className="notebook-sentence text-sm"
+                    />
+                  </div>
+                )}
+
+                {activeSide === 'front' && activeMode === 'spelling' && (
+                  <div className="notebook-sticky-example">
+                    <span className="sticky-title font-bold text-xs block mb-1">SPELLING TEST</span>
+                    <AutoResizingTextarea
+                      value={spellingSentence}
+                      onChange={(val) => updateField('spellingSentence', val)}
+                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'spellingSentence' })}
+                      placeholder="Fill sentence..."
+                      className="notebook-sentence text-sm"
+                    />
+                    <div className="flex gap-2 my-2">
+                      <input
+                        type="text"
+                        value={userSpellingInput}
+                        onChange={(e) => {
+                          setUserSpellingInput(e.target.value);
+                          setSpellingStatus('idle');
+                        }}
+                        placeholder="Type spelling..."
+                        className="flex-1 px-2.5 py-1 text-xs border border-black bg-white font-bold text-black"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCheckSpelling}
+                        className="px-3 py-1 bg-rose-500 text-white font-bold text-xs border border-black cursor-pointer"
+                      >
+                        Check
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {activeSide === 'back' && (
+                  <>
+                    <div className="notebook-highlighter-meaning">
+                      <span className="highlighter-label">PERSIAN MEANING</span>
+                      <AutoResizingTextarea
+                        value={cardData?.meaningFa || ''}
+                        onChange={(val) => updateField('meaningFa', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'meaningFa' })}
+                        placeholder="معنی فارسی..."
+                        dir="rtl"
+                        className="notebook-meaning-fa"
+                      />
+                    </div>
+
+                    <div className="p-3 border border-black bg-white/80 my-2">
+                      <span className="font-bold text-xs block mb-1">ENGLISH DEFINITION</span>
+                      <AutoResizingTextarea
+                        value={cardData?.definitionEn || ''}
+                        onChange={(val) => updateField('definitionEn', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'definitionEn' })}
+                        placeholder="Definition..."
+                        className="text-xs"
+                      />
+                    </div>
+
+                    <div className="notebook-sticky-example">
+                      <span className="sticky-title font-bold text-xs block mb-1">EXAMPLE & TRANSLATION</span>
+                      <AutoResizingTextarea
+                        value={cardData?.example || ''}
+                        onChange={(val) => updateField('example', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                        placeholder="Example..."
+                        className="notebook-sentence text-xs"
+                      />
+                      <AutoResizingTextarea
+                        value={cardData?.translationFa || ''}
+                        onChange={(val) => updateField('translationFa', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'translationFa' })}
+                        placeholder="ترجمه..."
+                        dir="rtl"
+                        className="text-xs text-zinc-600 dark:text-zinc-400 mt-1"
+                      />
+                    </div>
+
+                    <div className="notebook-washi-mnemonic">
+                      <span className="washi-title font-bold text-xs block mb-1">📌 MEMORY HOOK</span>
+                      <AutoResizingTextarea
+                        value={cardData?.mnemonic || ''}
+                        onChange={(val) => updateField('mnemonic', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'mnemonic' })}
+                        placeholder="Mnemonic..."
+                        className="washi-text text-xs"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Custom Blocks */}
+                {currentSideBlocks.map((blk) => (
+                  <div
+                    key={blk.id}
+                    className="notebook-washi-mnemonic custom-card-block relative group mt-3"
+                    style={{
+                      backgroundColor: blk.color,
+                      borderColor: blk.borderColor,
+                      color: getContrastTextColor(blk.color),
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2 border-b border-black/10 pb-1 mb-1">
+                      <input
+                        type="text"
+                        value={blk.title}
+                        onChange={(e) => handleUpdateBox(blk.id, { title: e.target.value })}
+                        placeholder="Title..."
+                        className="font-bold text-xs bg-transparent border-none outline-none flex-1 text-inherit"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteBox(blk.id)}
+                        className="text-inherit opacity-60 hover:opacity-100 hover:text-rose-500 text-xs px-1 cursor-pointer font-bold"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <AutoResizingTextarea
+                      value={blk.content}
+                      onChange={(val) => handleUpdateBox(blk.id, { content: val })}
+                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'customBlock', blockId: blk.id })}
+                      placeholder="Notes..."
+                      dir={blk.dir || (isRTLText(blk.content) ? 'rtl' : 'ltr')}
+                      style={{ color: getContrastTextColor(blk.color) }}
+                      className="washi-text text-xs"
+                    />
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={handleAddBox}
+                  className="w-full mt-3 py-2 bg-white hover:bg-zinc-100 text-black font-bold text-xs border border-dashed border-black flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Add Box ({activeSide === 'front' ? 'Front' : 'Back'})</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ====================================================== */}
+          {/* THEME D: BOTANICAL SAGE (Light & Dark)                 */}
+          {/* ====================================================== */}
+          {isBotanical && (
+            <div className={`botanical-wrapper theme-botanical`}>
+              <div className="botanical-card">
+                {cardData?.imageBase64 && (
+                  <img src={cardData.imageBase64} alt={cardData.word} className="card-illustration rounded-2xl" />
+                )}
+
+                <div className="botanical-box botanical-word-box">
+                  <AutoResizingTextarea
+                    value={cardData?.word || ''}
+                    onChange={(val) => updateField('word', val)}
+                    onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'word' })}
+                    placeholder={emptyWordPlaceholder}
+                    className="botanical-word text-center"
+                  />
+                  <input
+                    type="text"
+                    value={cardData?.partOfSpeech || ''}
+                    onChange={(e) => updateField('partOfSpeech', e.target.value)}
+                    onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' })}
+                    placeholder="part of speech"
+                    className="botanical-pos text-center bg-transparent border-none outline-none w-full"
+                  />
+                  <div className="mt-3">
+                    <input
+                      type="text"
+                      value={cardData?.phonetic || ''}
+                      onChange={(e) => updateField('phonetic', e.target.value)}
+                      onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'phonetic' })}
+                      placeholder="/IPA/"
+                      className="botanical-ipa-pill text-center border-none outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Audio Box */}
+                <div className="botanical-box botanical-audio-box">
+                  <div className="flex justify-center items-center gap-3">
+                    {cardData?.wordAudioUsNormalBase64 && (
+                      <button
+                        type="button"
+                        onClick={() => handlePlayAudio(cardData.wordAudioUsNormalBase64)}
+                        className="px-3 py-1.5 rounded-full bg-[#6E8060] text-white font-bold text-xs flex items-center gap-1 cursor-pointer"
                       >
                         <Volume2 className="w-3.5 h-3.5" />
-                        <span>US Slow</span>
+                        <span>US Audio</span>
                       </button>
                     )}
                     {cardData?.wordAudioUkNormalBase64 && (
                       <button
                         type="button"
                         onClick={() => handlePlayAudio(cardData.wordAudioUkNormalBase64)}
-                        className="px-2.5 py-1 text-xs border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 cursor-pointer rounded-none"
+                        className="px-3 py-1.5 rounded-full bg-[#5D6F4F] text-white font-bold text-xs flex items-center gap-1 cursor-pointer"
                       >
                         <Volume2 className="w-3.5 h-3.5" />
-                        <span>UK Normal</span>
+                        <span>UK Audio</span>
                       </button>
                     )}
                   </div>
-
-                  {/* Smart Image (if present) */}
-                  {cardData?.imageBase64 && (
-                    <div className="my-2 border border-zinc-200 dark:border-zinc-800 p-2 flex flex-col items-center bg-black/5 dark:bg-white/5">
-                      <img
-                        src={cardData.imageBase64}
-                        alt={cardData.word}
-                        className="max-h-48 object-contain"
-                      />
-                      {isEditing && onRemoveImage && (
-                        <div className="flex gap-2 mt-2">
-                          <button
-                            type="button"
-                            onClick={onRemoveImage}
-                            className="text-[11px] text-rose-500 hover:underline cursor-pointer"
-                          >
-                            Remove Image
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
-              ) : (
-                /* 13. Spelling Mode Front */
-                <div className="space-y-4 text-center py-4">
-                  {/* Audio Buttons */}
-                  <div className="flex items-center justify-center gap-2">
-                    {cardData?.wordAudioUsNormalBase64 && (
-                      <button
-                        type="button"
-                        onClick={() => handlePlayAudio(cardData.wordAudioUsNormalBase64)}
-                        className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium flex items-center gap-1.5 cursor-pointer rounded-none"
-                      >
-                        <Volume2 className="w-4 h-4" />
-                        <span>Play Pronunciation</span>
-                      </button>
-                    )}
-                    {cardData?.wordAudioUsSlowBase64 && (
-                      <button
-                        type="button"
-                        onClick={() => handlePlayAudio(cardData.wordAudioUsSlowBase64)}
-                        className="px-2.5 py-1.5 text-xs border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 cursor-pointer rounded-none"
-                      >
-                        <Volume2 className="w-4 h-4" />
-                        <span>Slow</span>
-                      </button>
-                    )}
-                  </div>
 
-                  {/* Sentence with Blank */}
-                  <div className="text-base font-medium py-3 text-zinc-800 dark:text-zinc-200">
-                    {isEditing ? (
-                      <textarea
-                        rows={2}
-                        value={spellingSentence}
-                        onChange={(e) => updateField('spellingSentence', e.target.value)}
-                        onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'spellingSentence' })}
-                        className="w-full text-center bg-transparent border-b border-zinc-300 dark:border-zinc-700 focus:outline-none focus:border-blue-500 text-sm font-medium resize-none"
-                      />
-                    ) : (
-                      <span>{spellingSentence}</span>
-                    )}
-                  </div>
-
-                  {cardData?.phonetic && (
-                    <div className="text-xs font-mono text-zinc-500">
-                      {cardData.phonetic}
-                    </div>
-                  )}
-
-                  {/* Interactive Test Input */}
-                  <div className="pt-2 max-w-sm mx-auto flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={userSpellingInput}
-                      onChange={(e) => {
-                        setUserSpellingInput(e.target.value);
-                        setSpellingStatus('idle');
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleCheckSpelling();
-                        }
-                      }}
-                      placeholder="Type the spelling..."
-                      className="flex-1 px-3 py-1.5 text-sm border border-zinc-300 dark:border-zinc-700 bg-transparent rounded-none focus:outline-none focus:border-blue-500"
+                {activeSide === 'front' && activeMode === 'normal' && (
+                  <div className="botanical-box botanical-example-box">
+                    <div className="botanical-example-title font-bold text-xs mb-1">EXAMPLE</div>
+                    <AutoResizingTextarea
+                      value={cardData?.example || ''}
+                      onChange={(val) => updateField('example', val)}
+                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                      placeholder="Context example..."
+                      className="botanical-sentence text-sm"
                     />
-                    <button
-                      type="button"
-                      onClick={handleCheckSpelling}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-none cursor-pointer"
-                    >
-                      Check
-                    </button>
                   </div>
-
-                  {/* Spelling Result: Only correct word in green/red box */}
-                  {spellingStatus === 'correct' && (
-                    <div className="p-2 border border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-bold text-sm">
-                      {cardData?.word}
-                    </div>
-                  )}
-                  {spellingStatus === 'incorrect' && (
-                    <div className="p-2 border border-rose-500 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 font-bold text-sm">
-                      {cardData?.word}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 11. Front Custom Boxes */}
-              <div className="space-y-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
-                {frontBlocks.map((blk) => {
-                  const boxBg = blk.color || (isDark ? '#1E293B' : '#F1F5F9');
-                  const boxBorder = blk.borderColor || blk.color || (isDark ? '#334155' : '#CBD5E1');
-                  const contrastText = getContrastTextColor(boxBg);
-
-                  return (
-                    <div
-                      key={blk.id}
-                      style={{ backgroundColor: boxBg, borderColor: boxBorder }}
-                      className="p-3 border rounded-none space-y-2 transition-colors"
-                    >
-                      <div className="flex items-center justify-between gap-2 border-b border-black/10 dark:border-white/10 pb-1.5">
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            value={blk.title}
-                            onChange={(e) => handleUpdateBox(blk.id, { title: e.target.value })}
-                            placeholder="Title"
-                            className="font-bold text-xs bg-transparent border-0 focus:outline-none flex-1"
-                            style={{ color: contrastText }}
-                          />
-                        ) : (
-                          <span className="font-bold text-xs" style={{ color: contrastText }}>
-                            {blk.title}
-                          </span>
-                        )}
-
-                        {isEditing && (
-                          <div className="flex items-center gap-2.5">
-                            <div className="flex items-center gap-1 text-[11px]" style={{ color: contrastText }}>
-                              <span className="opacity-80">BG</span>
-                              <ColorSwatchPicker
-                                label="Box BG"
-                                value={blk.color}
-                                defaultValue={isDark ? '#1E293B' : '#F1F5F9'}
-                                onChange={(c) => handleUpdateBox(blk.id, { color: c })}
-                              />
-                            </div>
-                            <div className="flex items-center gap-1 text-[11px]" style={{ color: contrastText }}>
-                              <span className="opacity-80">Border</span>
-                              <ColorSwatchPicker
-                                label="Box Border"
-                                value={blk.borderColor}
-                                defaultValue={blk.color || (isDark ? '#334155' : '#CBD5E1')}
-                                onChange={(c) => handleUpdateBox(blk.id, { borderColor: c })}
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteBox(blk.id)}
-                              className="text-zinc-400 hover:text-rose-500 text-xs px-1 cursor-pointer"
-                              title="Delete Box"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      {isEditing ? (
-                        <textarea
-                          rows={2}
-                          value={blk.content}
-                          onChange={(e) => handleUpdateBox(blk.id, { content: e.target.value })}
-                          onFocus={(e) =>
-                            (activeInputRef.current = {
-                              element: e.target,
-                              fieldName: 'customBlock',
-                              blockId: blk.id,
-                            })
-                          }
-                          placeholder="Content..."
-                          className="w-full text-xs bg-transparent border-0 focus:outline-none resize-y leading-relaxed"
-                          style={{ color: contrastText }}
-                        />
-                      ) : (
-                        <div
-                          className="text-xs leading-relaxed"
-                          style={{ color: contrastText }}
-                          dangerouslySetInnerHTML={{ __html: formatCardFieldHtml(blk.content) }}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-
-                {/* + Add Box Button */}
-                {isEditing && (
-                  <button
-                    type="button"
-                    onClick={handleAddBox}
-                    className="w-full py-2 border border-dashed border-zinc-300 dark:border-zinc-700 hover:border-blue-500 text-zinc-600 dark:text-zinc-400 hover:text-blue-500 text-xs font-semibold rounded-none flex items-center justify-center gap-1 cursor-pointer transition-colors"
-                  >
-                    + Add Box
-                  </button>
                 )}
+
+                {activeSide === 'front' && activeMode === 'spelling' && (
+                  <div className="botanical-box">
+                    <div className="botanical-example-title font-bold text-xs mb-1">SPELLING TEST</div>
+                    <AutoResizingTextarea
+                      value={spellingSentence}
+                      onChange={(val) => updateField('spellingSentence', val)}
+                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'spellingSentence' })}
+                      placeholder="Spelling sentence..."
+                      className="text-center font-bold text-sm"
+                    />
+                    <div className="flex gap-2 my-2">
+                      <input
+                        type="text"
+                        value={userSpellingInput}
+                        onChange={(e) => {
+                          setUserSpellingInput(e.target.value);
+                          setSpellingStatus('idle');
+                        }}
+                        placeholder="Type spelling..."
+                        className="flex-1 px-3 py-1.5 rounded-xl border border-zinc-400 bg-white text-zinc-900 text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCheckSpelling}
+                        className="px-3 py-1.5 rounded-xl bg-[#6E8060] text-white font-bold text-xs cursor-pointer"
+                      >
+                        Check
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {activeSide === 'back' && (
+                  <>
+                    <div className="botanical-box botanical-meaning-box">
+                      <div className="botanical-meaning-title font-bold text-xs mb-1">PERSIAN MEANING</div>
+                      <AutoResizingTextarea
+                        value={cardData?.meaningFa || ''}
+                        onChange={(val) => updateField('meaningFa', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'meaningFa' })}
+                        placeholder="معنی فارسی..."
+                        dir="rtl"
+                        className="botanical-meaning-fa text-xl font-bold"
+                      />
+                    </div>
+
+                    <div className="botanical-box botanical-definition-box">
+                      <div className="botanical-definition-title font-bold text-xs mb-1">ENGLISH DEFINITION</div>
+                      <AutoResizingTextarea
+                        value={cardData?.definitionEn || ''}
+                        onChange={(val) => updateField('definitionEn', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'definitionEn' })}
+                        placeholder="English definition..."
+                        className="botanical-definition-en text-xs"
+                      />
+                    </div>
+
+                    <div className="botanical-box botanical-example-box">
+                      <div className="botanical-example-title font-bold text-xs mb-1">EXAMPLE & TRANSLATION</div>
+                      <AutoResizingTextarea
+                        value={cardData?.example || ''}
+                        onChange={(val) => updateField('example', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                        placeholder="Example..."
+                        className="botanical-sentence text-xs"
+                      />
+                      <AutoResizingTextarea
+                        value={cardData?.translationFa || ''}
+                        onChange={(val) => updateField('translationFa', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'translationFa' })}
+                        placeholder="ترجمه مثال..."
+                        dir="rtl"
+                        className="botanical-translation-fa text-xs mt-1"
+                      />
+                    </div>
+
+                    <div className="botanical-box botanical-mnemonic-box">
+                      <div className="botanical-mnemonic-title font-bold text-xs mb-1">MEMORY HOOK</div>
+                      <AutoResizingTextarea
+                        value={cardData?.mnemonic || ''}
+                        onChange={(val) => updateField('mnemonic', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'mnemonic' })}
+                        placeholder="کد یادسپاری..."
+                        className="botanical-mnemonic-text text-xs"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Custom Blocks */}
+                {currentSideBlocks.map((blk) => (
+                  <div
+                    key={blk.id}
+                    className="botanical-box custom-card-block relative group mt-3"
+                    style={{
+                      backgroundColor: blk.color,
+                      borderColor: blk.borderColor,
+                      color: getContrastTextColor(blk.color),
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2 border-b border-black/10 pb-1 mb-1">
+                      <input
+                        type="text"
+                        value={blk.title}
+                        onChange={(e) => handleUpdateBox(blk.id, { title: e.target.value })}
+                        placeholder="Title..."
+                        className="font-bold text-xs bg-transparent border-none outline-none flex-1 text-inherit"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteBox(blk.id)}
+                        className="text-inherit opacity-60 hover:opacity-100 hover:text-rose-500 text-xs px-1 cursor-pointer font-bold"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <AutoResizingTextarea
+                      value={blk.content}
+                      onChange={(val) => handleUpdateBox(blk.id, { content: val })}
+                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'customBlock', blockId: blk.id })}
+                      placeholder="Notes..."
+                      dir={blk.dir || (isRTLText(blk.content) ? 'rtl' : 'ltr')}
+                      style={{ color: getContrastTextColor(blk.color) }}
+                      className="text-xs"
+                    />
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={handleAddBox}
+                  className="w-full mt-3 py-2.5 rounded-2xl bg-[#F4F5ED] hover:bg-[#EAECE0] text-[#445339] font-bold text-xs border border-[#B4C4A9]/40 flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Box ({activeSide === 'front' ? 'Front' : 'Back'})</span>
+                </button>
               </div>
             </div>
           )}
 
-          {/* ========================================== */}
-          {/* BACK SIDE RENDERING                       */}
-          {/* ========================================== */}
-          {activeSide === 'back' && (
-            <div className="space-y-4">
-              {/* Word & Phonetics Header */}
-              <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                <h2 className="text-xl font-black text-zinc-900 dark:text-zinc-100">
-                  {displayWord}
-                </h2>
-                {cardData?.phonetic && (
-                  <span className="text-xs font-mono italic text-zinc-500">{cardData.phonetic}</span>
+          {/* ====================================================== */}
+          {/* THEME E: MINIMAL (Light & Dark)                        */}
+          {/* ====================================================== */}
+          {isMinimal && (
+            <div className={`minimal-card-wrapper theme-minimal`}>
+              <div className="minimal-card">
+                <div className="minimal-header flex items-center justify-between">
+                  <input
+                    type="text"
+                    value={cardData?.partOfSpeech || (activeMode === 'spelling' ? 'SPELLING' : 'PART OF SPEECH')}
+                    onChange={(e) => updateField('partOfSpeech', e.target.value)}
+                    onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' })}
+                    className="minimal-pos font-bold uppercase w-32 bg-transparent outline-none"
+                  />
+                </div>
+
+                {cardData?.imageBase64 && (
+                  <img src={cardData.imageBase64} alt={cardData.word} className="card-illustration rounded-md" />
                 )}
-              </div>
 
-              {/* Main Content Boxes: Meaning, Definition, Example */}
-              <div className="space-y-3">
-                {/* Persian Meaning Box */}
-                <div className="p-3 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850/60 rounded-none space-y-1">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                    Persian Meaning
-                  </div>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      dir="rtl"
-                      value={cardData?.meaningFa || ''}
-                      onChange={(e) => updateField('meaningFa', e.target.value)}
-                      onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'meaningFa' })}
-                      placeholder="معنی فارسی..."
-                      className="w-full bg-transparent border-0 focus:outline-none text-sm font-semibold text-zinc-900 dark:text-zinc-100"
-                    />
-                  ) : (
-                    <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100" dir="rtl">
-                      {cardData?.meaningFa || '-'}
-                    </div>
+                <div className="minimal-word-block">
+                  <AutoResizingTextarea
+                    value={cardData?.word || ''}
+                    onChange={(val) => updateField('word', val)}
+                    onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'word' })}
+                    placeholder={emptyWordPlaceholder}
+                    className="minimal-word"
+                  />
+                  <input
+                    type="text"
+                    value={cardData?.phonetic || ''}
+                    onChange={(e) => updateField('phonetic', e.target.value)}
+                    onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'phonetic' })}
+                    placeholder="/IPA/"
+                    className="minimal-phonetic bg-transparent border-none outline-none w-full"
+                  />
+                </div>
+
+                {/* Audio row */}
+                <div className="minimal-audio-row flex gap-3">
+                  {cardData?.wordAudioUsNormalBase64 && (
+                    <button
+                      type="button"
+                      onClick={() => handlePlayAudio(cardData.wordAudioUsNormalBase64)}
+                      className="px-2.5 py-1 text-xs border border-zinc-300 dark:border-zinc-700 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer flex items-center gap-1 font-medium"
+                    >
+                      <Volume2 className="w-3.5 h-3.5 text-blue-500" />
+                      <span>US Normal</span>
+                    </button>
+                  )}
+                  {cardData?.wordAudioUkNormalBase64 && (
+                    <button
+                      type="button"
+                      onClick={() => handlePlayAudio(cardData.wordAudioUkNormalBase64)}
+                      className="px-2.5 py-1 text-xs border border-zinc-300 dark:border-zinc-700 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer flex items-center gap-1 font-medium"
+                    >
+                      <Volume2 className="w-3.5 h-3.5 text-sky-500" />
+                      <span>UK Normal</span>
+                    </button>
                   )}
                 </div>
 
-                {/* English Definition Box */}
-                <div className="p-3 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850/60 rounded-none space-y-1">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                    English Definition
-                  </div>
-                  {isEditing ? (
-                    <textarea
-                      rows={2}
-                      value={cardData?.definitionEn || ''}
-                      onChange={(e) => updateField('definitionEn', e.target.value)}
-                      onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'definitionEn' })}
-                      placeholder="English definition..."
-                      className="w-full bg-transparent border-0 focus:outline-none text-xs leading-relaxed text-zinc-800 dark:text-zinc-200 resize-y"
-                    />
-                  ) : (
-                    <div
-                      className="text-xs leading-relaxed text-zinc-800 dark:text-zinc-200"
-                      dangerouslySetInnerHTML={{ __html: formatCardFieldHtml(cardData?.definitionEn) }}
-                    />
-                  )}
-                </div>
+                <div className="minimal-divider"></div>
 
-                {/* Example Sentence Box */}
-                <div className="p-3 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850/60 rounded-none space-y-1">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
-                    Example Sentence
+                {activeSide === 'front' && activeMode === 'normal' && (
+                  <div className="minimal-example-block">
+                    <div className="minimal-example-label font-bold text-xs mb-1">CONTEXT</div>
+                    <AutoResizingTextarea
+                      value={cardData?.example || ''}
+                      onChange={(val) => updateField('example', val)}
+                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                      placeholder="Context sentence..."
+                      className="minimal-sentence text-sm"
+                    />
                   </div>
-                  {isEditing ? (
-                    <div className="space-y-1.5">
-                      <textarea
-                        rows={2}
-                        value={cardData?.example || ''}
-                        onChange={(e) => updateField('example', e.target.value)}
-                        onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'example' })}
-                        placeholder="Example sentence..."
-                        className="w-full bg-transparent border-0 focus:outline-none text-xs leading-relaxed text-zinc-800 dark:text-zinc-200 resize-y"
-                      />
+                )}
+
+                {activeSide === 'front' && activeMode === 'spelling' && (
+                  <div className="minimal-example-block">
+                    <div className="minimal-example-label font-bold text-xs mb-1">SPELLING TEST</div>
+                    <AutoResizingTextarea
+                      value={spellingSentence}
+                      onChange={(val) => updateField('spellingSentence', val)}
+                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'spellingSentence' })}
+                      placeholder="Spelling sentence..."
+                      className="minimal-sentence text-sm"
+                    />
+                    <div className="flex gap-2 my-2">
                       <input
                         type="text"
-                        dir="rtl"
-                        value={cardData?.translationFa || ''}
-                        onChange={(e) => updateField('translationFa', e.target.value)}
-                        onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'translationFa' })}
-                        placeholder="ترجمه مثال..."
-                        className="w-full bg-transparent border-0 focus:outline-none text-xs text-zinc-500"
+                        value={userSpellingInput}
+                        onChange={(e) => {
+                          setUserSpellingInput(e.target.value);
+                          setSpellingStatus('idle');
+                        }}
+                        placeholder="Type spelling..."
+                        className="flex-1 px-3 py-1.5 text-xs border border-zinc-300 dark:border-zinc-700 rounded bg-transparent"
                       />
+                      <button
+                        type="button"
+                        onClick={handleCheckSpelling}
+                        className="px-3 py-1.5 bg-blue-600 text-white font-medium text-xs rounded cursor-pointer"
+                      >
+                        Check
+                      </button>
                     </div>
-                  ) : (
-                    <div className="space-y-1">
-                      <div
-                        className="text-xs leading-relaxed text-zinc-800 dark:text-zinc-200"
-                        dangerouslySetInnerHTML={{ __html: formatCardFieldHtml(cardData?.example) }}
-                      />
-                      {cardData?.translationFa && (
-                        <div className="text-xs text-zinc-500" dir="rtl">
-                          {cardData.translationFa}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 11. Back Custom Boxes */}
-              <div className="space-y-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
-                {backBlocks.map((blk) => {
-                  const boxBg = blk.color || (isDark ? '#1E293B' : '#F1F5F9');
-                  const boxBorder = blk.borderColor || blk.color || (isDark ? '#334155' : '#CBD5E1');
-                  const contrastText = getContrastTextColor(boxBg);
-
-                  return (
-                    <div
-                      key={blk.id}
-                      style={{ backgroundColor: boxBg, borderColor: boxBorder }}
-                      className="p-3 border rounded-none space-y-2 transition-colors"
-                    >
-                      <div className="flex items-center justify-between gap-2 border-b border-black/10 dark:border-white/10 pb-1.5">
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            value={blk.title}
-                            onChange={(e) => handleUpdateBox(blk.id, { title: e.target.value })}
-                            placeholder="Title"
-                            className="font-bold text-xs bg-transparent border-0 focus:outline-none flex-1"
-                            style={{ color: contrastText }}
-                          />
-                        ) : (
-                          <span className="font-bold text-xs" style={{ color: contrastText }}>
-                            {blk.title}
-                          </span>
-                        )}
-
-                        {isEditing && (
-                          <div className="flex items-center gap-2.5">
-                            <div className="flex items-center gap-1 text-[11px]" style={{ color: contrastText }}>
-                              <span className="opacity-80">BG</span>
-                              <ColorSwatchPicker
-                                label="Box BG"
-                                value={blk.color}
-                                defaultValue={isDark ? '#1E293B' : '#F1F5F9'}
-                                onChange={(c) => handleUpdateBox(blk.id, { color: c })}
-                              />
-                            </div>
-                            <div className="flex items-center gap-1 text-[11px]" style={{ color: contrastText }}>
-                              <span className="opacity-80">Border</span>
-                              <ColorSwatchPicker
-                                label="Box Border"
-                                value={blk.borderColor}
-                                defaultValue={blk.color || (isDark ? '#334155' : '#CBD5E1')}
-                                onChange={(c) => handleUpdateBox(blk.id, { borderColor: c })}
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteBox(blk.id)}
-                              className="text-zinc-400 hover:text-rose-500 text-xs px-1 cursor-pointer"
-                              title="Delete Box"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      {isEditing ? (
-                        <textarea
-                          rows={2}
-                          value={blk.content}
-                          onChange={(e) => handleUpdateBox(blk.id, { content: e.target.value })}
-                          onFocus={(e) =>
-                            (activeInputRef.current = {
-                              element: e.target,
-                              fieldName: 'customBlock',
-                              blockId: blk.id,
-                            })
-                          }
-                          placeholder="Content..."
-                          className="w-full text-xs bg-transparent border-0 focus:outline-none resize-y leading-relaxed"
-                          style={{ color: contrastText }}
-                        />
-                      ) : (
-                        <div
-                          className="text-xs leading-relaxed"
-                          style={{ color: contrastText }}
-                          dangerouslySetInnerHTML={{ __html: formatCardFieldHtml(blk.content) }}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-
-                {/* + Add Box Button */}
-                {isEditing && (
-                  <button
-                    type="button"
-                    onClick={handleAddBox}
-                    className="w-full py-2 border border-dashed border-zinc-300 dark:border-zinc-700 hover:border-blue-500 text-zinc-600 dark:text-zinc-400 hover:text-blue-500 text-xs font-semibold rounded-none flex items-center justify-center gap-1 cursor-pointer transition-colors"
-                  >
-                    + Add Box
-                  </button>
+                  </div>
                 )}
+
+                {activeSide === 'back' && (
+                  <>
+                    <div className="minimal-meaning-block">
+                      <div className="minimal-meaning-label font-bold text-xs mb-1">PERSIAN MEANING</div>
+                      <AutoResizingTextarea
+                        value={cardData?.meaningFa || ''}
+                        onChange={(val) => updateField('meaningFa', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'meaningFa' })}
+                        placeholder="معنی فارسی..."
+                        dir="rtl"
+                        className="minimal-meaning-text text-xl font-bold"
+                      />
+                    </div>
+
+                    <div className="minimal-definition-block">
+                      <div className="minimal-definition-label font-bold text-xs mb-1">ENGLISH DEFINITION</div>
+                      <AutoResizingTextarea
+                        value={cardData?.definitionEn || ''}
+                        onChange={(val) => updateField('definitionEn', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'definitionEn' })}
+                        placeholder="Definition..."
+                        className="minimal-definition-text text-xs"
+                      />
+                    </div>
+
+                    <div className="minimal-example-block">
+                      <div className="minimal-example-label font-bold text-xs mb-1">EXAMPLE & TRANSLATION</div>
+                      <AutoResizingTextarea
+                        value={cardData?.example || ''}
+                        onChange={(val) => updateField('example', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                        placeholder="Example..."
+                        className="minimal-sentence text-xs"
+                      />
+                      <AutoResizingTextarea
+                        value={cardData?.translationFa || ''}
+                        onChange={(val) => updateField('translationFa', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'translationFa' })}
+                        placeholder="ترجمه..."
+                        dir="rtl"
+                        className="text-xs text-zinc-500 mt-1"
+                      />
+                    </div>
+
+                    <div className="minimal-mnemonic-block">
+                      <div className="minimal-mnemonic-label font-bold text-xs mb-1">MEMORY HOOK</div>
+                      <AutoResizingTextarea
+                        value={cardData?.mnemonic || ''}
+                        onChange={(val) => updateField('mnemonic', val)}
+                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'mnemonic' })}
+                        placeholder="Mnemonic..."
+                        className="minimal-mnemonic-text text-xs"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Custom Blocks */}
+                {currentSideBlocks.map((blk) => (
+                  <div
+                    key={blk.id}
+                    className="minimal-mnemonic-block custom-card-block relative group mt-3 p-3 border rounded"
+                    style={{
+                      backgroundColor: blk.color,
+                      borderColor: blk.borderColor,
+                      color: getContrastTextColor(blk.color),
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2 border-b border-black/10 pb-1 mb-1">
+                      <input
+                        type="text"
+                        value={blk.title}
+                        onChange={(e) => handleUpdateBox(blk.id, { title: e.target.value })}
+                        placeholder="Title..."
+                        className="font-bold text-xs bg-transparent border-none outline-none flex-1 text-inherit"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteBox(blk.id)}
+                        className="text-inherit opacity-60 hover:opacity-100 hover:text-rose-500 text-xs px-1 cursor-pointer font-bold"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <AutoResizingTextarea
+                      value={blk.content}
+                      onChange={(val) => handleUpdateBox(blk.id, { content: val })}
+                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'customBlock', blockId: blk.id })}
+                      placeholder="Notes..."
+                      dir={blk.dir || (isRTLText(blk.content) ? 'rtl' : 'ltr')}
+                      style={{ color: getContrastTextColor(blk.color) }}
+                      className="text-xs"
+                    />
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={handleAddBox}
+                  className="w-full mt-3 py-2 border border-dashed border-zinc-300 dark:border-zinc-700 hover:border-blue-500 text-zinc-600 dark:text-zinc-400 hover:text-blue-500 text-xs font-semibold rounded flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Box ({activeSide === 'front' ? 'Front' : 'Back'})</span>
+                </button>
               </div>
             </div>
           )}
@@ -1382,7 +2381,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
       </div>
 
       {/* ======================================================== */}
-      {/* OPTIONAL BOTTOM NAVIGATION                               */}
+      {/* 4. OPTIONAL BOTTOM NAVIGATION                            */}
       {/* ======================================================== */}
       {navigation && navigation.totalCount > 1 && (
         <div className="w-full flex items-center justify-between pt-3 border-t border-zinc-200 dark:border-zinc-800 text-xs select-none">

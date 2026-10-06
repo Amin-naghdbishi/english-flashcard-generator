@@ -632,3 +632,118 @@ export function resolveThemeFromNoteType(
   }
   return fallbackTheme;
 }
+
+export interface ThemeCardClasses {
+  wrapper: string;
+  card: string;
+  wordSection: string;
+  wordTitle: string;
+  ipaBadge: string;
+  posBadge: string;
+  pronunciationBox: string;
+  meaningBox: string;
+  meaningLabel: string;
+  exampleBox: string;
+  exampleLabel: string;
+  mnemonicBox: string;
+  mnemonicLabel: string;
+  customBox: string;
+  customLabel: string;
+}
+
+export function getThemeCardClasses(themeId: ThemeId): ThemeCardClasses {
+  if (themeId.includes('pop') || themeId === 'comic-light' || themeId === 'comic-dark' || themeId.includes('strip')) {
+    return {
+      wrapper: 'comic-card-wrapper theme-pop',
+      card: 'comic-card',
+      wordSection: 'comic-word-section',
+      wordTitle: 'comic-title',
+      ipaBadge: 'comic-badge badge-ipa',
+      posBadge: 'comic-badge badge-pos',
+      pronunciationBox: 'comic-pronunciation-box',
+      meaningBox: 'comic-meaning-box',
+      meaningLabel: 'box-label label-meaning',
+      exampleBox: 'comic-example-box',
+      exampleLabel: 'box-label label-example',
+      mnemonicBox: 'comic-mnemonic-box',
+      mnemonicLabel: 'box-label label-memory',
+      customBox: 'comic-mnemonic-box custom-card-block',
+      customLabel: 'box-label',
+    };
+  }
+  if (themeId.includes('botanical')) {
+    return {
+      wrapper: 'botanical-wrapper theme-botanical',
+      card: 'botanical-card',
+      wordSection: 'botanical-box botanical-word-box',
+      wordTitle: 'botanical-word',
+      ipaBadge: 'botanical-ipa-pill',
+      posBadge: 'botanical-pos',
+      pronunciationBox: 'botanical-box botanical-audio-box',
+      meaningBox: 'botanical-box botanical-meaning-box',
+      meaningLabel: 'botanical-meaning-title',
+      exampleBox: 'botanical-example-section botanical-example-box',
+      exampleLabel: 'botanical-example-title',
+      mnemonicBox: 'botanical-mnemonic-box',
+      mnemonicLabel: 'botanical-mnemonic-title',
+      customBox: 'botanical-custom-block custom-card-block',
+      customLabel: 'botanical-custom-title',
+    };
+  }
+  if (themeId.includes('quest') || themeId.includes('manga') || themeId.includes('arcade')) {
+    return {
+      wrapper: 'comic-card-wrapper theme-quest',
+      card: 'comic-card quest-card',
+      wordSection: 'quest-hero',
+      wordTitle: 'quest-word',
+      ipaBadge: 'quest-ipa',
+      posBadge: 'quest-level-pill',
+      pronunciationBox: 'quest-sound-dock',
+      meaningBox: 'quest-meaning-banner',
+      meaningLabel: 'meaning-quest-label',
+      exampleBox: 'quest-example-card',
+      exampleLabel: 'quest-tag',
+      mnemonicBox: 'quest-mnemonic-card',
+      mnemonicLabel: 'quest-tag-purple',
+      customBox: 'quest-mnemonic-card custom-card-block',
+      customLabel: 'quest-tag-purple',
+    };
+  }
+  if (themeId.includes('notebook')) {
+    return {
+      wrapper: 'comic-card-wrapper theme-notebook',
+      card: 'comic-card notebook-sheet',
+      wordSection: 'notebook-header',
+      wordTitle: 'notebook-title',
+      ipaBadge: 'notebook-ipa',
+      posBadge: 'notebook-tab-pos',
+      pronunciationBox: 'comic-pronunciation-box',
+      meaningBox: 'notebook-meaning-note',
+      meaningLabel: 'sticky-title',
+      exampleBox: 'notebook-example-ruled',
+      exampleLabel: 'notebook-label',
+      mnemonicBox: 'notebook-washi-mnemonic',
+      mnemonicLabel: 'washi-title',
+      customBox: 'notebook-washi-mnemonic custom-card-block',
+      customLabel: 'washi-title',
+    };
+  }
+  return {
+    wrapper: 'minimal-card-wrapper theme-minimal',
+    card: 'comic-card minimal-card',
+    wordSection: 'minimal-word-header',
+    wordTitle: 'minimal-word',
+    ipaBadge: 'minimal-ipa',
+    posBadge: 'minimal-pos',
+    pronunciationBox: 'comic-pronunciation-box',
+    meaningBox: 'minimal-meaning-block',
+    meaningLabel: 'minimal-meaning-label',
+    exampleBox: 'minimal-example-block',
+    exampleLabel: 'minimal-example-label',
+    mnemonicBox: 'minimal-mnemonic-block',
+    mnemonicLabel: 'minimal-mnemonic-label',
+    customBox: 'minimal-mnemonic-block custom-card-block',
+    customLabel: 'minimal-mnemonic-label',
+  };
+}
+
