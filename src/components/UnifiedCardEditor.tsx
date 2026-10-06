@@ -22,7 +22,6 @@ import {
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
 import { getAnkiTags, getAnkiModelNames } from '../services/api';
-import { applyHtmlFormattingToText, HtmlToolbarAction } from '../utils/markdown';
 import {
   Volume2,
   Save,
@@ -72,16 +71,27 @@ export interface ColorSwatchPickerProps {
   value?: string;
   defaultValue?: string;
   onChange: (color: string) => void;
+  align?: 'left' | 'right';
 }
 
+/**
+ * ColorSwatchPicker with intelligent viewport positioning.
+ * Automatically aligns left/right and flips top/bottom so it never clips outside the screen.
+ */
 export const ColorSwatchPicker: React.FC<ColorSwatchPickerProps> = ({
   label,
   value,
   defaultValue = '#1E293B',
   onChange,
+  align,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ right?: number | string; left?: number | string; top?: number | string; bottom?: number | string }>({
+    left: 0,
+    top: 'calc(100% + 4px)',
+  });
   const currentColor = value || defaultValue;
 
   useEffect(() => {
@@ -96,6 +106,32 @@ export const ColorSwatchPicker: React.FC<ColorSwatchPickerProps> = ({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const popupWidth = 220;
+      const popupHeight = 190;
+      const margin = 12;
+
+      let left: number | string = 0;
+      let right: number | string = 'auto';
+      let top: number | string = 'calc(100% + 4px)';
+      let bottom: number | string = 'auto';
+
+      if (align === 'right' || rect.left + popupWidth + margin > window.innerWidth) {
+        left = 'auto';
+        right = 0;
+      }
+
+      if (rect.bottom + popupHeight + margin > window.innerHeight && rect.top > popupHeight) {
+        top = 'auto';
+        bottom = 'calc(100% + 4px)';
+      }
+
+      setCoords({ left, right, top, bottom });
+    }
+  }, [isOpen, align]);
+
   return (
     <div className="relative inline-block" ref={containerRef}>
       <button
@@ -107,7 +143,18 @@ export const ColorSwatchPicker: React.FC<ColorSwatchPickerProps> = ({
       />
 
       {isOpen && (
-        <div className="absolute z-50 mt-1 left-0 p-2.5 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 shadow-xl rounded-none w-52 space-y-2 select-none">
+        <div
+          ref={popupRef}
+          className="p-2.5 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 shadow-2xl rounded-none w-52 space-y-2 select-none"
+          style={{
+            position: 'absolute',
+            left: coords.left,
+            right: coords.right,
+            top: coords.top,
+            bottom: coords.bottom,
+            zIndex: 9999,
+          }}
+        >
           <div className="flex items-center justify-between text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             <span>{label}</span>
             <button
@@ -215,62 +262,73 @@ export interface UnifiedCardEditorProps {
 }
 
 /**
- * Auto-resizing textarea that inherits exact typography from its theme container
- * and grows dynamically without any text clipping.
+ * Visual in-place contentEditable component.
+ * Renders rich HTML visually (bold, colors, highlights) WITHOUT exposing raw tags.
+ * Preserves cursor position during typing and automatically resizes with content.
  */
-const AutoResizingTextarea: React.FC<{
-  value: string;
+export const ContentEditableField: React.FC<{
+  value?: string;
   onChange: (val: string) => void;
-  onFocus?: (el: HTMLTextAreaElement) => void;
+  onFocus?: (el: HTMLElement) => void;
   placeholder?: string;
   className?: string;
   style?: React.CSSProperties;
   dir?: 'rtl' | 'ltr' | 'auto';
-  rows?: number;
+  tagName?: 'div' | 'p' | 'span' | 'h1' | 'h2';
 }> = ({
-  value,
+  value = '',
   onChange,
   onFocus,
   placeholder = '',
   className = '',
   style = {},
   dir,
-  rows = 1,
+  tagName = 'div',
 }) => {
-  const ref = useRef<HTMLTextAreaElement>(null);
+  const elRef = useRef<HTMLElement>(null);
+  const isComposingRef = useRef(false);
 
-  const resize = useCallback(() => {
-    if (ref.current) {
-      ref.current.style.height = 'auto';
-      ref.current.style.height = `${ref.current.scrollHeight}px`;
-    }
-  }, []);
-
+  // Sync external changes into DOM only when different from current DOM to preserve typing cursor
   useEffect(() => {
-    resize();
-  }, [value, resize]);
+    if (elRef.current && elRef.current.innerHTML !== value) {
+      elRef.current.innerHTML = value;
+    }
+  }, [value]);
+
+  const handleInput = () => {
+    if (!elRef.current || isComposingRef.current) return;
+    const currentHtml = elRef.current.innerHTML;
+    onChange(currentHtml);
+  };
+
+  const Component = tagName as any;
 
   return (
-    <textarea
-      ref={ref}
-      rows={rows}
+    <Component
+      ref={elRef}
+      contentEditable
+      suppressContentEditableWarning
       dir={dir}
-      value={value}
-      onChange={(e) => {
-        onChange(e.target.value);
-        resize();
+      onInput={handleInput}
+      onCompositionStart={() => {
+        isComposingRef.current = true;
       }}
-      onInput={resize}
-      onFocus={(e) => {
-        resize();
-        if (onFocus) onFocus(e.target);
+      onCompositionEnd={() => {
+        isComposingRef.current = false;
+        handleInput();
       }}
-      placeholder={placeholder}
-      className={`theme-inline-editable ${className}`}
+      onFocus={(e: React.FocusEvent<HTMLElement>) => {
+        if (onFocus) onFocus(e.currentTarget);
+      }}
+      data-placeholder={placeholder}
+      className={`theme-editable-field ${className}`}
       style={{
+        outline: 'none',
+        minHeight: '1.2em',
+        wordBreak: 'break-word',
+        overflowWrap: 'break-word',
+        cursor: 'text',
         ...style,
-        resize: 'none',
-        overflow: 'hidden',
       }}
     />
   );
@@ -306,11 +364,18 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
 }) => {
   const themeContext = useAppTheme();
   const { t } = useTranslation();
-  const isDark = (propAppTheme || themeContext.appTheme) === 'anki-dark';
+  const isAppDark = (propAppTheme || themeContext.appTheme) === 'anki-dark';
 
   // Card view state
   const [activeSide, setActiveSide] = useState<'front' | 'back'>('back');
   const [activeMode, setActiveMode] = useState<CardType>(initialCardType);
+
+  // Sync activeMode whenever initialCardType prop changes
+  useEffect(() => {
+    if (initialCardType) {
+      setActiveMode(initialCardType);
+    }
+  }, [initialCardType]);
 
   // Available Note Types
   const [ankiModelNames, setAnkiModelNames] = useState<string[]>(propAvailableNoteTypes || []);
@@ -335,6 +400,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
 
   const theme = THEMES[activeThemeId] || THEMES['comic-pop-dark'];
   const themeClasses = useMemo(() => getThemeCardClasses(activeThemeId), [activeThemeId]);
+  const isThemeLight = activeThemeId.endsWith('-light');
 
   const handleSelectNoteType = (newModelName: string) => {
     if (onNoteTypeChange) {
@@ -413,45 +479,58 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
     }
   };
 
-  // Text formatting Toolbar
-  const activeInputRef = useRef<{
-    element: HTMLInputElement | HTMLTextAreaElement;
+  // Track active element for toolbar commands
+  const activeFieldRef = useRef<{
+    element: HTMLElement;
     fieldName: string;
     blockId?: string;
   } | null>(null);
 
-  const applyFormat = (action: HtmlToolbarAction, extraValue?: string) => {
-    const active = activeInputRef.current;
-    if (!active || !active.element || !cardData || !onCardChange) return;
+  /**
+   * Visual Rich Text Formatting.
+   * Immediately applies visual formatting (bold, italic, colors) with styleWithCSS,
+   * completely avoiding raw HTML tags in user view.
+   */
+  const applyVisualFormat = (command: 'bold' | 'italic' | 'underline' | 'color' | 'highlight', value?: string) => {
+    document.execCommand('styleWithCSS', false, 'true');
 
-    const el = active.element;
-    const start = el.selectionStart || 0;
-    const end = el.selectionEnd || 0;
-    const fullText = el.value || '';
-
-    const { newText, newStart, newEnd } = applyHtmlFormattingToText(fullText, start, end, action, extraValue);
-
-    if (active.fieldName === 'customBlock' && active.blockId) {
-      const allBlocks = getAllCustomBlocks(cardData).map((b) =>
-        b.id === active.blockId ? { ...b, content: newText } : b
-      );
-      onCardChange({
-        ...cardData,
-        customBlocks: allBlocks,
-        frontCustomBlocks: allBlocks.filter((b) => b.side === 'front'),
-        backCustomBlocks: allBlocks.filter((b) => b.side === 'back' || !b.side),
-      });
-    } else {
-      onCardChange({
-        ...cardData,
-        [active.fieldName]: newText,
-      });
+    if (command === 'bold') {
+      document.execCommand('bold', false);
+    } else if (command === 'italic') {
+      document.execCommand('italic', false);
+    } else if (command === 'underline') {
+      document.execCommand('underline', false);
+    } else if (command === 'color' && value) {
+      document.execCommand('foreColor', false, value);
+    } else if (command === 'highlight' && value) {
+      if (!document.execCommand('hiliteColor', false, value)) {
+        document.execCommand('backColor', false, value);
+      }
     }
 
-    setTimeout(() => {
-      el.focus();
-      el.setSelectionRange(newStart, newEnd);
-    }, 0);
+    if (activeFieldRef.current?.element) {
+      const el = activeFieldRef.current.element;
+      const newHtml = el.innerHTML;
+      const fieldName = activeFieldRef.current.fieldName;
+      const blockId = activeFieldRef.current.blockId;
+
+      if (fieldName === 'customBlock' && blockId && cardData && onCardChange) {
+        const allBlocks = getAllCustomBlocks(cardData).map((b) =>
+          b.id === blockId ? { ...b, content: newHtml } : b
+        );
+        onCardChange({
+          ...cardData,
+          customBlocks: allBlocks,
+          frontCustomBlocks: allBlocks.filter((b) => b.side === 'front'),
+          backCustomBlocks: allBlocks.filter((b) => b.side === 'back' || !b.side),
+        });
+      } else if (cardData && onCardChange && fieldName) {
+        onCardChange({
+          ...cardData,
+          [fieldName]: newHtml,
+        });
+      }
+    }
   };
 
   // Card update helper
@@ -475,8 +554,8 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
       side: activeSide,
       title: activeSide === 'front' ? 'Note / Context' : 'Extra Note',
       content: '',
-      color: isDark ? '#1E293B' : '#F1F5F9',
-      borderColor: isDark ? '#334155' : '#CBD5E1',
+      color: isThemeLight ? '#F1F5F9' : '#1E293B',
+      borderColor: isThemeLight ? '#CBD5E1' : '#334155',
       dir: 'auto',
     };
 
@@ -552,10 +631,10 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
   const [spellingStatus, setSpellingStatus] = useState<'idle' | 'correct' | 'incorrect'>('idle');
 
   const handleCheckSpelling = () => {
-    const target = (cardData?.word || '').trim().toLowerCase();
+    const rawTarget = (cardData?.word || '').replace(/<[^>]+>/g, '').trim().toLowerCase();
     const typed = userSpellingInput.trim().toLowerCase();
     if (!typed) return;
-    if (typed === target) {
+    if (typed === rawTarget) {
       setSpellingStatus('correct');
     } else {
       setSpellingStatus('incorrect');
@@ -585,13 +664,13 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
 
   return (
     <div className="w-full flex-1 flex flex-col min-w-0 select-text">
-      {/* Dynamic Theme CSS Injection */}
+      {/* Theme CSS and In-Place Visual Editor Styles */}
       <style key={activeThemeId}>
         {`
           ${theme.css}
           ${SHARED_CARD_CSS}
 
-          /* Editor canvas adaptations */
+          /* Editor canvas layout */
           .editor-canvas-wrapper .card {
             min-height: auto !important;
             height: auto !important;
@@ -616,33 +695,54 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
             box-sizing: border-box !important;
           }
 
-          /* Seamless in-place editable fields that dynamically grow */
-          .theme-inline-editable {
-            background: transparent !important;
-            border: none !important;
-            outline: none !important;
-            box-shadow: none !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            width: 100% !important;
-            resize: none !important;
-            overflow: hidden !important;
+          /* Light Card Theme Text Contrast - Ensure dark, crisp text */
+          .editor-canvas-wrapper.theme-is-light,
+          .editor-canvas-wrapper.theme-is-light .card,
+          .editor-canvas-wrapper.theme-is-light .comic-card-wrapper,
+          .editor-canvas-wrapper.theme-is-light .quest-card,
+          .editor-canvas-wrapper.theme-is-light .comic-card,
+          .editor-canvas-wrapper.theme-is-light .notebook-sheet,
+          .editor-canvas-wrapper.theme-is-light .botanical-card,
+          .editor-canvas-wrapper.theme-is-light .minimal-card {
+            color: #0F172A !important;
+          }
+
+          .editor-canvas-wrapper.theme-is-light .theme-editable-field {
             color: inherit !important;
-            font-family: inherit !important;
-            font-size: inherit !important;
-            font-weight: inherit !important;
-            line-height: inherit !important;
-            letter-spacing: inherit !important;
-            text-align: inherit !important;
+          }
+
+          /* Dark Card Theme Text Contrast */
+          .editor-canvas-wrapper.theme-is-dark,
+          .editor-canvas-wrapper.theme-is-dark .card,
+          .editor-canvas-wrapper.theme-is-dark .comic-card-wrapper,
+          .editor-canvas-wrapper.theme-is-dark .quest-card,
+          .editor-canvas-wrapper.theme-is-dark .comic-card,
+          .editor-canvas-wrapper.theme-is-dark .notebook-sheet,
+          .editor-canvas-wrapper.theme-is-dark .botanical-card,
+          .editor-canvas-wrapper.theme-is-dark .minimal-card {
+            color: #F8FAFC !important;
+          }
+
+          .editor-canvas-wrapper.theme-is-dark .theme-editable-field {
+            color: inherit !important;
+          }
+
+          /* Editable Field Hover and Focus Indicators */
+          .theme-editable-field {
             transition: outline 0.15s ease;
           }
-          .theme-inline-editable:hover {
+          .theme-editable-field:hover {
             outline: 1px dashed rgba(59, 130, 246, 0.45) !important;
             outline-offset: 2px !important;
           }
-          .theme-inline-editable:focus {
+          .theme-editable-field:focus {
             outline: 1.5px solid rgba(59, 130, 246, 0.9) !important;
             outline-offset: 2px !important;
+          }
+          .theme-editable-field:empty::before {
+            content: attr(data-placeholder);
+            opacity: 0.45;
+            cursor: text;
           }
         `}
       </style>
@@ -826,7 +926,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
 
       {/* ======================================================== */}
       {/* 2. CARD SIDE & FORMATTING CONTROLS                       */}
-      {/* Front   Back    |  Standard   Spelling  |  BG ■  Border ■   */}
+      {/* Front   Back  | Standard Spelling | + Add Box | Formatting*/}
       {/* ======================================================== */}
       <div className="flex flex-wrap items-center justify-between gap-3 py-2.5 border-b border-zinc-200 dark:border-zinc-800 text-xs">
         {/* Front / Back Toggle & Standard / Spelling Toggle */}
@@ -856,7 +956,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
             </button>
           </div>
 
-          <div className="h-4 w-px bg-zinc-300 dark:border-zinc-700" />
+          <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-700" />
 
           <div className="flex items-center gap-1">
             <button
@@ -888,6 +988,19 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
               Spelling
             </button>
           </div>
+
+          <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-700" />
+
+          {/* REQUIREMENT 3: + Add Box OUTSIDE the card in the Editor UI */}
+          <button
+            type="button"
+            onClick={handleAddBox}
+            className="px-2.5 py-1 text-xs font-semibold rounded-none border border-zinc-300 dark:border-zinc-700 hover:border-blue-500 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 cursor-pointer transition-colors"
+            title={`Add custom box to ${activeSide} of card`}
+          >
+            <Plus className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            <span>+ Add Box ({activeSide === 'front' ? 'Front' : 'Back'})</span>
+          </button>
         </div>
 
         {/* Card Background / Border and Formatting Toolbar */}
@@ -898,7 +1011,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
               <ColorSwatchPicker
                 label="Card BG"
                 value={cardCustomBg}
-                defaultValue={isDark ? '#18181B' : '#FFFFFF'}
+                defaultValue={isThemeLight ? '#FFFFFF' : '#18181B'}
                 onChange={setCardBg}
               />
             </div>
@@ -907,17 +1020,17 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
               <ColorSwatchPicker
                 label="Card Border"
                 value={cardCustomBorder}
-                defaultValue={isDark ? '#27272A' : '#E4E4E7'}
+                defaultValue={isThemeLight ? '#000000' : '#27272A'}
                 onChange={setCardBorder}
               />
             </div>
           </div>
 
-          {/* Minimal Rich Text Formatting Toolbar */}
+          {/* Visual Formatting Toolbar */}
           <div className="flex items-center gap-0.5 border border-zinc-200 dark:border-zinc-800 px-1 py-0.5 bg-white dark:bg-zinc-900 rounded-none">
             <button
               type="button"
-              onClick={() => applyFormat('bold')}
+              onClick={() => applyVisualFormat('bold')}
               className="w-6 h-6 font-bold hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center justify-center cursor-pointer rounded-none"
               title="Bold"
             >
@@ -925,7 +1038,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => applyFormat('italic')}
+              onClick={() => applyVisualFormat('italic')}
               className="w-6 h-6 italic font-serif hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center justify-center cursor-pointer rounded-none"
               title="Italic"
             >
@@ -933,7 +1046,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => applyFormat('underline')}
+              onClick={() => applyVisualFormat('underline')}
               className="w-6 h-6 underline hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center justify-center cursor-pointer rounded-none"
               title="Underline"
             >
@@ -945,7 +1058,8 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
               <ColorSwatchPicker
                 label="Text Color"
                 defaultValue="#38BDF8"
-                onChange={(c) => applyFormat('color', c)}
+                onChange={(c) => applyVisualFormat('color', c)}
+                align="right"
               />
             </div>
             <div className="flex items-center gap-1 px-1">
@@ -953,7 +1067,8 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
               <ColorSwatchPicker
                 label="Highlight"
                 defaultValue="#FEF08A"
-                onChange={(c) => applyFormat('highlight', c)}
+                onChange={(c) => applyVisualFormat('highlight', c)}
+                align="right"
               />
             </div>
           </div>
@@ -966,7 +1081,9 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
       {/* ======================================================== */}
       <div className="w-full flex-1 flex flex-col items-center justify-start min-h-0 py-4 px-2 sm:px-4 bg-zinc-100/60 dark:bg-zinc-950/60 overflow-y-auto">
         <div
-          className="editor-canvas-wrapper w-full max-w-2xl transition-all duration-150"
+          className={`editor-canvas-wrapper w-full max-w-2xl transition-all duration-150 ${
+            isThemeLight ? 'theme-is-light' : 'theme-is-dark'
+          }`}
           style={{
             ...(cardCustomBg ? { backgroundColor: cardCustomBg } : {}),
             ...(cardCustomBorder ? { borderColor: cardCustomBorder, borderStyle: 'solid', borderWidth: '2px' } : {}),
@@ -986,13 +1103,13 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     ) : (
                       <>
                         <span>LEVEL 1 •</span>
-                        <input
-                          type="text"
+                        <ContentEditableField
                           value={cardData?.partOfSpeech || ''}
-                          onChange={(e) => updateField('partOfSpeech', e.target.value)}
-                          onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' })}
+                          onChange={(val) => updateField('partOfSpeech', val)}
+                          onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'partOfSpeech' })}
                           placeholder="POS"
-                          className="bg-transparent border-none outline-none font-black text-inherit uppercase w-16"
+                          tagName="span"
+                          className="font-black uppercase inline-block ml-1"
                         />
                       </>
                     )}
@@ -1041,20 +1158,21 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                 {activeSide === 'front' && activeMode === 'normal' && (
                   <>
                     <div className="quest-hero">
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.word || ''}
                         onChange={(val) => updateField('word', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'word' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'word' })}
                         placeholder={emptyWordPlaceholder}
+                        tagName="h1"
                         className="quest-word text-center"
                       />
-                      <input
-                        type="text"
+                      <ContentEditableField
                         value={cardData?.phonetic || ''}
-                        onChange={(e) => updateField('phonetic', e.target.value)}
-                        onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'phonetic' })}
+                        onChange={(val) => updateField('phonetic', val)}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'phonetic' })}
                         placeholder="/IPA/"
-                        className="quest-ipa text-center bg-transparent border-none outline-none w-full"
+                        tagName="span"
+                        className="quest-ipa text-center block"
                       />
                     </div>
 
@@ -1113,11 +1231,12 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                       <div className="example-quest-header">
                         <span className="quest-tag">SENTENCE CHALLENGE</span>
                       </div>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.example || ''}
                         onChange={(val) => updateField('example', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'example' })}
                         placeholder="Context / Example Sentence..."
+                        tagName="p"
                         className="quest-sentence"
                       />
                     </div>
@@ -1129,11 +1248,12 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                   <>
                     <div className="quest-prompt-center">
                       <div className="quest-instruction">Listen and type the missing word:</div>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={spellingSentence}
                         onChange={(val) => updateField('spellingSentence', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'spellingSentence' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'spellingSentence' })}
                         placeholder="Listen and fill in the missing word..."
+                        tagName="p"
                         className="quest-fill-sentence text-center"
                       />
                     </div>
@@ -1188,12 +1308,12 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
 
                     {spellingStatus === 'correct' && (
                       <div className="p-3 my-2 border-3 border-black bg-[#DCFCE7] text-[#15803D] font-black text-center rounded-xl shadow-[0_3px_0_#000]">
-                        ✓ EXCELLENT! {cardData?.word}
+                        ✓ EXCELLENT! {cardData?.word?.replace(/<[^>]+>/g, '')}
                       </div>
                     )}
                     {spellingStatus === 'incorrect' && (
                       <div className="p-3 my-2 border-3 border-black bg-[#FFE4E6] text-[#BE123C] font-black text-center rounded-xl shadow-[0_3px_0_#000]">
-                        ✕ TARGET WORD: {cardData?.word}
+                        ✕ TARGET WORD: {cardData?.word?.replace(/<[^>]+>/g, '')}
                       </div>
                     )}
                   </>
@@ -1203,20 +1323,21 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                 {activeSide === 'back' && (
                   <>
                     <div className="quest-hero">
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.word || ''}
                         onChange={(val) => updateField('word', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'word' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'word' })}
                         placeholder={emptyWordPlaceholder}
+                        tagName="h1"
                         className="quest-word text-center"
                       />
-                      <input
-                        type="text"
+                      <ContentEditableField
                         value={cardData?.phonetic || ''}
-                        onChange={(e) => updateField('phonetic', e.target.value)}
-                        onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'phonetic' })}
+                        onChange={(val) => updateField('phonetic', val)}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'phonetic' })}
                         placeholder="/IPA/"
-                        className="quest-ipa text-center bg-transparent border-none outline-none w-full"
+                        tagName="span"
+                        className="quest-ipa text-center block"
                       />
                     </div>
 
@@ -1274,12 +1395,13 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     {/* Persian Meaning Banner */}
                     <div className="quest-meaning-banner">
                       <span className="meaning-quest-label">PERSIAN MEANING</span>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.meaningFa || ''}
                         onChange={(val) => updateField('meaningFa', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'meaningFa' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'meaningFa' })}
                         placeholder="معنی فارسی..."
                         dir="rtl"
+                        tagName="p"
                         className="quest-meaning-fa"
                       />
                     </div>
@@ -1287,11 +1409,12 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     {/* English Definition Card */}
                     <div className="quest-definition-card">
                       <span className="quest-tag-blue">ENGLISH DEFINITION</span>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.definitionEn || ''}
                         onChange={(val) => updateField('definitionEn', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'definitionEn' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'definitionEn' })}
                         placeholder="English definition..."
+                        tagName="p"
                         className="quest-definition-text"
                       />
                     </div>
@@ -1301,19 +1424,21 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                       <div className="example-quest-header">
                         <span className="quest-tag">EXAMPLE & TRANSLATION</span>
                       </div>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.example || ''}
                         onChange={(val) => updateField('example', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'example' })}
                         placeholder="Example sentence..."
+                        tagName="p"
                         className="quest-sentence"
                       />
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.translationFa || ''}
                         onChange={(val) => updateField('translationFa', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'translationFa' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'translationFa' })}
                         placeholder="ترجمه مثال..."
                         dir="rtl"
+                        tagName="p"
                         className="quest-translation-fa"
                       />
                     </div>
@@ -1321,11 +1446,12 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     {/* Memory Hook Mnemonic Card */}
                     <div className="quest-mnemonic-card">
                       <span className="quest-tag-purple">💡 MEMORY HOOK</span>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.mnemonic || ''}
                         onChange={(val) => updateField('mnemonic', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'mnemonic' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'mnemonic' })}
                         placeholder="کد یادسپاری یا نکته طلایی..."
+                        tagName="p"
                         className="quest-mnemonic"
                       />
                     </div>
@@ -1345,25 +1471,28 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     }}
                   >
                     <div className="flex items-center justify-between gap-2 border-b border-black/10 dark:border-white/10 pb-1 mb-2">
-                      <input
-                        type="text"
+                      <ContentEditableField
                         value={blk.title}
-                        onChange={(e) => handleUpdateBox(blk.id, { title: e.target.value })}
+                        onChange={(val) => handleUpdateBox(blk.id, { title: val })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'customBlockTitle', blockId: blk.id })}
                         placeholder="Box Title..."
-                        className="font-black text-xs uppercase bg-transparent border-none outline-none flex-1 text-inherit"
+                        tagName="span"
+                        className="font-black text-xs uppercase flex-1 text-inherit"
                       />
                       <div className="flex items-center gap-2">
                         <ColorSwatchPicker
                           label="Box BG"
                           value={blk.color}
-                          defaultValue={isDark ? '#1E293B' : '#FAF5FF'}
+                          defaultValue={isThemeLight ? '#FAF5FF' : '#1E293B'}
                           onChange={(c) => handleUpdateBox(blk.id, { color: c })}
+                          align="right"
                         />
                         <ColorSwatchPicker
                           label="Box Border"
                           value={blk.borderColor}
-                          defaultValue={blk.color || (isDark ? '#334155' : '#000000')}
+                          defaultValue={blk.color || (isThemeLight ? '#000000' : '#334155')}
                           onChange={(c) => handleUpdateBox(blk.id, { borderColor: c })}
+                          align="right"
                         />
                         <button
                           type="button"
@@ -1375,10 +1504,10 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                         </button>
                       </div>
                     </div>
-                    <AutoResizingTextarea
+                    <ContentEditableField
                       value={blk.content}
                       onChange={(val) => handleUpdateBox(blk.id, { content: val })}
-                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'customBlock', blockId: blk.id })}
+                      onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'customBlock', blockId: blk.id })}
                       placeholder="Custom notes or details..."
                       dir={blk.dir || (isRTLText(blk.content) ? 'rtl' : 'ltr')}
                       style={{ color: getContrastTextColor(blk.color) }}
@@ -1386,16 +1515,6 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     />
                   </div>
                 ))}
-
-                {/* 7. Add Box Button */}
-                <button
-                  type="button"
-                  onClick={handleAddBox}
-                  className="w-full mt-3 py-2.5 bg-white hover:bg-zinc-50 text-zinc-800 font-extrabold text-xs rounded-xl border-3 border-black shadow-[0_3px_0_#000] flex items-center justify-center gap-1 cursor-pointer transition-transform active:translate-y-0.5"
-                >
-                  <Plus className="w-4 h-4 text-[#58CC02]" />
-                  <span>Add Box ({activeSide === 'front' ? 'Front' : 'Back'})</span>
-                </button>
               </div>
             </div>
           )}
@@ -1411,13 +1530,13 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                   <span className={`hero-badge ${activeMode === 'spelling' ? 'badge-spelling' : ''}`}>
                     {activeMode === 'spelling' ? '🎯 SPELLING CHALLENGE' : '💥 VOCABULARY'}
                   </span>
-                  <input
-                    type="text"
+                  <ContentEditableField
                     value={cardData?.partOfSpeech || ''}
-                    onChange={(e) => updateField('partOfSpeech', e.target.value)}
-                    onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' })}
+                    onChange={(val) => updateField('partOfSpeech', val)}
+                    onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'partOfSpeech' })}
                     placeholder="POS"
-                    className="comic-badge badge-pos bg-transparent border-2 border-black uppercase font-black w-20 text-center"
+                    tagName="span"
+                    className="comic-badge badge-pos uppercase font-black"
                   />
                 </div>
 
@@ -1455,22 +1574,23 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                 {/* Word Section */}
                 <div className="comic-word-section">
                   <div className="comic-title-row">
-                    <AutoResizingTextarea
+                    <ContentEditableField
                       value={cardData?.word || ''}
                       onChange={(val) => updateField('word', val)}
-                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'word' })}
+                      onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'word' })}
                       placeholder={emptyWordPlaceholder}
+                      tagName="h1"
                       className="comic-title"
                     />
                   </div>
                   <div className="comic-badges-row">
-                    <input
-                      type="text"
+                    <ContentEditableField
                       value={cardData?.phonetic || ''}
-                      onChange={(e) => updateField('phonetic', e.target.value)}
-                      onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'phonetic' })}
+                      onChange={(val) => updateField('phonetic', val)}
+                      onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'phonetic' })}
                       placeholder="/IPA/"
-                      className="comic-badge badge-ipa bg-white text-black font-mono font-bold"
+                      tagName="span"
+                      className="comic-badge badge-ipa font-mono font-bold"
                     />
                   </div>
                 </div>
@@ -1529,11 +1649,12 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                 {activeSide === 'front' && activeMode === 'normal' && (
                   <div className="comic-hint-box">
                     <span className="hint-label">💡 CONTEXT / EXAMPLE</span>
-                    <AutoResizingTextarea
+                    <ContentEditableField
                       value={cardData?.example || ''}
                       onChange={(val) => updateField('example', val)}
-                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                      onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'example' })}
                       placeholder="Example sentence..."
+                      tagName="p"
                       className="comic-example-en"
                     />
                   </div>
@@ -1543,11 +1664,12 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                 {activeSide === 'front' && activeMode === 'spelling' && (
                   <div className="spelling-prompt-box">
                     <div className="spelling-prompt-title">LISTEN & FILL IN THE MISSING WORD:</div>
-                    <AutoResizingTextarea
+                    <ContentEditableField
                       value={spellingSentence}
                       onChange={(val) => updateField('spellingSentence', val)}
-                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'spellingSentence' })}
+                      onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'spellingSentence' })}
                       placeholder="Missing word sentence..."
+                      tagName="p"
                       className="spelling-sentence"
                     />
                     <div className="spelling-interactive-area my-3 flex gap-2">
@@ -1577,12 +1699,12 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     </div>
                     {spellingStatus === 'correct' && (
                       <div className="p-2 border-2 border-black bg-emerald-100 text-emerald-900 font-black text-center">
-                        ✓ CORRECT: {cardData?.word}
+                        ✓ CORRECT: {cardData?.word?.replace(/<[^>]+>/g, '')}
                       </div>
                     )}
                     {spellingStatus === 'incorrect' && (
                       <div className="p-2 border-2 border-black bg-rose-100 text-rose-900 font-black text-center">
-                        ✕ TARGET: {cardData?.word}
+                        ✕ TARGET: {cardData?.word?.replace(/<[^>]+>/g, '')}
                       </div>
                     )}
                   </div>
@@ -1595,23 +1717,25 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
 
                     <div className="comic-meaning-box">
                       <span className="box-label label-meaning">📖 PERSIAN MEANING</span>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.meaningFa || ''}
                         onChange={(val) => updateField('meaningFa', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'meaningFa' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'meaningFa' })}
                         placeholder="معنی فارسی..."
                         dir="rtl"
+                        tagName="p"
                         className="meaning-text"
                       />
                     </div>
 
                     <div className="comic-definition-box">
                       <span className="box-label label-definition">📖 ENGLISH DEFINITION</span>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.definitionEn || ''}
                         onChange={(val) => updateField('definitionEn', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'definitionEn' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'definitionEn' })}
                         placeholder="English definition..."
+                        tagName="p"
                         className="definition-text"
                       />
                     </div>
@@ -1620,30 +1744,33 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                       <div className="example-header">
                         <span className="box-label label-example">💬 EXAMPLE SENTENCE</span>
                       </div>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.example || ''}
                         onChange={(val) => updateField('example', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'example' })}
                         placeholder="Example sentence..."
+                        tagName="p"
                         className="example-en"
                       />
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.translationFa || ''}
                         onChange={(val) => updateField('translationFa', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'translationFa' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'translationFa' })}
                         placeholder="ترجمه مثال..."
                         dir="rtl"
+                        tagName="p"
                         className="example-fa"
                       />
                     </div>
 
                     <div className="comic-mnemonic-box">
                       <span className="box-label label-memory">🧠 MEMORY AID / MNEMONIC</span>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.mnemonic || ''}
                         onChange={(val) => updateField('mnemonic', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'mnemonic' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'mnemonic' })}
                         placeholder="کد یادسپاری..."
+                        tagName="p"
                         className="mnemonic-text"
                       />
                     </div>
@@ -1663,25 +1790,28 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     }}
                   >
                     <div className="flex items-center justify-between gap-2 border-b border-black/10 dark:border-white/10 pb-1 mb-2">
-                      <input
-                        type="text"
+                      <ContentEditableField
                         value={blk.title}
-                        onChange={(e) => handleUpdateBox(blk.id, { title: e.target.value })}
+                        onChange={(val) => handleUpdateBox(blk.id, { title: val })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'customBlockTitle', blockId: blk.id })}
                         placeholder="Box Title..."
-                        className="font-black text-xs uppercase bg-transparent border-none outline-none flex-1 text-inherit"
+                        tagName="span"
+                        className="font-black text-xs uppercase flex-1 text-inherit"
                       />
                       <div className="flex items-center gap-2">
                         <ColorSwatchPicker
                           label="Box BG"
                           value={blk.color}
-                          defaultValue={isDark ? '#1E293B' : '#F1F5F9'}
+                          defaultValue={isThemeLight ? '#F1F5F9' : '#1E293B'}
                           onChange={(c) => handleUpdateBox(blk.id, { color: c })}
+                          align="right"
                         />
                         <ColorSwatchPicker
                           label="Box Border"
                           value={blk.borderColor}
-                          defaultValue={blk.color || (isDark ? '#334155' : '#CBD5E1')}
+                          defaultValue={blk.color || (isThemeLight ? '#CBD5E1' : '#334155')}
                           onChange={(c) => handleUpdateBox(blk.id, { borderColor: c })}
+                          align="right"
                         />
                         <button
                           type="button"
@@ -1693,10 +1823,10 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                         </button>
                       </div>
                     </div>
-                    <AutoResizingTextarea
+                    <ContentEditableField
                       value={blk.content}
                       onChange={(val) => handleUpdateBox(blk.id, { content: val })}
-                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'customBlock', blockId: blk.id })}
+                      onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'customBlock', blockId: blk.id })}
                       placeholder="Notes / Content..."
                       dir={blk.dir || (isRTLText(blk.content) ? 'rtl' : 'ltr')}
                       style={{ color: getContrastTextColor(blk.color) }}
@@ -1704,16 +1834,6 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     />
                   </div>
                 ))}
-
-                {/* Add Box Button */}
-                <button
-                  type="button"
-                  onClick={handleAddBox}
-                  className="w-full mt-3 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-black text-xs border-2 border-black shadow-[2px_2px_0_#000] flex items-center justify-center gap-1 cursor-pointer uppercase"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>+ Add Box ({activeSide === 'front' ? 'Front' : 'Back'})</span>
-                </button>
               </div>
             </div>
           )}
@@ -1730,12 +1850,12 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                   <span className="hole"></span>
                 </div>
                 <div className={`notebook-tab-pos ${activeMode === 'spelling' ? 'tab-spelling' : ''}`}>
-                  <input
-                    type="text"
+                  <ContentEditableField
                     value={cardData?.partOfSpeech || (activeMode === 'spelling' ? 'SPELLING' : 'POS')}
-                    onChange={(e) => updateField('partOfSpeech', e.target.value)}
-                    onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' })}
-                    className="bg-transparent border-none outline-none font-black text-inherit uppercase w-20 text-center"
+                    onChange={(val) => updateField('partOfSpeech', val)}
+                    onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'partOfSpeech' })}
+                    tagName="span"
+                    className="font-black text-inherit uppercase"
                   />
                 </div>
 
@@ -1744,19 +1864,20 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                 )}
 
                 <div className="notebook-header">
-                  <AutoResizingTextarea
+                  <ContentEditableField
                     value={cardData?.word || ''}
                     onChange={(val) => updateField('word', val)}
-                    onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'word' })}
+                    onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'word' })}
                     placeholder={emptyWordPlaceholder}
+                    tagName="h1"
                     className="notebook-word"
                   />
-                  <input
-                    type="text"
+                  <ContentEditableField
                     value={cardData?.phonetic || ''}
-                    onChange={(e) => updateField('phonetic', e.target.value)}
-                    onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'phonetic' })}
+                    onChange={(val) => updateField('phonetic', val)}
+                    onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'phonetic' })}
                     placeholder="/IPA/"
+                    tagName="span"
                     className="notebook-tape-ipa"
                   />
                 </div>
@@ -1794,11 +1915,12 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                 {activeSide === 'front' && activeMode === 'normal' && (
                   <div className="notebook-sticky-example">
                     <span className="sticky-title font-bold text-xs block mb-1">CONTEXT</span>
-                    <AutoResizingTextarea
+                    <ContentEditableField
                       value={cardData?.example || ''}
                       onChange={(val) => updateField('example', val)}
-                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                      onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'example' })}
                       placeholder="Context sentence..."
+                      tagName="p"
                       className="notebook-sentence text-sm"
                     />
                   </div>
@@ -1807,11 +1929,12 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                 {activeSide === 'front' && activeMode === 'spelling' && (
                   <div className="notebook-sticky-example">
                     <span className="sticky-title font-bold text-xs block mb-1">SPELLING TEST</span>
-                    <AutoResizingTextarea
+                    <ContentEditableField
                       value={spellingSentence}
                       onChange={(val) => updateField('spellingSentence', val)}
-                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'spellingSentence' })}
+                      onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'spellingSentence' })}
                       placeholder="Fill sentence..."
+                      tagName="p"
                       className="notebook-sentence text-sm"
                     />
                     <div className="flex gap-2 my-2">
@@ -1840,53 +1963,58 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                   <>
                     <div className="notebook-highlighter-meaning">
                       <span className="highlighter-label">PERSIAN MEANING</span>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.meaningFa || ''}
                         onChange={(val) => updateField('meaningFa', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'meaningFa' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'meaningFa' })}
                         placeholder="معنی فارسی..."
                         dir="rtl"
+                        tagName="p"
                         className="notebook-meaning-fa"
                       />
                     </div>
 
                     <div className="p-3 border border-black bg-white/80 my-2">
                       <span className="font-bold text-xs block mb-1">ENGLISH DEFINITION</span>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.definitionEn || ''}
                         onChange={(val) => updateField('definitionEn', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'definitionEn' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'definitionEn' })}
                         placeholder="Definition..."
+                        tagName="p"
                         className="text-xs"
                       />
                     </div>
 
                     <div className="notebook-sticky-example">
                       <span className="sticky-title font-bold text-xs block mb-1">EXAMPLE & TRANSLATION</span>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.example || ''}
                         onChange={(val) => updateField('example', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'example' })}
                         placeholder="Example..."
+                        tagName="p"
                         className="notebook-sentence text-xs"
                       />
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.translationFa || ''}
                         onChange={(val) => updateField('translationFa', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'translationFa' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'translationFa' })}
                         placeholder="ترجمه..."
                         dir="rtl"
+                        tagName="p"
                         className="text-xs text-zinc-600 dark:text-zinc-400 mt-1"
                       />
                     </div>
 
                     <div className="notebook-washi-mnemonic">
                       <span className="washi-title font-bold text-xs block mb-1">📌 MEMORY HOOK</span>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.mnemonic || ''}
                         onChange={(val) => updateField('mnemonic', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'mnemonic' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'mnemonic' })}
                         placeholder="Mnemonic..."
+                        tagName="p"
                         className="washi-text text-xs"
                       />
                     </div>
@@ -1905,12 +2033,13 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     }}
                   >
                     <div className="flex items-center justify-between gap-2 border-b border-black/10 pb-1 mb-1">
-                      <input
-                        type="text"
+                      <ContentEditableField
                         value={blk.title}
-                        onChange={(e) => handleUpdateBox(blk.id, { title: e.target.value })}
+                        onChange={(val) => handleUpdateBox(blk.id, { title: val })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'customBlockTitle', blockId: blk.id })}
                         placeholder="Title..."
-                        className="font-bold text-xs bg-transparent border-none outline-none flex-1 text-inherit"
+                        tagName="span"
+                        className="font-bold text-xs flex-1 text-inherit"
                       />
                       <button
                         type="button"
@@ -1920,10 +2049,10 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                         ✕
                       </button>
                     </div>
-                    <AutoResizingTextarea
+                    <ContentEditableField
                       value={blk.content}
                       onChange={(val) => handleUpdateBox(blk.id, { content: val })}
-                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'customBlock', blockId: blk.id })}
+                      onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'customBlock', blockId: blk.id })}
                       placeholder="Notes..."
                       dir={blk.dir || (isRTLText(blk.content) ? 'rtl' : 'ltr')}
                       style={{ color: getContrastTextColor(blk.color) }}
@@ -1931,15 +2060,6 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     />
                   </div>
                 ))}
-
-                <button
-                  type="button"
-                  onClick={handleAddBox}
-                  className="w-full mt-3 py-2 bg-white hover:bg-zinc-100 text-black font-bold text-xs border border-dashed border-black flex items-center justify-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Add Box ({activeSide === 'front' ? 'Front' : 'Back'})</span>
-                </button>
               </div>
             </div>
           )}
@@ -1955,29 +2075,30 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                 )}
 
                 <div className="botanical-box botanical-word-box">
-                  <AutoResizingTextarea
+                  <ContentEditableField
                     value={cardData?.word || ''}
                     onChange={(val) => updateField('word', val)}
-                    onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'word' })}
+                    onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'word' })}
                     placeholder={emptyWordPlaceholder}
+                    tagName="h1"
                     className="botanical-word text-center"
                   />
-                  <input
-                    type="text"
+                  <ContentEditableField
                     value={cardData?.partOfSpeech || ''}
-                    onChange={(e) => updateField('partOfSpeech', e.target.value)}
-                    onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' })}
+                    onChange={(val) => updateField('partOfSpeech', val)}
+                    onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'partOfSpeech' })}
                     placeholder="part of speech"
-                    className="botanical-pos text-center bg-transparent border-none outline-none w-full"
+                    tagName="div"
+                    className="botanical-pos text-center"
                   />
                   <div className="mt-3">
-                    <input
-                      type="text"
+                    <ContentEditableField
                       value={cardData?.phonetic || ''}
-                      onChange={(e) => updateField('phonetic', e.target.value)}
-                      onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'phonetic' })}
+                      onChange={(val) => updateField('phonetic', val)}
+                      onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'phonetic' })}
                       placeholder="/IPA/"
-                      className="botanical-ipa-pill text-center border-none outline-none"
+                      tagName="span"
+                      className="botanical-ipa-pill text-center inline-block"
                     />
                   </div>
                 </div>
@@ -2011,11 +2132,12 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                 {activeSide === 'front' && activeMode === 'normal' && (
                   <div className="botanical-box botanical-example-box">
                     <div className="botanical-example-title font-bold text-xs mb-1">EXAMPLE</div>
-                    <AutoResizingTextarea
+                    <ContentEditableField
                       value={cardData?.example || ''}
                       onChange={(val) => updateField('example', val)}
-                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                      onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'example' })}
                       placeholder="Context example..."
+                      tagName="p"
                       className="botanical-sentence text-sm"
                     />
                   </div>
@@ -2024,11 +2146,12 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                 {activeSide === 'front' && activeMode === 'spelling' && (
                   <div className="botanical-box">
                     <div className="botanical-example-title font-bold text-xs mb-1">SPELLING TEST</div>
-                    <AutoResizingTextarea
+                    <ContentEditableField
                       value={spellingSentence}
                       onChange={(val) => updateField('spellingSentence', val)}
-                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'spellingSentence' })}
+                      onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'spellingSentence' })}
                       placeholder="Spelling sentence..."
+                      tagName="p"
                       className="text-center font-bold text-sm"
                     />
                     <div className="flex gap-2 my-2">
@@ -2057,53 +2180,58 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                   <>
                     <div className="botanical-box botanical-meaning-box">
                       <div className="botanical-meaning-title font-bold text-xs mb-1">PERSIAN MEANING</div>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.meaningFa || ''}
                         onChange={(val) => updateField('meaningFa', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'meaningFa' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'meaningFa' })}
                         placeholder="معنی فارسی..."
                         dir="rtl"
+                        tagName="p"
                         className="botanical-meaning-fa text-xl font-bold"
                       />
                     </div>
 
                     <div className="botanical-box botanical-definition-box">
                       <div className="botanical-definition-title font-bold text-xs mb-1">ENGLISH DEFINITION</div>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.definitionEn || ''}
                         onChange={(val) => updateField('definitionEn', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'definitionEn' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'definitionEn' })}
                         placeholder="English definition..."
+                        tagName="p"
                         className="botanical-definition-en text-xs"
                       />
                     </div>
 
                     <div className="botanical-box botanical-example-box">
                       <div className="botanical-example-title font-bold text-xs mb-1">EXAMPLE & TRANSLATION</div>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.example || ''}
                         onChange={(val) => updateField('example', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'example' })}
                         placeholder="Example..."
+                        tagName="p"
                         className="botanical-sentence text-xs"
                       />
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.translationFa || ''}
                         onChange={(val) => updateField('translationFa', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'translationFa' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'translationFa' })}
                         placeholder="ترجمه مثال..."
                         dir="rtl"
+                        tagName="p"
                         className="botanical-translation-fa text-xs mt-1"
                       />
                     </div>
 
                     <div className="botanical-box botanical-mnemonic-box">
                       <div className="botanical-mnemonic-title font-bold text-xs mb-1">MEMORY HOOK</div>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.mnemonic || ''}
                         onChange={(val) => updateField('mnemonic', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'mnemonic' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'mnemonic' })}
                         placeholder="کد یادسپاری..."
+                        tagName="p"
                         className="botanical-mnemonic-text text-xs"
                       />
                     </div>
@@ -2122,12 +2250,13 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     }}
                   >
                     <div className="flex items-center justify-between gap-2 border-b border-black/10 pb-1 mb-1">
-                      <input
-                        type="text"
+                      <ContentEditableField
                         value={blk.title}
-                        onChange={(e) => handleUpdateBox(blk.id, { title: e.target.value })}
+                        onChange={(val) => handleUpdateBox(blk.id, { title: val })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'customBlockTitle', blockId: blk.id })}
                         placeholder="Title..."
-                        className="font-bold text-xs bg-transparent border-none outline-none flex-1 text-inherit"
+                        tagName="span"
+                        className="font-bold text-xs flex-1 text-inherit"
                       />
                       <button
                         type="button"
@@ -2137,10 +2266,10 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                         ✕
                       </button>
                     </div>
-                    <AutoResizingTextarea
+                    <ContentEditableField
                       value={blk.content}
                       onChange={(val) => handleUpdateBox(blk.id, { content: val })}
-                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'customBlock', blockId: blk.id })}
+                      onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'customBlock', blockId: blk.id })}
                       placeholder="Notes..."
                       dir={blk.dir || (isRTLText(blk.content) ? 'rtl' : 'ltr')}
                       style={{ color: getContrastTextColor(blk.color) }}
@@ -2148,15 +2277,6 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     />
                   </div>
                 ))}
-
-                <button
-                  type="button"
-                  onClick={handleAddBox}
-                  className="w-full mt-3 py-2.5 rounded-2xl bg-[#F4F5ED] hover:bg-[#EAECE0] text-[#445339] font-bold text-xs border border-[#B4C4A9]/40 flex items-center justify-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Box ({activeSide === 'front' ? 'Front' : 'Back'})</span>
-                </button>
               </div>
             </div>
           )}
@@ -2168,12 +2288,12 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
             <div className={`minimal-card-wrapper theme-minimal`}>
               <div className="minimal-card">
                 <div className="minimal-header flex items-center justify-between">
-                  <input
-                    type="text"
+                  <ContentEditableField
                     value={cardData?.partOfSpeech || (activeMode === 'spelling' ? 'SPELLING' : 'PART OF SPEECH')}
-                    onChange={(e) => updateField('partOfSpeech', e.target.value)}
-                    onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'partOfSpeech' })}
-                    className="minimal-pos font-bold uppercase w-32 bg-transparent outline-none"
+                    onChange={(val) => updateField('partOfSpeech', val)}
+                    onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'partOfSpeech' })}
+                    tagName="span"
+                    className="minimal-pos font-bold uppercase inline-block"
                   />
                 </div>
 
@@ -2182,20 +2302,21 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                 )}
 
                 <div className="minimal-word-block">
-                  <AutoResizingTextarea
+                  <ContentEditableField
                     value={cardData?.word || ''}
                     onChange={(val) => updateField('word', val)}
-                    onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'word' })}
+                    onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'word' })}
                     placeholder={emptyWordPlaceholder}
+                    tagName="h1"
                     className="minimal-word"
                   />
-                  <input
-                    type="text"
+                  <ContentEditableField
                     value={cardData?.phonetic || ''}
-                    onChange={(e) => updateField('phonetic', e.target.value)}
-                    onFocus={(e) => (activeInputRef.current = { element: e.target, fieldName: 'phonetic' })}
+                    onChange={(val) => updateField('phonetic', val)}
+                    onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'phonetic' })}
                     placeholder="/IPA/"
-                    className="minimal-phonetic bg-transparent border-none outline-none w-full"
+                    tagName="span"
+                    className="minimal-phonetic block"
                   />
                 </div>
 
@@ -2228,11 +2349,12 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                 {activeSide === 'front' && activeMode === 'normal' && (
                   <div className="minimal-example-block">
                     <div className="minimal-example-label font-bold text-xs mb-1">CONTEXT</div>
-                    <AutoResizingTextarea
+                    <ContentEditableField
                       value={cardData?.example || ''}
                       onChange={(val) => updateField('example', val)}
-                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                      onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'example' })}
                       placeholder="Context sentence..."
+                      tagName="p"
                       className="minimal-sentence text-sm"
                     />
                   </div>
@@ -2241,11 +2363,12 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                 {activeSide === 'front' && activeMode === 'spelling' && (
                   <div className="minimal-example-block">
                     <div className="minimal-example-label font-bold text-xs mb-1">SPELLING TEST</div>
-                    <AutoResizingTextarea
+                    <ContentEditableField
                       value={spellingSentence}
                       onChange={(val) => updateField('spellingSentence', val)}
-                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'spellingSentence' })}
+                      onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'spellingSentence' })}
                       placeholder="Spelling sentence..."
+                      tagName="p"
                       className="minimal-sentence text-sm"
                     />
                     <div className="flex gap-2 my-2">
@@ -2274,53 +2397,58 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                   <>
                     <div className="minimal-meaning-block">
                       <div className="minimal-meaning-label font-bold text-xs mb-1">PERSIAN MEANING</div>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.meaningFa || ''}
                         onChange={(val) => updateField('meaningFa', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'meaningFa' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'meaningFa' })}
                         placeholder="معنی فارسی..."
                         dir="rtl"
+                        tagName="p"
                         className="minimal-meaning-text text-xl font-bold"
                       />
                     </div>
 
                     <div className="minimal-definition-block">
                       <div className="minimal-definition-label font-bold text-xs mb-1">ENGLISH DEFINITION</div>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.definitionEn || ''}
                         onChange={(val) => updateField('definitionEn', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'definitionEn' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'definitionEn' })}
                         placeholder="Definition..."
+                        tagName="p"
                         className="minimal-definition-text text-xs"
                       />
                     </div>
 
                     <div className="minimal-example-block">
                       <div className="minimal-example-label font-bold text-xs mb-1">EXAMPLE & TRANSLATION</div>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.example || ''}
                         onChange={(val) => updateField('example', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'example' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'example' })}
                         placeholder="Example..."
+                        tagName="p"
                         className="minimal-sentence text-xs"
                       />
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.translationFa || ''}
                         onChange={(val) => updateField('translationFa', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'translationFa' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'translationFa' })}
                         placeholder="ترجمه..."
                         dir="rtl"
+                        tagName="p"
                         className="text-xs text-zinc-500 mt-1"
                       />
                     </div>
 
                     <div className="minimal-mnemonic-block">
                       <div className="minimal-mnemonic-label font-bold text-xs mb-1">MEMORY HOOK</div>
-                      <AutoResizingTextarea
+                      <ContentEditableField
                         value={cardData?.mnemonic || ''}
                         onChange={(val) => updateField('mnemonic', val)}
-                        onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'mnemonic' })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'mnemonic' })}
                         placeholder="Mnemonic..."
+                        tagName="p"
                         className="minimal-mnemonic-text text-xs"
                       />
                     </div>
@@ -2339,12 +2467,13 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     }}
                   >
                     <div className="flex items-center justify-between gap-2 border-b border-black/10 pb-1 mb-1">
-                      <input
-                        type="text"
+                      <ContentEditableField
                         value={blk.title}
-                        onChange={(e) => handleUpdateBox(blk.id, { title: e.target.value })}
+                        onChange={(val) => handleUpdateBox(blk.id, { title: val })}
+                        onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'customBlockTitle', blockId: blk.id })}
                         placeholder="Title..."
-                        className="font-bold text-xs bg-transparent border-none outline-none flex-1 text-inherit"
+                        tagName="span"
+                        className="font-bold text-xs flex-1 text-inherit"
                       />
                       <button
                         type="button"
@@ -2354,10 +2483,10 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                         ✕
                       </button>
                     </div>
-                    <AutoResizingTextarea
+                    <ContentEditableField
                       value={blk.content}
                       onChange={(val) => handleUpdateBox(blk.id, { content: val })}
-                      onFocus={(el) => (activeInputRef.current = { element: el, fieldName: 'customBlock', blockId: blk.id })}
+                      onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'customBlock', blockId: blk.id })}
                       placeholder="Notes..."
                       dir={blk.dir || (isRTLText(blk.content) ? 'rtl' : 'ltr')}
                       style={{ color: getContrastTextColor(blk.color) }}
@@ -2365,18 +2494,21 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     />
                   </div>
                 ))}
-
-                <button
-                  type="button"
-                  onClick={handleAddBox}
-                  className="w-full mt-3 py-2 border border-dashed border-zinc-300 dark:border-zinc-700 hover:border-blue-500 text-zinc-600 dark:text-zinc-400 hover:text-blue-500 text-xs font-semibold rounded flex items-center justify-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Box ({activeSide === 'front' ? 'Front' : 'Back'})</span>
-                </button>
               </div>
             </div>
           )}
+        </div>
+
+        {/* REQUIREMENT 3: + Add Box OUTSIDE the rendered card */}
+        <div className="w-full max-w-2xl mt-4 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={handleAddBox}
+            className="w-full py-2 border border-dashed border-zinc-300 dark:border-zinc-700 hover:border-blue-500 text-zinc-600 dark:text-zinc-400 hover:text-blue-500 text-xs font-semibold rounded-none flex items-center justify-center gap-1.5 cursor-pointer transition-colors bg-white/40 dark:bg-zinc-900/40"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>+ Add Custom Box to {activeSide === 'front' ? 'Front' : 'Back'}</span>
+          </button>
         </div>
       </div>
 

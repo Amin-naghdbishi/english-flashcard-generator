@@ -157,18 +157,25 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
           setTotalCount(res.totalCount);
 
           if (res.notes.length > 0) {
-            // Select first card by default
-            setSelectedIndex(0);
+            // Select first card by default and authoritatively apply its Note Type & Theme
             const firstNote = res.notes[0];
-            const firstCardData = { ...firstNote.cardData };
-            setEditingCard(firstCardData);
-            setOriginalCardJson(JSON.stringify(firstCardData));
-            setIsDirty(false);
             const actualNoteType = firstNote.modelName || firstNote.noteType || 'Standard';
-            setCurrentNoteType(actualNoteType);
             const initialTheme =
               firstNote.detectedTheme ||
               resolveThemeFromNoteType(actualNoteType, settings.theme || 'comic-pop-dark');
+            const firstCardData: CardData = {
+              ...firstNote.cardData,
+              modelName: actualNoteType,
+              noteType: actualNoteType,
+              cardType: firstNote.cardType || firstNote.cardData?.cardType || 'normal',
+            };
+
+            setSelectedIndex(0);
+            setEditingCard(firstCardData);
+            setOriginalCardJson(JSON.stringify(firstCardData));
+            setIsDirty(false);
+            setSaveSuccessMsg(null);
+            setCurrentNoteType(actualNoteType);
             setCurrentTheme(initialTheme);
 
             const foundModels = Array.from(new Set(res.notes.map((n) => n.modelName).filter(Boolean)));
@@ -192,6 +199,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
         setEditingCard(null);
         setOriginalCardJson('');
         setIsDirty(false);
+        setCurrentNoteType('');
       } finally {
         setIsSearching(false);
       }
@@ -217,26 +225,33 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
 
   const handleSelectCard = useCallback(
     (index: number) => {
-      if (index === selectedIndex) return;
       if (index < 0 || index >= notes.length) return;
 
       const target = notes[index];
+      if (!target) return;
+
       requestNavigation(() => {
         setSelectedIndex(index);
-        const cardCopy = { ...target.cardData };
+        const actualNoteType = target.modelName || target.noteType || 'Standard';
+        const targetTheme =
+          target.detectedTheme ||
+          resolveThemeFromNoteType(actualNoteType, settings.theme || 'comic-pop-dark');
+        const cardCopy: CardData = {
+          ...target.cardData,
+          modelName: actualNoteType,
+          noteType: actualNoteType,
+          cardType: target.cardType || target.cardData?.cardType || 'normal',
+        };
+
         setEditingCard(cardCopy);
         setOriginalCardJson(JSON.stringify(cardCopy));
         setIsDirty(false);
         setSaveSuccessMsg(null);
-        const actualNoteType = target.modelName || target.noteType || 'Standard';
         setCurrentNoteType(actualNoteType);
-        const targetTheme =
-          target.detectedTheme ||
-          resolveThemeFromNoteType(actualNoteType, settings.theme || 'comic-pop-dark');
         setCurrentTheme(targetTheme);
       }, target.word);
     },
-    [notes, selectedIndex, requestNavigation, settings.theme]
+    [notes, requestNavigation, settings.theme]
   );
 
   const appThemeNoteTypes = useMemo(
@@ -639,6 +654,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
       <div className="w-full md:w-3/4 flex-1 min-w-0 p-4 sm:p-6 flex flex-col bg-zinc-50 dark:bg-zinc-950">
         {selectedNote && editingCard ? (
           <UnifiedCardEditor
+            key={`${selectedNote.noteId}_${currentNoteType}`}
             cardData={editingCard}
             noteId={selectedNote.noteId}
             deckName={selectedNote.deckName}

@@ -908,82 +908,25 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
           </button>
         </div>
 
-        {/* Simple Card Editor directly below Upload button */}
-        {selectedItemForPreview && (
-          <div className="mb-4 p-3 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-850 space-y-2.5 text-xs">
-            <div className="flex items-center justify-between font-semibold border-b border-zinc-200 dark:border-zinc-750 pb-1.5 text-zinc-900 dark:text-zinc-100">
-              <span className="truncate">Card Editor: {selectedItemForPreview.word}</span>
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={handlePreviousCard}
-                  disabled={previewIndex <= 0}
-                  className="px-1.5 py-0.5 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-750 disabled:opacity-30 rounded-none cursor-pointer"
-                  title="Previous card"
-                >
-                  ◀
-                </button>
-                <span className="text-[10px] text-zinc-500 font-mono">
-                  {previewIndex + 1}/{items.length}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleNextCard}
-                  disabled={previewIndex >= items.length - 1}
-                  className="px-1.5 py-0.5 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-750 disabled:opacity-30 rounded-none cursor-pointer"
-                  title="Next card"
-                >
-                  ▶
-                </button>
-              </div>
-            </div>
-
-            {/* Word */}
-            <div>
-              <label className="text-[10px] font-semibold text-zinc-700 dark:text-zinc-300 block mb-0.5">Word</label>
-              <input
-                type="text"
-                value={previewCard?.word || selectedItemForPreview.word || ''}
-                onChange={(e) => handleQuickEditField('word', e.target.value)}
-                className="w-full px-2 py-1 text-xs border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-none focus:outline-none focus:border-blue-600 dark:focus:border-blue-500"
-              />
-            </div>
-
-            {/* Persian Meaning */}
-            <div>
-              <label className="text-[10px] font-semibold text-zinc-700 dark:text-zinc-300 block mb-0.5">Persian Meaning</label>
-              <input
-                type="text"
-                dir="rtl"
-                value={previewCard?.meaningFa || ''}
-                onChange={(e) => handleQuickEditField('meaningFa', e.target.value)}
-                className="w-full px-2 py-1 text-xs border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-none focus:outline-none focus:border-blue-600 dark:focus:border-blue-500 font-sans"
-              />
-            </div>
-
-            {/* English Definition */}
-            <div>
-              <label className="text-[10px] font-semibold text-zinc-700 dark:text-zinc-300 block mb-0.5">English Definition</label>
-              <textarea
-                rows={2}
-                value={previewCard?.definitionEn || ''}
-                onChange={(e) => handleQuickEditField('definitionEn', e.target.value)}
-                className="w-full px-2 py-1 text-xs border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-none focus:outline-none focus:border-blue-600 dark:focus:border-blue-500 resize-none"
-              />
-            </div>
-
-            {/* Example */}
-            <div>
-              <label className="text-[10px] font-semibold text-zinc-700 dark:text-zinc-300 block mb-0.5">Example Sentence</label>
-              <textarea
-                rows={2}
-                value={previewCard?.example || ''}
-                onChange={(e) => handleQuickEditField('example', e.target.value)}
-                className="w-full px-2 py-1 text-xs border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-none focus:outline-none focus:border-blue-600 dark:focus:border-blue-500 resize-none"
-              />
-            </div>
+        {/* Simple Text Input for Batch Words */}
+        <div className="mb-4 space-y-1">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold block text-zinc-700 dark:text-zinc-300">
+              Batch Words Text
+            </label>
+            <span className="text-[10px] text-zinc-500 font-mono">
+              {items.length} word(s)
+            </span>
           </div>
-        )}
+          <textarea
+            rows={6}
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            disabled={isProcessing}
+            placeholder="Enter or paste words here (one per line, or word: meaning)..."
+            className="w-full p-2 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600 focus:border-blue-500 bg-white dark:bg-zinc-900 text-xs font-mono rounded-none focus:outline-none transition-colors text-zinc-900 dark:text-zinc-100 resize-y"
+          />
+        </div>
 
         {/* Grouping */}
         <div className="space-y-2 mb-4 pt-2 border-t border-zinc-200 dark:border-zinc-800 text-xs">
