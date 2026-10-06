@@ -4,7 +4,7 @@ import { UnifiedCardEditor } from './UnifiedCardEditor';
 import { AudioPlayer } from './AudioPlayer';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
-import { makeSpellingSentence, resolveThemeFromNoteType } from '../themes';
+import { makeSpellingSentence, resolveThemeFromNoteType, getDefaultNoteType } from '../themes';
 import {
   runFullPipeline,
   getAnkiDecks,
@@ -15,6 +15,7 @@ import {
   downloadImage,
   searchOnlineImages,
   updateAnkiNote,
+  createDirectAnkiNote,
 } from '../services/api';
 import {
   Sparkles,
@@ -143,33 +144,34 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
   // Editable Card Data (updated directly by CardPreview editor)
   const [editableCard, setEditableCard] = useState<CardData | null>(null);
 
+  // Dedicated editor tags state (preserves tags even when clearing the word form)
+  const [editorTags, setEditorTags] = useState<string[]>(() => settings.anki?.tags || []);
+
   // Note Type & Card Theme selection (defaults to Settings)
-  const defaultNoteType = settings.anki?.defaultNoteType || 'AI Vocabulary - Comic Pop (Dark) (Normal)';
-  const [selectedNoteType, setSelectedNoteType] = useState<string>(defaultNoteType);
-  const [selectedTheme, setSelectedTheme] = useState<ThemeId>(settings.theme || 'comic-pop-dark');
+  const defaultNoteType = getDefaultNoteType(settings);
+  const [selectedNoteType, setSelectedNoteType] = useState<string>(() => getDefaultNoteType(settings));
+  const [selectedTheme, setSelectedTheme] = useState<ThemeId>(() => resolveThemeFromNoteType(getDefaultNoteType(settings), settings.theme || 'comic-pop-dark'));
 
   useEffect(() => {
-    if (settings.anki?.defaultNoteType) {
-      setSelectedNoteType(settings.anki.defaultNoteType);
-    }
-  }, [settings.anki?.defaultNoteType]);
-
-  useEffect(() => {
-    if (settings.theme) {
-      setSelectedTheme(settings.theme);
-    }
-  }, [settings.theme]);
+    const def = getDefaultNoteType(settings);
+    setSelectedNoteType(def);
+    setSelectedTheme(resolveThemeFromNoteType(def, settings.theme || 'comic-pop-dark'));
+  }, [settings.anki?.defaultNoteType, settings.theme]);
 
   const handleNoteTypeChange = useCallback((newModelName: string) => {
     setSelectedNoteType(newModelName);
     const newTheme = resolveThemeFromNoteType(newModelName, selectedTheme);
     setSelectedTheme(newTheme);
+    let detectedType = cardType;
     if (/(\b|_|\(|-)spell(ing)?(\b|_|\)|-)/i.test(newModelName)) {
+      detectedType = 'spelling';
       setCardType('spelling');
     } else if (/(\b|_|\(|-)normal(\b|_|\)|-)/i.test(newModelName)) {
+      detectedType = 'normal';
       setCardType('normal');
     }
-  }, [selectedTheme]);
+    setEditableCard((prev) => (prev ? { ...prev, modelName: newModelName, noteType: newModelName, cardType: detectedType } : null));
+  }, [selectedTheme, cardType]);
 
   // Online Image Search Dialog State
   const [showInternetPanel, setShowInternetPanel] = useState(false);
@@ -241,6 +243,9 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
   const handleCardChange = useCallback(
     (updated: CardData) => {
       setEditableCard(updated);
+      if (updated.tags) {
+        setEditorTags(updated.tags);
+      }
       if (updated.word && updated.word.trim() !== word) {
         setWord(updated.word.trim());
       }
@@ -408,6 +413,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
     setAnkiActionMessage(null);
 
     try {
+      const activeTags = editableCard?.tags || editorTags;
       const manualOverrides: ManualOverrides = {
         phonetic: editableCard?.phonetic || undefined,
         partOfSpeech: editableCard?.partOfSpeech || undefined,
@@ -417,7 +423,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
         translationFa: editableCard?.translationFa || undefined,
         mnemonic: editableCard?.mnemonic || undefined,
         cardType,
-        tags: editableCard?.tags || [],
+        tags: activeTags,
         allowAi: settings.ai?.enabled !== false,
         imageBase64: editableCard?.imageBase64 || undefined,
         imageFileName: editableCard?.imageFileName || undefined,
@@ -426,6 +432,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
         customBlocks: getAllCustomBlocks(editableCard),
         mainBoxStyles: editableCard?.mainBoxStyles || undefined,
         needsPhoto: photoChoice === 'yes' || !!editableCard?.imageBase64,
+        modelName: selectedNoteType,
       };
 
       const pipelineRes = await runFullPipeline({
@@ -433,10 +440,11 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
         deck: deck.trim(),
         manualOverrides,
         cardType,
+        modelName: selectedNoteType,
         createInAnki: true,
         theme: selectedTheme,
         url: settings.anki.url,
-        tags: editableCard?.tags || [],
+        tags: activeTags,
         allowAi: settings.ai?.enabled !== false,
         signal: abortCtrl.signal,
       });
@@ -482,20 +490,47 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
     }
   };
 
-  // Direct Update Note in Anki
+  // Direct Save/Update Note in Anki
   const handleSaveToAnki = async () => {
-    if (!createdNoteId || !editableCard) return;
+    const cardToSave = previewDisplayCard || editableCard;
+    if (!cardToSave) return;
     setIsUpdatingAnki(true);
     setAnkiActionMessage(null);
     try {
-      const res = await updateAnkiNote(createdNoteId, editableCard, selectedTheme, settings.anki.url, undefined, selectedNoteType);
-      if (res.success) {
-        setAnkiActionMessage(`✓ Note #${createdNoteId} successfully updated in Anki!`);
+      if (createdNoteId) {
+        const res = await updateAnkiNote(
+          createdNoteId,
+          cardToSave,
+          selectedTheme,
+          settings.anki.url,
+          deck.trim(),
+          selectedNoteType
+        );
+        if (res.success) {
+          setAnkiActionMessage(`✓ Note #${createdNoteId} successfully updated in Anki!`);
+        } else {
+          setAnkiActionMessage(`✕ Failed to update note: ${res.error}`);
+        }
       } else {
-        setAnkiActionMessage(`✕ Failed to update note: ${res.error}`);
+        const res = await createDirectAnkiNote({
+          deck: deck.trim(),
+          cardData: cardToSave,
+          theme: selectedTheme,
+          cardType,
+          modelName: selectedNoteType,
+          url: settings.anki.url,
+          tags: cardToSave.tags || editorTags,
+        });
+        if (res.success && res.noteId) {
+          setCreatedNoteId(res.noteId);
+          if (res.cardIds) setCreatedCardIds(res.cardIds);
+          setAnkiActionMessage(`✓ Created Note #${res.noteId} in Anki!`);
+        } else {
+          setAnkiActionMessage(`✕ Failed to create note: ${res.error}`);
+        }
       }
     } catch (err: any) {
-      setAnkiActionMessage(`✕ Error updating note: ${err?.message}`);
+      setAnkiActionMessage(`✕ Error saving note: ${err?.message}`);
     } finally {
       setIsUpdatingAnki(false);
     }
@@ -574,29 +609,39 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
   // Display card for the preview/editor
   const previewDisplayCard = useMemo(() => {
     if (editableCard) {
-      return editableCard;
-    }
-    if (generatedCard) {
-      return generatedCard;
-    }
-    if (word.trim()) {
       return {
-        word: word.trim(),
-        phonetic: '',
-        partOfSpeech: '',
-        meaningFa: '',
-        definitionEn: '',
-        example: '',
-        translationFa: '',
-        mnemonic: '',
-        cardType,
-        spellingSentence: '',
-        needsPhoto: photoChoice === 'yes',
-        customBlocks: [],
+        ...editableCard,
+        tags: editableCard.tags || editorTags,
+        modelName: editableCard.modelName || selectedNoteType,
+        noteType: editableCard.noteType || selectedNoteType,
       };
     }
-    return null;
-  }, [editableCard, generatedCard, word, cardType, photoChoice]);
+    if (generatedCard) {
+      return {
+        ...generatedCard,
+        tags: generatedCard.tags || editorTags,
+        modelName: generatedCard.modelName || selectedNoteType,
+        noteType: generatedCard.noteType || selectedNoteType,
+      };
+    }
+    return {
+      word: word.trim() || '',
+      phonetic: '',
+      partOfSpeech: '',
+      meaningFa: '',
+      definitionEn: '',
+      example: '',
+      translationFa: '',
+      mnemonic: '',
+      cardType,
+      spellingSentence: '',
+      needsPhoto: photoChoice === 'yes',
+      customBlocks: [],
+      tags: editorTags,
+      modelName: selectedNoteType,
+      noteType: selectedNoteType,
+    };
+  }, [editableCard, generatedCard, word, cardType, photoChoice, editorTags, selectedNoteType]);
 
   const isAiEnabled = settings.ai?.enabled !== false;
   const isCardAlreadyComplete = useMemo(() => isCardComplete(previewDisplayCard), [previewDisplayCard]);
@@ -811,6 +856,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
       {/* RIGHT COLUMN: 75% width - Shared Card Editor */}
       <div className="w-full md:w-3/4 flex-1 min-w-0 p-4 sm:p-6 flex flex-col">
         <UnifiedCardEditor
+          key={`${createdNoteId || 'new'}_${selectedNoteType}`}
           cardData={previewDisplayCard}
           emptyWordPlaceholder={word.trim() || 'Word'}
           themeId={selectedTheme}
@@ -823,12 +869,14 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
           onCardChange={handleCardChange}
           onSaveToAnki={handleSaveToAnki}
           isSavingToAnki={isUpdatingAnki}
-          canSaveToAnki={!!createdNoteId}
+          canSaveToAnki={true}
+          saveSuccessMsg={ankiActionMessage}
           onShowInAnki={handleOpenInAnki}
           isShowingInAnki={isOpeningInAnki}
           onOpenImageSearch={handleOpenInternetSearch}
           onUploadImage={handleLocalImageUpload}
           onRemoveImage={handleRemoveImage}
+          availableTags={editorTags}
           ankiUrl={settings.anki?.url}
         />
       </div>

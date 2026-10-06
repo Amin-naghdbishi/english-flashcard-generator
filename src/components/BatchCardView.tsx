@@ -14,7 +14,7 @@ import {
 import { UnifiedCardEditor } from './UnifiedCardEditor';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
-import { resolveThemeFromNoteType } from '../themes';
+import { resolveThemeFromNoteType, getDefaultNoteType } from '../themes';
 import {
   FileText,
   Upload,
@@ -279,26 +279,32 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
   const [isShowingInAnki, setIsShowingInAnki] = useState<boolean>(false);
 
   // Note Type & Card Theme selection (defaults to Settings)
-  const defaultNoteType = settings.anki?.defaultNoteType || 'AI Vocabulary - Comic Pop (Dark) (Normal)';
-  const [selectedNoteType, setSelectedNoteType] = useState<string>(defaultNoteType);
-  const [selectedTheme, setSelectedTheme] = useState<ThemeId>(settings.theme || 'comic-pop-dark');
+  const defaultNoteType = getDefaultNoteType(settings);
+  const [selectedNoteType, setSelectedNoteType] = useState<string>(() => getDefaultNoteType(settings));
+  const [selectedTheme, setSelectedTheme] = useState<ThemeId>(() => resolveThemeFromNoteType(getDefaultNoteType(settings), settings.theme || 'comic-pop-dark'));
 
   useEffect(() => {
-    if (settings.anki?.defaultNoteType) {
-      setSelectedNoteType(settings.anki.defaultNoteType);
-    }
-  }, [settings.anki?.defaultNoteType]);
+    const def = getDefaultNoteType(settings);
+    setSelectedNoteType(def);
+    setSelectedTheme(resolveThemeFromNoteType(def, settings.theme || 'comic-pop-dark'));
+  }, [settings.anki?.defaultNoteType, settings.theme]);
 
-  useEffect(() => {
-    if (settings.theme) {
-      setSelectedTheme(settings.theme);
+  const syncNoteTypeFromItem = (item: BatchItem) => {
+    const card = item.cardData || batchItemToCardData(item);
+    const itemNoteType = card?.modelName || card?.noteType;
+    if (itemNoteType) {
+      setSelectedNoteType(itemNoteType);
+      setSelectedTheme(resolveThemeFromNoteType(itemNoteType, selectedTheme));
     }
-  }, [settings.theme]);
+    return card;
+  };
 
   const handleNoteTypeChange = (newModelName: string) => {
     setSelectedNoteType(newModelName);
     const newTheme = resolveThemeFromNoteType(newModelName, selectedTheme);
     setSelectedTheme(newTheme);
+    const newCardType = /(\b|_|\(|-)spell(ing)?(\b|_|\)|-)/i.test(newModelName) ? 'spelling' : 'normal';
+    setPreviewCard((prev) => (prev ? { ...prev, modelName: newModelName, noteType: newModelName, cardType: newCardType } : null));
     if (selectedItemForPreview) {
       setItems((prev) =>
         prev.map((item) =>
@@ -307,7 +313,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
                 ...item,
                 isEdited: true,
                 cardData: item.cardData
-                  ? { ...item.cardData, modelName: newModelName, noteType: newModelName }
+                  ? { ...item.cardData, modelName: newModelName, noteType: newModelName, cardType: newCardType }
                   : undefined,
               }
             : item
@@ -333,7 +339,8 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
       const prevItem = items[previewIndex - 1];
       isUserNavigatingRef.current = true;
       setSelectedItemForPreview(prevItem);
-      setPreviewCard(prevItem.cardData || batchItemToCardData(prevItem));
+      const card = syncNoteTypeFromItem(prevItem);
+      setPreviewCard(card);
     }
   };
 
@@ -342,14 +349,16 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
       const nextItem = items[previewIndex + 1];
       isUserNavigatingRef.current = true;
       setSelectedItemForPreview(nextItem);
-      setPreviewCard(nextItem.cardData || batchItemToCardData(nextItem));
+      const card = syncNoteTypeFromItem(nextItem);
+      setPreviewCard(card);
     }
   };
 
   const handleSelectCard = (item: BatchItem) => {
     isUserNavigatingRef.current = true;
     setSelectedItemForPreview(item);
-    setPreviewCard(item.cardData || batchItemToCardData(item));
+    const card = syncNoteTypeFromItem(item);
+    setPreviewCard(card);
   };
 
   // Keyboard shortcut Ctrl+Left / Ctrl+Right for navigation
@@ -563,6 +572,8 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
           'normal';
 
         const targetDeck = item.deck || deck;
+        const effectiveModel = item.cardData?.modelName || item.cardData?.noteType || selectedNoteType;
+        const effectiveTheme = resolveThemeFromNoteType(effectiveModel, selectedTheme);
 
         const res = await runFullPipeline({
           word: item.word,
@@ -572,10 +583,12 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             cardType: effectiveCardType,
             tags: cardTags,
             allowAi: cardAllowAi,
+            modelName: effectiveModel,
           },
           cardType: effectiveCardType,
+          modelName: effectiveModel,
           createInAnki: true,
-          theme: settings.theme,
+          theme: effectiveTheme,
           url: settings.anki.url,
           tags: cardTags,
           allowAi: cardAllowAi,
@@ -753,7 +766,8 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
   const handleSelectForPreview = (item: BatchItem) => {
     isUserNavigatingRef.current = true;
     setSelectedItemForPreview(item);
-    setPreviewCard(item.cardData || batchItemToCardData(item));
+    const card = syncNoteTypeFromItem(item);
+    setPreviewCard(card);
     setSaveActionMessage(null);
   };
 
@@ -799,8 +813,10 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
       const res = await updateAnkiNote(
         selectedItemForPreview.noteId,
         previewCard,
-        settings.theme,
-        settings.anki.url
+        selectedTheme,
+        settings.anki.url,
+        undefined,
+        selectedNoteType
       );
 
       if (res.success) {
@@ -834,7 +850,9 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
     let savedCount = 0;
     for (const it of editedItems) {
       try {
-        const res = await updateAnkiNote(it.noteId!, it.cardData!, settings.theme, settings.anki.url);
+        const itemNoteType = it.cardData.modelName || it.cardData.noteType || selectedNoteType;
+        const itemTheme = resolveThemeFromNoteType(itemNoteType, settings.theme || 'comic-pop-dark');
+        const res = await updateAnkiNote(it.noteId!, it.cardData!, itemTheme, settings.anki.url, undefined, itemNoteType);
         if (res.success) {
           savedCount++;
           setItems((prev) =>
@@ -1137,6 +1155,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
       {/* RIGHT COLUMN: 75% width - Shared Card Editor */}
       <div className="w-full md:w-3/4 flex-1 min-w-0 p-4 sm:p-6 flex flex-col">
         <UnifiedCardEditor
+            key={`${selectedItemForPreview?.id || 'batch'}_${selectedNoteType}`}
             cardData={previewCard}
             emptyWordPlaceholder={selectedItemForPreview?.word || items[0]?.word || 'batch card'}
             themeId={selectedTheme}

@@ -381,7 +381,8 @@ export async function createAnkiNote(
   cardData: CardData,
   themeId: ThemeId = 'comic-pop-dark',
   cardType: CardType = 'normal',
-  tags?: string[]
+  tags?: string[],
+  modelName?: string
 ): Promise<{
   success: boolean;
   noteId?: number;
@@ -392,15 +393,18 @@ export async function createAnkiNote(
   const targetDeck = deckName.trim();
   const effectiveCardType = cardData.cardType || cardType || 'normal';
 
-  const targetModelName = getThemedModelName(themeId, effectiveCardType);
+  const explicitModelName = (modelName || cardData.modelName || cardData.noteType || '').trim();
+  const targetModelName = explicitModelName || getThemedModelName(themeId, effectiveCardType);
 
-  // 1. Ensure Model exists in Anki with complete HTML/CSS templates
-  const modelRes = await ensureAnkiModel(baseUrl, themeId, effectiveCardType, targetModelName);
-  if (!modelRes.success) {
-    return {
-      success: false,
-      error: `Model setup failed: ${modelRes.error || modelRes.message}`,
-    };
+  // 1. Ensure Model exists in Anki with complete HTML/CSS templates for AI Vocabulary models
+  if (/^AI Vocabulary/i.test(targetModelName)) {
+    const modelRes = await ensureAnkiModel(baseUrl, themeId, effectiveCardType, targetModelName);
+    if (!modelRes.success) {
+      return {
+        success: false,
+        error: `Model setup failed: ${modelRes.error || modelRes.message}`,
+      };
+    }
   }
 
   // 2. Ensure Deck exists in Anki
@@ -529,6 +533,47 @@ export async function createAnkiNote(
     MainBoxStyles: renderMainBoxStyles(cardData.mainBoxStyles, themeId),
   };
 
+  // Adapt fields for targetModelName (especially non-AI models like Basic, Cloze, etc.)
+  let noteFieldsToSubmit: Record<string, string> = fields;
+  try {
+    const fieldsRes = await callAnkiConnect(baseUrl, 'modelFieldNames', { modelName: targetModelName });
+    if (fieldsRes.success && Array.isArray(fieldsRes.result) && fieldsRes.result.length > 0) {
+      const validFieldNames = fieldsRes.result;
+      if (!validFieldNames.includes('Word') && validFieldNames.includes('Front')) {
+        fields.Front = (cardData.word || '').trim();
+      }
+      if (!validFieldNames.includes('Meaning') && validFieldNames.includes('Back')) {
+        fields.Back = renderMarkdown((cardData.meaningFa || '').trim());
+      }
+      if (!validFieldNames.includes('Word') && validFieldNames.includes('Text')) {
+        fields.Text = (cardData.word || '').trim();
+      }
+      if (!validFieldNames.includes('Meaning') && validFieldNames.includes('Extra')) {
+        fields.Extra = renderMarkdown((cardData.meaningFa || '').trim());
+      }
+      const frontBlocksHtml = renderCustomBlocksHtml(getFrontCustomBlocks(cardData), themeId);
+      const backBlocksHtml = renderCustomBlocksHtml(getBackCustomBlocks(cardData), themeId);
+      if (frontBlocksHtml && !validFieldNames.includes('CustomFrontSections') && validFieldNames.includes('Front')) {
+        fields.Front = (fields.Front || '') + (fields.Front ? '<br>' : '') + frontBlocksHtml;
+      }
+      if (backBlocksHtml && !validFieldNames.includes('CustomBackSections') && !validFieldNames.includes('CustomSections')) {
+        if (validFieldNames.includes('Back')) {
+          fields.Back = (fields.Back || '') + (fields.Back ? '<br>' : '') + backBlocksHtml;
+        } else if (validFieldNames.includes('Extra')) {
+          fields.Extra = (fields.Extra || '') + (fields.Extra ? '<br>' : '') + backBlocksHtml;
+        }
+      }
+      noteFieldsToSubmit = {};
+      for (const [key, val] of Object.entries(fields)) {
+        if (validFieldNames.includes(key)) {
+          noteFieldsToSubmit[key] = val;
+        }
+      }
+    }
+  } catch (fieldCheckErr) {
+    console.warn(`[Anki] Could not check modelFieldNames for ${targetModelName}:`, fieldCheckErr);
+  }
+
   // 6. Add Note (IMPORTANT: allowDuplicate: true so user can create multiple cards for the same word with different meanings)
   // Strictly preserve user-specified tags without injecting automatic clutter tags
   const userTags = Array.isArray(tags) && tags.length > 0
@@ -540,7 +585,7 @@ export async function createAnkiNote(
     note: {
       deckName: targetDeck,
       modelName: targetModelName,
-      fields: fields,
+      fields: noteFieldsToSubmit,
       options: {
         allowDuplicate: true,
         duplicateScope: 'deck',

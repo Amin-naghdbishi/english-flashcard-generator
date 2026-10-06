@@ -406,6 +406,7 @@ export async function createDirectAnkiNote(params: {
   cardData: CardData;
   theme?: ThemeId;
   cardType?: CardType;
+  modelName?: string;
   url?: string;
   tags?: string[];
 }): Promise<{
@@ -428,6 +429,7 @@ export async function runFullPipeline(params: {
   deck: string;
   manualOverrides?: ManualOverrides;
   cardType?: CardType;
+  modelName?: string;
   createInAnki?: boolean;
   theme?: ThemeId;
   url?: string;

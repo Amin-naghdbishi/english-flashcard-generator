@@ -4,7 +4,7 @@ import { getAnkiTags, findNotesByTag, completeAnkiNote, checkAnki, updateAnkiNot
 import { UnifiedCardEditor } from './UnifiedCardEditor';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
-import { resolveThemeFromNoteType } from '../themes';
+import { resolveThemeFromNoteType, parseCustomBlocksHtml } from '../themes';
 import {
   Tag,
   Tags,
@@ -60,6 +60,19 @@ function noteItemToCardData(item: TaggedNoteItem | null): CardData | null {
   const translationFa = getVal('Translation', 'translation', 'Example Translation', 'exampletranslation', 'Sentence Fa');
   const mnemonic = getVal('Mnemonic', 'mnemonic', 'Memory Aid', 'memoryaid', 'Aid');
 
+  const cardType: CardType =
+    (item.modelName && /(\b|_|\(|-)spell(ing)?(\b|_|\)|-)/i.test(item.modelName)) ||
+    fields.CardType === 'spelling'
+      ? 'spelling'
+      : 'normal';
+
+  const frontCustomBlocks = parseCustomBlocksHtml(fields.CustomFrontSections || '', 'front');
+  const backCustomBlocks = parseCustomBlocksHtml(
+    fields.CustomBackSections || fields.CustomSections || fields.Back || '',
+    'back'
+  );
+  const customBlocks = [...frontCustomBlocks, ...backCustomBlocks];
+
   return {
     word,
     phonetic: phonetic || (item.needsCompletion ? '[Missing - will generate]' : undefined),
@@ -68,7 +81,13 @@ function noteItemToCardData(item: TaggedNoteItem | null): CardData | null {
     example: example || (item.needsCompletion ? '[Missing - will generate]' : undefined),
     translationFa: translationFa || (item.needsCompletion ? '[Missing - will generate]' : undefined),
     mnemonic: mnemonic || (item.needsCompletion ? '[Missing - will generate]' : undefined),
-    cardType: 'normal',
+    cardType,
+    modelName: item.modelName,
+    noteType: item.modelName,
+    tags: item.tags || [],
+    frontCustomBlocks,
+    backCustomBlocks,
+    customBlocks,
   };
 }
 
@@ -121,24 +140,23 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
   const [saveActionMessage, setSaveActionMessage] = useState<string | null>(null);
   const [isShowingInAnki, setIsShowingInAnki] = useState<boolean>(false);
 
-  // Note Type & Card Theme selection
-  const defaultNoteType = settings.anki?.defaultNoteType || 'AI Vocabulary - Comic Pop (Dark) (Normal)';
-  const [selectedNoteType, setSelectedNoteType] = useState<string>(defaultNoteType);
+  // Note Type & Card Theme selection (initialized from selected note, NEVER forced to settings default)
+  const [selectedNoteType, setSelectedNoteType] = useState<string>('');
   const [selectedTheme, setSelectedTheme] = useState<ThemeId>(settings.theme || 'comic-pop-dark');
 
   useEffect(() => {
     if (selectedNoteForPreview?.modelName) {
       setSelectedNoteType(selectedNoteForPreview.modelName);
       setSelectedTheme(resolveThemeFromNoteType(selectedNoteForPreview.modelName, selectedTheme));
-    } else if (settings.anki?.defaultNoteType) {
-      setSelectedNoteType(settings.anki.defaultNoteType);
     }
-  }, [selectedNoteForPreview?.modelName, settings.anki?.defaultNoteType]);
+  }, [selectedNoteForPreview?.modelName]);
 
   const handleNoteTypeChange = (newModelName: string) => {
     setSelectedNoteType(newModelName);
     const newTheme = resolveThemeFromNoteType(newModelName, selectedTheme);
     setSelectedTheme(newTheme);
+    const newCardType = /(\b|_|\(|-)spell(ing)?(\b|_|\)|-)/i.test(newModelName) ? 'spelling' : 'normal';
+    setPreviewCard((prev) => (prev ? { ...prev, modelName: newModelName, noteType: newModelName, cardType: newCardType } : null));
     if (selectedNoteForPreview) {
       setNotes((prev) =>
         prev.map((item) =>
@@ -148,7 +166,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                 isEdited: true,
                 modelName: newModelName,
                 cardData: item.cardData
-                  ? { ...item.cardData, modelName: newModelName, noteType: newModelName }
+                  ? { ...item.cardData, modelName: newModelName, noteType: newModelName, cardType: newCardType }
                   : undefined,
               }
             : item
@@ -175,6 +193,10 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
       isUserNavigatingRef.current = true;
       setSelectedNoteForPreview(prevNote);
       setPreviewCard(noteItemToCardData(prevNote));
+      if (prevNote.modelName) {
+        setSelectedNoteType(prevNote.modelName);
+        setSelectedTheme(resolveThemeFromNoteType(prevNote.modelName, selectedTheme));
+      }
     }
   };
 
@@ -184,6 +206,10 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
       isUserNavigatingRef.current = true;
       setSelectedNoteForPreview(nextNote);
       setPreviewCard(noteItemToCardData(nextNote));
+      if (nextNote.modelName) {
+        setSelectedNoteType(nextNote.modelName);
+        setSelectedTheme(resolveThemeFromNoteType(nextNote.modelName, selectedTheme));
+      }
     }
   };
 
@@ -191,6 +217,10 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
     isUserNavigatingRef.current = true;
     setSelectedNoteForPreview(note);
     setPreviewCard(noteItemToCardData(note));
+    if (note.modelName) {
+      setSelectedNoteType(note.modelName);
+      setSelectedTheme(resolveThemeFromNoteType(note.modelName, selectedTheme));
+    }
     setSaveActionMessage(null);
   };
 
@@ -292,8 +322,13 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
       setNotes(scannedNotes);
       setHasScanned(true);
       if (scannedNotes.length > 0) {
-        setSelectedNoteForPreview(scannedNotes[0]);
-        setPreviewCard(noteItemToCardData(scannedNotes[0]));
+        const first = scannedNotes[0];
+        setSelectedNoteForPreview(first);
+        setPreviewCard(noteItemToCardData(first));
+        if (first.modelName) {
+          setSelectedNoteType(first.modelName);
+          setSelectedTheme(resolveThemeFromNoteType(first.modelName, selectedTheme));
+        }
       }
     } catch (err: any) {
       setScanError(err.message || 'An error occurred while scanning tagged notes.');
@@ -583,11 +618,14 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
     setSaveActionMessage(null);
 
     try {
+      const noteModel = selectedNoteType || selectedNoteForPreview.modelName;
       const res = await updateAnkiNote(
         selectedNoteForPreview.noteId,
         previewCard,
-        settings.theme,
-        settings.anki.url
+        selectedTheme,
+        settings.anki.url,
+        undefined,
+        noteModel
       );
 
       if (res.success) {
@@ -620,7 +658,9 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
     let savedCount = 0;
     for (const n of editedNotes) {
       try {
-        const res = await updateAnkiNote(n.noteId, n.updatedCardData!, settings.theme, settings.anki.url);
+        const noteModel = n.modelName || selectedNoteType;
+        const noteTheme = resolveThemeFromNoteType(noteModel, settings.theme || 'comic-pop-dark');
+        const res = await updateAnkiNote(n.noteId, n.updatedCardData!, noteTheme, settings.anki.url, undefined, noteModel);
         if (res.success) {
           savedCount++;
           setNotes((prev) =>
@@ -869,6 +909,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
       <div className="w-full md:w-3/4 flex-1 min-w-0 p-4 sm:p-6 flex flex-col">
 
           <UnifiedCardEditor
+            key={`${selectedNoteForPreview?.noteId || 'tag'}_${selectedNoteType}`}
             cardData={previewCard}
             emptyWordPlaceholder={selectedNoteForPreview?.word || 'tag card'}
             themeId={selectedTheme}

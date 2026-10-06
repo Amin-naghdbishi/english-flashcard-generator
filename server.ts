@@ -728,11 +728,12 @@ async function startServer() {
   });
 
   app.post('/api/anki/create-note', async (req, res) => {
-    const { cardData, deck, url, theme, cardType, tags } = req.body;
+    const { cardData, deck, url, theme, cardType, tags, modelName } = req.body;
     const ankiUrl = url || appSettings.anki.url || 'http://127.0.0.1:8765';
     const targetDeck = deck || appSettings.anki.defaultDeck || 'English::B1';
     const selectedTheme: ThemeId = theme || appSettings.theme || 'comic-pop-dark';
     const selectedType: CardType = cardType || cardData?.cardType || appSettings.defaultCard?.cardType || 'normal';
+    const targetModel = (modelName || cardData?.modelName || cardData?.noteType || '').trim();
 
     if (!cardData || !cardData.word) {
       return res.status(400).json({ success: false, error: 'cardData with word is required' });
@@ -744,7 +745,8 @@ async function startServer() {
       cardData,
       selectedTheme,
       selectedType,
-      tags || cardData?.tags
+      tags || cardData?.tags,
+      targetModel || undefined
     );
     res.json(result);
   });
@@ -1382,6 +1384,18 @@ async function startServer() {
         }
         if (!existingModelFieldNames.includes('Meaning') && existingModelFieldNames.includes('Extra')) {
           fields.Extra = renderMarkdown((cardData.meaningFa || '').trim());
+        }
+
+        // Custom blocks fallback for models without CustomFrontSections / CustomBackSections:
+        if (customFrontHtml && !existingModelFieldNames.includes('CustomFrontSections') && existingModelFieldNames.includes('Front')) {
+          fields.Front = (fields.Front || '') + (fields.Front ? '<br>' : '') + customFrontHtml;
+        }
+        if (customBackHtml && !existingModelFieldNames.includes('CustomBackSections') && !existingModelFieldNames.includes('CustomSections')) {
+          if (existingModelFieldNames.includes('Back')) {
+            fields.Back = (fields.Back || '') + (fields.Back ? '<br>' : '') + customBackHtml;
+          } else if (existingModelFieldNames.includes('Extra')) {
+            fields.Extra = (fields.Extra || '') + (fields.Extra ? '<br>' : '') + customBackHtml;
+          }
         }
 
         fieldsToUpdate = {};
@@ -2189,13 +2203,15 @@ async function startServer() {
 
     // [9] Note Created in Anki
     pushLog(9, 'Note created in Anki', 'pending', `Writing note into deck "${targetDeck}"...`);
+    const targetModel = (req.body.modelName || manualOverrides?.modelName || cardData.modelName || cardData.noteType || '').trim();
     const noteRes = await createAnkiNote(
       ankiUrl,
       targetDeck,
       cardData,
       effectiveTheme,
       effectiveCardType,
-      cardTags
+      cardTags,
+      targetModel || undefined
     );
 
     if (!noteRes.success) {

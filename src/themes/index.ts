@@ -2,6 +2,7 @@ import {
   ThemeDefinition,
   CardData,
   ThemeId,
+  CardType,
   CustomCardBlock,
   MainBoxCustomizations,
   getFrontCustomBlocks,
@@ -631,6 +632,82 @@ export function resolveThemeFromNoteType(
     return 'comic-pop-light';
   }
   return fallbackTheme;
+}
+
+export function getThemedModelName(
+  themeId: ThemeId = 'comic-pop-dark',
+  cardType: CardType = 'normal'
+): string {
+  const theme = THEMES[themeId] || THEMES['comic-pop-dark'];
+  const cleanName = theme?.name || themeId;
+  const suffix = cardType === 'spelling' ? ' (Spelling)' : ' (Normal)';
+  return `AI Vocabulary - ${cleanName}${suffix}`;
+}
+
+export function getDefaultNoteType(settings: {
+  anki?: { defaultNoteType?: string; noteType?: string };
+  theme?: ThemeId;
+  defaultCard?: { cardType?: CardType };
+}): string {
+  if (settings.anki?.defaultNoteType) return settings.anki.defaultNoteType;
+  if (settings.anki?.noteType && settings.anki.noteType !== 'AI Vocabulary') return settings.anki.noteType;
+  return getThemedModelName(settings.theme || 'comic-pop-dark', settings.defaultCard?.cardType || 'normal');
+}
+
+export function parseCustomBlocksHtml(html?: string, side: 'front' | 'back' = 'back'): CustomCardBlock[] {
+  if (!html || typeof html !== 'string' || !html.trim()) return [];
+
+  const blocks: CustomCardBlock[] = [];
+  const blockRegex = /<div\s+[^>]*class="[^"]*custom-card-block[^"]*"[^>]*style="([^"]*)"[^>]*>([\s\S]*?)<\/div>\s*(?=(?:<div\s+[^>]*class="[^"]*custom-card-block|$))/gi;
+
+  let match: RegExpExecArray | null;
+  while ((match = blockRegex.exec(html)) !== null) {
+    const styleAttr = match[1] || '';
+    const innerHtml = match[2] || '';
+
+    const bgMatch = styleAttr.match(/background-color:\s*([^;!]+)/i);
+    const bgColor = bgMatch ? bgMatch[1].trim() : undefined;
+
+    const textMatch = styleAttr.match(/(?:^|;)\s*color:\s*([^;!]+)/i);
+    const textColor = textMatch ? textMatch[1].trim() : undefined;
+
+    const borderMatch = styleAttr.match(/border(?:-color)?:\s*(?:[0-9.]+(?:px|rem)?\s+solid\s+)?([^;!]+)/i);
+    const borderColor = borderMatch ? borderMatch[1].trim() : undefined;
+
+    const titleMatch = innerHtml.match(/<(?:span|div)\s+[^>]*class="[^"]*(?:box-label|botanical-custom-title|quest-tag-purple|washi-title|minimal-mnemonic-label)[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/i);
+    let title = '';
+    if (titleMatch) {
+      title = titleMatch[1].replace(/<[^>]+>/g, '').trim();
+      title = title.replace(/^📌\s*/, '');
+    }
+
+    const contentMatch = innerHtml.match(/<div\s+[^>]*class="[^"]*(?:custom-block-content|botanical-custom-content|quest-custom-content|washi-text|minimal-custom-content)[^"]*"[^>]*dir="([^"]*)"[^>]*>([\s\S]*?)<\/div>/i) ||
+      innerHtml.match(/<div\s+[^>]*class="[^"]*(?:custom-block-content|botanical-custom-content|quest-custom-content|washi-text|minimal-custom-content)[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+
+    let content = '';
+    let dir: 'rtl' | 'ltr' | 'auto' | undefined = undefined;
+    if (contentMatch) {
+      if (contentMatch.length === 3) {
+        dir = (contentMatch[1] as any) || undefined;
+        content = contentMatch[2].trim();
+      } else {
+        content = contentMatch[1].trim();
+      }
+    }
+
+    blocks.push({
+      id: `parsed_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      title: title || (side === 'front' ? 'Note / Context' : 'Extra Note'),
+      content,
+      color: bgColor,
+      borderColor,
+      textColor,
+      dir: dir || 'auto',
+      side,
+    });
+  }
+
+  return blocks;
 }
 
 export interface ThemeCardClasses {

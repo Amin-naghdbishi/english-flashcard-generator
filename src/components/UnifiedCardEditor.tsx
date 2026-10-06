@@ -18,10 +18,11 @@ import {
   SHARED_CARD_CSS,
   getThemeCardClasses,
   isRTLText,
+  getDefaultNoteType,
 } from '../themes';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
-import { getAnkiTags, getAnkiModelNames } from '../services/api';
+import { getAnkiTags, getAnkiModelNames, openInAnki } from '../services/api';
 import {
   Volume2,
   Save,
@@ -31,6 +32,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
+  ExternalLink,
 } from 'lucide-react';
 
 export const APP_THEME_NOTE_TYPES = [
@@ -136,6 +138,7 @@ export const ColorSwatchPicker: React.FC<ColorSwatchPickerProps> = ({
     <div className="relative inline-block" ref={containerRef}>
       <button
         type="button"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => setIsOpen(!isOpen)}
         className="w-4 h-4 rounded-none border border-zinc-400 dark:border-zinc-600 cursor-pointer block hover:scale-105 transition-transform"
         style={{ backgroundColor: currentColor }}
@@ -145,6 +148,11 @@ export const ColorSwatchPicker: React.FC<ColorSwatchPickerProps> = ({
       {isOpen && (
         <div
           ref={popupRef}
+          onMouseDown={(e) => {
+            if ((e.target as HTMLElement).tagName !== 'INPUT') {
+              e.preventDefault();
+            }
+          }}
           className="p-2.5 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 shadow-2xl rounded-none w-52 space-y-2 select-none"
           style={{
             position: 'absolute',
@@ -159,6 +167,7 @@ export const ColorSwatchPicker: React.FC<ColorSwatchPickerProps> = ({
             <span>{label}</span>
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => setIsOpen(false)}
               className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer text-xs"
             >
@@ -194,6 +203,7 @@ export const ColorSwatchPicker: React.FC<ColorSwatchPickerProps> = ({
               <button
                 key={p.hex}
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   onChange(p.hex);
                   setIsOpen(false);
@@ -270,6 +280,8 @@ export const ContentEditableField: React.FC<{
   value?: string;
   onChange: (val: string) => void;
   onFocus?: (el: HTMLElement) => void;
+  fieldName?: string;
+  blockId?: string;
   placeholder?: string;
   className?: string;
   style?: React.CSSProperties;
@@ -279,6 +291,8 @@ export const ContentEditableField: React.FC<{
   value = '',
   onChange,
   onFocus,
+  fieldName,
+  blockId,
   placeholder = '',
   className = '',
   style = {},
@@ -309,6 +323,8 @@ export const ContentEditableField: React.FC<{
       contentEditable
       suppressContentEditableWarning
       dir={dir}
+      data-field-name={fieldName}
+      data-block-id={blockId}
       onInput={handleInput}
       onCompositionStart={() => {
         isComposingRef.current = true;
@@ -402,6 +418,15 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
   const themeClasses = useMemo(() => getThemeCardClasses(activeThemeId), [activeThemeId]);
   const isThemeLight = activeThemeId.endsWith('-light');
 
+  // Compute full combined model names so currentNoteType is ALWAYS valid in the select
+  const combinedModelNames = useMemo(() => {
+    const set = new Set<string>();
+    if (currentNoteType) set.add(currentNoteType);
+    ankiModelNames.forEach((m) => set.add(m));
+    APP_THEME_NOTE_TYPES.forEach((t) => set.add(t.value));
+    return Array.from(set);
+  }, [currentNoteType, ankiModelNames]);
+
   const handleSelectNoteType = (newModelName: string) => {
     if (onNoteTypeChange) {
       onNoteTypeChange(newModelName);
@@ -424,9 +449,9 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
     }
   };
 
-  // Tags popup state & Anki tags
+  // Tags popup state & Anki collection tags
   const [isTagsOpen, setIsTagsOpen] = useState<boolean>(false);
-  const [newTagInput, setNewTagInput] = useState<string>('');
+  const [tagSearchQuery, setTagSearchQuery] = useState<string>('');
   const [collectionTags, setCollectionTags] = useState<string[]>(propAvailableTags || []);
   const tagsPopupRef = useRef<HTMLDivElement>(null);
 
@@ -458,40 +483,158 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
     return cardData?.tags || [];
   }, [cardData?.tags]);
 
+  const filteredTags = useMemo(() => {
+    const q = tagSearchQuery.trim().toLowerCase();
+    if (!q) return collectionTags;
+    return collectionTags.filter((t) => t.toLowerCase().includes(q));
+  }, [collectionTags, tagSearchQuery]);
+
   const handleAddTag = (rawTag: string) => {
     const cleanTag = rawTag.trim();
     if (!cleanTag) return;
-    if (activeTags.includes(cleanTag)) {
-      setNewTagInput('');
-      return;
-    }
+    if (activeTags.includes(cleanTag)) return;
     const updated = [...activeTags, cleanTag];
-    if (cardData && onCardChange) {
-      onCardChange({ ...cardData, tags: updated });
+    if (onCardChange) {
+      onCardChange({
+        ...(cardData || {
+          word: '',
+          phonetic: '',
+          partOfSpeech: '',
+          meaningFa: '',
+          example: '',
+          translationFa: '',
+          mnemonic: '',
+          cardType: activeMode,
+        }),
+        tags: updated,
+      });
     }
-    setNewTagInput('');
+    if (!collectionTags.includes(cleanTag)) {
+      setCollectionTags((prev) => [...prev, cleanTag]);
+    }
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
     const updated = activeTags.filter((t) => t !== tagToRemove);
-    if (cardData && onCardChange) {
-      onCardChange({ ...cardData, tags: updated });
+    if (onCardChange) {
+      onCardChange({
+        ...(cardData || {
+          word: '',
+          phonetic: '',
+          partOfSpeech: '',
+          meaningFa: '',
+          example: '',
+          translationFa: '',
+          mnemonic: '',
+          cardType: activeMode,
+        }),
+        tags: updated,
+      });
     }
   };
 
-  // Track active element for toolbar commands
+  // Show Card in Anki action
+  const [internalShowingInAnki, setInternalShowingInAnki] = useState(false);
+  const [ankiFeedback, setAnkiFeedback] = useState<string | null>(null);
+
+  const effectiveNoteId = noteId || (cardData as any)?.noteId;
+
+  const handleShowInAnkiClick = async () => {
+    if (!effectiveNoteId) return;
+    if (onShowInAnki) {
+      onShowInAnki(effectiveNoteId);
+      return;
+    }
+    setInternalShowingInAnki(true);
+    setAnkiFeedback(null);
+    try {
+      const res = await openInAnki({ noteId: effectiveNoteId, url: ankiUrl });
+      if (res.success) {
+        setAnkiFeedback('✓ Opened in Anki');
+        setTimeout(() => setAnkiFeedback(null), 3000);
+      } else {
+        setAnkiFeedback(`✕ ${res.error || 'Failed'}`);
+        setTimeout(() => setAnkiFeedback(null), 4000);
+      }
+    } catch (e: any) {
+      setAnkiFeedback(`✕ ${e?.message || 'Error'}`);
+      setTimeout(() => setAnkiFeedback(null), 4000);
+    } finally {
+      setInternalShowingInAnki(false);
+    }
+  };
+
+  // Track active element & text selection range for toolbar commands
   const activeFieldRef = useRef<{
     element: HTMLElement;
     fieldName: string;
     blockId?: string;
   } | null>(null);
 
+  const savedSelectionRef = useRef<{
+    range: Range;
+    editableEl: HTMLElement;
+    fieldName: string;
+    blockId?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0);
+
+      let node: Node | null = range.commonAncestorContainer;
+      if (node.nodeType === Node.TEXT_NODE) {
+        node = node.parentNode;
+      }
+      const el = (node as HTMLElement)?.closest?.('.theme-editable-field') as HTMLElement | null;
+      if (el) {
+        const fieldName = el.getAttribute('data-field-name') || '';
+        const blockId = el.getAttribute('data-block-id') || undefined;
+        if (fieldName) {
+          savedSelectionRef.current = {
+            range: range.cloneRange(),
+            editableEl: el,
+            fieldName,
+            blockId,
+          };
+          activeFieldRef.current = {
+            element: el,
+            fieldName,
+            blockId,
+          };
+        }
+      }
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+  }, []);
+
   /**
    * Visual Rich Text Formatting.
-   * Immediately applies visual formatting (bold, italic, colors) with styleWithCSS,
-   * completely avoiding raw HTML tags in user view.
+   * Immediately applies visual formatting (bold, italic, colors, highlights)
+   * while preserving selection and avoiding raw HTML markup.
    */
-  const applyVisualFormat = (command: 'bold' | 'italic' | 'underline' | 'color' | 'highlight', value?: string) => {
+  const applyVisualFormat = (
+    command: 'bold' | 'italic' | 'underline' | 'color' | 'highlight',
+    value?: string
+  ) => {
+    const sel = window.getSelection();
+    const saved = savedSelectionRef.current;
+
+    // Restore saved selection range
+    if (saved?.range && sel) {
+      try {
+        sel.removeAllRanges();
+        sel.addRange(saved.range);
+        saved.editableEl.focus();
+      } catch (e) {
+        // Range could be detached
+      }
+    }
+
     document.execCommand('styleWithCSS', false, 'true');
 
     if (command === 'bold') {
@@ -508,11 +651,16 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
       }
     }
 
-    if (activeFieldRef.current?.element) {
-      const el = activeFieldRef.current.element;
-      const newHtml = el.innerHTML;
-      const fieldName = activeFieldRef.current.fieldName;
-      const blockId = activeFieldRef.current.blockId;
+    if (sel && sel.rangeCount > 0 && saved) {
+      saved.range = sel.getRangeAt(0).cloneRange();
+    }
+
+    const targetEl = saved?.editableEl || activeFieldRef.current?.element;
+    const fieldName = saved?.fieldName || activeFieldRef.current?.fieldName;
+    const blockId = saved?.blockId || activeFieldRef.current?.blockId;
+
+    if (targetEl && fieldName) {
+      const newHtml = targetEl.innerHTML;
 
       if (fieldName === 'customBlock' && blockId && cardData && onCardChange) {
         const allBlocks = getAllCustomBlocks(cardData).map((b) =>
@@ -524,7 +672,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
           frontCustomBlocks: allBlocks.filter((b) => b.side === 'front'),
           backCustomBlocks: allBlocks.filter((b) => b.side === 'back' || !b.side),
         });
-      } else if (cardData && onCardChange && fieldName) {
+      } else if (cardData && onCardChange) {
         onCardChange({
           ...cardData,
           [fieldName]: newHtml,
@@ -732,8 +880,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
             transition: outline 0.15s ease;
           }
           .theme-editable-field:hover {
-            outline: 1px dashed rgba(59, 130, 246, 0.45) !important;
-            outline-offset: 2px !important;
+            outline: none !important;
           }
           .theme-editable-field:focus {
             outline: 1.5px solid rgba(59, 130, 246, 0.9) !important;
@@ -749,7 +896,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
 
       {/* ======================================================== */}
       {/* 1. EDITOR HEADER                                         */}
-      {/* Note Type                       Tags         Save         */}
+      {/* Note Type          Tags       Show In Anki      Save     */}
       {/* ======================================================== */}
       <div className="w-full flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800 text-xs">
         {/* Left: Note Type */}
@@ -763,29 +910,21 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
               onChange={(e) => handleSelectNoteType(e.target.value)}
               className="px-2.5 py-1 text-xs font-medium border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-none cursor-pointer focus:outline-none focus:border-blue-500 hover:border-zinc-400 dark:hover:border-zinc-600"
             >
-              {ankiModelNames.length > 0 ? (
-                ankiModelNames.map((model) => (
-                  <option key={model} value={model}>
-                    {model}
-                  </option>
-                ))
-              ) : (
-                APP_THEME_NOTE_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))
-              )}
+              {combinedModelNames.map((model) => (
+                <option key={model} value={model}>
+                  {model}
+                </option>
+              ))}
             </select>
           </div>
-          {isNoteTypeDetected && (
+          {(isNoteTypeDetected || Boolean(noteId)) && (
             <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-none font-semibold">
               Detected
             </span>
           )}
         </div>
 
-        {/* Right: Tags & Save */}
+        {/* Right: Tags, Show Card in Anki, and Save */}
         <div className="flex items-center gap-3">
           {/* Tags list + Add popup button */}
           <div className="relative flex items-center gap-1.5" ref={tagsPopupRef}>
@@ -802,7 +941,8 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                   <button
                     type="button"
                     onClick={() => handleRemoveTag(tag)}
-                    className="hover:text-rose-500 cursor-pointer ml-0.5"
+                    className="hover:text-rose-500 cursor-pointer ml-0.5 font-bold"
+                    title={`Remove tag ${tag}`}
                   >
                     ×
                   </button>
@@ -821,9 +961,9 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
 
             {/* Tag Popup */}
             {isTagsOpen && (
-              <div className="absolute right-0 top-7 z-50 p-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 shadow-xl rounded-none w-64 space-y-2.5">
+              <div className="absolute right-0 top-7 z-50 p-3 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 shadow-2xl rounded-none w-72 space-y-2.5">
                 <div className="flex items-center justify-between text-xs font-semibold border-b border-zinc-200 dark:border-zinc-800 pb-1.5 text-zinc-800 dark:text-zinc-200">
-                  <span>Tags</span>
+                  <span>Manage Tags</span>
                   <button
                     type="button"
                     onClick={() => setIsTagsOpen(false)}
@@ -836,33 +976,42 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                 <div className="flex items-center gap-1">
                   <input
                     type="text"
-                    value={newTagInput}
-                    onChange={(e) => setNewTagInput(e.target.value)}
+                    value={tagSearchQuery}
+                    onChange={(e) => setTagSearchQuery(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        handleAddTag(newTagInput);
+                        if (tagSearchQuery.trim()) {
+                          handleAddTag(tagSearchQuery);
+                          setTagSearchQuery('');
+                        }
                       }
                     }}
-                    placeholder="Add tag..."
+                    placeholder="Search or add tag..."
                     className="flex-1 px-2 py-1 text-xs border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-none focus:outline-none focus:border-blue-500"
                   />
                   <button
                     type="button"
-                    onClick={() => handleAddTag(newTagInput)}
-                    className="px-2.5 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-none cursor-pointer"
+                    disabled={!tagSearchQuery.trim()}
+                    onClick={() => {
+                      handleAddTag(tagSearchQuery);
+                      setTagSearchQuery('');
+                    }}
+                    className="px-2.5 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-medium rounded-none cursor-pointer"
                   >
                     Add
                   </button>
                 </div>
 
-                {collectionTags.length > 0 && (
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-semibold text-zinc-500 uppercase">
-                      Existing tags
-                    </span>
-                    <div className="max-h-32 overflow-y-auto space-y-0.5 border border-zinc-200 dark:border-zinc-800 p-1">
-                      {collectionTags.slice(0, 30).map((t) => {
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[10px] font-semibold text-zinc-500 uppercase">
+                    <span>{tagSearchQuery.trim() ? 'Matching Tags' : 'Anki Collection Tags'}</span>
+                    <span>{filteredTags.length}</span>
+                  </div>
+
+                  <div className="max-h-40 overflow-y-auto space-y-0.5 border border-zinc-200 dark:border-zinc-800 p-1">
+                    {filteredTags.length > 0 ? (
+                      filteredTags.map((t) => {
                         const isSelected = activeTags.includes(t);
                         return (
                           <div
@@ -871,23 +1020,67 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                               if (isSelected) handleRemoveTag(t);
                               else handleAddTag(t);
                             }}
-                            className={`px-1.5 py-0.5 text-xs flex items-center justify-between cursor-pointer ${
+                            className={`px-2 py-1 text-xs flex items-center justify-between cursor-pointer transition-colors ${
                               isSelected
-                                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold'
-                                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                                ? 'bg-blue-600 text-white font-semibold'
+                                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200'
                             }`}
                           >
-                            <span>{t}</span>
-                            {isSelected && <span className="text-[10px]">✓</span>}
+                            <span className="truncate">{t}</span>
+                            <span className="text-[11px] font-bold ml-1">{isSelected ? '✓' : '+'}</span>
                           </div>
                         );
-                      })}
-                    </div>
+                      })
+                    ) : (
+                      <div className="p-2 text-center text-xs text-zinc-400">
+                        {tagSearchQuery.trim() ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleAddTag(tagSearchQuery);
+                              setTagSearchQuery('');
+                            }}
+                            className="text-blue-500 hover:underline cursor-pointer"
+                          >
+                            + Create tag "{tagSearchQuery.trim()}"
+                          </button>
+                        ) : (
+                          'No tags in Anki collection'
+                        )}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             )}
           </div>
+
+          {/* Show Card in Anki Button */}
+          <button
+            type="button"
+            onClick={handleShowInAnkiClick}
+            disabled={!effectiveNoteId || isShowingInAnki || internalShowingInAnki}
+            title={
+              effectiveNoteId
+                ? `Show Note #${effectiveNoteId} in Anki Browser GUI`
+                : 'Card has not been created in Anki yet'
+            }
+            className={`px-2.5 py-1 text-xs font-medium rounded-none border flex items-center gap-1.5 transition-colors ${
+              effectiveNoteId
+                ? 'border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer'
+                : 'border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-50'
+            }`}
+          >
+            {isShowingInAnki || internalShowingInAnki ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <ExternalLink className="w-3.5 h-3.5" />
+            )}
+            <span>Show Card in Anki</span>
+          </button>
+          {ankiFeedback && (
+            <span className="text-[11px] font-mono text-zinc-500">{ankiFeedback}</span>
+          )}
 
           {/* Primary Save Action */}
           {onSaveToAnki && (
@@ -991,7 +1184,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
 
           <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-700" />
 
-          {/* REQUIREMENT 3: + Add Box OUTSIDE the card in the Editor UI */}
+          {/* REQUIREMENT 3 & 8: + Add Box OUTSIDE the card in the Editor UI */}
           <button
             type="button"
             onClick={handleAddBox}
@@ -1030,6 +1223,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
           <div className="flex items-center gap-0.5 border border-zinc-200 dark:border-zinc-800 px-1 py-0.5 bg-white dark:bg-zinc-900 rounded-none">
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyVisualFormat('bold')}
               className="w-6 h-6 font-bold hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center justify-center cursor-pointer rounded-none"
               title="Bold"
@@ -1038,6 +1232,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
             </button>
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyVisualFormat('italic')}
               className="w-6 h-6 italic font-serif hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center justify-center cursor-pointer rounded-none"
               title="Italic"
@@ -1046,6 +1241,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
             </button>
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyVisualFormat('underline')}
               className="w-6 h-6 underline hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center justify-center cursor-pointer rounded-none"
               title="Underline"
@@ -1079,7 +1275,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
       {/* 3. WORKSPACE CANVAS: REAL THEME CARD PREVIEW & EDITOR    */}
       {/* Directly renders the exact theme layout & CSS            */}
       {/* ======================================================== */}
-      <div className="w-full flex-1 flex flex-col items-center justify-start min-h-0 py-4 px-2 sm:px-4 bg-zinc-100/60 dark:bg-zinc-950/60 overflow-y-auto">
+      <div className="w-full flex-1 flex flex-col items-center justify-start min-h-0 py-4 px-2 sm:px-4 bg-zinc-100 dark:bg-zinc-900/60 overflow-y-auto">
         <div
           className={`editor-canvas-wrapper w-full max-w-2xl transition-all duration-150 ${
             isThemeLight ? 'theme-is-light' : 'theme-is-dark'
@@ -2504,7 +2700,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
           <button
             type="button"
             onClick={handleAddBox}
-            className="w-full py-2 border border-dashed border-zinc-300 dark:border-zinc-700 hover:border-blue-500 text-zinc-600 dark:text-zinc-400 hover:text-blue-500 text-xs font-semibold rounded-none flex items-center justify-center gap-1.5 cursor-pointer transition-colors bg-white/40 dark:bg-zinc-900/40"
+            className="w-full py-2 border border-zinc-300 dark:border-zinc-700 hover:border-blue-500 text-zinc-600 dark:text-zinc-400 hover:text-blue-500 text-xs font-semibold rounded-none flex items-center justify-center gap-1.5 cursor-pointer transition-colors bg-white/40 dark:bg-zinc-900/40"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>+ Add Custom Box to {activeSide === 'front' ? 'Front' : 'Back'}</span>

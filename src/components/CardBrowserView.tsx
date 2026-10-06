@@ -651,7 +651,7 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
       </div>
 
       {/* RIGHT COLUMN: 75% width - Shared Card Editor */}
-      <div className="w-full md:w-3/4 flex-1 min-w-0 p-4 sm:p-6 flex flex-col bg-zinc-50 dark:bg-zinc-950">
+      <div className="w-full md:w-3/4 flex-1 min-w-0 p-4 sm:p-6 flex flex-col">
         {selectedNote && editingCard ? (
           <UnifiedCardEditor
             key={`${selectedNote.noteId}_${currentNoteType}`}
