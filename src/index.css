@@ -1,1 +1,19 @@
 @import "tailwindcss";
+
+/* Remove unwanted white borders, outlines, and rings while typing inside editable text */
+[contenteditable],
+[contenteditable]:focus,
+[contenteditable]:focus-visible,
+[contenteditable]:active,
+.theme-editable-field,
+.theme-editable-field:focus,
+.theme-editable-field:focus-visible,
+.theme-editable-field:active {
+  outline: none !important;
+  outline-width: 0 !important;
+  outline-style: none !important;
+  outline-color: transparent !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+  -webkit-tap-highlight-color: transparent;
+}

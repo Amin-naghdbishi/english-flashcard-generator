@@ -68,6 +68,64 @@ export const COLOR_PRESETS = [
   { name: 'Charcoal', hex: '#0F172A' },
 ];
 
+export interface ToolbarColorPickerSquareProps {
+  label: string;
+  value: string;
+  onChange: (color: string) => void;
+}
+
+/**
+ * Direct Toolbar Color Picker Square (■)
+ * Clicking the square immediately triggers the color picker.
+ * The square immediately and visibly updates to the chosen color and persists.
+ * Mouse events do NOT steal focus from the editor, keeping the text selection intact.
+ */
+export const ToolbarColorPickerSquare: React.FC<ToolbarColorPickerSquareProps> = ({
+  label,
+  value,
+  onChange,
+}) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (inputRef.current) {
+      inputRef.current.click();
+    }
+  };
+
+  return (
+    <div
+      className="relative inline-flex items-center justify-center cursor-pointer select-none"
+      title={`${label}: ${value}`}
+      onMouseDown={(e) => {
+        // Prevent default so the contenteditable text selection is preserved!
+        e.preventDefault();
+      }}
+      onClick={handleClick}
+    >
+      <span
+        className="w-4 h-4 rounded-none border border-zinc-400 dark:border-zinc-500 block shadow-2xs hover:scale-110 transition-transform cursor-pointer"
+        style={{ backgroundColor: value }}
+      />
+      <input
+        ref={inputRef}
+        type="color"
+        value={value && value.startsWith('#') && value.length === 7 ? value : '#EF4444'}
+        onInput={(e) => {
+          onChange(e.currentTarget.value);
+        }}
+        onChange={(e) => {
+          onChange(e.currentTarget.value);
+        }}
+        className="sr-only pointer-events-none"
+        tabIndex={-1}
+      />
+    </div>
+  );
+};
+
 export interface ColorSwatchPickerProps {
   label: string;
   value?: string;
@@ -340,6 +398,10 @@ export const ContentEditableField: React.FC<{
       className={`theme-editable-field ${className}`}
       style={{
         outline: 'none',
+        outlineWidth: 0,
+        outlineStyle: 'none',
+        border: 'none',
+        boxShadow: 'none',
         minHeight: '1.2em',
         wordBreak: 'break-word',
         overflowWrap: 'break-word',
@@ -597,17 +659,20 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
         const fieldName = el.getAttribute('data-field-name') || '';
         const blockId = el.getAttribute('data-block-id') || undefined;
         if (fieldName) {
-          savedSelectionRef.current = {
-            range: range.cloneRange(),
-            editableEl: el,
-            fieldName,
-            blockId,
-          };
           activeFieldRef.current = {
             element: el,
             fieldName,
             blockId,
           };
+          // Preserve uncollapsed text selection so opening the color picker never clears it
+          if (!range.collapsed) {
+            savedSelectionRef.current = {
+              range: range.cloneRange(),
+              editableEl: el,
+              fieldName,
+              blockId,
+            };
+          }
         }
       }
     };
@@ -627,6 +692,14 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
   ) => {
     const sel = window.getSelection();
     const saved = savedSelectionRef.current;
+
+    // For color/highlight, strictly require an active non-collapsed selection
+    if (command === 'color' || command === 'highlight') {
+      const activeRange = saved?.range || (sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null);
+      if (!activeRange || activeRange.collapsed) {
+        return;
+      }
+    }
 
     // Restore saved selection range
     if (saved?.range && sel) {
@@ -866,7 +939,9 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
           .editor-canvas-wrapper.theme-is-light .quest-level-pill,
           .editor-canvas-wrapper.theme-is-light .quest-btn,
           .editor-canvas-wrapper.theme-is-light .hero-badge,
-          .editor-canvas-wrapper.theme-is-light .quest-level-pill .theme-editable-field {
+          .editor-canvas-wrapper.theme-is-light .quest-level-pill .theme-editable-field,
+          .editor-canvas-wrapper.theme-is-light button.text-white,
+          .editor-canvas-wrapper.theme-is-light .text-white {
             color: #FFFFFF !important;
           }
 
@@ -891,16 +966,19 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
           .theme-editable-field:hover,
           .theme-editable-field:focus,
           .theme-editable-field:focus-visible,
-          .theme-editable-field:active {
-            outline: none !important;
-            box-shadow: none !important;
-            border-color: inherit;
-          }
+          .theme-editable-field:active,
+          [contenteditable],
+          [contenteditable]:hover,
           [contenteditable]:focus,
           [contenteditable]:focus-visible,
           [contenteditable]:active {
             outline: none !important;
+            outline-width: 0 !important;
+            outline-style: none !important;
+            outline-color: transparent !important;
             box-shadow: none !important;
+            border: none !important;
+            border-color: transparent !important;
           }
           .theme-editable-field:empty::before {
             content: attr(data-placeholder);
@@ -1275,12 +1353,10 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
               >
                 Color
               </button>
-              <ColorSwatchPicker
+              <ToolbarColorPickerSquare
                 label="Text Color"
                 value={selectedTextColor}
-                defaultValue="#EF4444"
                 onChange={setSelectedTextColor}
-                align="right"
               />
             </div>
             <div className="flex items-center gap-1.5 px-1">
@@ -1293,12 +1369,10 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
               >
                 Highlight
               </button>
-              <ColorSwatchPicker
+              <ToolbarColorPickerSquare
                 label="Highlight"
                 value={selectedHighlightColor}
-                defaultValue="#FEF08A"
                 onChange={setSelectedHighlightColor}
-                align="right"
               />
             </div>
           </div>
@@ -1414,7 +1488,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                             <button
                               type="button"
                               onClick={() => handlePlayAudio(cardData.wordAudioUsNormalBase64)}
-                              className="px-2.5 py-1 text-xs font-black bg-[#58CC02] hover:bg-[#46A302] text-white rounded-lg border-2 border-black shadow-[0_2px_0_#000] flex items-center gap-1 cursor-pointer"
+                              className="px-2.5 py-1 text-xs font-black bg-[#58CC02] hover:bg-[#46A302] text-white rounded-lg border-2 border-[#46A302] shadow-[0_2px_0_#46A302] flex items-center gap-1 cursor-pointer transition-transform active:translate-y-0.5"
                             >
                               <Volume2 className="w-3.5 h-3.5" />
                               <span>Normal</span>
@@ -1424,7 +1498,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                             <button
                               type="button"
                               onClick={() => handlePlayAudio(cardData.wordAudioUsSlowBase64)}
-                              className="px-2 py-1 text-xs font-bold bg-white hover:bg-zinc-100 text-zinc-800 rounded-lg border-2 border-black shadow-[0_2px_0_#000] flex items-center gap-1 cursor-pointer"
+                              className="px-2 py-1 text-xs font-bold bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg border-2 border-zinc-300 dark:border-zinc-700 shadow-[0_2px_0_#CBD5E1] dark:shadow-[0_2px_0_#18181B] flex items-center gap-1 cursor-pointer transition-transform active:translate-y-0.5"
                             >
                               <span>🐢 Slow</span>
                             </button>
@@ -1438,7 +1512,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                             <button
                               type="button"
                               onClick={() => handlePlayAudio(cardData.wordAudioUkNormalBase64)}
-                              className="px-2.5 py-1 text-xs font-black bg-[#38BDF8] hover:bg-[#0284C7] text-white rounded-lg border-2 border-black shadow-[0_2px_0_#000] flex items-center gap-1 cursor-pointer"
+                              className="px-2.5 py-1 text-xs font-black bg-[#0EA5E9] hover:bg-[#0284C7] text-white rounded-lg border-2 border-[#0284C7] shadow-[0_2px_0_#0284C7] flex items-center gap-1 cursor-pointer transition-transform active:translate-y-0.5"
                             >
                               <Volume2 className="w-3.5 h-3.5" />
                               <span>Normal</span>
@@ -1448,7 +1522,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                             <button
                               type="button"
                               onClick={() => handlePlayAudio(cardData.wordAudioUkSlowBase64)}
-                              className="px-2 py-1 text-xs font-bold bg-white hover:bg-zinc-100 text-zinc-800 rounded-lg border-2 border-black shadow-[0_2px_0_#000] flex items-center gap-1 cursor-pointer"
+                              className="px-2 py-1 text-xs font-bold bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg border-2 border-zinc-300 dark:border-zinc-700 shadow-[0_2px_0_#CBD5E1] dark:shadow-[0_2px_0_#18181B] flex items-center gap-1 cursor-pointer transition-transform active:translate-y-0.5"
                             >
                               <span>🐢 Slow</span>
                             </button>
@@ -1494,7 +1568,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                         <button
                           type="button"
                           onClick={() => handlePlayAudio(cardData.wordAudioUsNormalBase64)}
-                          className="px-2.5 py-1 text-xs font-bold bg-[#58CC02] hover:bg-[#46A302] text-white rounded-lg border-2 border-black shadow-[0_2px_0_#000] cursor-pointer"
+                          className="px-2.5 py-1 text-xs font-bold bg-[#58CC02] hover:bg-[#46A302] text-white rounded-lg border-2 border-[#46A302] shadow-[0_2px_0_#46A302] cursor-pointer transition-transform active:translate-y-0.5"
                         >
                           US Normal
                         </button>
@@ -1503,7 +1577,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                         <button
                           type="button"
                           onClick={() => handlePlayAudio(cardData.wordAudioUsSlowBase64)}
-                          className="px-2 py-1 text-xs font-bold bg-white text-zinc-800 rounded-lg border-2 border-black shadow-[0_2px_0_#000] cursor-pointer"
+                          className="px-2 py-1 text-xs font-bold bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg border-2 border-zinc-300 dark:border-zinc-700 shadow-[0_2px_0_#CBD5E1] dark:shadow-[0_2px_0_#18181B] cursor-pointer transition-transform active:translate-y-0.5"
                         >
                           🐢 Slow
                         </button>
@@ -1525,24 +1599,24 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                           }
                         }}
                         placeholder="Type answer here..."
-                        className="quest-input flex-1 px-3 py-2 border-3 border-black text-base font-black rounded-xl bg-white text-zinc-900"
+                        className="quest-input flex-1 px-3 py-2 border-2 border-zinc-300 dark:border-zinc-700 text-base font-bold rounded-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-[0_2px_0_#CBD5E1] dark:shadow-[0_2px_0_#18181B] focus:border-[#58CC02] focus:outline-none"
                       />
                       <button
                         type="button"
                         onClick={handleCheckSpelling}
-                        className="quest-btn cursor-pointer font-black"
+                        className="quest-btn cursor-pointer font-black px-4 py-2 bg-[#58CC02] hover:bg-[#46A302] text-white rounded-xl border-2 border-[#46A302] shadow-[0_3px_0_#46A302] transition-transform active:translate-y-0.5"
                       >
                         CHECK ANSWER
                       </button>
                     </div>
 
                     {spellingStatus === 'correct' && (
-                      <div className="p-3 my-2 border-3 border-black bg-[#DCFCE7] text-[#15803D] font-black text-center rounded-xl shadow-[0_3px_0_#000]">
+                      <div className="p-3 my-2 border-2 border-[#86EFAC] bg-[#DCFCE7] text-[#15803D] font-bold text-center rounded-xl shadow-[0_3px_0_#86EFAC]">
                         ✓ EXCELLENT! {cardData?.word?.replace(/<[^>]+>/g, '')}
                       </div>
                     )}
                     {spellingStatus === 'incorrect' && (
-                      <div className="p-3 my-2 border-3 border-black bg-[#FFE4E6] text-[#BE123C] font-black text-center rounded-xl shadow-[0_3px_0_#000]">
+                      <div className="p-3 my-2 border-2 border-[#FECDD3] bg-[#FFE4E6] text-[#BE123C] font-bold text-center rounded-xl shadow-[0_3px_0_#FECDD3]">
                         ✕ TARGET WORD: {cardData?.word?.replace(/<[^>]+>/g, '')}
                       </div>
                     )}
@@ -1579,7 +1653,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                             <button
                               type="button"
                               onClick={() => handlePlayAudio(cardData.wordAudioUsNormalBase64)}
-                              className="px-2.5 py-1 text-xs font-black bg-[#58CC02] hover:bg-[#46A302] text-white rounded-lg border-2 border-black shadow-[0_2px_0_#000] flex items-center gap-1 cursor-pointer"
+                              className="px-2.5 py-1 text-xs font-black bg-[#58CC02] hover:bg-[#46A302] text-white rounded-lg border-2 border-[#46A302] shadow-[0_2px_0_#46A302] flex items-center gap-1 cursor-pointer transition-transform active:translate-y-0.5"
                             >
                               <Volume2 className="w-3.5 h-3.5" />
                               <span>Normal</span>
@@ -1589,7 +1663,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                             <button
                               type="button"
                               onClick={() => handlePlayAudio(cardData.wordAudioUsSlowBase64)}
-                              className="px-2 py-1 text-xs font-bold bg-white hover:bg-zinc-100 text-zinc-800 rounded-lg border-2 border-black shadow-[0_2px_0_#000] flex items-center gap-1 cursor-pointer"
+                              className="px-2 py-1 text-xs font-bold bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg border-2 border-zinc-300 dark:border-zinc-700 shadow-[0_2px_0_#CBD5E1] dark:shadow-[0_2px_0_#18181B] flex items-center gap-1 cursor-pointer transition-transform active:translate-y-0.5"
                             >
                               <span>🐢 Slow</span>
                             </button>
@@ -1603,7 +1677,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                             <button
                               type="button"
                               onClick={() => handlePlayAudio(cardData.wordAudioUkNormalBase64)}
-                              className="px-2.5 py-1 text-xs font-black bg-[#38BDF8] hover:bg-[#0284C7] text-white rounded-lg border-2 border-black shadow-[0_2px_0_#000] flex items-center gap-1 cursor-pointer"
+                              className="px-2.5 py-1 text-xs font-black bg-[#0EA5E9] hover:bg-[#0284C7] text-white rounded-lg border-2 border-[#0284C7] shadow-[0_2px_0_#0284C7] flex items-center gap-1 cursor-pointer transition-transform active:translate-y-0.5"
                             >
                               <Volume2 className="w-3.5 h-3.5" />
                               <span>Normal</span>
@@ -1613,7 +1687,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                             <button
                               type="button"
                               onClick={() => handlePlayAudio(cardData.wordAudioUkSlowBase64)}
-                              className="px-2 py-1 text-xs font-bold bg-white hover:bg-zinc-100 text-zinc-800 rounded-lg border-2 border-black shadow-[0_2px_0_#000] flex items-center gap-1 cursor-pointer"
+                              className="px-2 py-1 text-xs font-bold bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg border-2 border-zinc-300 dark:border-zinc-700 shadow-[0_2px_0_#CBD5E1] dark:shadow-[0_2px_0_#18181B] flex items-center gap-1 cursor-pointer transition-transform active:translate-y-0.5"
                             >
                               <span>🐢 Slow</span>
                             </button>

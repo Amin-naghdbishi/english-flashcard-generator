@@ -12,6 +12,9 @@ interface AppThemeContextType {
 }
 
 export function normalizeAppTheme(theme?: string): AppTheme {
+  if (theme === 'system') {
+    return 'system';
+  }
   if (theme === 'anki-dark' || theme === 'minimal-dark') {
     return 'anki-dark';
   }
@@ -34,7 +37,22 @@ export const AppThemeProvider: React.FC<{
   children: React.ReactNode;
 }> = ({ appTheme: propAppTheme, setAppTheme, children }) => {
   const appTheme = normalizeAppTheme(propAppTheme);
-  const isDark = appTheme === 'anki-dark';
+  const [systemIsDark, setSystemIsDark] = React.useState<boolean>(() => {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e: MediaQueryListEvent) => setSystemIsDark(e.matches);
+    media.addEventListener('change', handler);
+    return () => media.removeEventListener('change', handler);
+  }, []);
+
+  const isDark = appTheme === 'system' ? systemIsDark : appTheme === 'anki-dark';
   const isLight = !isDark;
   const isAnkiLight = isLight;
   const isAnkiDark = isDark;

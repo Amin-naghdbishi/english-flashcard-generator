@@ -167,7 +167,7 @@ export function isCardComplete(card?: Partial<CardData> | ManualOverrides | null
   );
 }
 
-export type AppTheme = 'anki-light' | 'anki-dark';
+export type AppTheme = 'anki-light' | 'anki-dark' | 'system';
 
 export type AIProvider = 'ollama' | 'gemini' | 'custom' | string;
 export type TTSProvider = 'piper' | 'online' | 'custom' | string;
@@ -251,6 +251,7 @@ export interface CustomTTSProviderConfig {
 }
 
 export interface TTSConfig {
+  enabled?: boolean;
   provider: TTSProvider;
   engine?: TTSProvider; // backwards compatibility
   endpoint: string; // http://127.0.0.1:5000 (for Piper)

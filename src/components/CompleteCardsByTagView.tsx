@@ -54,6 +54,17 @@ function noteItemToCardData(item: TaggedNoteItem | null): CardData | null {
 
   const word = item.word || getVal('Word', 'word', 'Front', 'front', 'English', 'Term') || 'Preview Word';
   const meaningFa = getVal('Meaning', 'meaning', 'Persian Meaning', 'persianmeaning', 'Back', 'Translation');
+  const definitionEn = getVal(
+    'EnglishDefinition',
+    'English Definition',
+    'englishdefinition',
+    'DefinitionEn',
+    'definitionen',
+    'Definition',
+    'definition',
+    'English Meaning',
+    'MeaningEn'
+  );
   const phonetic = getVal('Phonetic', 'phonetic', 'IPA', 'ipa', 'Pronunciation');
   const partOfSpeech = getVal('PartOfSpeech', 'partofspeech', 'Part of Speech', 'pos', 'POS', 'Type');
   const example = getVal('Example', 'example', 'Example Sentence', 'examplesentence', 'Sentence');
@@ -78,6 +89,7 @@ function noteItemToCardData(item: TaggedNoteItem | null): CardData | null {
     phonetic: phonetic || (item.needsCompletion ? '[Missing - will generate]' : undefined),
     partOfSpeech: partOfSpeech || (item.needsCompletion ? '[Missing - will generate]' : undefined),
     meaningFa: meaningFa || (item.needsCompletion ? '[Missing - will generate]' : undefined),
+    definitionEn: definitionEn || (item.needsCompletion ? '[Missing - will generate]' : undefined),
     example: example || (item.needsCompletion ? '[Missing - will generate]' : undefined),
     translationFa: translationFa || (item.needsCompletion ? '[Missing - will generate]' : undefined),
     mnemonic: mnemonic || (item.needsCompletion ? '[Missing - will generate]' : undefined),

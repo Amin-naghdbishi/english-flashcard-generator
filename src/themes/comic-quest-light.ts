@@ -4,7 +4,7 @@ import { duoQuestFrontNormalHtml, duoQuestBackHtml } from './templates';
 const css = `/* THEME 3: DUO QUEST LIGHT */
 .card {
   background-color: #FFFFFF !important;
-  color: #1E293B !important;
+  color: #0F172A !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -19,7 +19,7 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
 
 .nightMode .card, .nightMode.card {
   background-color: #FFFFFF !important;
-  color: #1E293B !important;
+  color: #0F172A !important;
 }
 
 .comic-card-wrapper.theme-quest {
@@ -61,16 +61,19 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   font-size: 11px;
   font-weight: 900;
   background-color: #58CC02;
-  color: #FFFFFF;
-  padding: 4px 10px;
+  color: #FFFFFF !important;
+  padding: 5px 12px;
   border-radius: 20px;
-  border: 2px solid #000000;
+  border: 2px solid #46A302;
+  box-shadow: 0 2px 0 #46A302;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .quest-level-pill.pill-spelling {
   background-color: #A855F7;
+  border-color: #9333EA;
+  box-shadow: 0 2px 0 #9333EA;
 }
 
 .quest-points {
@@ -78,28 +81,30 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   font-weight: 900;
   color: #A16207;
   background-color: #FEF9C3;
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: 12px;
-  border: 2px solid #000000;
+  border: 2px solid #FDE047;
+  box-shadow: 0 2px 0 #EAB308;
 }
 
 .card-illustration {
   width: 100%;
   max-height: 180px;
   object-fit: cover;
-  border-radius: 12px;
-  border: 3px solid #000000;
-  box-shadow: 0 3px 0 #000000;
+  border-radius: 14px;
+  border: 2px solid #E2E8F0;
+  box-shadow: 0 3px 0 #CBD5E1;
   margin-bottom: 14px;
   display: block;
 }
 
 .quest-hero {
   text-align: center;
-  padding: 12px 14px;
+  padding: 14px 16px;
   background-color: #F8FAFC;
-  border: 3px solid #000000;
-  border-radius: 14px;
+  border: 2px solid #E2E8F0;
+  border-radius: 16px;
+  box-shadow: 0 3px 0 #CBD5E1;
   margin-bottom: 14px;
 }
 
@@ -131,14 +136,14 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
 
 .sound-card {
   background-color: #FFFFFF;
-  border: 3px solid #000000;
-  border-radius: 12px;
-  padding: 8px 10px;
-  box-shadow: 0 3px 0 #000000;
+  border: 2px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 0 3px 0 #CBD5E1;
 }
 
-.sound-card.us-card { border-left: 8px solid #EF4444; }
-.sound-card.uk-card { border-left: 8px solid #38BDF8; }
+.sound-card.us-card { border-left: 6px solid #EF4444; }
+.sound-card.uk-card { border-left: 6px solid #0EA5E9; }
 
 .dock-flag {
   font-size: 10px;
@@ -146,7 +151,7 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   display: block;
   margin-bottom: 6px;
   text-transform: uppercase;
-  color: #0F172A;
+  color: #475569;
 }
 
 .dock-actions {
@@ -157,11 +162,11 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
 
 .quest-meaning-banner {
   background-color: #DCFCE7;
-  border: 3px solid #000000;
-  border-radius: 12px;
-  padding: 12px 14px;
+  border: 2px solid #86EFAC;
+  border-radius: 14px;
+  padding: 14px 16px;
   margin-bottom: 14px;
-  box-shadow: 0 3px 0 #000000;
+  box-shadow: 0 3px 0 #4ADE80;
 }
 
 .meaning-quest-label {
@@ -171,6 +176,7 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   color: #15803D;
   margin-bottom: 4px;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .quest-meaning-fa {
@@ -183,11 +189,11 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
 
 .quest-definition-card {
   background-color: #F0F9FF;
-  border: 3px solid #000000;
-  border-radius: 12px;
-  padding: 12px 14px;
+  border: 2px solid #BAE6FD;
+  border-radius: 14px;
+  padding: 14px 16px;
   margin-bottom: 14px;
-  box-shadow: 0 3px 0 #000000;
+  box-shadow: 0 3px 0 #7DD3FC;
 }
 
 .quest-tag-blue {
@@ -210,11 +216,11 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
 
 .quest-example-card {
   background-color: #EFF6FF;
-  border: 3px solid #000000;
-  border-radius: 12px;
-  padding: 12px 14px;
+  border: 2px solid #BFDBFE;
+  border-radius: 14px;
+  padding: 14px 16px;
   margin-bottom: 14px;
-  box-shadow: 0 3px 0 #000000;
+  box-shadow: 0 3px 0 #93C5FD;
 }
 
 .example-quest-header {
@@ -229,6 +235,7 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   font-weight: 900;
   color: #1D4ED8;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .quest-sentence {
@@ -249,10 +256,10 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
 
 .quest-mnemonic-card {
   background-color: #FAF5FF;
-  border: 3px solid #000000;
-  border-radius: 12px;
-  padding: 10px 12px;
-  box-shadow: 0 3px 0 #000000;
+  border: 2px solid #E9D5FF;
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 3px 0 #D8B4FE;
 }
 
 .quest-tag-purple {
@@ -262,6 +269,7 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   display: block;
   margin-bottom: 4px;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .quest-mnemonic {
@@ -275,11 +283,12 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
 /* SPELLING QUEST */
 .quest-prompt-center {
   background-color: #FAF5FF;
-  border: 3px solid #000000;
-  border-radius: 14px;
-  padding: 14px;
+  border: 2px solid #DDD6FE;
+  border-radius: 16px;
+  padding: 16px;
   text-align: center;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  box-shadow: 0 3px 0 #C4B5FD;
 }
 
 .quest-instruction {
@@ -315,6 +324,7 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
 .quest-btn {
   background-color: #58CC02 !important;
   color: #FFFFFF !important;
+  border: 2px solid #46A302 !important;
   border-radius: 12px !important;
   box-shadow: 0 4px 0 #3b8701 !important;
   font-size: 13px !important;
@@ -338,11 +348,12 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   font-family: inherit !important;
   font-size: 16px !important;
   font-weight: 800 !important;
-  border: 3px solid #000000 !important;
+  border: 2px solid #CBD5E1 !important;
   border-radius: 12px !important;
   background-color: #FFFFFF !important;
   color: #0F172A !important;
   outline: none !important;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.05) !important;
   -webkit-user-select: text !important;
   -moz-user-select: text !important;
   user-select: text !important;
@@ -352,8 +363,12 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   cursor: text !important;
 }
 
+.spelling-input:focus, .quest-input:focus {
+  border-color: #3B82F6 !important;
+}
+
 .spelling-input::placeholder, .quest-input::placeholder {
-  color: #64748B !important;
+  color: #94A3B8 !important;
   opacity: 1 !important;
   font-weight: 600 !important;
 }
@@ -369,14 +384,16 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
 
 .spelling-result.is-correct {
   background-color: #DCFCE7 !important;
-  border: 3px solid #000000 !important;
+  border: 2px solid #86EFAC !important;
+  box-shadow: 0 3px 0 #4ADE80 !important;
   padding: 12px !important;
   color: #0F172A !important;
 }
 
 .spelling-result.is-incorrect {
   background-color: #FEE2E2 !important;
-  border: 3px solid #000000 !important;
+  border: 2px solid #FECACA !important;
+  box-shadow: 0 3px 0 #F87171 !important;
   padding: 12px !important;
   color: #0F172A !important;
 }
@@ -393,24 +410,29 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
 
 /* AUDIO BUTTONS */
 .replay-button, .play-button, a.replay-button, .comic-audio-btn {
-  background-color: #38BDF8 !important;
-  border: 2px solid #000000 !important;
-  color: #000000 !important;
+  background-color: #0EA5E9 !important;
+  border: 2px solid #0284C7 !important;
+  color: #FFFFFF !important;
   font-weight: 900 !important;
-  padding: 3px 10px !important;
+  padding: 4px 12px !important;
   cursor: pointer !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   text-decoration: none !important;
-  box-shadow: 0 2px 0 #0284c7 !important;
-  border-radius: 8px !important;
+  box-shadow: 0 3px 0 #0284C7 !important;
+  border-radius: 10px !important;
   text-transform: uppercase !important;
 }
 
 .replay-button:hover, .play-button:hover, a.replay-button:hover, .comic-audio-btn:hover {
-  background-color: #7dd3fc !important;
+  background-color: #38BDF8 !important;
+}
+
+.replay-button:active, .play-button:active, a.replay-button:active, .comic-audio-btn:active {
+  transform: translateY(2px) !important;
+  box-shadow: 0 1px 0 #0284C7 !important;
 }
 
 /* Suppress unwanted generic/uncontained Anki default audio replay buttons */
