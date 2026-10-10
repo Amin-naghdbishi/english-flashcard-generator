@@ -1,5 +1,38 @@
 @import "tailwindcss";
 
+/* Bundled Font Definitions */
+@font-face {
+  font-family: 'Charis SIL';
+  src: url('/fonts/CharisSIL-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Charis SIL';
+  src: url('/fonts/CharisSIL-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('/fonts/Vazirmatn-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('/fonts/Vazirmatn-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Remove unwanted white borders, outlines, and rings while typing inside editable text */
 [contenteditable],
 [contenteditable]:focus,

@@ -137,8 +137,8 @@ const css = `/* THEME 1: HERO POP DARK */
 .badge-ipa {
   background-color: #38BDF8;
   color: #000000;
-  font-family: "Lucida Sans Unicode", "DejaVu Sans", sans-serif;
-  font-style: italic;
+  font-family: 'Charis SIL', 'Doulos SIL', 'DejaVu Sans', serif !important;
+  font-style: normal !important;
 }
 
 .comic-pronunciation-box {
@@ -259,7 +259,8 @@ const css = `/* THEME 1: HERO POP DARK */
   font-size: 22px;
   font-weight: 900;
   color: #F8FAFC;
-  line-height: 1.4;
+  line-height: 1.5;
+  font-family: 'Vazirmatn', Tahoma, 'Segoe UI', sans-serif !important;
 }
 
 .comic-definition-box {
@@ -324,8 +325,9 @@ const css = `/* THEME 1: HERO POP DARK */
   margin: 0;
   font-size: 13px;
   color: #CBD5E1;
-  line-height: 1.4;
+  line-height: 1.5;
   font-weight: 600;
+  font-family: 'Vazirmatn', Tahoma, 'Segoe UI', sans-serif !important;
 }
 
 .comic-mnemonic-box {
@@ -340,8 +342,9 @@ const css = `/* THEME 1: HERO POP DARK */
   margin: 0;
   font-size: 13px;
   color: #F8FAFC;
-  line-height: 1.4;
+  line-height: 1.5;
   font-weight: 700;
+  font-family: 'Vazirmatn', Tahoma, 'Segoe UI', sans-serif !important;
 }
 
 /* SPELLING STYLES */

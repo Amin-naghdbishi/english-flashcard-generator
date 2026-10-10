@@ -87,7 +87,8 @@ const css = `/* THEME 5: BOTANICAL SAGE (LIGHT) */
   display: inline-block !important;
   background-color: #617352 !important;
   color: #FFFFFF !important;
-  font-family: "Lucida Sans", "DejaVu Sans", "Segoe UI", sans-serif !important;
+  font-family: 'Charis SIL', 'Doulos SIL', 'DejaVu Sans', serif !important;
+  font-style: normal !important;
   font-size: 24px !important;
   font-weight: 700 !important;
   padding: 8px 24px !important;
@@ -262,6 +263,8 @@ const css = `/* THEME 5: BOTANICAL SAGE (LIGHT) */
   text-align: center !important;
   max-width: 90% !important;
   word-break: break-word !important;
+  font-family: 'Vazirmatn', Tahoma, sans-serif !important;
+  direction: rtl !important;
 }
 
 /* Custom Blocks on Botanical Theme */

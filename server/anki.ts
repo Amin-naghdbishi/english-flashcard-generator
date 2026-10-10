@@ -1,6 +1,8 @@
 import { THEMES, getSpellingFrontHtml, renderCustomBlocksHtml, renderMainBoxStyles, SHARED_CARD_CSS } from '../src/themes';
 import { CardData, ThemeId, CardType, getFrontCustomBlocks, getBackCustomBlocks } from '../src/types';
 import { renderMarkdown } from '../src/utils/markdown';
+import fs from 'fs';
+import path from 'path';
 
 export const ANKI_NOTE_TYPE_NAME = 'AI Vocabulary';
 export const ANKI_MODEL_FIELDS = [
@@ -259,6 +261,95 @@ export async function ensureAnkiModel(
       message: `Updated '${targetModel}' model in Anki with latest ${theme.name} CSS and templates.`,
     };
   }
+}
+
+export async function ensureAnkiFonts(baseUrl: string): Promise<{ success: boolean; synced: string[]; errors: string[] }> {
+  const synced: string[] = [];
+  const errors: string[] = [];
+
+  const fontsToSync = [
+    { sourceName: 'CharisSIL-Regular.woff2', targetName: '_CharisSIL-Regular.woff2' },
+    { sourceName: 'CharisSIL-Bold.woff2', targetName: '_CharisSIL-Bold.woff2' },
+    { sourceName: 'Vazirmatn-Regular.woff2', targetName: '_Vazirmatn-Regular.woff2' },
+    { sourceName: 'Vazirmatn-Bold.woff2', targetName: '_Vazirmatn-Bold.woff2' },
+  ];
+
+  const fontsDir = path.resolve(process.cwd(), 'public/fonts');
+
+  for (const font of fontsToSync) {
+    const filePath = path.join(fontsDir, font.sourceName);
+    if (!fs.existsSync(filePath)) {
+      errors.push(`Font file not found: ${filePath}`);
+      continue;
+    }
+
+    try {
+      const buffer = fs.readFileSync(filePath);
+      const base64Data = buffer.toString('base64');
+      const res = await callAnkiConnect(baseUrl, 'storeMediaFile', {
+        filename: font.targetName,
+        data: base64Data,
+      });
+      if (res.success) {
+        synced.push(font.targetName);
+      } else {
+        errors.push(`Failed to store font ${font.targetName}: ${res.error}`);
+      }
+    } catch (err: any) {
+      errors.push(`Error reading/uploading ${font.sourceName}: ${err?.message}`);
+    }
+  }
+
+  return {
+    success: errors.length === 0,
+    synced,
+    errors,
+  };
+}
+
+export async function ensureAllAnkiModels(baseUrl: string): Promise<{
+  success: boolean;
+  totalSynced: number;
+  results: Array<{ modelName: string; success: boolean; message?: string; error?: string }>;
+  fontSync: { success: boolean; synced: string[]; errors: string[] };
+}> {
+  // 1. Ensure offline fonts in Anki media collection
+  const fontSync = await ensureAnkiFonts(baseUrl);
+
+  // 2. Ensure each of the 20 model variants (10 themes x 2 card types)
+  const results: Array<{ modelName: string; success: boolean; message?: string; error?: string }> = [];
+  const themeIds = Object.keys(THEMES) as ThemeId[];
+  const cardTypes: CardType[] = ['normal', 'spelling'];
+
+  for (const themeId of themeIds) {
+    for (const cardType of cardTypes) {
+      const modelName = getThemedModelName(themeId, cardType);
+      try {
+        const res = await ensureAnkiModel(baseUrl, themeId, cardType);
+        results.push({
+          modelName,
+          success: res.success,
+          message: res.message,
+          error: res.error,
+        });
+      } catch (err: any) {
+        results.push({
+          modelName,
+          success: false,
+          error: err?.message,
+        });
+      }
+    }
+  }
+
+  const successCount = results.filter((r) => r.success).length;
+
+  return {
+    success: successCount === results.length,
+    totalSynced: successCount,
+    results,
+    fontSync,
+  };
 }
 
 export async function checkDuplicateInDeck(

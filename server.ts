@@ -30,6 +30,7 @@ import {
   checkAnkiConnection,
   getAnkiDecks,
   ensureAnkiModel,
+  ensureAllAnkiModels,
   checkDuplicateInDeck,
   createAnkiNote,
   runAnkiPipelineDiagnostic,
@@ -140,6 +141,7 @@ const defaultSettings: AppSettings = {
         httpMethod: 'POST',
       },
     ],
+    generateWordSingle: false,
     generateAmericanNormal: true,
     generateAmericanSlow: true,
     generateBritishNormal: false,
@@ -148,6 +150,7 @@ const defaultSettings: AppSettings = {
     generateExampleUsSlow: false,
     generateExampleUkNormal: false,
     generateExampleUkSlow: false,
+    audioSpeed: 1.0,
     speedAmericanNormal: 1.0,
     speedAmericanSlow: 1.25,
     speedBritishNormal: 1.0,
@@ -259,6 +262,8 @@ function normalizeSettings(raw: any): AppSettings {
     speedExampleUkSlow: typeof tts.speedExampleUkSlow === 'number' ? tts.speedExampleUkSlow : 1.25,
     customProviders: Array.isArray(tts.customProviders) ? tts.customProviders : defaultSettings.tts.customProviders,
     activeCustomProviderId: tts.activeCustomProviderId,
+    generateWordSingle: typeof tts.generateWordSingle === 'boolean' ? tts.generateWordSingle : false,
+    audioSpeed: typeof tts.audioSpeed === 'number' ? Math.max(0.70, Math.min(1.30, Number(tts.audioSpeed.toFixed(2)))) : 1.0,
     generateAmericanNormal: genUsNorm,
     generateAmericanSlow: genUsSlow,
     generateBritishNormal: genUkNorm,
@@ -716,6 +721,13 @@ async function startServer() {
     const selectedTheme: ThemeId = theme || appSettings.theme || 'comic-pop-dark';
     const selectedType: CardType = cardType || appSettings.defaultCard?.cardType || 'normal';
     const result = await ensureAnkiModel(ankiUrl, selectedTheme, selectedType);
+    res.json(result);
+  });
+
+  app.post('/api/anki/sync-all-models', async (req, res) => {
+    const { url } = req.body || {};
+    const ankiUrl = url || appSettings.anki.url || 'http://127.0.0.1:8765';
+    const result = await ensureAllAnkiModels(ankiUrl);
     res.json(result);
   });
 
@@ -1930,6 +1942,8 @@ async function startServer() {
         const onlineAudioRes = await generateAllOnlineCardAudios({
           word: cardData.word,
           example: cardData.example,
+          audioSpeed: appSettings.tts.audioSpeed,
+          generateWordSingle: appSettings.tts.generateWordSingle,
           generateAmericanNormal: appSettings.tts.generateAmericanNormal,
           generateAmericanSlow: appSettings.tts.generateAmericanSlow,
           generateBritishNormal: appSettings.tts.generateBritishNormal,
@@ -1940,7 +1954,18 @@ async function startServer() {
           generateExampleUkSlow: appSettings.tts.generateExampleUkSlow,
         });
 
-        if (!onlineAudioRes.success || onlineAudioRes.files.length === 0) {
+        const anyOnlineRequested =
+          Boolean(appSettings.tts.generateWordSingle) ||
+          appSettings.tts.generateAmericanNormal ||
+          appSettings.tts.generateAmericanSlow ||
+          appSettings.tts.generateBritishNormal ||
+          appSettings.tts.generateBritishSlow ||
+          appSettings.tts.generateExampleUsNormal ||
+          appSettings.tts.generateExampleUsSlow ||
+          appSettings.tts.generateExampleUkNormal ||
+          appSettings.tts.generateExampleUkSlow;
+
+        if (!onlineAudioRes.success && anyOnlineRequested) {
           const errDetail = onlineAudioRes.error || 'Failed to synthesize online audio';
           pushLog(6, 'TTS Audio Generation', 'error', errDetail);
           return res.status(500).json({
@@ -1970,9 +1995,9 @@ async function startServer() {
           exampleAudioUsSlowFileName: onlineAudioRes.exampleAudioUsSlowFileName,
           exampleAudioUkNormalFileName: onlineAudioRes.exampleAudioUkNormalFileName,
           exampleAudioUkSlowFileName: onlineAudioRes.exampleAudioUkSlowFileName,
-          wordAudioBase64: onlineAudioRes.wordAudioUsNormalBase64 || onlineAudioRes.wordAudioUsSlowBase64 || onlineAudioRes.wordAudioUkNormalBase64 || onlineAudioRes.wordAudioUkSlowBase64,
+          wordAudioBase64: onlineAudioRes.wordAudioBase64 || onlineAudioRes.wordAudioUsNormalBase64 || onlineAudioRes.wordAudioUsSlowBase64 || onlineAudioRes.wordAudioUkNormalBase64 || onlineAudioRes.wordAudioUkSlowBase64,
           exampleAudioBase64: onlineAudioRes.exampleAudioUsNormalBase64 || onlineAudioRes.exampleAudioUsSlowBase64 || onlineAudioRes.exampleAudioUkNormalBase64 || onlineAudioRes.exampleAudioUkSlowBase64,
-          wordAudioFileName: onlineAudioRes.wordAudioUsNormalFileName || onlineAudioRes.wordAudioUsSlowFileName || onlineAudioRes.wordAudioUkNormalFileName || onlineAudioRes.wordAudioUkSlowFileName,
+          wordAudioFileName: onlineAudioRes.wordAudioFileName || onlineAudioRes.wordAudioUsNormalFileName || onlineAudioRes.wordAudioUsSlowFileName || onlineAudioRes.wordAudioUkNormalFileName || onlineAudioRes.wordAudioUkSlowFileName,
           exampleAudioFileName: onlineAudioRes.exampleAudioUsNormalFileName || onlineAudioRes.exampleAudioUsSlowFileName || onlineAudioRes.exampleAudioUkNormalFileName || onlineAudioRes.exampleAudioUkSlowFileName,
           audioFiles: onlineAudioRes.files.map((f) => ({
             fileName: f.fileName,
@@ -2011,7 +2036,7 @@ async function startServer() {
         });
       }
 
-      pushLog(6, 'TTS Audio Generation', 'pending', `Synthesizing with Piper (Length scale ${appSettings.tts.slowSpeed})...`);
+      pushLog(6, 'TTS Audio Generation', 'pending', `Synthesizing with Piper (Length scale ${appSettings.tts.slowSpeed}, Speed ${appSettings.tts.audioSpeed || 1.0}x)...`);
       try {
         const audioGenRes = await generateAllCardAudios({
           word: cardData.word,
@@ -2021,6 +2046,8 @@ async function startServer() {
           britishVoice: appSettings.tts.britishVoice,
           normalSpeed: appSettings.tts.normalSpeed,
           slowSpeed: appSettings.tts.slowSpeed,
+          audioSpeed: appSettings.tts.audioSpeed,
+          generateWordSingle: appSettings.tts.generateWordSingle,
           generateAmericanNormal: appSettings.tts.generateAmericanNormal,
           generateAmericanSlow: appSettings.tts.generateAmericanSlow,
           generateBritishNormal: appSettings.tts.generateBritishNormal,
@@ -2039,7 +2066,18 @@ async function startServer() {
           speedExampleUkSlow: appSettings.tts.speedExampleUkSlow,
         });
 
-        if (!audioGenRes.success || audioGenRes.files.length === 0) {
+        const anyPiperRequested =
+          Boolean(appSettings.tts.generateWordSingle) ||
+          appSettings.tts.generateAmericanNormal ||
+          appSettings.tts.generateAmericanSlow ||
+          appSettings.tts.generateBritishNormal ||
+          appSettings.tts.generateBritishSlow ||
+          appSettings.tts.generateExampleUsNormal ||
+          appSettings.tts.generateExampleUsSlow ||
+          appSettings.tts.generateExampleUkNormal ||
+          appSettings.tts.generateExampleUkSlow;
+
+        if (!audioGenRes.success && anyPiperRequested) {
           const errDetail = audioGenRes.error || 'Failed to synthesize audio with Piper';
           pushLog(6, 'TTS Audio Generation', 'error', errDetail);
           return res.status(500).json({
@@ -2069,9 +2107,9 @@ async function startServer() {
           exampleAudioUsSlowFileName: audioGenRes.exampleAudioUsSlowFileName,
           exampleAudioUkNormalFileName: audioGenRes.exampleAudioUkNormalFileName,
           exampleAudioUkSlowFileName: audioGenRes.exampleAudioUkSlowFileName,
-          wordAudioBase64: audioGenRes.wordAudioUsNormalBase64 || audioGenRes.wordAudioUsSlowBase64 || audioGenRes.wordAudioUkNormalBase64 || audioGenRes.wordAudioUkSlowBase64,
+          wordAudioBase64: audioGenRes.wordAudioBase64 || audioGenRes.wordAudioUsNormalBase64 || audioGenRes.wordAudioUsSlowBase64 || audioGenRes.wordAudioUkNormalBase64 || audioGenRes.wordAudioUkSlowBase64,
           exampleAudioBase64: audioGenRes.exampleAudioUsNormalBase64 || audioGenRes.exampleAudioUsSlowBase64 || audioGenRes.exampleAudioUkNormalBase64 || audioGenRes.exampleAudioUkSlowBase64,
-          wordAudioFileName: audioGenRes.wordAudioUsNormalFileName || audioGenRes.wordAudioUsSlowFileName || audioGenRes.wordAudioUkNormalFileName || audioGenRes.wordAudioUkSlowFileName,
+          wordAudioFileName: audioGenRes.wordAudioFileName || audioGenRes.wordAudioUsNormalFileName || audioGenRes.wordAudioUsSlowFileName || audioGenRes.wordAudioUkNormalFileName || audioGenRes.wordAudioUkSlowFileName,
           exampleAudioFileName: audioGenRes.exampleAudioUsNormalFileName || audioGenRes.exampleAudioUsSlowFileName || audioGenRes.exampleAudioUkNormalFileName || audioGenRes.exampleAudioUkSlowFileName,
           audioFiles: audioGenRes.files.map((f) => ({
             fileName: f.fileName,

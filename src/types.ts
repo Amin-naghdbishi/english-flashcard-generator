@@ -263,6 +263,7 @@ export interface TTSConfig {
   activeCustomProviderId?: string;
 
   // Independent audio generation flags
+  generateWordSingle?: boolean;
   generateAmericanNormal: boolean;
   generateAmericanSlow: boolean;
   generateBritishNormal: boolean;
@@ -271,6 +272,9 @@ export interface TTSConfig {
   generateExampleUsSlow: boolean;
   generateExampleUkNormal: boolean;
   generateExampleUkSlow: boolean;
+
+  // Global Audio Speed Multiplier (0.70x - 1.30x, default 1.00x)
+  audioSpeed?: number;
 
   // Independent speed (length_scale) for every audio variant
   speedAmericanNormal?: number; // default 1.00

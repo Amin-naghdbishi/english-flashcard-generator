@@ -123,8 +123,8 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   font-size: 14px;
   font-weight: 800;
   color: #2563EB;
-  font-family: "Lucida Sans Unicode", sans-serif;
-  font-style: italic;
+  font-family: 'Charis SIL', 'Doulos SIL', 'DejaVu Sans', serif !important;
+  font-style: normal !important;
 }
 
 .quest-sound-dock {
@@ -184,7 +184,8 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   font-size: 22px;
   font-weight: 900;
   color: #0F172A;
-  line-height: 1.4;
+  line-height: 1.5;
+  font-family: 'Vazirmatn', Tahoma, 'Segoe UI', sans-serif !important;
 }
 
 .quest-definition-card {
@@ -251,7 +252,8 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   font-size: 13px;
   font-weight: 600;
   color: #475569;
-  line-height: 1.4;
+  line-height: 1.5;
+  font-family: 'Vazirmatn', Tahoma, 'Segoe UI', sans-serif !important;
 }
 
 .quest-mnemonic-card {
@@ -277,7 +279,8 @@ const css = `/* THEME 3: DUO QUEST LIGHT */
   font-size: 13px;
   font-weight: 700;
   color: #1E293B;
-  line-height: 1.35;
+  line-height: 1.5;
+  font-family: 'Vazirmatn', Tahoma, 'Segoe UI', sans-serif !important;
 }
 
 /* SPELLING QUEST */

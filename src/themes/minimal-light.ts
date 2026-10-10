@@ -96,7 +96,8 @@ const css = `/* THEME: MINIMAL LIGHT - Clean, Distraction-Free Practical Theme *
   font-size: 14px !important;
   font-weight: 500 !important;
   color: #64748B !important;
-  font-family: "Lucida Sans Unicode", "DejaVu Sans", sans-serif !important;
+  font-family: 'Charis SIL', 'Doulos SIL', 'DejaVu Sans', serif !important;
+  font-style: normal !important;
 }
 
 .minimal-audio-row {
@@ -154,7 +155,7 @@ const css = `/* THEME: MINIMAL LIGHT - Clean, Distraction-Free Practical Theme *
   line-height: 1.5 !important;
   direction: rtl !important;
   text-align: right !important;
-  font-family: Tahoma, Vazirmatn, "Segoe UI", sans-serif !important;
+  font-family: 'Vazirmatn', Tahoma, sans-serif !important;
 }
 
 .minimal-definition-block {
@@ -219,7 +220,7 @@ const css = `/* THEME: MINIMAL LIGHT - Clean, Distraction-Free Practical Theme *
   color: #475569 !important;
   direction: rtl !important;
   text-align: right !important;
-  font-family: Tahoma, Vazirmatn, "Segoe UI", sans-serif !important;
+  font-family: 'Vazirmatn', Tahoma, sans-serif !important;
   line-height: 1.5 !important;
 }
 
@@ -244,6 +245,8 @@ const css = `/* THEME: MINIMAL LIGHT - Clean, Distraction-Free Practical Theme *
   font-weight: 500 !important;
   color: #334155 !important;
   line-height: 1.4 !important;
+  font-family: 'Vazirmatn', Tahoma, sans-serif !important;
+  direction: rtl !important;
 }
 
 /* SPELLING MINIMAL */

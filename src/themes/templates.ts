@@ -105,20 +105,38 @@ export const heroPopFrontNormalHtml = `
     </div>
 
     <div class="comic-pronunciation-box">
-      <div class="audio-region region-us">
+      {{#WordAudioUsNormal}}<div class="audio-region region-us">
         <div class="audio-region-title">🇺🇸 American English</div>
         <div class="audio-buttons-row">
           <div class="audio-item"><span class="speed-label">Normal:</span> {{WordAudioUsNormal}}</div>
+          {{#WordAudioUsSlow}}<div class="audio-item"><span class="speed-label">Slow:</span> {{WordAudioUsSlow}}</div>{{/WordAudioUsSlow}}
+        </div>
+      </div>{{/WordAudioUsNormal}}
+      {{^WordAudioUsNormal}}{{#WordAudioUsSlow}}<div class="audio-region region-us">
+        <div class="audio-region-title">🇺🇸 American English</div>
+        <div class="audio-buttons-row">
           <div class="audio-item"><span class="speed-label">Slow:</span> {{WordAudioUsSlow}}</div>
         </div>
-      </div>
-      <div class="audio-region region-uk">
+      </div>{{/WordAudioUsSlow}}{{/WordAudioUsNormal}}
+      {{#WordAudioUkNormal}}<div class="audio-region region-uk">
         <div class="audio-region-title">🇬🇧 British English</div>
         <div class="audio-buttons-row">
           <div class="audio-item"><span class="speed-label">Normal:</span> {{WordAudioUkNormal}}</div>
+          {{#WordAudioUkSlow}}<div class="audio-item"><span class="speed-label">Slow:</span> {{WordAudioUkSlow}}</div>{{/WordAudioUkSlow}}
+        </div>
+      </div>{{/WordAudioUkNormal}}
+      {{^WordAudioUkNormal}}{{#WordAudioUkSlow}}<div class="audio-region region-uk">
+        <div class="audio-region-title">🇬🇧 British English</div>
+        <div class="audio-buttons-row">
           <div class="audio-item"><span class="speed-label">Slow:</span> {{WordAudioUkSlow}}</div>
         </div>
-      </div>
+      </div>{{/WordAudioUkSlow}}{{/WordAudioUkNormal}}
+      {{#WordAudio}}<div class="audio-region region-us">
+        <div class="audio-region-title">🔊 Audio</div>
+        <div class="audio-buttons-row">
+          <div class="audio-item">{{WordAudio}}</div>
+        </div>
+      </div>{{/WordAudio}}
     </div>
 
     <div class="comic-hint-box">
@@ -155,8 +173,8 @@ export const heroPopFrontSpellingHtml = `
       <div class="audio-region region-us">
         <div class="audio-region-title">🇺🇸 Audio Clues</div>
         <div class="audio-buttons-row">
-          <div class="audio-item"><span class="speed-label">Word:</span> {{WordAudioUsNormal}} {{WordAudioUsSlow}}</div>
-          <div class="audio-item"><span class="speed-label">Sentence:</span> {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}</div>
+          <div class="audio-item">{{#WordAudioUsNormal}}<span class="speed-label">Word:</span> {{WordAudioUsNormal}} {{/WordAudioUsNormal}}{{#WordAudioUsSlow}}{{WordAudioUsSlow}} {{/WordAudioUsSlow}}{{#WordAudio}}<span class="speed-label">Word:</span> {{WordAudio}}{{/WordAudio}}</div>
+          <div class="audio-item">{{#ExampleAudioUsNormal}}<span class="speed-label">Sentence:</span> {{ExampleAudioUsNormal}} {{/ExampleAudioUsNormal}}{{#ExampleAudioUsSlow}}{{ExampleAudioUsSlow}} {{/ExampleAudioUsSlow}}{{#ExampleAudio}}<span class="speed-label">Sentence:</span> {{ExampleAudio}}{{/ExampleAudio}}</div>
         </div>
       </div>
     </div>
@@ -210,20 +228,38 @@ export const heroPopBackHtml = `
     </div>
 
     <div class="comic-pronunciation-box">
-      <div class="audio-region region-us">
+      {{#WordAudioUsNormal}}<div class="audio-region region-us">
         <div class="audio-region-title">🇺🇸 American English</div>
         <div class="audio-buttons-row">
           <div class="audio-item"><span class="speed-label">Normal:</span> {{WordAudioUsNormal}}</div>
+          {{#WordAudioUsSlow}}<div class="audio-item"><span class="speed-label">Slow:</span> {{WordAudioUsSlow}}</div>{{/WordAudioUsSlow}}
+        </div>
+      </div>{{/WordAudioUsNormal}}
+      {{^WordAudioUsNormal}}{{#WordAudioUsSlow}}<div class="audio-region region-us">
+        <div class="audio-region-title">🇺🇸 American English</div>
+        <div class="audio-buttons-row">
           <div class="audio-item"><span class="speed-label">Slow:</span> {{WordAudioUsSlow}}</div>
         </div>
-      </div>
-      <div class="audio-region region-uk">
+      </div>{{/WordAudioUsSlow}}{{/WordAudioUsNormal}}
+      {{#WordAudioUkNormal}}<div class="audio-region region-uk">
         <div class="audio-region-title">🇬🇧 British English</div>
         <div class="audio-buttons-row">
           <div class="audio-item"><span class="speed-label">Normal:</span> {{WordAudioUkNormal}}</div>
+          {{#WordAudioUkSlow}}<div class="audio-item"><span class="speed-label">Slow:</span> {{WordAudioUkSlow}}</div>{{/WordAudioUkSlow}}
+        </div>
+      </div>{{/WordAudioUkNormal}}
+      {{^WordAudioUkNormal}}{{#WordAudioUkSlow}}<div class="audio-region region-uk">
+        <div class="audio-region-title">🇬🇧 British English</div>
+        <div class="audio-buttons-row">
           <div class="audio-item"><span class="speed-label">Slow:</span> {{WordAudioUkSlow}}</div>
         </div>
-      </div>
+      </div>{{/WordAudioUkSlow}}{{/WordAudioUkNormal}}
+      {{#WordAudio}}<div class="audio-region region-us">
+        <div class="audio-region-title">🔊 Audio</div>
+        <div class="audio-buttons-row">
+          <div class="audio-item">{{WordAudio}}</div>
+        </div>
+      </div>{{/WordAudio}}
     </div>
 
     <div class="comic-divider"></div>
@@ -244,8 +280,9 @@ export const heroPopBackHtml = `
       <div class="example-header">
         <span class="box-label label-example">💬 EXAMPLE SENTENCE</span>
         <div class="example-audio-group">
-          <div class="example-audio-item"><span>🇺🇸</span> {{ExampleAudioUsNormal}}</div>
-          <div class="example-audio-item"><span>🇬🇧</span> {{ExampleAudioUkNormal}}</div>
+          {{#ExampleAudioUsNormal}}<div class="example-audio-item"><span>🇺🇸</span> {{ExampleAudioUsNormal}}</div>{{/ExampleAudioUsNormal}}
+          {{#ExampleAudioUkNormal}}<div class="example-audio-item"><span>🇬🇧</span> {{ExampleAudioUkNormal}}</div>{{/ExampleAudioUkNormal}}
+          {{#ExampleAudio}}<div class="example-audio-item"><span>🔊</span> {{ExampleAudio}}</div>{{/ExampleAudio}}
         </div>
       </div>
       <p class="example-en">{{Example}}</p>
@@ -292,14 +329,26 @@ export const duoQuestFrontNormalHtml = `
     </div>
 
     <div class="quest-sound-dock">
-      <div class="sound-card us-card">
+      {{#WordAudioUsNormal}}<div class="sound-card us-card">
         <span class="dock-flag">🇺🇸 American</span>
-        <div class="dock-actions">{{WordAudioUsNormal}} {{WordAudioUsSlow}}</div>
-      </div>
-      <div class="sound-card uk-card">
+        <div class="dock-actions">{{WordAudioUsNormal}} {{#WordAudioUsSlow}}{{WordAudioUsSlow}}{{/WordAudioUsSlow}}</div>
+      </div>{{/WordAudioUsNormal}}
+      {{^WordAudioUsNormal}}{{#WordAudioUsSlow}}<div class="sound-card us-card">
+        <span class="dock-flag">🇺🇸 American</span>
+        <div class="dock-actions">{{WordAudioUsSlow}}</div>
+      </div>{{/WordAudioUsSlow}}{{/WordAudioUsNormal}}
+      {{#WordAudioUkNormal}}<div class="sound-card uk-card">
         <span class="dock-flag">🇬🇧 British</span>
-        <div class="dock-actions">{{WordAudioUkNormal}} {{WordAudioUkSlow}}</div>
-      </div>
+        <div class="dock-actions">{{WordAudioUkNormal}} {{#WordAudioUkSlow}}{{WordAudioUkSlow}}{{/WordAudioUkSlow}}</div>
+      </div>{{/WordAudioUkNormal}}
+      {{^WordAudioUkNormal}}{{#WordAudioUkSlow}}<div class="sound-card uk-card">
+        <span class="dock-flag">🇬🇧 British</span>
+        <div class="dock-actions">{{WordAudioUkSlow}}</div>
+      </div>{{/WordAudioUkSlow}}{{/WordAudioUkNormal}}
+      {{#WordAudio}}<div class="sound-card us-card">
+        <span class="dock-flag">🔊 Audio</span>
+        <div class="dock-actions">{{WordAudio}}</div>
+      </div>{{/WordAudio}}
     </div>
 
     <div class="quest-example-card">
@@ -335,7 +384,7 @@ export const duoQuestFrontSpellingHtml = `
 
     <div class="quest-sound-dock-compact">
       <span class="sound-label">🔊 Pronunciation:</span>
-      {{WordAudioUsNormal}} {{WordAudioUsSlow}} {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}
+      {{#WordAudioUsNormal}}{{WordAudioUsNormal}} {{/WordAudioUsNormal}}{{#WordAudioUsSlow}}{{WordAudioUsSlow}} {{/WordAudioUsSlow}}{{#ExampleAudioUsNormal}}{{ExampleAudioUsNormal}} {{/ExampleAudioUsNormal}}{{#ExampleAudioUsSlow}}{{ExampleAudioUsSlow}} {{/ExampleAudioUsSlow}}{{#WordAudio}}{{WordAudio}}{{/WordAudio}}
     </div>
 
     <div class="spelling-interactive-area tappable">
@@ -381,14 +430,26 @@ export const duoQuestBackHtml = `
     </div>
 
     <div class="quest-sound-dock">
-      <div class="sound-card us-card">
+      {{#WordAudioUsNormal}}<div class="sound-card us-card">
         <span class="dock-flag">🇺🇸 American</span>
-        <div class="dock-actions">{{WordAudioUsNormal}} {{WordAudioUsSlow}}</div>
-      </div>
-      <div class="sound-card uk-card">
+        <div class="dock-actions">{{WordAudioUsNormal}} {{#WordAudioUsSlow}}{{WordAudioUsSlow}}{{/WordAudioUsSlow}}</div>
+      </div>{{/WordAudioUsNormal}}
+      {{^WordAudioUsNormal}}{{#WordAudioUsSlow}}<div class="sound-card us-card">
+        <span class="dock-flag">🇺🇸 American</span>
+        <div class="dock-actions">{{WordAudioUsSlow}}</div>
+      </div>{{/WordAudioUsSlow}}{{/WordAudioUsNormal}}
+      {{#WordAudioUkNormal}}<div class="sound-card uk-card">
         <span class="dock-flag">🇬🇧 British</span>
-        <div class="dock-actions">{{WordAudioUkNormal}} {{WordAudioUkSlow}}</div>
-      </div>
+        <div class="dock-actions">{{WordAudioUkNormal}} {{#WordAudioUkSlow}}{{WordAudioUkSlow}}{{/WordAudioUkSlow}}</div>
+      </div>{{/WordAudioUkNormal}}
+      {{^WordAudioUkNormal}}{{#WordAudioUkSlow}}<div class="sound-card uk-card">
+        <span class="dock-flag">🇬🇧 British</span>
+        <div class="dock-actions">{{WordAudioUkSlow}}</div>
+      </div>{{/WordAudioUkSlow}}{{/WordAudioUkNormal}}
+      {{#WordAudio}}<div class="sound-card us-card">
+        <span class="dock-flag">🔊 Audio</span>
+        <div class="dock-actions">{{WordAudio}}</div>
+      </div>{{/WordAudio}}
     </div>
 
     <div class="quest-meaning-banner">
@@ -406,7 +467,7 @@ export const duoQuestBackHtml = `
     <div class="quest-example-card">
       <div class="example-quest-header">
         <span class="quest-tag">EXAMPLE & TRANSLATION</span>
-        <div class="dock-actions">{{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}} {{ExampleAudioUkNormal}} {{ExampleAudioUkSlow}}</div>
+        <div class="dock-actions">{{#ExampleAudioUsNormal}}{{ExampleAudioUsNormal}} {{/ExampleAudioUsNormal}}{{#ExampleAudioUsSlow}}{{ExampleAudioUsSlow}} {{/ExampleAudioUsSlow}}{{#ExampleAudioUkNormal}}{{ExampleAudioUkNormal}} {{/ExampleAudioUkNormal}}{{#ExampleAudioUkSlow}}{{ExampleAudioUkSlow}}{{/ExampleAudioUkSlow}}{{#ExampleAudio}}{{ExampleAudio}}{{/ExampleAudio}}</div>
       </div>
       <p class="quest-sentence">{{Example}}</p>
       <p class="quest-translation-fa" dir="rtl">{{Translation}}</p>
@@ -454,8 +515,11 @@ export const indexNotebookFrontNormalHtml = `
     <div class="notebook-margin-line"></div>
 
     <div class="notebook-audio-strip">
-      <div class="tape-clip us-tape">🇺🇸 US: {{WordAudioUsNormal}} {{WordAudioUsSlow}}</div>
-      <div class="tape-clip uk-tape">🇬🇧 UK: {{WordAudioUkNormal}} {{WordAudioUkSlow}}</div>
+      {{#WordAudioUsNormal}}<div class="tape-clip us-tape">🇺🇸 US: {{WordAudioUsNormal}} {{#WordAudioUsSlow}}{{WordAudioUsSlow}}{{/WordAudioUsSlow}}</div>{{/WordAudioUsNormal}}
+      {{^WordAudioUsNormal}}{{#WordAudioUsSlow}}<div class="tape-clip us-tape">🇺🇸 US: {{WordAudioUsSlow}}</div>{{/WordAudioUsSlow}}{{/WordAudioUsNormal}}
+      {{#WordAudioUkNormal}}<div class="tape-clip uk-tape">🇬🇧 UK: {{WordAudioUkNormal}} {{#WordAudioUkSlow}}{{WordAudioUkSlow}}{{/WordAudioUkSlow}}</div>{{/WordAudioUkNormal}}
+      {{^WordAudioUkNormal}}{{#WordAudioUkSlow}}<div class="tape-clip uk-tape">🇬🇧 UK: {{WordAudioUkSlow}}</div>{{/WordAudioUkSlow}}{{/WordAudioUkNormal}}
+      {{#WordAudio}}<div class="tape-clip">🎧 Audio: {{WordAudio}}</div>{{/WordAudio}}
     </div>
 
     <div class="notebook-sticky-example">
@@ -489,7 +553,7 @@ export const indexNotebookFrontSpellingHtml = `
     </div>
 
     <div class="notebook-audio-strip">
-      <div class="tape-clip us-tape">🎧 Audio: {{WordAudioUsNormal}} {{WordAudioUsSlow}} {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}</div>
+      <div class="tape-clip us-tape">🎧 Audio: {{#WordAudioUsNormal}}{{WordAudioUsNormal}} {{/WordAudioUsNormal}}{{#WordAudioUsSlow}}{{WordAudioUsSlow}} {{/WordAudioUsSlow}}{{#ExampleAudioUsNormal}}{{ExampleAudioUsNormal}} {{/ExampleAudioUsNormal}}{{#ExampleAudioUsSlow}}{{ExampleAudioUsSlow}}{{/ExampleAudioUsSlow}}{{#WordAudio}}{{WordAudio}}{{/WordAudio}}</div>
     </div>
 
     <div class="spelling-interactive-area tappable">
@@ -537,8 +601,11 @@ export const indexNotebookBackHtml = `
     <div class="notebook-margin-line"></div>
 
     <div class="notebook-audio-strip">
-      <div class="tape-clip us-tape">🇺🇸 US: {{WordAudioUsNormal}} {{WordAudioUsSlow}}</div>
-      <div class="tape-clip uk-tape">🇬🇧 UK: {{WordAudioUkNormal}} {{WordAudioUkSlow}}</div>
+      {{#WordAudioUsNormal}}<div class="tape-clip us-tape">🇺🇸 US: {{WordAudioUsNormal}} {{#WordAudioUsSlow}}{{WordAudioUsSlow}}{{/WordAudioUsSlow}}</div>{{/WordAudioUsNormal}}
+      {{^WordAudioUsNormal}}{{#WordAudioUsSlow}}<div class="tape-clip us-tape">🇺🇸 US: {{WordAudioUsSlow}}</div>{{/WordAudioUsSlow}}{{/WordAudioUsNormal}}
+      {{#WordAudioUkNormal}}<div class="tape-clip uk-tape">🇬🇧 UK: {{WordAudioUkNormal}} {{#WordAudioUkSlow}}{{WordAudioUkSlow}}{{/WordAudioUkSlow}}</div>{{/WordAudioUkNormal}}
+      {{^WordAudioUkNormal}}{{#WordAudioUkSlow}}<div class="tape-clip uk-tape">🇬🇧 UK: {{WordAudioUkSlow}}</div>{{/WordAudioUkSlow}}{{/WordAudioUkNormal}}
+      {{#WordAudio}}<div class="tape-clip">🎧 Audio: {{WordAudio}}</div>{{/WordAudio}}
     </div>
 
     <div class="notebook-highlighter-meaning" dir="rtl">
@@ -558,7 +625,7 @@ export const indexNotebookBackHtml = `
       <div class="sticky-header-row">
         <span class="sticky-pin">📌</span>
         <span class="sticky-title">Example & Translation:</span>
-        <div class="sticky-audio">{{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}} {{ExampleAudioUkNormal}} {{ExampleAudioUkSlow}}</div>
+        <div class="sticky-audio">{{#ExampleAudioUsNormal}}{{ExampleAudioUsNormal}} {{/ExampleAudioUsNormal}}{{#ExampleAudioUsSlow}}{{ExampleAudioUsSlow}} {{/ExampleAudioUsSlow}}{{#ExampleAudioUkNormal}}{{ExampleAudioUkNormal}} {{/ExampleAudioUkNormal}}{{#ExampleAudioUkSlow}}{{ExampleAudioUkSlow}}{{/ExampleAudioUkSlow}}{{#ExampleAudio}}{{ExampleAudio}}{{/ExampleAudio}}</div>
       </div>
       <p class="sticky-text">{{Example}}</p>
       <p class="sticky-translation" dir="rtl">{{Translation}}</p>
@@ -604,12 +671,21 @@ export const minimalFrontNormalHtml = `
     </div>
 
     <div class="minimal-audio-row">
-      <div class="minimal-audio-group">
-        <span class="minimal-audio-label">US:</span> {{WordAudioUsNormal}} {{WordAudioUsSlow}}
-      </div>
-      <div class="minimal-audio-group">
-        <span class="minimal-audio-label">UK:</span> {{WordAudioUkNormal}} {{WordAudioUkSlow}}
-      </div>
+      {{#WordAudioUsNormal}}<div class="minimal-audio-group">
+        <span class="minimal-audio-label">US:</span> {{WordAudioUsNormal}} {{#WordAudioUsSlow}}{{WordAudioUsSlow}}{{/WordAudioUsSlow}}
+      </div>{{/WordAudioUsNormal}}
+      {{^WordAudioUsNormal}}{{#WordAudioUsSlow}}<div class="minimal-audio-group">
+        <span class="minimal-audio-label">US:</span> {{WordAudioUsSlow}}
+      </div>{{/WordAudioUsSlow}}{{/WordAudioUsNormal}}
+      {{#WordAudioUkNormal}}<div class="minimal-audio-group">
+        <span class="minimal-audio-label">UK:</span> {{WordAudioUkNormal}} {{#WordAudioUkSlow}}{{WordAudioUkSlow}}{{/WordAudioUkSlow}}
+      </div>{{/WordAudioUkNormal}}
+      {{^WordAudioUkNormal}}{{#WordAudioUkSlow}}<div class="minimal-audio-group">
+        <span class="minimal-audio-label">UK:</span> {{WordAudioUkSlow}}
+      </div>{{/WordAudioUkSlow}}{{/WordAudioUkNormal}}
+      {{#WordAudio}}<div class="minimal-audio-group">
+        <span class="minimal-audio-label">Audio:</span> {{WordAudio}}
+      </div>{{/WordAudio}}
     </div>
 
     <div class="minimal-example-block">
@@ -640,7 +716,7 @@ export const minimalFrontSpellingHtml = `
     </div>
 
     <div class="minimal-audio-row">
-      <span class="minimal-audio-label">Audio:</span> {{WordAudioUsNormal}} {{WordAudioUsSlow}} {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}
+      <span class="minimal-audio-label">Audio:</span> {{#WordAudioUsNormal}}{{WordAudioUsNormal}} {{/WordAudioUsNormal}}{{#WordAudioUsSlow}}{{WordAudioUsSlow}} {{/WordAudioUsSlow}}{{#ExampleAudioUsNormal}}{{ExampleAudioUsNormal}} {{/ExampleAudioUsNormal}}{{#ExampleAudioUsSlow}}{{ExampleAudioUsSlow}}{{/ExampleAudioUsSlow}}{{#WordAudio}}{{WordAudio}}{{/WordAudio}}
     </div>
 
     <div class="spelling-interactive-area tappable">
@@ -687,12 +763,21 @@ export const minimalBackHtml = `
     </div>
 
     <div class="minimal-audio-row">
-      <div class="minimal-audio-group">
-        <span class="minimal-audio-label">US:</span> {{WordAudioUsNormal}} {{WordAudioUsSlow}}
-      </div>
-      <div class="minimal-audio-group">
-        <span class="minimal-audio-label">UK:</span> {{WordAudioUkNormal}} {{WordAudioUkSlow}}
-      </div>
+      {{#WordAudioUsNormal}}<div class="minimal-audio-group">
+        <span class="minimal-audio-label">US:</span> {{WordAudioUsNormal}} {{#WordAudioUsSlow}}{{WordAudioUsSlow}}{{/WordAudioUsSlow}}
+      </div>{{/WordAudioUsNormal}}
+      {{^WordAudioUsNormal}}{{#WordAudioUsSlow}}<div class="minimal-audio-group">
+        <span class="minimal-audio-label">US:</span> {{WordAudioUsSlow}}
+      </div>{{/WordAudioUsSlow}}{{/WordAudioUsNormal}}
+      {{#WordAudioUkNormal}}<div class="minimal-audio-group">
+        <span class="minimal-audio-label">UK:</span> {{WordAudioUkNormal}} {{#WordAudioUkSlow}}{{WordAudioUkSlow}}{{/WordAudioUkSlow}}
+      </div>{{/WordAudioUkNormal}}
+      {{^WordAudioUkNormal}}{{#WordAudioUkSlow}}<div class="minimal-audio-group">
+        <span class="minimal-audio-label">UK:</span> {{WordAudioUkSlow}}
+      </div>{{/WordAudioUkSlow}}{{/WordAudioUkNormal}}
+      {{#WordAudio}}<div class="minimal-audio-group">
+        <span class="minimal-audio-label">Audio:</span> {{WordAudio}}
+      </div>{{/WordAudio}}
     </div>
 
     <hr class="minimal-divider" />
@@ -712,7 +797,7 @@ export const minimalBackHtml = `
     <div class="minimal-example-block">
       <div class="minimal-example-header">
         <span class="minimal-example-label">Example & Translation</span>
-        <div class="minimal-example-audio">{{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}} {{ExampleAudioUkNormal}} {{ExampleAudioUkSlow}}</div>
+        <div class="minimal-example-audio">{{#ExampleAudioUsNormal}}{{ExampleAudioUsNormal}} {{/ExampleAudioUsNormal}}{{#ExampleAudioUsSlow}}{{ExampleAudioUsSlow}} {{/ExampleAudioUsSlow}}{{#ExampleAudioUkNormal}}{{ExampleAudioUkNormal}} {{/ExampleAudioUkNormal}}{{#ExampleAudioUkSlow}}{{ExampleAudioUkSlow}}{{/ExampleAudioUkSlow}}{{#ExampleAudio}}{{ExampleAudio}}{{/ExampleAudio}}</div>
       </div>
       <p class="minimal-example">{{Example}}</p>
       <p class="minimal-translation" dir="rtl">{{Translation}}</p>
@@ -758,9 +843,11 @@ export const botanicalFrontNormalHtml = `
       <div class="botanical-ipa-pill">{{Phonetic}}</div>
       <div class="botanical-audio-divider"></div>
       <div class="botanical-play-row">
-        {{WordAudioUsNormal}}
-        {{WordAudioUsSlow}}
-        {{WordAudioUkNormal}}
+        {{#WordAudioUsNormal}}{{WordAudioUsNormal}}{{/WordAudioUsNormal}}
+        {{#WordAudioUsSlow}}{{WordAudioUsSlow}}{{/WordAudioUsSlow}}
+        {{#WordAudioUkNormal}}{{WordAudioUkNormal}}{{/WordAudioUkNormal}}
+        {{#WordAudioUkSlow}}{{WordAudioUkSlow}}{{/WordAudioUkSlow}}
+        {{#WordAudio}}{{WordAudio}}{{/WordAudio}}
       </div>
     </div>
 
@@ -792,9 +879,11 @@ export const botanicalFrontSpellingHtml = `
     <!-- Box 2: Audio listening clue -->
     <div class="botanical-box botanical-audio-box">
       <div class="botanical-play-row">
-        {{WordAudioUsNormal}}
-        {{WordAudioUsSlow}}
-        {{ExampleAudioUsNormal}}
+        {{#WordAudioUsNormal}}{{WordAudioUsNormal}}{{/WordAudioUsNormal}}
+        {{#WordAudioUsSlow}}{{WordAudioUsSlow}}{{/WordAudioUsSlow}}
+        {{#ExampleAudioUsNormal}}{{ExampleAudioUsNormal}}{{/ExampleAudioUsNormal}}
+        {{#ExampleAudioUsSlow}}{{ExampleAudioUsSlow}}{{/ExampleAudioUsSlow}}
+        {{#WordAudio}}{{WordAudio}}{{/WordAudio}}
       </div>
     </div>
 
@@ -849,9 +938,11 @@ export const botanicalBackHtml = `
       <div class="botanical-ipa-pill">{{Phonetic}}</div>
       <div class="botanical-audio-divider"></div>
       <div class="botanical-play-row">
-        {{WordAudioUsNormal}}
-        {{WordAudioUsSlow}}
-        {{WordAudioUkNormal}}
+        {{#WordAudioUsNormal}}{{WordAudioUsNormal}}{{/WordAudioUsNormal}}
+        {{#WordAudioUsSlow}}{{WordAudioUsSlow}}{{/WordAudioUsSlow}}
+        {{#WordAudioUkNormal}}{{WordAudioUkNormal}}{{/WordAudioUkNormal}}
+        {{#WordAudioUkSlow}}{{WordAudioUkSlow}}{{/WordAudioUkSlow}}
+        {{#WordAudio}}{{WordAudio}}{{/WordAudio}}
       </div>
     </div>
 
@@ -873,7 +964,11 @@ export const botanicalBackHtml = `
       <p class="botanical-example-en">{{Example}}</p>
       <p class="botanical-example-fa" dir="rtl">{{Translation}}</p>
       <div class="botanical-example-audio-row">
-        {{ExampleAudioUsNormal}} {{ExampleAudioUsSlow}}
+        {{#ExampleAudioUsNormal}}{{ExampleAudioUsNormal}}{{/ExampleAudioUsNormal}}
+        {{#ExampleAudioUsSlow}}{{ExampleAudioUsSlow}}{{/ExampleAudioUsSlow}}
+        {{#ExampleAudioUkNormal}}{{ExampleAudioUkNormal}}{{/ExampleAudioUkNormal}}
+        {{#ExampleAudioUkSlow}}{{ExampleAudioUkSlow}}{{/ExampleAudioUkSlow}}
+        {{#ExampleAudio}}{{ExampleAudio}}{{/ExampleAudio}}
       </div>
     </div>
 

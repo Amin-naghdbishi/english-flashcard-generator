@@ -1894,7 +1894,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                       onFocus={(el) => (activeFieldRef.current = { element: el, fieldName: 'phonetic' })}
                       placeholder="/IPA/"
                       tagName="span"
-                      className="comic-badge badge-ipa font-mono font-bold"
+                      className="comic-badge badge-ipa font-bold"
                     />
                   </div>
                 </div>

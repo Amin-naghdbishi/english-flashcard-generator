@@ -45,7 +45,8 @@ export async function synthesizeCustomTTS(
   config: CustomTTSProviderConfig,
   text: string,
   isSlow: boolean = false,
-  slowSpeed: number = 1.25
+  slowSpeed: number = 1.25,
+  audioSpeed: number = 1.0
 ): Promise<CustomTTSResult> {
   const trimmed = (text || '').trim();
   if (!trimmed) {
@@ -66,7 +67,8 @@ export async function synthesizeCustomTTS(
     // 1. OPENAI AUDIO / SPEECH PROTOCOL
     if (config.protocol === 'openai-speech' || endpoint.includes('/audio/speech')) {
       // For OpenAI, speed is a multiplier (0.25 - 4.0). Slow speech means < 1.0 (e.g. 1 / 1.25 = 0.8x)
-      const calculatedSpeed = isSlow ? Math.max(0.25, Math.min(4.0, +(1 / slowSpeed).toFixed(2))) : 1.0;
+      const baseMultiplier = isSlow ? +(1 / slowSpeed).toFixed(2) : 1.0;
+      const calculatedSpeed = Math.max(0.25, Math.min(4.0, +(baseMultiplier * audioSpeed).toFixed(2)));
 
       const bodyPayload = {
         model: config.model || 'tts-1',

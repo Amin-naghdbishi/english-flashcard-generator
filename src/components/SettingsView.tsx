@@ -25,9 +25,11 @@ import {
   controlPiperService,
   synthesizeAudio,
   runTTSDiagnostics,
+  checkOnlineTTS,
   checkAnki,
   getAnkiDecks,
   ensureModelInAnki,
+  syncAllAnkiModels,
   runFullDiagnostics,
   testSmartImage,
   fetchDefaultPrompts,
@@ -146,6 +148,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     detail?: string;
     error?: string;
   } | null>(null);
+  const [onlineTtsStatus, setOnlineTtsStatus] = useState<{ connected: boolean; error?: string } | null>(null);
+  const [testingOnlineTts, setTestingOnlineTts] = useState(false);
 
   // Smart Images test states
   const [imgTestWord, setImgTestWord] = useState('apple');
@@ -156,6 +160,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [ankiStatus, setAnkiStatus] = useState<{ connected: boolean; version?: number; error?: string } | null>(null);
   const [ankiDecks, setAnkiDecks] = useState<string[]>([]);
   const [ankiModelSyncMsg, setAnkiModelSyncMsg] = useState<string | null>(null);
+  const [syncAllModelsMsg, setSyncAllModelsMsg] = useState<string | null>(null);
+  const [syncingAllModels, setSyncingAllModels] = useState(false);
   const [testingAnkiConn, setTestingAnkiConn] = useState(false);
 
   // Diagnostics Report
@@ -410,6 +416,39 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     setTimeout(() => setAnkiModelSyncMsg(null), 5000);
   };
 
+  // Sync All Note Types & Offline Fonts to Anki
+  const handleSyncAllAnkiModels = async () => {
+    setSyncingAllModels(true);
+    setSyncAllModelsMsg('Syncing all 20 Note Types and Charis SIL/Vazirmatn fonts to Anki...');
+    try {
+      const res = await syncAllAnkiModels(form.anki.url);
+      if (res.success) {
+        setSyncAllModelsMsg(`✓ Successfully synced ${res.totalSynced} Note Types & offline fonts to Anki!`);
+      } else {
+        setSyncAllModelsMsg(`✕ Partial sync: ${res.totalSynced} Note Types updated`);
+      }
+    } catch (err: any) {
+      setSyncAllModelsMsg(`✕ Error: ${err.message}`);
+    } finally {
+      setSyncingAllModels(false);
+      setTimeout(() => setSyncAllModelsMsg(null), 8000);
+    }
+  };
+
+  // Test Online TTS
+  const handleTestOnlineTts = async () => {
+    setTestingOnlineTts(true);
+    setOnlineTtsStatus(null);
+    try {
+      const res = await checkOnlineTTS();
+      setOnlineTtsStatus(res);
+    } catch (err: any) {
+      setOnlineTtsStatus({ connected: false, error: err.message });
+    } finally {
+      setTestingOnlineTts(false);
+    }
+  };
+
   // Prompt configuration handling
   const currentPrompts: AIPromptsConfig = {
     ...defaultPrompts,
@@ -536,6 +575,49 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
         }`}
       >
         {selected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+      </span>
+      <span>{label}</span>
+    </button>
+  );
+
+  // Helper: Square checkbox (independent toggle)
+  const SquareCheckbox = ({
+    checked,
+    label,
+    onChange,
+    disabled = false,
+  }: {
+    checked: boolean;
+    label: string;
+    onChange: (val: boolean) => void;
+    disabled?: boolean;
+  }) => (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium cursor-pointer border select-none transition-colors rounded-none ${
+        disabled
+          ? 'opacity-50 cursor-not-allowed border-zinc-200 dark:border-zinc-800'
+          : checked
+          ? isDark
+            ? 'bg-zinc-800 text-white border-blue-500 font-semibold'
+            : 'bg-blue-50 text-blue-900 border-blue-600 font-semibold'
+          : isDark
+          ? 'bg-zinc-900 text-zinc-300 border-zinc-700 hover:border-zinc-500'
+          : 'bg-white text-zinc-700 border-zinc-300 hover:border-zinc-400'
+      }`}
+    >
+      <span
+        className={`w-3.5 h-3.5 border flex items-center justify-center transition-colors ${
+          checked
+            ? 'border-blue-600 bg-blue-600 text-white'
+            : isDark
+            ? 'border-zinc-500 bg-zinc-800'
+            : 'border-zinc-400 bg-white'
+        }`}
+      >
+        {checked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
       </span>
       <span>{label}</span>
     </button>
@@ -1357,7 +1439,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 {/* TTS Provider */}
                 <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
                   <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
-                    TTS
+                    TTS Provider
                   </label>
                   <div className="flex flex-wrap gap-2">
                     <SquareOption
@@ -1365,6 +1447,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       label="Local"
                       onClick={() =>
                         updateAndSave({ ...form, tts: { ...form.tts, provider: 'piper' } })
+                      }
+                    />
+                    <SquareOption
+                      selected={form.tts.provider === 'online'}
+                      label="Online"
+                      onClick={() =>
+                        updateAndSave({ ...form, tts: { ...form.tts, provider: 'online' } })
                       }
                     />
                     <SquareOption
@@ -1457,6 +1546,58 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                       {piperTestMessage && (
                         <span className="text-xs font-medium text-zinc-600 dark:text-zinc-300">
                           {piperTestMessage}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Online TTS Configuration */}
+                {form.tts.provider === 'online' && (
+                  <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-4 max-w-md">
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
+                        Engine
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        value="Google Translate TTS (Online)"
+                        className="w-full text-xs font-medium p-2.5 border rounded-none bg-zinc-100 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300 border-zinc-300 dark:border-zinc-700 select-none"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-3 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleTestOnlineTts}
+                        disabled={testingOnlineTts}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-none flex items-center gap-1.5 cursor-pointer transition-colors"
+                      >
+                        {testingOnlineTts ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Activity className="w-3.5 h-3.5" />
+                        )}
+                        <span>Check Status</span>
+                      </button>
+
+                      {onlineTtsStatus && (
+                        <span className="text-xs flex items-center gap-1">
+                          {onlineTtsStatus.connected ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                          ) : (
+                            <XCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                          )}
+                          <span
+                            className={
+                              onlineTtsStatus.connected
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-rose-600 dark:text-rose-400'
+                            }
+                          >
+                            {onlineTtsStatus.connected ? 'Online TTS Active' : onlineTtsStatus.error || 'Offline'}
+                          </span>
                         </span>
                       )}
                     </div>
@@ -1604,6 +1745,219 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                     </div>
                   </div>
                 )}
+
+                {/* Audio Generation Section */}
+                <div className="pt-6 border-t border-zinc-200 dark:border-zinc-800 space-y-4 max-w-2xl">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
+                        Audio Generation
+                      </h3>
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                        Select which audio variations should be synthesized and attached to flashcards.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = {
+                            ...form,
+                            tts: {
+                              ...form.tts,
+                              generateWordSingle: true,
+                              generateAmericanNormal: true,
+                              generateAmericanSlow: true,
+                              generateBritishNormal: true,
+                              generateBritishSlow: true,
+                              generateExampleUsNormal: true,
+                              generateExampleUsSlow: true,
+                              generateExampleUkNormal: true,
+                              generateExampleUkSlow: true,
+                            },
+                          };
+                          updateAndSave(updated, '✓ Selected all audio variants');
+                        }}
+                        className="px-2.5 py-1 text-[11px] font-medium border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-none cursor-pointer transition-colors"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = {
+                            ...form,
+                            tts: {
+                              ...form.tts,
+                              generateWordSingle: false,
+                              generateAmericanNormal: false,
+                              generateAmericanSlow: false,
+                              generateBritishNormal: false,
+                              generateBritishSlow: false,
+                              generateExampleUsNormal: false,
+                              generateExampleUsSlow: false,
+                              generateExampleUkNormal: false,
+                              generateExampleUkSlow: false,
+                            },
+                          };
+                          updateAndSave(updated, '✓ Cleared all audio variants');
+                        }}
+                        className="px-2.5 py-1 text-[11px] font-medium border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-none cursor-pointer transition-colors"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Variant Checkboxes */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-1">
+                    <SquareCheckbox
+                      checked={Boolean(form.tts.generateWordSingle)}
+                      label="Word Single Audio"
+                      onChange={(checked) =>
+                        updateAndSave({
+                          ...form,
+                          tts: { ...form.tts, generateWordSingle: checked },
+                        })
+                      }
+                    />
+                    <SquareCheckbox
+                      checked={Boolean(form.tts.generateAmericanNormal)}
+                      label="American Normal"
+                      onChange={(checked) =>
+                        updateAndSave({
+                          ...form,
+                          tts: { ...form.tts, generateAmericanNormal: checked },
+                        })
+                      }
+                    />
+                    <SquareCheckbox
+                      checked={Boolean(form.tts.generateAmericanSlow)}
+                      label="American Slow"
+                      onChange={(checked) =>
+                        updateAndSave({
+                          ...form,
+                          tts: { ...form.tts, generateAmericanSlow: checked },
+                        })
+                      }
+                    />
+                    <SquareCheckbox
+                      checked={Boolean(form.tts.generateBritishNormal)}
+                      label="British Normal"
+                      onChange={(checked) =>
+                        updateAndSave({
+                          ...form,
+                          tts: { ...form.tts, generateBritishNormal: checked },
+                        })
+                      }
+                    />
+                    <SquareCheckbox
+                      checked={Boolean(form.tts.generateBritishSlow)}
+                      label="British Slow"
+                      onChange={(checked) =>
+                        updateAndSave({
+                          ...form,
+                          tts: { ...form.tts, generateBritishSlow: checked },
+                        })
+                      }
+                    />
+                    <SquareCheckbox
+                      checked={Boolean(form.tts.generateExampleUsNormal)}
+                      label="American Example Normal"
+                      onChange={(checked) =>
+                        updateAndSave({
+                          ...form,
+                          tts: { ...form.tts, generateExampleUsNormal: checked },
+                        })
+                      }
+                    />
+                    <SquareCheckbox
+                      checked={Boolean(form.tts.generateExampleUsSlow)}
+                      label="American Example Slow"
+                      onChange={(checked) =>
+                        updateAndSave({
+                          ...form,
+                          tts: { ...form.tts, generateExampleUsSlow: checked },
+                        })
+                      }
+                    />
+                    <SquareCheckbox
+                      checked={Boolean(form.tts.generateExampleUkNormal)}
+                      label="British Example Normal"
+                      onChange={(checked) =>
+                        updateAndSave({
+                          ...form,
+                          tts: { ...form.tts, generateExampleUkNormal: checked },
+                        })
+                      }
+                    />
+                    <SquareCheckbox
+                      checked={Boolean(form.tts.generateExampleUkSlow)}
+                      label="British Example Slow"
+                      onChange={(checked) =>
+                        updateAndSave({
+                          ...form,
+                          tts: { ...form.tts, generateExampleUkSlow: checked },
+                        })
+                      }
+                    />
+                  </div>
+
+                  {/* Audio Speed Control */}
+                  <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                        Audio Speed: <span className="font-mono text-zinc-900 dark:text-zinc-100">{(form.tts.audioSpeed ?? 1.0).toFixed(2)}×</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateAndSave({
+                            ...form,
+                            tts: { ...form.tts, audioSpeed: 1.0 },
+                          })
+                        }
+                        className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-1"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Reset (1.00×)</span>
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[11px] font-mono text-zinc-400">0.70×</span>
+                      <input
+                        type="range"
+                        min="0.70"
+                        max="1.30"
+                        step="0.05"
+                        value={form.tts.audioSpeed ?? 1.0}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setForm((prev) => ({
+                            ...prev,
+                            tts: { ...prev.tts, audioSpeed: val },
+                          }));
+                        }}
+                        onMouseUp={(e) => {
+                          const val = parseFloat((e.target as HTMLInputElement).value);
+                          updateAndSave({
+                            ...form,
+                            tts: { ...form.tts, audioSpeed: val },
+                          });
+                        }}
+                        onTouchEnd={(e) => {
+                          const val = parseFloat((e.target as HTMLInputElement).value);
+                          updateAndSave({
+                            ...form,
+                            tts: { ...form.tts, audioSpeed: val },
+                          });
+                        }}
+                        className="flex-1 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-none appearance-none cursor-pointer accent-blue-600"
+                      />
+                      <span className="text-[11px] font-mono text-zinc-400">1.30×</span>
+                    </div>
+                  </div>
+                </div>
               </>
             )}
           </div>
@@ -1712,7 +2066,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-2 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+            <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-zinc-200 dark:border-zinc-800">
               <button
                 type="button"
                 onClick={async () => {
@@ -1737,13 +2091,33 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 className="px-4 py-2 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-medium text-xs rounded-none flex items-center gap-1.5 cursor-pointer transition-colors"
               >
                 <Bookmark className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                <span>Sync Note Model</span>
+                <span>Sync Current Model</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSyncAllAnkiModels}
+                disabled={syncingAllModels}
+                className="px-4 py-2 border border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-medium text-xs rounded-none flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                {syncingAllModels ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+                <span>Sync All Note Types & Fonts</span>
               </button>
             </div>
 
             {ankiModelSyncMsg && (
               <p className="text-xs font-mono text-zinc-600 dark:text-zinc-400 pt-1">
                 {ankiModelSyncMsg}
+              </p>
+            )}
+
+            {syncAllModelsMsg && (
+              <p className="text-xs font-mono text-blue-600 dark:text-blue-400 pt-1">
+                {syncAllModelsMsg}
               </p>
             )}
           </div>

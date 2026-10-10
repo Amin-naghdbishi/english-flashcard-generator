@@ -339,6 +339,8 @@ export interface GeneratedPiperCardAudios {
   wordAudioField: string;
   exampleAudioField: string;
   // Specific audio base64 & filenames for CardData
+  wordAudioBase64?: string;
+  wordAudioFileName?: string;
   wordAudioUsNormalBase64?: string;
   wordAudioUsSlowBase64?: string;
   wordAudioUkNormalBase64?: string;
@@ -369,6 +371,8 @@ export async function generateAllCardAudios(params: {
   britishVoice?: string;
   normalSpeed?: number;
   slowSpeed?: number;
+  audioSpeed?: number;
+  generateWordSingle?: boolean;
   generateAmericanNormal?: boolean;
   generateAmericanSlow?: boolean;
   generateBritishNormal?: boolean;
@@ -403,6 +407,8 @@ export async function generateAllCardAudios(params: {
     britishVoice = 'en_GB-cori-high',
     normalSpeed = 1.0,
     slowSpeed = 1.25,
+    audioSpeed = 1.0,
+    generateWordSingle = false,
     generateAmericanNormal = true,
     generateAmericanSlow = true,
     generateBritishNormal = false,
@@ -413,14 +419,22 @@ export async function generateAllCardAudios(params: {
     generateExampleUkSlow = false,
   } = params;
 
-  const speedUsNormal = Number(params.speedAmericanNormal ?? normalSpeed) || 1.0;
-  const speedUsSlow = Number(params.speedAmericanSlow ?? slowSpeed) || 1.25;
-  const speedUkNormal = Number(params.speedBritishNormal ?? normalSpeed) || 1.0;
-  const speedUkSlow = Number(params.speedBritishSlow ?? slowSpeed) || 1.25;
-  const speedExUsNormal = Number(params.speedExampleUsNormal ?? normalSpeed) || 1.0;
-  const speedExUsSlow = Number(params.speedExampleUsSlow ?? slowSpeed) || 1.25;
-  const speedExUkNormal = Number(params.speedExampleUkNormal ?? normalSpeed) || 1.0;
-  const speedExUkSlow = Number(params.speedExampleUkSlow ?? slowSpeed) || 1.25;
+  // Effective length scale: higher length_scale means slower speech.
+  // When audioSpeed > 1.0 (faster audio), length_scale must decrease.
+  const speedMultiplier = Number(audioSpeed) > 0 ? Number(audioSpeed) : 1.0;
+  const toScale = (base: number) => {
+    const s = (1.0 / speedMultiplier) * base;
+    return Math.max(0.2, Math.min(3.0, Number(s.toFixed(2))));
+  };
+
+  const speedUsNormal = toScale(Number(params.speedAmericanNormal ?? normalSpeed) || 1.0);
+  const speedUsSlow = toScale(Number(params.speedAmericanSlow ?? slowSpeed) || 1.25);
+  const speedUkNormal = toScale(Number(params.speedBritishNormal ?? normalSpeed) || 1.0);
+  const speedUkSlow = toScale(Number(params.speedBritishSlow ?? slowSpeed) || 1.25);
+  const speedExUsNormal = toScale(Number(params.speedExampleUsNormal ?? normalSpeed) || 1.0);
+  const speedExUsSlow = toScale(Number(params.speedExampleUsSlow ?? slowSpeed) || 1.25);
+  const speedExUkNormal = toScale(Number(params.speedExampleUkNormal ?? normalSpeed) || 1.0);
+  const speedExUkSlow = toScale(Number(params.speedExampleUkSlow ?? slowSpeed) || 1.25);
 
   const safeWord = word.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
   const resultFiles: GeneratedPiperCardAudios['files'] = [];
@@ -446,6 +460,29 @@ export async function generateAllCardAudios(params: {
       wordAudioField: '',
       exampleAudioField: '',
     };
+  }
+
+  // --- SINGLE WORD AUDIO ---
+  if (generateWordSingle) {
+    const singleFile = `${safeWord}_single.wav`;
+    const singleRes = await synthesizePiperAudio(word, americanVoice, speedUsNormal, endpoint);
+    if (singleRes.success && singleRes.wavBuffer && singleRes.wavBase64) {
+      resultFiles.push({
+        fileName: singleFile,
+        fieldSoundTag: `[sound:${singleFile}]`,
+        base64: singleRes.wavBase64,
+        buffer: singleRes.wavBuffer,
+        label: '🔊 Word Single Audio',
+        voice: americanVoice,
+        speed: speedUsNormal,
+        validation: singleRes.validation!,
+      });
+      wordSoundTags.push(`[sound:${singleFile}]`);
+      returnData.wordAudioBase64 = singleRes.wavBase64;
+      returnData.wordAudioFileName = singleFile;
+    } else {
+      synthesisErrors.push(`Word Single (${americanVoice}): ${singleRes.error || 'Failed'}`);
+    }
   }
 
   // --- AMERICAN PRONUNCIATIONS ---
@@ -626,11 +663,29 @@ export async function generateAllCardAudios(params: {
     }
   }
 
+  const anyRequested =
+    Boolean(generateWordSingle) ||
+    generateAmericanNormal ||
+    generateAmericanSlow ||
+    generateBritishNormal ||
+    generateBritishSlow ||
+    generateExampleUsNormal ||
+    generateExampleUsSlow ||
+    generateExampleUkNormal ||
+    generateExampleUkSlow;
+
   if (resultFiles.length === 0) {
-    returnData.success = false;
-    returnData.error = synthesisErrors.length > 0
-      ? synthesisErrors.join(' | ')
-      : 'No audio variants were enabled for synthesis.';
+    if (anyRequested) {
+      returnData.success = false;
+      returnData.error = synthesisErrors.length > 0
+        ? synthesisErrors.join(' | ')
+        : 'All requested audio syntheses failed.';
+    } else {
+      returnData.success = true;
+      returnData.files = [];
+      returnData.wordAudioField = '';
+      returnData.exampleAudioField = '';
+    }
   } else {
     returnData.success = true;
     returnData.files = resultFiles;

@@ -492,6 +492,32 @@ export function renderThemeHtml(
     '{{ExampleAudioUkSlow}}': exampleAudioUkSlow,
   };
 
+  // Handle audio conditional tags
+  const audioConditionals: Record<string, boolean> = {
+    WordAudioUsNormal: Boolean(wordAudioUsNormal),
+    WordAudioUsSlow: Boolean(wordAudioUsSlow),
+    WordAudioUkNormal: Boolean(wordAudioUkNormal),
+    WordAudioUkSlow: Boolean(wordAudioUkSlow),
+    WordAudio: Boolean(wordAudio),
+    ExampleAudioUsNormal: Boolean(exampleAudioUsNormal),
+    ExampleAudioUsSlow: Boolean(exampleAudioUsSlow),
+    ExampleAudioUkNormal: Boolean(exampleAudioUkNormal),
+    ExampleAudioUkSlow: Boolean(exampleAudioUkSlow),
+    ExampleAudio: Boolean(exampleAudio),
+  };
+
+  for (const [tag, hasVal] of Object.entries(audioConditionals)) {
+    if (hasVal) {
+      html = html.replace(new RegExp(`\\{\\{\\^${tag}\\}\\}[\\s\\S]*?\\{\\{\\/${tag}\\}\\}`, 'g'), '');
+      html = html.replace(new RegExp(`\\{\\{#${tag}\\}\\}`, 'g'), '');
+      html = html.replace(new RegExp(`\\{\\{\\/${tag}\\}\\}`, 'g'), '');
+    } else {
+      html = html.replace(new RegExp(`\\{\\{#${tag}\\}\\}[\\s\\S]*?\\{\\{\\/${tag}\\}\\}`, 'g'), '');
+      html = html.replace(new RegExp(`\\{\\{\\^${tag}\\}\\}`, 'g'), '');
+      html = html.replace(new RegExp(`\\{\\{\\/${tag}\\}\\}`, 'g'), '');
+    }
+  }
+
   for (const [key, value] of Object.entries(replacements)) {
     html = html.replaceAll(key, value);
   }
@@ -550,6 +576,110 @@ export function renderThemeHtml(
 }
 
 export const SHARED_CARD_CSS = `
+/* =========================================================================
+   UNIVERSAL TYPOGRAPHY FOR ALL NOTE TYPES (IPA & PERSIAN)
+   ========================================================================= */
+@import url('https://fonts.googleapis.com/css2?family=Charis+SIL:ital,wght@0,400;0,700;1,400;1,700&family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');
+
+@font-face {
+  font-family: 'Charis SIL';
+  src: url('_CharisSIL-Regular.woff2') format('woff2'),
+       url('/fonts/CharisSIL-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Charis SIL';
+  src: url('_CharisSIL-Bold.woff2') format('woff2'),
+       url('/fonts/CharisSIL-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('_Vazirmatn-Regular.woff2') format('woff2'),
+       url('/fonts/Vazirmatn-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('_Vazirmatn-Bold.woff2') format('woff2'),
+       url('/fonts/Vazirmatn-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* English phonetic transcription (IPA): Charis SIL */
+.badge-ipa,
+.quest-ipa,
+.notebook-tape-ipa,
+.notebook-ipa,
+.minimal-phonetic,
+.minimal-ipa,
+.botanical-ipa-pill,
+.theme-editable-ipa,
+[data-field-key="phonetic"],
+.ipa-symbol {
+  font-family: 'Charis SIL', 'Doulos SIL', 'DejaVu Sans', serif !important;
+  font-style: normal !important;
+  font-feature-settings: "liga" 1, "calt" 1;
+}
+
+/* Persian text: Vazirmatn */
+[dir="rtl"],
+.meaning-text,
+.quest-meaning-fa,
+.notebook-highlighter-meaning,
+.highlighter-text,
+.notebook-meaning-fa,
+.minimal-meaning-block,
+.minimal-meaning-text,
+.botanical-meaning-box,
+.botanical-meaning-text,
+.botanical-meaning-fa,
+.example-fa,
+.quest-translation-fa,
+.sticky-translation,
+.minimal-translation,
+.botanical-example-fa,
+.mnemonic-text,
+.quest-mnemonic,
+.washi-text,
+.minimal-mnemonic,
+.botanical-mnemonic-text,
+[data-field-key="meaningFa"],
+[data-field-key="translationFa"],
+[data-field-key="mnemonic"] {
+  font-family: 'Vazirmatn', Tahoma, 'Segoe UI', sans-serif !important;
+}
+
+/* Inline IPA symbols inside RTL text retain LTR and Charis SIL */
+[dir="rtl"] .ipa-symbol,
+[dir="rtl"] .badge-ipa,
+[dir="rtl"] [data-field-key="phonetic"] {
+  font-family: 'Charis SIL', 'Doulos SIL', 'DejaVu Sans', serif !important;
+  direction: ltr !important;
+  display: inline-block !important;
+}
+
+/* Hide empty audio containers when all audio variants are disabled */
+.comic-pronunciation-box:empty,
+.quest-sound-dock:empty,
+.notebook-audio-strip:empty,
+.minimal-audio-row:empty,
+.botanical-play-row:empty,
+.botanical-example-audio-row:empty {
+  display: none !important;
+}
+
 /* Shared HTML & Custom Blocks CSS */
 .custom-card-block {
   margin-top: 8px !important;

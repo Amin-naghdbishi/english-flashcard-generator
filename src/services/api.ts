@@ -361,6 +361,20 @@ export async function ensureModelInAnki(url?: string, theme?: ThemeId, cardType?
   return res.json();
 }
 
+export async function syncAllAnkiModels(url?: string): Promise<{
+  success: boolean;
+  totalSynced: number;
+  results: Array<{ modelName: string; success: boolean; message?: string; error?: string }>;
+  fontSync?: { success: boolean; synced: string[]; errors: string[] };
+}> {
+  const res = await fetch('/api/anki/sync-all-models', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  });
+  return res.json();
+}
+
 export async function runAnkiPipelineTest(params: {
   word?: string;
   deck?: string;

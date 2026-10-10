@@ -119,7 +119,8 @@ const css = `/* THEME 4: INDEX NOTEBOOK LIGHT */
   font-size: 13px;
   font-weight: 700;
   color: #000000;
-  font-family: "Lucida Sans Unicode", sans-serif;
+  font-family: 'Charis SIL', 'Doulos SIL', 'DejaVu Sans', serif !important;
+  font-style: normal !important;
   margin-top: 4px;
 }
 
@@ -159,6 +160,8 @@ const css = `/* THEME 4: INDEX NOTEBOOK LIGHT */
   font-weight: 900;
   color: #000000;
   line-height: 1.4;
+  font-family: 'Vazirmatn', Tahoma, sans-serif !important;
+  direction: rtl;
 }
 
 .highlighter-label {
@@ -218,6 +221,8 @@ const css = `/* THEME 4: INDEX NOTEBOOK LIGHT */
   font-weight: 600;
   color: #475569;
   line-height: 1.4;
+  font-family: 'Vazirmatn', Tahoma, sans-serif !important;
+  direction: rtl;
 }
 
 .notebook-washi-mnemonic {
@@ -244,6 +249,8 @@ const css = `/* THEME 4: INDEX NOTEBOOK LIGHT */
   font-weight: 700;
   color: #1E293B;
   line-height: 1.35;
+  font-family: 'Vazirmatn', Tahoma, sans-serif !important;
+  direction: rtl;
 }
 
 /* SPELLING NOTEBOOK */

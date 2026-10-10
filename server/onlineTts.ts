@@ -26,6 +26,8 @@ export interface GeneratedOnlineCardAudios {
   }>;
   wordAudioField: string;
   exampleAudioField: string;
+  wordAudioBase64?: string;
+  wordAudioFileName?: string;
   wordAudioUsNormalBase64?: string;
   wordAudioUsSlowBase64?: string;
   wordAudioUkNormalBase64?: string;
@@ -174,6 +176,8 @@ export async function checkOnlineTtsHealth(): Promise<{ connected: boolean; erro
 export async function generateAllOnlineCardAudios(params: {
   word: string;
   example: string;
+  audioSpeed?: number;
+  generateWordSingle?: boolean;
   generateAmericanNormal?: boolean;
   generateAmericanSlow?: boolean;
   generateBritishNormal?: boolean;
@@ -193,6 +197,8 @@ export async function generateAllOnlineCardAudios(params: {
   const {
     word,
     example,
+    audioSpeed = 1.0,
+    generateWordSingle = false,
     generateAmericanNormal = true,
     generateAmericanSlow = true,
     generateBritishNormal = false,
@@ -215,6 +221,27 @@ export async function generateAllOnlineCardAudios(params: {
     wordAudioField: '',
     exampleAudioField: '',
   };
+
+  // 0. Single Word Audio
+  if (generateWordSingle) {
+    const singleFile = `${safeWord}_single.mp3`;
+    const singleRes = await synthesizeOnlineAudio(word, 'en-US', false);
+    if (singleRes.success && singleRes.audioBuffer && singleRes.audioBase64) {
+      resultFiles.push({
+        fileName: singleFile,
+        fieldSoundTag: `[sound:${singleFile}]`,
+        base64: singleRes.audioBase64,
+        buffer: singleRes.audioBuffer,
+        label: '🔊 Word Single Audio',
+        voice: 'en-US',
+        speed: audioSpeed,
+        durationSeconds: singleRes.durationSeconds,
+      });
+      wordSoundTags.push(`[sound:${singleFile}]`);
+      returnData.wordAudioBase64 = singleRes.audioBase64;
+      returnData.wordAudioFileName = singleFile;
+    }
+  }
 
   // 1. American Normal Word
   if (generateAmericanNormal) {
@@ -384,6 +411,21 @@ export async function generateAllOnlineCardAudios(params: {
     }
   }
 
+  const anyRequested =
+    Boolean(generateWordSingle) ||
+    generateAmericanNormal ||
+    generateAmericanSlow ||
+    generateBritishNormal ||
+    generateBritishSlow ||
+    generateExampleUsNormal ||
+    generateExampleUsSlow ||
+    generateExampleUkNormal ||
+    generateExampleUkSlow;
+
+  returnData.success = !anyRequested || resultFiles.length > 0;
+  if (!returnData.success) {
+    returnData.error = 'All requested online audio syntheses failed.';
+  }
   returnData.files = resultFiles;
   returnData.wordAudioField = wordSoundTags.join(' ');
   returnData.exampleAudioField = exampleSoundTags.join(' ');
