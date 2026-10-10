@@ -446,6 +446,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
         url: settings.anki.url,
         tags: activeTags,
         allowAi: settings.ai?.enabled !== false,
+        aiPrompts: settings.aiPrompts,
         signal: abortCtrl.signal,
       });
 

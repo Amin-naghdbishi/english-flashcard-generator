@@ -321,6 +321,7 @@ function normalizeSettings(raw: any): AppSettings {
   merged.aiPrompts = {
     systemRole: typeof prompts.systemRole === 'string' && prompts.systemRole.trim() ? prompts.systemRole : DEFAULT_AI_PROMPTS.systemRole,
     meaningGeneration: typeof prompts.meaningGeneration === 'string' && prompts.meaningGeneration.trim() ? prompts.meaningGeneration : DEFAULT_AI_PROMPTS.meaningGeneration,
+    definitionGeneration: typeof prompts.definitionGeneration === 'string' && prompts.definitionGeneration.trim() ? prompts.definitionGeneration : DEFAULT_AI_PROMPTS.definitionGeneration,
     exampleGeneration: typeof prompts.exampleGeneration === 'string' && prompts.exampleGeneration.trim() ? prompts.exampleGeneration : DEFAULT_AI_PROMPTS.exampleGeneration,
     exampleTranslation: typeof prompts.exampleTranslation === 'string' && prompts.exampleTranslation.trim() ? prompts.exampleTranslation : DEFAULT_AI_PROMPTS.exampleTranslation,
     memoryHook: typeof prompts.memoryHook === 'string' && prompts.memoryHook.trim() ? prompts.memoryHook : DEFAULT_AI_PROMPTS.memoryHook,
@@ -912,7 +913,7 @@ async function startServer() {
   });
 
   app.post('/api/anki/complete-note', async (req, res) => {
-    const { noteId, selectedTag, includeImage = true, url } = req.body;
+    const { noteId, selectedTag, includeImage = true, url, aiPrompts } = req.body;
     const ankiUrl = url || appSettings.anki.url || 'http://127.0.0.1:8765';
     if (!noteId) {
       return res.status(400).json({ success: false, error: 'noteId is required' });
@@ -980,6 +981,11 @@ async function startServer() {
     // 3. AI Generation for missing fields
     let generatedCardData: CardData;
     const aiProvider = appSettings.ai.provider;
+    const effectivePrompts: AIPromptsConfig = {
+      ...DEFAULT_AI_PROMPTS,
+      ...(appSettings.aiPrompts || {}),
+      ...(aiPrompts || {}),
+    };
 
     try {
       if (aiProvider === 'gemini') {
@@ -989,7 +995,7 @@ async function startServer() {
           cleanWord,
           manualOverrides,
           appSettings.ai.gemini.temperature,
-          appSettings.aiPrompts
+          effectivePrompts
         );
         if (!gemRes.success || !gemRes.data) throw new Error(gemRes.error || 'Gemini generation failed');
         generatedCardData = gemRes.data;
@@ -1001,7 +1007,7 @@ async function startServer() {
           manualOverrides,
           appSettings.ai.ollama.temperature,
           appSettings.ai.ollama.contextLength,
-          appSettings.aiPrompts
+          effectivePrompts
         );
         if (!olRes.success || !olRes.data) throw new Error(olRes.error || 'Ollama generation failed');
         generatedCardData = olRes.data;
@@ -1013,7 +1019,7 @@ async function startServer() {
           cleanWord,
           manualOverrides,
           customConfig.temperature || 0.2,
-          appSettings.aiPrompts
+          effectivePrompts
         );
         if (!custRes.success || !custRes.data) throw new Error(custRes.error || 'Custom AI generation failed');
         generatedCardData = custRes.data;
@@ -1575,7 +1581,7 @@ async function startServer() {
 
   // --- Full Generation Pipeline Route ---
   app.post('/api/pipeline', async (req, res) => {
-    const { word, deck, manualOverrides, createInAnki = true, cardType, theme, url } = req.body;
+    const { word, deck, manualOverrides, createInAnki = true, cardType, theme, url, aiPrompts } = req.body;
     const cleanWord = (word || '').trim();
     const targetDeck = deck || appSettings.anki.defaultDeck || 'English::B1';
     const effectiveCardType: CardType =
@@ -1720,6 +1726,12 @@ async function startServer() {
     } else {
       pushLog(4, 'AI data generated', 'pending', `Generating vocabulary with ${aiProvider.toUpperCase()}...`);
 
+      const effectivePrompts: AIPromptsConfig = {
+        ...DEFAULT_AI_PROMPTS,
+        ...(appSettings.aiPrompts || {}),
+        ...(aiPrompts || {}),
+      };
+
       try {
         if (aiProvider === 'gemini') {
           const geminiRes = await generateWithGemini(
@@ -1728,7 +1740,7 @@ async function startServer() {
             cleanWord,
             mergedOverrides,
             appSettings.ai.gemini.temperature,
-            appSettings.aiPrompts
+            effectivePrompts
           );
           if (!geminiRes.success || !geminiRes.data) {
             pushLog(4, 'AI data generated', 'error', geminiRes.error || 'Gemini generation failed');
@@ -1749,7 +1761,7 @@ async function startServer() {
             mergedOverrides,
             appSettings.ai.ollama.temperature,
             appSettings.ai.ollama.contextLength,
-            appSettings.aiPrompts
+            effectivePrompts
           );
           if (!ollamaRes.success || !ollamaRes.data) {
             pushLog(4, 'AI data generated', 'error', ollamaRes.error || 'Ollama generation failed');
@@ -1776,7 +1788,7 @@ async function startServer() {
             cleanWord,
             mergedOverrides,
             customConfig.temperature || 0.2,
-            appSettings.aiPrompts
+            effectivePrompts
           );
 
           if (!customRes.success || !customRes.data) {

@@ -592,6 +592,7 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
           url: settings.anki.url,
           tags: cardTags,
           allowAi: cardAllowAi,
+          aiPrompts: settings.aiPrompts,
         });
 
         if (res.success && res.cardData) {

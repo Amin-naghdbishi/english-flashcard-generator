@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { CardData, ManualOverrides, AIPromptsConfig } from '../src/types';
-import { buildFlashcardPrompt } from './prompts';
+import { buildFlashcardPrompt, DEFAULT_AI_PROMPTS } from './prompts';
 
 export const GEMINI_MODELS = [
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Fast & High Quality)' },
@@ -82,10 +82,12 @@ export async function generateWithGemini(
   try {
     const ai = new GoogleGenAI({ apiKey: cleanKey });
 
+    const systemInstruction = promptsConfig?.systemRole || DEFAULT_AI_PROMPTS.systemRole;
     const response = await ai.models.generateContent({
       model: targetModel,
       contents: prompt,
       config: {
+        systemInstruction,
         responseMimeType: 'application/json',
         temperature: typeof temperature === 'number' ? temperature : 0.2,
       },

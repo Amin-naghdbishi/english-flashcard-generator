@@ -392,6 +392,7 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
           selectedTag: tag,
           includeImage,
           url: settings.anki.url,
+          aiPrompts: settings.aiPrompts,
         });
 
         if (res.success && res.cardData) {

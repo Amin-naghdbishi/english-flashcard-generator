@@ -435,6 +435,7 @@ export async function runFullPipeline(params: {
   url?: string;
   tags?: string[];
   allowAi?: boolean;
+  aiPrompts?: AIPromptsConfig;
   signal?: AbortSignal;
 }): Promise<{
   success: boolean;
@@ -500,6 +501,7 @@ export async function completeAnkiNote(params: {
   selectedTag?: string;
   includeImage?: boolean;
   url?: string;
+  aiPrompts?: AIPromptsConfig;
 }): Promise<{
   success: boolean;
   noteId?: number;

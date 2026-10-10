@@ -107,6 +107,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [promptSaveStatus, setPromptSaveStatus] = useState<string | null>(null);
   const [isRestoringPrompts, setIsRestoringPrompts] = useState<boolean>(false);
   const [isSavingPrompts, setIsSavingPrompts] = useState<boolean>(false);
+  const [personalizationSide, setPersonalizationSide] = useState<'front' | 'back'>('back');
 
   // Ollama states
   const [ollamaStatus, setOllamaStatus] = useState<{ connected: boolean; version?: string; error?: string } | null>(null);
@@ -631,7 +632,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       </aside>
 
       {/* RIGHT CONTENT PANEL: Single-Column Minimal Controls */}
-      <main className="flex-1 min-w-0 p-5 sm:p-8 overflow-y-auto max-w-4xl">
+      <main
+        className={`flex-1 min-w-0 p-5 sm:p-8 overflow-y-auto ${
+          activeTab === 'personalization' ? 'w-full max-w-7xl' : 'max-w-4xl'
+        }`}
+      >
         {/* Section Title */}
         <div className="flex items-center justify-between pb-3 mb-6 border-b border-zinc-200 dark:border-zinc-800">
           <h2 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100 uppercase">
@@ -808,81 +813,96 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
         {/* 2. PERSONALIZATION */}
         {activeTab === 'personalization' && (
-          <div className="space-y-6">
-            {/* Theme */}
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
-                Theme
-              </label>
-              <div className="flex flex-wrap gap-2">
-                <SquareOption
-                  selected={form.appTheme === 'anki-dark'}
-                  label="Dark"
-                  onClick={() => handleAppThemeSelect('anki-dark')}
-                />
-                <SquareOption
-                  selected={form.appTheme === 'anki-light' || !form.appTheme}
-                  label="Light"
-                  onClick={() => handleAppThemeSelect('anki-light')}
-                />
-                <SquareOption
-                  selected={form.appTheme === 'system'}
-                  label="System"
-                  onClick={() => handleAppThemeSelect('system')}
-                />
+          <div className="flex flex-col lg:flex-row items-start gap-8 xl:gap-12 w-full">
+            {/* Left Controls Column */}
+            <div className="w-full lg:w-72 xl:w-80 shrink-0 space-y-6">
+              {/* Theme */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
+                  Theme
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <SquareOption
+                    selected={form.appTheme === 'anki-dark'}
+                    label="Dark"
+                    onClick={() => handleAppThemeSelect('anki-dark')}
+                  />
+                  <SquareOption
+                    selected={form.appTheme === 'anki-light' || !form.appTheme}
+                    label="Light"
+                    onClick={() => handleAppThemeSelect('anki-light')}
+                  />
+                  <SquareOption
+                    selected={form.appTheme === 'system'}
+                    label="System"
+                    onClick={() => handleAppThemeSelect('system')}
+                  />
+                </div>
+              </div>
+
+              {/* Card Theme */}
+              <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
+                  Card Theme
+                </label>
+                <select
+                  value={form.theme}
+                  onChange={(e) => handleCardThemeSelect(e.target.value as ThemeId)}
+                  className="w-full text-xs font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-300 dark:border-zinc-700"
+                >
+                  <optgroup label="Light Card Themes">
+                    {THEME_GROUPS.light.map((th) => (
+                      <option key={th.id} value={th.id}>
+                        {th.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Dark Card Themes">
+                    {THEME_GROUPS.dark.map((th) => (
+                      <option key={th.id} value={th.id}>
+                        {th.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+                <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                  {THEMES[form.theme]?.description || ''}
+                </p>
+              </div>
+
+              {/* Card Side Toggle */}
+              <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
+                  Card Side
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <SquareOption
+                    selected={personalizationSide === 'back'}
+                    label="Back (Answer)"
+                    onClick={() => setPersonalizationSide('back')}
+                  />
+                  <SquareOption
+                    selected={personalizationSide === 'front'}
+                    label="Front"
+                    onClick={() => setPersonalizationSide('front')}
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Card Themes & Live Card Preview */}
-            <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
-                Card Theme
-              </label>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                <div className="space-y-3">
-                  <select
-                    value={form.theme}
-                    onChange={(e) => handleCardThemeSelect(e.target.value as ThemeId)}
-                    className="w-full text-xs font-medium p-2.5 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-300 dark:border-zinc-700"
-                  >
-                    <optgroup label="Light Card Themes">
-                      {THEME_GROUPS.light.map((th) => (
-                        <option key={th.id} value={th.id}>
-                          {th.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Dark Card Themes">
-                      {THEME_GROUPS.dark.map((th) => (
-                        <option key={th.id} value={th.id}>
-                          {th.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  </select>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                    {THEMES[form.theme]?.description || ''}
-                  </p>
-                </div>
-
-                {/* Live Card Preview */}
-                <div className="w-full border border-zinc-200 dark:border-zinc-800 p-3 sm:p-4 bg-zinc-100/60 dark:bg-zinc-900/60 overflow-hidden">
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 flex items-center justify-between">
-                    <span>Live Card Preview</span>
-                    <span className="font-normal text-zinc-400 dark:text-zinc-500">
-                      {THEMES[form.theme]?.name}
-                    </span>
-                  </div>
-                  <div className="max-h-[380px] overflow-y-auto">
-                    <CardPreview
-                      cardData={sampleCardData}
-                      themeId={form.theme}
-                      appTheme={isDark ? 'anki-dark' : 'anki-light'}
-                      editable={false}
-                    />
-                  </div>
-                </div>
+            {/* Right: Large Unboxed Card Preview */}
+            <div className="flex-1 min-w-0 w-full">
+              <div className="w-full max-w-2xl xl:max-w-3xl">
+                <CardPreview
+                  cardData={sampleCardData}
+                  themeId={form.theme}
+                  appTheme={isDark ? 'anki-dark' : 'anki-light'}
+                  editable={false}
+                  mode="preview"
+                  activeSide={personalizationSide}
+                  viewMode="desktop"
+                  hideTopToolbar={true}
+                />
               </div>
             </div>
           </div>
@@ -1800,6 +1820,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                 rows={3}
                 value={currentPrompts.exampleTranslation || ''}
                 onChange={(e) => handlePromptChange('exampleTranslation', e.target.value)}
+                className="w-full text-xs font-mono p-3 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-300 dark:border-zinc-700 leading-relaxed"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                Phonetics & Part of Speech Prompt
+              </label>
+              <textarea
+                rows={3}
+                value={currentPrompts.phoneticAndPos || ''}
+                onChange={(e) => handlePromptChange('phoneticAndPos', e.target.value)}
+                className="w-full text-xs font-mono p-3 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-300 dark:border-zinc-700 leading-relaxed"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                Missing Field Completion Prompt
+              </label>
+              <textarea
+                rows={6}
+                value={currentPrompts.missingFieldCompletion || ''}
+                onChange={(e) => handlePromptChange('missingFieldCompletion', e.target.value)}
                 className="w-full text-xs font-mono p-3 border rounded-none focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-300 dark:border-zinc-700 leading-relaxed"
               />
             </div>

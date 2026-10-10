@@ -1,5 +1,5 @@
 import { CardData, ManualOverrides, AIPromptsConfig } from '../src/types';
-import { buildFlashcardPrompt } from './prompts';
+import { buildFlashcardPrompt, DEFAULT_AI_PROMPTS } from './prompts';
 
 export interface OllamaModelTag {
   name: string;
@@ -148,10 +148,16 @@ export async function generateWithOllama(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 45000);
 
+    const systemRole = promptsConfig?.systemRole || DEFAULT_AI_PROMPTS.systemRole;
+
     // Call Ollama /api/chat with structured format
     const payload = {
       model: model || 'qwen3:4b',
       messages: [
+        {
+          role: 'system',
+          content: systemRole,
+        },
         {
           role: 'user',
           content: prompt,

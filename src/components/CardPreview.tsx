@@ -2122,7 +2122,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
   return (
     <div className="w-full flex-1 flex flex-col min-h-0 text-left relative">
       {/* Inject Selected Card Theme CSS & Shared Custom Block CSS */}
-      <style>{`${theme.css}\n${SHARED_CARD_CSS}`}</style>
+      <style>{`${theme.css}\n${SHARED_CARD_CSS}\n.card, .comic-card-wrapper, .minimal-card-wrapper, .botanical-wrapper, .quest-card, .notebook-sheet, .minimal-card, .botanical-card { min-height: auto !important; }`}</style>
 
       {/* Hidden File Input for Local Image Upload */}
       <input
