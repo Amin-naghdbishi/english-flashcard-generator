@@ -1,7 +1,7 @@
 import { AppTheme } from '../types';
 
-export function getThemeClasses(theme?: AppTheme | string) {
-  const isDark = theme === 'anki-dark' || theme === 'minimal-dark';
+export function getThemeClasses(theme?: AppTheme | string | boolean) {
+  const isDark = typeof theme === 'boolean' ? theme : (theme === 'anki-dark' || theme === 'minimal-dark');
 
   return {
     // Top app background

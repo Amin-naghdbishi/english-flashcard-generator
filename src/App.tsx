@@ -7,7 +7,7 @@ import { CompleteCardsByTagView } from './components/CompleteCardsByTagView';
 import { CardBrowserView } from './components/CardBrowserView';
 import { SettingsView } from './components/SettingsView';
 import { fetchConfig, saveConfig, checkOllama, checkGemini, checkTTS, checkOnlineTTS, checkAnki } from './services/api';
-import { AppThemeProvider, normalizeAppTheme } from './context/ThemeContext';
+import { AppThemeProvider, normalizeAppTheme, useAppTheme } from './context/ThemeContext';
 import { I18nProvider, useTranslation, AppLanguage, AppDirection } from './i18n';
 
 const defaultSettings: AppSettings = {
@@ -34,6 +34,7 @@ const defaultSettings: AppSettings = {
     contextLength: 2048,
   },
   tts: {
+    enabled: true,
     provider: 'piper',
     engine: 'piper',
     endpoint: 'http://127.0.0.1:5000',
@@ -49,6 +50,14 @@ const defaultSettings: AppSettings = {
     generateExampleUsSlow: false,
     generateExampleUkNormal: false,
     generateExampleUkSlow: false,
+    volumeWordUkNormal: 100,
+    volumeWordUkSlow: 100,
+    volumeWordUsNormal: 100,
+    volumeWordUsSlow: 100,
+    volumeExampleUkNormal: 100,
+    volumeExampleUkSlow: 100,
+    volumeExampleUsNormal: 100,
+    volumeExampleUsSlow: 100,
     generateExampleUs: true,
     generateExampleUk: false,
     generateSlow: true,
@@ -83,87 +92,82 @@ const defaultSettings: AppSettings = {
 function AppShell({
   settings,
   setSettings,
-  activeAppTheme,
-  handleSetAppTheme,
   status,
   refreshStatuses,
+  onToggleTts,
 }: {
   settings: AppSettings;
   setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
-  activeAppTheme: AppTheme;
-  handleSetAppTheme: (newTheme: AppTheme) => void;
   status: NavigationStatus;
   refreshStatuses: (isManual?: boolean) => Promise<void>;
+  onToggleTts: () => void;
 }) {
   const { t } = useTranslation();
-  const isDark = activeAppTheme === 'anki-dark';
+  const { isDark, appTheme } = useAppTheme();
   const [currentTab, setCurrentTab] = useState<NavTab>('create');
 
   return (
-    <AppThemeProvider
-      appTheme={activeAppTheme}
-      setAppTheme={handleSetAppTheme}
+    <div
+      className={`min-h-screen flex flex-col font-sans transition-colors duration-150 relative ${
+        isDark
+          ? 'bg-[#18181B] text-zinc-100 dark selection:bg-blue-600 selection:text-white'
+          : 'bg-zinc-100 text-zinc-900 selection:bg-blue-500 selection:text-white'
+      }`}
     >
-      <div
-        className={`min-h-screen flex flex-col font-sans transition-colors duration-150 relative ${
-          isDark
-            ? 'bg-[#18181B] text-zinc-100 dark selection:bg-blue-600 selection:text-white'
-            : 'bg-zinc-100 text-zinc-900 selection:bg-blue-500 selection:text-white'
-        }`}
-      >
-        {/* Top Navigation Header - Permanently Visible */}
-        <NavigationStrip
-          currentTab={currentTab}
-          onSelectTab={setCurrentTab}
-          status={status}
-          onRefreshStatus={() => refreshStatuses(true)}
-          appTheme={activeAppTheme}
-          isVisible={true}
-        />
+      {/* Top Navigation Header - Permanently Visible */}
+      <NavigationStrip
+        currentTab={currentTab}
+        onSelectTab={setCurrentTab}
+        status={status}
+        onRefreshStatus={() => refreshStatuses(true)}
+        appTheme={appTheme}
+        onToggleTts={onToggleTts}
+        isVisible={true}
+      />
 
-        {/* Main Content Body - Edge-to-edge layout */}
-        <main className="flex-1 w-full min-w-0 pt-14">
-          <div className={currentTab === 'create' ? 'block' : 'hidden'}>
-            <CreateCardView
-              settings={settings}
-              appTheme={activeAppTheme}
-            />
-          </div>
+      {/* Main Content Body - Edge-to-edge layout */}
+      <main className="flex-1 w-full min-w-0 pt-14">
+        <div className={currentTab === 'create' ? 'block' : 'hidden'}>
+          <CreateCardView
+            settings={settings}
+            appTheme={appTheme}
+          />
+        </div>
 
-          <div className={currentTab === 'batch' ? 'block' : 'hidden'}>
-            <BatchCardView
-              settings={settings}
-              appTheme={activeAppTheme}
-            />
-          </div>
+        <div className={currentTab === 'batch' ? 'block' : 'hidden'}>
+          <BatchCardView
+            settings={settings}
+            appTheme={appTheme}
+          />
+        </div>
 
-          <div className={currentTab === 'complete-by-tag' ? 'block' : 'hidden'}>
-            <CompleteCardsByTagView
-              settings={settings}
-              appTheme={activeAppTheme}
-            />
-          </div>
+        <div className={currentTab === 'complete-by-tag' ? 'block' : 'hidden'}>
+          <CompleteCardsByTagView
+            settings={settings}
+            appTheme={appTheme}
+          />
+        </div>
 
-          <div className={currentTab === 'browser' ? 'block' : 'hidden'}>
-            <CardBrowserView
-              settings={settings}
-              appTheme={activeAppTheme}
-            />
-          </div>
+        <div className={currentTab === 'browser' ? 'block' : 'hidden'}>
+          <CardBrowserView
+            settings={settings}
+            appTheme={appTheme}
+          />
+        </div>
 
-          <div className={currentTab === 'settings' ? 'block' : 'hidden'}>
-            <SettingsView
-              settings={settings}
-              appTheme={activeAppTheme}
-              onUpdateSettings={(newCfg) => {
-                setSettings(newCfg);
-                refreshStatuses();
-              }}
-            />
-          </div>
-        </main>
-      </div>
-    </AppThemeProvider>
+        <div className={currentTab === 'settings' ? 'block' : 'hidden'}>
+          <SettingsView
+            settings={settings}
+            appTheme={appTheme}
+            onUpdateSettings={(newCfg) => {
+              settingsRef.current = newCfg;
+              setSettings(newCfg);
+              refreshStatuses(true, newCfg);
+            }}
+          />
+        </div>
+      </main>
+    </div>
   );
 }
 
@@ -200,7 +204,7 @@ export default function App() {
   }, []);
 
   // Check connection status asynchronously across all services concurrently
-  const refreshStatuses = useCallback(async (isManual: boolean = false) => {
+  const refreshStatuses = useCallback(async (isManual: boolean = false, overrideSettings?: AppSettings) => {
     if (isPollingRef.current) return;
     isPollingRef.current = true;
 
@@ -214,7 +218,7 @@ export default function App() {
       }));
     }
 
-    const currentSettings = settingsRef.current;
+    const currentSettings = overrideSettings || settingsRef.current;
 
     try {
       // 1. Check AI Provider
@@ -255,6 +259,15 @@ export default function App() {
 
       // 2. Check TTS Provider
       const checkTtsPromise = (async () => {
+        if (currentSettings.tts?.enabled === false) {
+          return {
+            ready: false,
+            connected: false,
+            state: 'disabled' as ServiceState,
+            label: 'TTS: Off',
+          };
+        }
+
         let ttsReady = false;
         let ttsLabel = 'Piper';
 
@@ -274,7 +287,8 @@ export default function App() {
 
         return {
           ready: ttsReady,
-          state: (ttsReady ? 'ready' : 'offline') as ServiceState,
+          connected: ttsReady,
+          state: (ttsReady ? 'connected' : 'disconnected') as ServiceState,
           label: ttsLabel,
         };
       })();
@@ -360,6 +374,27 @@ export default function App() {
     });
   };
 
+  const handleToggleTts = useCallback(async () => {
+    const isCurrentlyDisabled = settings.tts?.enabled === false;
+    const nextEnabled = isCurrentlyDisabled;
+    const updated: AppSettings = {
+      ...settings,
+      tts: {
+        ...settings.tts,
+        enabled: nextEnabled,
+        provider: 'piper',
+      },
+    };
+    settingsRef.current = updated;
+    setSettings(updated);
+    try {
+      await saveConfig(updated);
+    } catch (err) {
+      console.error('Failed to save TTS settings:', err);
+    }
+    refreshStatuses(true, updated);
+  }, [settings, refreshStatuses]);
+
   return (
     <I18nProvider
       initialLanguage={settings.language || 'en'}
@@ -367,14 +402,18 @@ export default function App() {
       onLanguageChange={handleLanguageChange}
       onDirectionChange={handleDirectionChange}
     >
-      <AppShell
-        settings={settings}
-        setSettings={setSettings}
-        activeAppTheme={activeAppTheme}
-        handleSetAppTheme={handleSetAppTheme}
-        status={status}
-        refreshStatuses={refreshStatuses}
-      />
+      <AppThemeProvider
+        appTheme={activeAppTheme}
+        setAppTheme={handleSetAppTheme}
+      >
+        <AppShell
+          settings={settings}
+          setSettings={setSettings}
+          status={status}
+          refreshStatuses={refreshStatuses}
+          onToggleTts={handleToggleTts}
+        />
+      </AppThemeProvider>
     </I18nProvider>
   );
 }

@@ -69,7 +69,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
 }) => {
   const themeContext = useAppTheme();
   const { t, isRTL } = useTranslation();
-  const isDark = (propTheme || themeContext.appTheme) === 'anki-dark';
+  const isDark = themeContext.isDark;
 
   // Input & Selection State (with localStorage persistence)
   const [word, setWord] = useState('');

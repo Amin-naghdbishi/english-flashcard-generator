@@ -63,6 +63,83 @@ import {
   EyeOff,
 } from 'lucide-react';
 
+function AudioOptionItem({
+  label,
+  checked,
+  volume,
+  disableUncheck,
+  onToggle,
+  onVolumeChange,
+}: {
+  label: string;
+  checked: boolean;
+  volume: number;
+  disableUncheck: boolean;
+  onToggle: () => void;
+  onVolumeChange: (val: number) => void;
+}) {
+  const [localVal, setLocalVal] = useState(volume);
+
+  useEffect(() => {
+    setLocalVal(volume);
+  }, [volume]);
+
+  return (
+    <div className="flex items-center gap-2 select-none py-1">
+      <label
+        className={`flex items-center gap-2 cursor-pointer ${
+          disableUncheck ? 'cursor-not-allowed opacity-90' : ''
+        }`}
+        title={disableUncheck ? 'At least one option must remain selected' : undefined}
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={disableUncheck}
+          onChange={onToggle}
+          className="w-3.5 h-3.5 rounded-none border border-zinc-400 dark:border-zinc-600 accent-blue-600 cursor-pointer disabled:cursor-not-allowed"
+        />
+        <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
+          {label}
+        </span>
+      </label>
+
+      {/* Compact vertical volume slider with percentage in very small text above */}
+      <div className="flex flex-col items-center justify-end ml-auto sm:ml-2">
+        <span className="text-[9px] font-mono text-zinc-500 dark:text-zinc-400 leading-none mb-1">
+          {localVal}%
+        </span>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value={localVal}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            setLocalVal(v);
+          }}
+          onMouseUp={(e) => {
+            const v = Number((e.target as HTMLInputElement).value);
+            onVolumeChange(v);
+          }}
+          onTouchEnd={(e) => {
+            const v = Number((e.target as HTMLInputElement).value);
+            onVolumeChange(v);
+          }}
+          className="accent-blue-600 cursor-pointer h-12 w-3"
+          style={{
+            writingMode: 'vertical-lr',
+            direction: 'rtl',
+            WebkitAppearance: 'slider-vertical',
+          }}
+          title={`${label} Volume: ${localVal}%`}
+        />
+      </div>
+    </div>
+  );
+}
+
 interface SettingsViewProps {
   settings: AppSettings;
   onUpdateSettings: (newSettings: AppSettings) => void;
@@ -1746,215 +1823,357 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                   </div>
                 )}
 
-                {/* Audio Generation Section */}
-                <div className="pt-6 border-t border-zinc-200 dark:border-zinc-800 space-y-4 max-w-2xl">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
-                        Audio Generation
-                      </h3>
-                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                        Select which audio variations should be synthesized and attached to flashcards.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const updated = {
-                            ...form,
-                            tts: {
-                              ...form.tts,
-                              generateWordSingle: true,
-                              generateAmericanNormal: true,
-                              generateAmericanSlow: true,
-                              generateBritishNormal: true,
-                              generateBritishSlow: true,
-                              generateExampleUsNormal: true,
-                              generateExampleUsSlow: true,
-                              generateExampleUkNormal: true,
-                              generateExampleUkSlow: true,
-                            },
-                          };
-                          updateAndSave(updated, '✓ Selected all audio variants');
-                        }}
-                        className="px-2.5 py-1 text-[11px] font-medium border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-none cursor-pointer transition-colors"
-                      >
-                        Select All
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const updated = {
-                            ...form,
-                            tts: {
-                              ...form.tts,
-                              generateWordSingle: false,
-                              generateAmericanNormal: false,
-                              generateAmericanSlow: false,
-                              generateBritishNormal: false,
-                              generateBritishSlow: false,
-                              generateExampleUsNormal: false,
-                              generateExampleUsSlow: false,
-                              generateExampleUkNormal: false,
-                              generateExampleUkSlow: false,
-                            },
-                          };
-                          updateAndSave(updated, '✓ Cleared all audio variants');
-                        }}
-                        className="px-2.5 py-1 text-[11px] font-medium border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-none cursor-pointer transition-colors"
-                      >
-                        Clear All
-                      </button>
-                    </div>
+                {/* Audio Section */}
+                <div className="pt-6 border-t border-zinc-200 dark:border-zinc-800 space-y-6 max-w-2xl">
+                  <div>
+                    <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                      Audio
+                    </h3>
                   </div>
 
-                  {/* Variant Checkboxes */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-1">
-                    <SquareCheckbox
-                      checked={Boolean(form.tts.generateWordSingle)}
-                      label="Word Single Audio"
-                      onChange={(checked) =>
-                        updateAndSave({
-                          ...form,
-                          tts: { ...form.tts, generateWordSingle: checked },
-                        })
-                      }
-                    />
-                    <SquareCheckbox
-                      checked={Boolean(form.tts.generateAmericanNormal)}
-                      label="American Normal"
-                      onChange={(checked) =>
-                        updateAndSave({
-                          ...form,
-                          tts: { ...form.tts, generateAmericanNormal: checked },
-                        })
-                      }
-                    />
-                    <SquareCheckbox
-                      checked={Boolean(form.tts.generateAmericanSlow)}
-                      label="American Slow"
-                      onChange={(checked) =>
-                        updateAndSave({
-                          ...form,
-                          tts: { ...form.tts, generateAmericanSlow: checked },
-                        })
-                      }
-                    />
-                    <SquareCheckbox
-                      checked={Boolean(form.tts.generateBritishNormal)}
-                      label="British Normal"
-                      onChange={(checked) =>
-                        updateAndSave({
-                          ...form,
-                          tts: { ...form.tts, generateBritishNormal: checked },
-                        })
-                      }
-                    />
-                    <SquareCheckbox
-                      checked={Boolean(form.tts.generateBritishSlow)}
-                      label="British Slow"
-                      onChange={(checked) =>
-                        updateAndSave({
-                          ...form,
-                          tts: { ...form.tts, generateBritishSlow: checked },
-                        })
-                      }
-                    />
-                    <SquareCheckbox
-                      checked={Boolean(form.tts.generateExampleUsNormal)}
-                      label="American Example Normal"
-                      onChange={(checked) =>
-                        updateAndSave({
-                          ...form,
-                          tts: { ...form.tts, generateExampleUsNormal: checked },
-                        })
-                      }
-                    />
-                    <SquareCheckbox
-                      checked={Boolean(form.tts.generateExampleUsSlow)}
-                      label="American Example Slow"
-                      onChange={(checked) =>
-                        updateAndSave({
-                          ...form,
-                          tts: { ...form.tts, generateExampleUsSlow: checked },
-                        })
-                      }
-                    />
-                    <SquareCheckbox
-                      checked={Boolean(form.tts.generateExampleUkNormal)}
-                      label="British Example Normal"
-                      onChange={(checked) =>
-                        updateAndSave({
-                          ...form,
-                          tts: { ...form.tts, generateExampleUkNormal: checked },
-                        })
-                      }
-                    />
-                    <SquareCheckbox
-                      checked={Boolean(form.tts.generateExampleUkSlow)}
-                      label="British Example Slow"
-                      onChange={(checked) =>
-                        updateAndSave({
-                          ...form,
-                          tts: { ...form.tts, generateExampleUkSlow: checked },
-                        })
-                      }
-                    />
-                  </div>
-
-                  {/* Audio Speed Control */}
-                  <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                        Audio Speed: <span className="font-mono text-zinc-900 dark:text-zinc-100">{(form.tts.audioSpeed ?? 1.0).toFixed(2)}×</span>
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateAndSave({
-                            ...form,
-                            tts: { ...form.tts, audioSpeed: 1.0 },
-                          })
+                  {/* Word Group */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+                      Word
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
+                      {/* Br */}
+                      <AudioOptionItem
+                        label="Br"
+                        checked={Boolean(form.tts.generateBritishNormal)}
+                        volume={form.tts.volumeWordUkNormal ?? 100}
+                        disableUncheck={
+                          Boolean(form.tts.generateBritishNormal) &&
+                          (Number(Boolean(form.tts.generateBritishNormal)) +
+                            Number(Boolean(form.tts.generateBritishSlow)) +
+                            Number(Boolean(form.tts.generateAmericanNormal)) +
+                            Number(Boolean(form.tts.generateAmericanSlow))) <= 1
                         }
-                        className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-1"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>Reset (1.00×)</span>
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[11px] font-mono text-zinc-400">0.70×</span>
-                      <input
-                        type="range"
-                        min="0.70"
-                        max="1.30"
-                        step="0.05"
-                        value={form.tts.audioSpeed ?? 1.0}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          setForm((prev) => ({
-                            ...prev,
-                            tts: { ...prev.tts, audioSpeed: val },
-                          }));
-                        }}
-                        onMouseUp={(e) => {
-                          const val = parseFloat((e.target as HTMLInputElement).value);
+                        onToggle={() => {
+                          const current = Boolean(form.tts.generateBritishNormal);
+                          const count =
+                            Number(Boolean(form.tts.generateBritishNormal)) +
+                            Number(Boolean(form.tts.generateBritishSlow)) +
+                            Number(Boolean(form.tts.generateAmericanNormal)) +
+                            Number(Boolean(form.tts.generateAmericanSlow));
+                          if (current && count <= 1) return;
+                          const next = !current;
                           updateAndSave({
                             ...form,
-                            tts: { ...form.tts, audioSpeed: val },
+                            tts: {
+                              ...form.tts,
+                              generateBritishNormal: next,
+                              generateBritish: next || Boolean(form.tts.generateBritishSlow),
+                            },
                           });
                         }}
-                        onTouchEnd={(e) => {
-                          const val = parseFloat((e.target as HTMLInputElement).value);
+                        onVolumeChange={(val) => {
                           updateAndSave({
                             ...form,
-                            tts: { ...form.tts, audioSpeed: val },
+                            tts: {
+                              ...form.tts,
+                              volumeWordUkNormal: val,
+                            },
                           });
                         }}
-                        className="flex-1 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-none appearance-none cursor-pointer accent-blue-600"
                       />
-                      <span className="text-[11px] font-mono text-zinc-400">1.30×</span>
+
+                      {/* Br Slow */}
+                      <AudioOptionItem
+                        label="Br Slow"
+                        checked={Boolean(form.tts.generateBritishSlow)}
+                        volume={form.tts.volumeWordUkSlow ?? 100}
+                        disableUncheck={
+                          Boolean(form.tts.generateBritishSlow) &&
+                          (Number(Boolean(form.tts.generateBritishNormal)) +
+                            Number(Boolean(form.tts.generateBritishSlow)) +
+                            Number(Boolean(form.tts.generateAmericanNormal)) +
+                            Number(Boolean(form.tts.generateAmericanSlow))) <= 1
+                        }
+                        onToggle={() => {
+                          const current = Boolean(form.tts.generateBritishSlow);
+                          const count =
+                            Number(Boolean(form.tts.generateBritishNormal)) +
+                            Number(Boolean(form.tts.generateBritishSlow)) +
+                            Number(Boolean(form.tts.generateAmericanNormal)) +
+                            Number(Boolean(form.tts.generateAmericanSlow));
+                          if (current && count <= 1) return;
+                          const next = !current;
+                          updateAndSave({
+                            ...form,
+                            tts: {
+                              ...form.tts,
+                              generateBritishSlow: next,
+                              generateBritish: next || Boolean(form.tts.generateBritishNormal),
+                            },
+                          });
+                        }}
+                        onVolumeChange={(val) => {
+                          updateAndSave({
+                            ...form,
+                            tts: {
+                              ...form.tts,
+                              volumeWordUkSlow: val,
+                            },
+                          });
+                        }}
+                      />
+
+                      {/* Am */}
+                      <AudioOptionItem
+                        label="Am"
+                        checked={Boolean(form.tts.generateAmericanNormal)}
+                        volume={form.tts.volumeWordUsNormal ?? 100}
+                        disableUncheck={
+                          Boolean(form.tts.generateAmericanNormal) &&
+                          (Number(Boolean(form.tts.generateBritishNormal)) +
+                            Number(Boolean(form.tts.generateBritishSlow)) +
+                            Number(Boolean(form.tts.generateAmericanNormal)) +
+                            Number(Boolean(form.tts.generateAmericanSlow))) <= 1
+                        }
+                        onToggle={() => {
+                          const current = Boolean(form.tts.generateAmericanNormal);
+                          const count =
+                            Number(Boolean(form.tts.generateBritishNormal)) +
+                            Number(Boolean(form.tts.generateBritishSlow)) +
+                            Number(Boolean(form.tts.generateAmericanNormal)) +
+                            Number(Boolean(form.tts.generateAmericanSlow));
+                          if (current && count <= 1) return;
+                          const next = !current;
+                          updateAndSave({
+                            ...form,
+                            tts: {
+                              ...form.tts,
+                              generateAmericanNormal: next,
+                              generateAmerican: next || Boolean(form.tts.generateAmericanSlow),
+                            },
+                          });
+                        }}
+                        onVolumeChange={(val) => {
+                          updateAndSave({
+                            ...form,
+                            tts: {
+                              ...form.tts,
+                              volumeWordUsNormal: val,
+                            },
+                          });
+                        }}
+                      />
+
+                      {/* Am Slow */}
+                      <AudioOptionItem
+                        label="Am Slow"
+                        checked={Boolean(form.tts.generateAmericanSlow)}
+                        volume={form.tts.volumeWordUsSlow ?? 100}
+                        disableUncheck={
+                          Boolean(form.tts.generateAmericanSlow) &&
+                          (Number(Boolean(form.tts.generateBritishNormal)) +
+                            Number(Boolean(form.tts.generateBritishSlow)) +
+                            Number(Boolean(form.tts.generateAmericanNormal)) +
+                            Number(Boolean(form.tts.generateAmericanSlow))) <= 1
+                        }
+                        onToggle={() => {
+                          const current = Boolean(form.tts.generateAmericanSlow);
+                          const count =
+                            Number(Boolean(form.tts.generateBritishNormal)) +
+                            Number(Boolean(form.tts.generateBritishSlow)) +
+                            Number(Boolean(form.tts.generateAmericanNormal)) +
+                            Number(Boolean(form.tts.generateAmericanSlow));
+                          if (current && count <= 1) return;
+                          const next = !current;
+                          updateAndSave({
+                            ...form,
+                            tts: {
+                              ...form.tts,
+                              generateAmericanSlow: next,
+                              generateAmerican: next || Boolean(form.tts.generateAmericanNormal),
+                              generateSlow: next || Boolean(form.tts.generateBritishSlow),
+                            },
+                          });
+                        }}
+                        onVolumeChange={(val) => {
+                          updateAndSave({
+                            ...form,
+                            tts: {
+                              ...form.tts,
+                              volumeWordUsSlow: val,
+                            },
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Example Group */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+                      Example
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
+                      {/* Br */}
+                      <AudioOptionItem
+                        label="Br"
+                        checked={Boolean(form.tts.generateExampleUkNormal)}
+                        volume={form.tts.volumeExampleUkNormal ?? 100}
+                        disableUncheck={
+                          Boolean(form.tts.generateExampleUkNormal) &&
+                          (Number(Boolean(form.tts.generateExampleUkNormal)) +
+                            Number(Boolean(form.tts.generateExampleUkSlow)) +
+                            Number(Boolean(form.tts.generateExampleUsNormal)) +
+                            Number(Boolean(form.tts.generateExampleUsSlow))) <= 1
+                        }
+                        onToggle={() => {
+                          const current = Boolean(form.tts.generateExampleUkNormal);
+                          const count =
+                            Number(Boolean(form.tts.generateExampleUkNormal)) +
+                            Number(Boolean(form.tts.generateExampleUkSlow)) +
+                            Number(Boolean(form.tts.generateExampleUsNormal)) +
+                            Number(Boolean(form.tts.generateExampleUsSlow));
+                          if (current && count <= 1) return;
+                          const next = !current;
+                          updateAndSave({
+                            ...form,
+                            tts: {
+                              ...form.tts,
+                              generateExampleUkNormal: next,
+                              generateExampleUk: next || Boolean(form.tts.generateExampleUkSlow),
+                            },
+                          });
+                        }}
+                        onVolumeChange={(val) => {
+                          updateAndSave({
+                            ...form,
+                            tts: {
+                              ...form.tts,
+                              volumeExampleUkNormal: val,
+                            },
+                          });
+                        }}
+                      />
+
+                      {/* Br Slow */}
+                      <AudioOptionItem
+                        label="Br Slow"
+                        checked={Boolean(form.tts.generateExampleUkSlow)}
+                        volume={form.tts.volumeExampleUkSlow ?? 100}
+                        disableUncheck={
+                          Boolean(form.tts.generateExampleUkSlow) &&
+                          (Number(Boolean(form.tts.generateExampleUkNormal)) +
+                            Number(Boolean(form.tts.generateExampleUkSlow)) +
+                            Number(Boolean(form.tts.generateExampleUsNormal)) +
+                            Number(Boolean(form.tts.generateExampleUsSlow))) <= 1
+                        }
+                        onToggle={() => {
+                          const current = Boolean(form.tts.generateExampleUkSlow);
+                          const count =
+                            Number(Boolean(form.tts.generateExampleUkNormal)) +
+                            Number(Boolean(form.tts.generateExampleUkSlow)) +
+                            Number(Boolean(form.tts.generateExampleUsNormal)) +
+                            Number(Boolean(form.tts.generateExampleUsSlow));
+                          if (current && count <= 1) return;
+                          const next = !current;
+                          updateAndSave({
+                            ...form,
+                            tts: {
+                              ...form.tts,
+                              generateExampleUkSlow: next,
+                              generateExampleUk: next || Boolean(form.tts.generateExampleUkNormal),
+                            },
+                          });
+                        }}
+                        onVolumeChange={(val) => {
+                          updateAndSave({
+                            ...form,
+                            tts: {
+                              ...form.tts,
+                              volumeExampleUkSlow: val,
+                            },
+                          });
+                        }}
+                      />
+
+                      {/* Am */}
+                      <AudioOptionItem
+                        label="Am"
+                        checked={Boolean(form.tts.generateExampleUsNormal)}
+                        volume={form.tts.volumeExampleUsNormal ?? 100}
+                        disableUncheck={
+                          Boolean(form.tts.generateExampleUsNormal) &&
+                          (Number(Boolean(form.tts.generateExampleUkNormal)) +
+                            Number(Boolean(form.tts.generateExampleUkSlow)) +
+                            Number(Boolean(form.tts.generateExampleUsNormal)) +
+                            Number(Boolean(form.tts.generateExampleUsSlow))) <= 1
+                        }
+                        onToggle={() => {
+                          const current = Boolean(form.tts.generateExampleUsNormal);
+                          const count =
+                            Number(Boolean(form.tts.generateExampleUkNormal)) +
+                            Number(Boolean(form.tts.generateExampleUkSlow)) +
+                            Number(Boolean(form.tts.generateExampleUsNormal)) +
+                            Number(Boolean(form.tts.generateExampleUsSlow));
+                          if (current && count <= 1) return;
+                          const next = !current;
+                          updateAndSave({
+                            ...form,
+                            tts: {
+                              ...form.tts,
+                              generateExampleUsNormal: next,
+                              generateExampleUs: next || Boolean(form.tts.generateExampleUsSlow),
+                            },
+                          });
+                        }}
+                        onVolumeChange={(val) => {
+                          updateAndSave({
+                            ...form,
+                            tts: {
+                              ...form.tts,
+                              volumeExampleUsNormal: val,
+                            },
+                          });
+                        }}
+                      />
+
+                      {/* Am Slow */}
+                      <AudioOptionItem
+                        label="Am Slow"
+                        checked={Boolean(form.tts.generateExampleUsSlow)}
+                        volume={form.tts.volumeExampleUsSlow ?? 100}
+                        disableUncheck={
+                          Boolean(form.tts.generateExampleUsSlow) &&
+                          (Number(Boolean(form.tts.generateExampleUkNormal)) +
+                            Number(Boolean(form.tts.generateExampleUkSlow)) +
+                            Number(Boolean(form.tts.generateExampleUsNormal)) +
+                            Number(Boolean(form.tts.generateExampleUsSlow))) <= 1
+                        }
+                        onToggle={() => {
+                          const current = Boolean(form.tts.generateExampleUsSlow);
+                          const count =
+                            Number(Boolean(form.tts.generateExampleUkNormal)) +
+                            Number(Boolean(form.tts.generateExampleUkSlow)) +
+                            Number(Boolean(form.tts.generateExampleUsNormal)) +
+                            Number(Boolean(form.tts.generateExampleUsSlow));
+                          if (current && count <= 1) return;
+                          const next = !current;
+                          updateAndSave({
+                            ...form,
+                            tts: {
+                              ...form.tts,
+                              generateExampleUsSlow: next,
+                              generateExampleUs: next || Boolean(form.tts.generateExampleUsNormal),
+                              generateSlowExample: next,
+                            },
+                          });
+                        }}
+                        onVolumeChange={(val) => {
+                          updateAndSave({
+                            ...form,
+                            tts: {
+                              ...form.tts,
+                              volumeExampleUsSlow: val,
+                            },
+                          });
+                        }}
+                      />
                     </div>
                   </div>
                 </div>

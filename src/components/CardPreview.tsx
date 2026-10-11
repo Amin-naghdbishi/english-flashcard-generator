@@ -411,7 +411,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({
 }) => {
   const themeContext = useAppTheme();
   const { t, isRTL } = useTranslation();
-  const isDark = (propTheme || themeContext.appTheme) === 'anki-dark';
+  const isDark = themeContext.isDark;
 
   const [internalMode, setInternalMode] = useState<'edit' | 'preview'>(editable ? 'edit' : 'preview');
   const [internalActiveSide, setInternalActiveSide] = useState<'front' | 'back' | 'both'>('back');

@@ -94,6 +94,44 @@ export function validateWavBuffer(buffer: Buffer): WavValidationResult {
 }
 
 /**
+ * Adjusts the volume of a 16-bit PCM WAV audio buffer.
+ * Volume is specified as a percentage from 0 to 100.
+ */
+export function adjustWavVolume(buffer: Buffer, volumePercent: number): Buffer {
+  if (!buffer || buffer.length < 44) return buffer;
+  const clampedVol = Math.max(0, Math.min(100, typeof volumePercent === 'number' ? volumePercent : 100));
+  if (clampedVol === 100) return buffer;
+
+  const scale = clampedVol / 100;
+
+  // Find data chunk
+  let dataOffset = 36;
+  let dataSize = 0;
+
+  while (dataOffset < buffer.length - 8) {
+    const chunkId = buffer.toString('ascii', dataOffset, dataOffset + 4);
+    const chunkSize = buffer.readUInt32LE(dataOffset + 4);
+    if (chunkId === 'data') {
+      dataSize = chunkSize;
+      break;
+    }
+    dataOffset += 8 + chunkSize;
+  }
+
+  const sampleStart = dataOffset + 8;
+  const sampleEnd = dataSize > 0 ? Math.min(buffer.length, sampleStart + dataSize) : buffer.length;
+
+  const out = Buffer.from(buffer);
+  for (let offset = sampleStart; offset + 1 < sampleEnd; offset += 2) {
+    const sample = out.readInt16LE(offset);
+    const scaled = Math.max(-32768, Math.min(32767, Math.round(sample * scale)));
+    out.writeInt16LE(scaled, offset);
+  }
+
+  return out;
+}
+
+/**
  * Generates a valid 16-bit PCM WAV audio buffer.
  * Uses phonetic acoustic synthesis with formants and envelope shaping for clear audible speech pronunciation.
  */

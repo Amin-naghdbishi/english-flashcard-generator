@@ -273,6 +273,16 @@ export interface TTSConfig {
   generateExampleUkNormal: boolean;
   generateExampleUkSlow: boolean;
 
+  // Individual volume percentages (0-100, default 100)
+  volumeWordUkNormal?: number;
+  volumeWordUkSlow?: number;
+  volumeWordUsNormal?: number;
+  volumeWordUsSlow?: number;
+  volumeExampleUkNormal?: number;
+  volumeExampleUkSlow?: number;
+  volumeExampleUsNormal?: number;
+  volumeExampleUsSlow?: number;
+
   // Global Audio Speed Multiplier (0.70x - 1.30x, default 1.00x)
   audioSpeed?: number;
 

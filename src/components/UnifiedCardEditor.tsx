@@ -442,7 +442,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
 }) => {
   const themeContext = useAppTheme();
   const { t } = useTranslation();
-  const isAppDark = (propAppTheme || themeContext.appTheme) === 'anki-dark';
+  const isAppDark = themeContext.isDark;
 
   // Card view state
   const [activeSide, setActiveSide] = useState<'front' | 'back'>('back');

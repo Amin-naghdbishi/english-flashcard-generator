@@ -120,6 +120,7 @@ const defaultSettings: AppSettings = {
     contextLength: 2048,
   },
   tts: {
+    enabled: true,
     provider: 'piper',
     engine: 'piper',
     endpoint: 'http://127.0.0.1:5000',
@@ -150,6 +151,14 @@ const defaultSettings: AppSettings = {
     generateExampleUsSlow: false,
     generateExampleUkNormal: false,
     generateExampleUkSlow: false,
+    volumeWordUkNormal: 100,
+    volumeWordUkSlow: 100,
+    volumeWordUsNormal: 100,
+    volumeWordUsSlow: 100,
+    volumeExampleUkNormal: 100,
+    volumeExampleUkSlow: 100,
+    volumeExampleUsNormal: 100,
+    volumeExampleUsSlow: 100,
     audioSpeed: 1.0,
     speedAmericanNormal: 1.0,
     speedAmericanSlow: 1.25,
@@ -234,6 +243,7 @@ function normalizeSettings(raw: any): AppSettings {
 
   // Normalize TTS config
   const tts = merged.tts || {};
+  const ttsEnabled = typeof tts.enabled === 'boolean' ? tts.enabled : true;
   const ttsProvider = tts.provider || tts.engine || 'piper';
   const genUsNorm = tts.generateAmericanNormal !== false;
   const genUsSlow = tts.generateAmericanSlow !== false;
@@ -245,6 +255,7 @@ function normalizeSettings(raw: any): AppSettings {
   const genExUkSlow = !!tts.generateExampleUkSlow;
 
   merged.tts = {
+    enabled: ttsEnabled,
     provider: ttsProvider,
     engine: ttsProvider,
     endpoint: tts.endpoint || 'http://127.0.0.1:5000',
@@ -260,6 +271,14 @@ function normalizeSettings(raw: any): AppSettings {
     speedExampleUsSlow: typeof tts.speedExampleUsSlow === 'number' ? tts.speedExampleUsSlow : 1.25,
     speedExampleUkNormal: typeof tts.speedExampleUkNormal === 'number' ? tts.speedExampleUkNormal : 1.0,
     speedExampleUkSlow: typeof tts.speedExampleUkSlow === 'number' ? tts.speedExampleUkSlow : 1.25,
+    volumeWordUkNormal: typeof tts.volumeWordUkNormal === 'number' ? Math.max(0, Math.min(100, tts.volumeWordUkNormal)) : 100,
+    volumeWordUkSlow: typeof tts.volumeWordUkSlow === 'number' ? Math.max(0, Math.min(100, tts.volumeWordUkSlow)) : 100,
+    volumeWordUsNormal: typeof tts.volumeWordUsNormal === 'number' ? Math.max(0, Math.min(100, tts.volumeWordUsNormal)) : 100,
+    volumeWordUsSlow: typeof tts.volumeWordUsSlow === 'number' ? Math.max(0, Math.min(100, tts.volumeWordUsSlow)) : 100,
+    volumeExampleUkNormal: typeof tts.volumeExampleUkNormal === 'number' ? Math.max(0, Math.min(100, tts.volumeExampleUkNormal)) : 100,
+    volumeExampleUkSlow: typeof tts.volumeExampleUkSlow === 'number' ? Math.max(0, Math.min(100, tts.volumeExampleUkSlow)) : 100,
+    volumeExampleUsNormal: typeof tts.volumeExampleUsNormal === 'number' ? Math.max(0, Math.min(100, tts.volumeExampleUsNormal)) : 100,
+    volumeExampleUsSlow: typeof tts.volumeExampleUsSlow === 'number' ? Math.max(0, Math.min(100, tts.volumeExampleUsSlow)) : 100,
     customProviders: Array.isArray(tts.customProviders) ? tts.customProviders : defaultSettings.tts.customProviders,
     activeCustomProviderId: tts.activeCustomProviderId,
     generateWordSingle: typeof tts.generateWordSingle === 'boolean' ? tts.generateWordSingle : false,
@@ -664,12 +683,12 @@ async function startServer() {
   });
 
   app.post('/api/tts/synthesize', async (req, res) => {
-    const { text, voice, speed, endpoint } = req.body;
+    const { text, voice, speed, endpoint, volume } = req.body;
     const ttsVoice = voice || appSettings.tts.americanVoice;
     const ttsSpeed = typeof speed === 'number' ? speed : appSettings.tts.normalSpeed;
     const ttsEndpoint = endpoint || appSettings.tts.endpoint;
 
-    const result = await synthesizePiperAudio(text, ttsVoice, ttsSpeed, ttsEndpoint);
+    const result = await synthesizePiperAudio(text, ttsVoice, ttsSpeed, ttsEndpoint, volume);
     res.json(result);
   });
 
@@ -1090,94 +1109,104 @@ async function startServer() {
     }
 
     // 5. Audio generation & storing into Anki media
-    try {
-      const ttsProvider = appSettings.tts.provider;
-      if (ttsProvider === 'online') {
-        const onlineAudio = await generateAllOnlineCardAudios({
-          word: generatedCardData.word,
-          example: generatedCardData.example,
-          generateAmericanNormal: appSettings.tts.generateAmericanNormal,
-          generateAmericanSlow: appSettings.tts.generateAmericanSlow,
-          generateBritishNormal: appSettings.tts.generateBritishNormal,
-          generateBritishSlow: appSettings.tts.generateBritishSlow,
-          generateExampleUsNormal: appSettings.tts.generateExampleUsNormal,
-          generateExampleUsSlow: appSettings.tts.generateExampleUsSlow,
-          generateExampleUkNormal: appSettings.tts.generateExampleUkNormal,
-          generateExampleUkSlow: appSettings.tts.generateExampleUkSlow,
-        });
+    if (appSettings.tts?.enabled !== false) {
+      try {
+        const ttsProvider = appSettings.tts.provider;
+        if (ttsProvider === 'online') {
+          const onlineAudio = await generateAllOnlineCardAudios({
+            word: generatedCardData.word,
+            example: generatedCardData.example,
+            generateAmericanNormal: appSettings.tts.generateAmericanNormal,
+            generateAmericanSlow: appSettings.tts.generateAmericanSlow,
+            generateBritishNormal: appSettings.tts.generateBritishNormal,
+            generateBritishSlow: appSettings.tts.generateBritishSlow,
+            generateExampleUsNormal: appSettings.tts.generateExampleUsNormal,
+            generateExampleUsSlow: appSettings.tts.generateExampleUsSlow,
+            generateExampleUkNormal: appSettings.tts.generateExampleUkNormal,
+            generateExampleUkSlow: appSettings.tts.generateExampleUkSlow,
+          });
 
-        for (const file of onlineAudio.files) {
-          await storeAnkiMediaFile(ankiUrl, file.fileName, file.base64);
+          for (const file of onlineAudio.files) {
+            await storeAnkiMediaFile(ankiUrl, file.fileName, file.base64);
+          }
+
+          generatedCardData.wordAudioUsNormalFileName = onlineAudio.wordAudioUsNormalFileName;
+          generatedCardData.wordAudioUsSlowFileName = onlineAudio.wordAudioUsSlowFileName;
+          generatedCardData.wordAudioUkNormalFileName = onlineAudio.wordAudioUkNormalFileName;
+          generatedCardData.wordAudioUkSlowFileName = onlineAudio.wordAudioUkSlowFileName;
+          generatedCardData.exampleAudioUsNormalFileName = onlineAudio.exampleAudioUsNormalFileName;
+          generatedCardData.exampleAudioUsSlowFileName = onlineAudio.exampleAudioUsSlowFileName;
+          generatedCardData.exampleAudioUkNormalFileName = onlineAudio.exampleAudioUkNormalFileName;
+          generatedCardData.exampleAudioUkSlowFileName = onlineAudio.exampleAudioUkSlowFileName;
+          generatedCardData.wordAudioUsNormalBase64 = onlineAudio.wordAudioUsNormalBase64;
+          generatedCardData.wordAudioUsSlowBase64 = onlineAudio.wordAudioUsSlowBase64;
+          generatedCardData.wordAudioUkNormalBase64 = onlineAudio.wordAudioUkNormalBase64;
+          generatedCardData.wordAudioUkSlowBase64 = onlineAudio.wordAudioUkSlowBase64;
+          generatedCardData.exampleAudioUsNormalBase64 = onlineAudio.exampleAudioUsNormalBase64;
+          generatedCardData.exampleAudioUsSlowBase64 = onlineAudio.exampleAudioUsSlowBase64;
+          generatedCardData.exampleAudioUkNormalBase64 = onlineAudio.exampleAudioUkNormalBase64;
+          generatedCardData.exampleAudioUkSlowBase64 = onlineAudio.exampleAudioUkSlowBase64;
+          generatedFieldsList.push('Audio');
+        } else if (ttsProvider === 'piper') {
+          const piperAudio = await generateAllCardAudios({
+            word: generatedCardData.word,
+            example: generatedCardData.example,
+            endpoint: appSettings.tts.endpoint,
+            americanVoice: appSettings.tts.americanVoice,
+            britishVoice: appSettings.tts.britishVoice,
+            normalSpeed: appSettings.tts.normalSpeed,
+            slowSpeed: appSettings.tts.slowSpeed,
+            generateAmericanNormal: appSettings.tts.generateAmericanNormal,
+            generateAmericanSlow: appSettings.tts.generateAmericanSlow,
+            generateBritishNormal: appSettings.tts.generateBritishNormal,
+            generateBritishSlow: appSettings.tts.generateBritishSlow,
+            generateExampleUsNormal: appSettings.tts.generateExampleUsNormal,
+            generateExampleUsSlow: appSettings.tts.generateExampleUsSlow,
+            generateExampleUkNormal: appSettings.tts.generateExampleUkNormal,
+            generateExampleUkSlow: appSettings.tts.generateExampleUkSlow,
+            speedAmericanNormal: appSettings.tts.speedAmericanNormal,
+            speedAmericanSlow: appSettings.tts.speedAmericanSlow,
+            speedBritishNormal: appSettings.tts.speedBritishNormal,
+            speedBritishSlow: appSettings.tts.speedBritishSlow,
+            speedExampleUsNormal: appSettings.tts.speedExampleUsNormal,
+            speedExampleUsSlow: appSettings.tts.speedExampleUsSlow,
+            speedExampleUkNormal: appSettings.tts.speedExampleUkNormal,
+            speedExampleUkSlow: appSettings.tts.speedExampleUkSlow,
+            volumeWordUkNormal: appSettings.tts.volumeWordUkNormal,
+            volumeWordUkSlow: appSettings.tts.volumeWordUkSlow,
+            volumeWordUsNormal: appSettings.tts.volumeWordUsNormal,
+            volumeWordUsSlow: appSettings.tts.volumeWordUsSlow,
+            volumeExampleUkNormal: appSettings.tts.volumeExampleUkNormal,
+            volumeExampleUkSlow: appSettings.tts.volumeExampleUkSlow,
+            volumeExampleUsNormal: appSettings.tts.volumeExampleUsNormal,
+            volumeExampleUsSlow: appSettings.tts.volumeExampleUsSlow,
+          });
+
+          for (const file of piperAudio.files) {
+            await storeAnkiMediaFile(ankiUrl, file.fileName, file.base64);
+          }
+
+          generatedCardData.wordAudioUsNormalFileName = piperAudio.wordAudioUsNormalFileName;
+          generatedCardData.wordAudioUsSlowFileName = piperAudio.wordAudioUsSlowFileName;
+          generatedCardData.wordAudioUkNormalFileName = piperAudio.wordAudioUkNormalFileName;
+          generatedCardData.wordAudioUkSlowFileName = piperAudio.wordAudioUkSlowFileName;
+          generatedCardData.exampleAudioUsNormalFileName = piperAudio.exampleAudioUsNormalFileName;
+          generatedCardData.exampleAudioUsSlowFileName = piperAudio.exampleAudioUsSlowFileName;
+          generatedCardData.exampleAudioUkNormalFileName = piperAudio.exampleAudioUkNormalFileName;
+          generatedCardData.exampleAudioUkSlowFileName = piperAudio.exampleAudioUkSlowFileName;
+          generatedCardData.wordAudioUsNormalBase64 = piperAudio.wordAudioUsNormalBase64;
+          generatedCardData.wordAudioUsSlowBase64 = piperAudio.wordAudioUsSlowBase64;
+          generatedCardData.wordAudioUkNormalBase64 = piperAudio.wordAudioUkNormalBase64;
+          generatedCardData.wordAudioUkSlowBase64 = piperAudio.wordAudioUkSlowBase64;
+          generatedCardData.exampleAudioUsNormalBase64 = piperAudio.exampleAudioUsNormalBase64;
+          generatedCardData.exampleAudioUsSlowBase64 = piperAudio.exampleAudioUsSlowBase64;
+          generatedCardData.exampleAudioUkNormalBase64 = piperAudio.exampleAudioUkNormalBase64;
+          generatedCardData.exampleAudioUkSlowBase64 = piperAudio.exampleAudioUkSlowBase64;
+          generatedFieldsList.push('Audio');
         }
-
-        generatedCardData.wordAudioUsNormalFileName = onlineAudio.wordAudioUsNormalFileName;
-        generatedCardData.wordAudioUsSlowFileName = onlineAudio.wordAudioUsSlowFileName;
-        generatedCardData.wordAudioUkNormalFileName = onlineAudio.wordAudioUkNormalFileName;
-        generatedCardData.wordAudioUkSlowFileName = onlineAudio.wordAudioUkSlowFileName;
-        generatedCardData.exampleAudioUsNormalFileName = onlineAudio.exampleAudioUsNormalFileName;
-        generatedCardData.exampleAudioUsSlowFileName = onlineAudio.exampleAudioUsSlowFileName;
-        generatedCardData.exampleAudioUkNormalFileName = onlineAudio.exampleAudioUkNormalFileName;
-        generatedCardData.exampleAudioUkSlowFileName = onlineAudio.exampleAudioUkSlowFileName;
-        generatedCardData.wordAudioUsNormalBase64 = onlineAudio.wordAudioUsNormalBase64;
-        generatedCardData.wordAudioUsSlowBase64 = onlineAudio.wordAudioUsSlowBase64;
-        generatedCardData.wordAudioUkNormalBase64 = onlineAudio.wordAudioUkNormalBase64;
-        generatedCardData.wordAudioUkSlowBase64 = onlineAudio.wordAudioUkSlowBase64;
-        generatedCardData.exampleAudioUsNormalBase64 = onlineAudio.exampleAudioUsNormalBase64;
-        generatedCardData.exampleAudioUsSlowBase64 = onlineAudio.exampleAudioUsSlowBase64;
-        generatedCardData.exampleAudioUkNormalBase64 = onlineAudio.exampleAudioUkNormalBase64;
-        generatedCardData.exampleAudioUkSlowBase64 = onlineAudio.exampleAudioUkSlowBase64;
-        generatedFieldsList.push('Audio');
-      } else if (ttsProvider === 'piper') {
-        const piperAudio = await generateAllCardAudios({
-          word: generatedCardData.word,
-          example: generatedCardData.example,
-          endpoint: appSettings.tts.endpoint,
-          americanVoice: appSettings.tts.americanVoice,
-          britishVoice: appSettings.tts.britishVoice,
-          normalSpeed: appSettings.tts.normalSpeed,
-          slowSpeed: appSettings.tts.slowSpeed,
-          generateAmericanNormal: appSettings.tts.generateAmericanNormal,
-          generateAmericanSlow: appSettings.tts.generateAmericanSlow,
-          generateBritishNormal: appSettings.tts.generateBritishNormal,
-          generateBritishSlow: appSettings.tts.generateBritishSlow,
-          generateExampleUsNormal: appSettings.tts.generateExampleUsNormal,
-          generateExampleUsSlow: appSettings.tts.generateExampleUsSlow,
-          generateExampleUkNormal: appSettings.tts.generateExampleUkNormal,
-          generateExampleUkSlow: appSettings.tts.generateExampleUkSlow,
-          speedAmericanNormal: appSettings.tts.speedAmericanNormal,
-          speedAmericanSlow: appSettings.tts.speedAmericanSlow,
-          speedBritishNormal: appSettings.tts.speedBritishNormal,
-          speedBritishSlow: appSettings.tts.speedBritishSlow,
-          speedExampleUsNormal: appSettings.tts.speedExampleUsNormal,
-          speedExampleUsSlow: appSettings.tts.speedExampleUsSlow,
-          speedExampleUkNormal: appSettings.tts.speedExampleUkNormal,
-          speedExampleUkSlow: appSettings.tts.speedExampleUkSlow,
-        });
-
-        for (const file of piperAudio.files) {
-          await storeAnkiMediaFile(ankiUrl, file.fileName, file.base64);
-        }
-
-        generatedCardData.wordAudioUsNormalFileName = piperAudio.wordAudioUsNormalFileName;
-        generatedCardData.wordAudioUsSlowFileName = piperAudio.wordAudioUsSlowFileName;
-        generatedCardData.wordAudioUkNormalFileName = piperAudio.wordAudioUkNormalFileName;
-        generatedCardData.wordAudioUkSlowFileName = piperAudio.wordAudioUkSlowFileName;
-        generatedCardData.exampleAudioUsNormalFileName = piperAudio.exampleAudioUsNormalFileName;
-        generatedCardData.exampleAudioUsSlowFileName = piperAudio.exampleAudioUsSlowFileName;
-        generatedCardData.exampleAudioUkNormalFileName = piperAudio.exampleAudioUkNormalFileName;
-        generatedCardData.exampleAudioUkSlowFileName = piperAudio.exampleAudioUkSlowFileName;
-        generatedCardData.wordAudioUsNormalBase64 = piperAudio.wordAudioUsNormalBase64;
-        generatedCardData.wordAudioUsSlowBase64 = piperAudio.wordAudioUsSlowBase64;
-        generatedCardData.wordAudioUkNormalBase64 = piperAudio.wordAudioUkNormalBase64;
-        generatedCardData.wordAudioUkSlowBase64 = piperAudio.wordAudioUkSlowBase64;
-        generatedCardData.exampleAudioUsNormalBase64 = piperAudio.exampleAudioUsNormalBase64;
-        generatedCardData.exampleAudioUsSlowBase64 = piperAudio.exampleAudioUsSlowBase64;
-        generatedCardData.exampleAudioUkNormalBase64 = piperAudio.exampleAudioUkNormalBase64;
-        generatedCardData.exampleAudioUkSlowBase64 = piperAudio.exampleAudioUkSlowBase64;
-        generatedFieldsList.push('Audio');
+      } catch (audioErr) {
+        console.warn('Tag completion audio generation error:', audioErr);
       }
-    } catch (audioErr) {
-      console.warn('Tag completion audio generation error:', audioErr);
     }
 
     // 6. Format updated fields to store in Anki
@@ -1934,7 +1963,10 @@ async function startServer() {
     }
 
     // [6] TTS Audio Generation (Piper vs Online vs Custom)
-    const ttsProvider = appSettings.tts.provider;
+    if (appSettings.tts?.enabled === false) {
+      pushLog(6, 'TTS Audio Generation', 'skipped', 'TTS is disabled in settings');
+    } else {
+      const ttsProvider = appSettings.tts.provider;
 
     if (ttsProvider === 'online') {
       pushLog(6, 'TTS Audio Generation', 'pending', 'Synthesizing selected pronunciations with Online TTS...');
@@ -2064,6 +2096,14 @@ async function startServer() {
           speedExampleUsSlow: appSettings.tts.speedExampleUsSlow,
           speedExampleUkNormal: appSettings.tts.speedExampleUkNormal,
           speedExampleUkSlow: appSettings.tts.speedExampleUkSlow,
+          volumeWordUkNormal: appSettings.tts.volumeWordUkNormal,
+          volumeWordUkSlow: appSettings.tts.volumeWordUkSlow,
+          volumeWordUsNormal: appSettings.tts.volumeWordUsNormal,
+          volumeWordUsSlow: appSettings.tts.volumeWordUsSlow,
+          volumeExampleUkNormal: appSettings.tts.volumeExampleUkNormal,
+          volumeExampleUkSlow: appSettings.tts.volumeExampleUkSlow,
+          volumeExampleUsNormal: appSettings.tts.volumeExampleUsNormal,
+          volumeExampleUsSlow: appSettings.tts.volumeExampleUsSlow,
         });
 
         const anyPiperRequested =
@@ -2221,8 +2261,9 @@ async function startServer() {
         });
       }
     }
+  }
 
-    if (!createInAnki) {
+  if (!createInAnki) {
       pushLog(7, 'AnkiConnect Connected', 'skipped', 'Anki sync disabled (Preview mode only)');
       return res.json({
         success: true,

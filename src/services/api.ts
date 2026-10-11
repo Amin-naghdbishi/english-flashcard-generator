@@ -234,11 +234,11 @@ export async function controlPiperService(action: 'start' | 'stop' | 'restart'):
   return res.json();
 }
 
-export async function synthesizeAudio(text: string, voice?: string, speed?: number, endpoint?: string) {
+export async function synthesizeAudio(text: string, voice?: string, speed?: number, endpoint?: string, volume?: number) {
   const res = await fetch('/api/tts/synthesize', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voice, speed, endpoint }),
+    body: JSON.stringify({ text, voice, speed, endpoint, volume }),
   });
   return res.json();
 }

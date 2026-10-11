@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Bundled Font Definitions */
 @font-face {
   font-family: 'Charis SIL';

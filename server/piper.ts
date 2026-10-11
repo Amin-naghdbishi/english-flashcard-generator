@@ -1,6 +1,6 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { validateWavBuffer, WavValidationResult } from './wavHelper';
+import { validateWavBuffer, WavValidationResult, adjustWavVolume } from './wavHelper';
 
 const execPromise = promisify(exec);
 
@@ -234,7 +234,8 @@ export async function synthesizePiperAudio(
   text: string,
   voice: string = 'en_US-lessac-high',
   lengthScale: number = 1.0,
-  endpoint: string = 'http://127.0.0.1:5000'
+  endpoint: string = 'http://127.0.0.1:5000',
+  volumePercent?: number
 ): Promise<PiperAudioResult> {
   const trimmed = (text || '').trim();
   if (!trimmed) {
@@ -295,7 +296,10 @@ export async function synthesizePiperAudio(
     }
 
     const arrayBuffer = await response.arrayBuffer();
-    const wavBuffer = Buffer.from(arrayBuffer);
+    const rawWavBuffer = Buffer.from(arrayBuffer);
+
+    // Apply volume adjustment if specified
+    const wavBuffer = typeof volumePercent === 'number' ? adjustWavVolume(rawWavBuffer, volumePercent) : rawWavBuffer;
 
     // Verify WAV integrity
     const validation = validateWavBuffer(wavBuffer);
@@ -398,6 +402,16 @@ export async function generateAllCardAudios(params: {
   speedExampleUsSlow?: number;
   speedExampleUkNormal?: number;
   speedExampleUkSlow?: number;
+
+  // Individual volumes (0-100) for each variant
+  volumeWordUkNormal?: number;
+  volumeWordUkSlow?: number;
+  volumeWordUsNormal?: number;
+  volumeWordUsSlow?: number;
+  volumeExampleUkNormal?: number;
+  volumeExampleUkSlow?: number;
+  volumeExampleUsNormal?: number;
+  volumeExampleUsSlow?: number;
 }): Promise<GeneratedPiperCardAudios> {
   const {
     word,
@@ -465,7 +479,7 @@ export async function generateAllCardAudios(params: {
   // --- SINGLE WORD AUDIO ---
   if (generateWordSingle) {
     const singleFile = `${safeWord}_single.wav`;
-    const singleRes = await synthesizePiperAudio(word, americanVoice, speedUsNormal, endpoint);
+    const singleRes = await synthesizePiperAudio(word, americanVoice, speedUsNormal, endpoint, params.volumeWordUsNormal);
     if (singleRes.success && singleRes.wavBuffer && singleRes.wavBase64) {
       resultFiles.push({
         fileName: singleFile,
@@ -488,7 +502,7 @@ export async function generateAllCardAudios(params: {
   // --- AMERICAN PRONUNCIATIONS ---
   if (generateAmericanNormal) {
     const usNormalFile = `${safeWord}_us_normal.wav`;
-    const usNormalRes = await synthesizePiperAudio(word, americanVoice, speedUsNormal, endpoint);
+    const usNormalRes = await synthesizePiperAudio(word, americanVoice, speedUsNormal, endpoint, params.volumeWordUsNormal);
     if (usNormalRes.success && usNormalRes.wavBuffer && usNormalRes.wavBase64) {
       resultFiles.push({
         fileName: usNormalFile,
@@ -510,7 +524,7 @@ export async function generateAllCardAudios(params: {
 
   if (generateAmericanSlow) {
     const usSlowFile = `${safeWord}_us_slow.wav`;
-    const usSlowRes = await synthesizePiperAudio(word, americanVoice, speedUsSlow, endpoint);
+    const usSlowRes = await synthesizePiperAudio(word, americanVoice, speedUsSlow, endpoint, params.volumeWordUsSlow);
     if (usSlowRes.success && usSlowRes.wavBuffer && usSlowRes.wavBase64) {
       resultFiles.push({
         fileName: usSlowFile,
@@ -532,7 +546,7 @@ export async function generateAllCardAudios(params: {
 
   if (generateExampleUsNormal && example && example.trim()) {
     const exampleUsFile = `${safeWord}_example_us_normal.wav`;
-    const exampleUsRes = await synthesizePiperAudio(example, americanVoice, speedExUsNormal, endpoint);
+    const exampleUsRes = await synthesizePiperAudio(example, americanVoice, speedExUsNormal, endpoint, params.volumeExampleUsNormal);
     if (exampleUsRes.success && exampleUsRes.wavBuffer && exampleUsRes.wavBase64) {
       resultFiles.push({
         fileName: exampleUsFile,
@@ -554,7 +568,7 @@ export async function generateAllCardAudios(params: {
 
   if (generateExampleUsSlow && example && example.trim()) {
     const exampleUsSlowFile = `${safeWord}_example_us_slow.wav`;
-    const exampleUsSlowRes = await synthesizePiperAudio(example, americanVoice, speedExUsSlow, endpoint);
+    const exampleUsSlowRes = await synthesizePiperAudio(example, americanVoice, speedExUsSlow, endpoint, params.volumeExampleUsSlow);
     if (exampleUsSlowRes.success && exampleUsSlowRes.wavBuffer && exampleUsSlowRes.wavBase64) {
       resultFiles.push({
         fileName: exampleUsSlowFile,
@@ -577,7 +591,7 @@ export async function generateAllCardAudios(params: {
   // --- BRITISH PRONUNCIATIONS ---
   if (generateBritishNormal) {
     const ukNormalFile = `${safeWord}_uk_normal.wav`;
-    const ukNormalRes = await synthesizePiperAudio(word, britishVoice, speedUkNormal, endpoint);
+    const ukNormalRes = await synthesizePiperAudio(word, britishVoice, speedUkNormal, endpoint, params.volumeWordUkNormal);
     if (ukNormalRes.success && ukNormalRes.wavBuffer && ukNormalRes.wavBase64) {
       resultFiles.push({
         fileName: ukNormalFile,
@@ -599,7 +613,7 @@ export async function generateAllCardAudios(params: {
 
   if (generateBritishSlow) {
     const ukSlowFile = `${safeWord}_uk_slow.wav`;
-    const ukSlowRes = await synthesizePiperAudio(word, britishVoice, speedUkSlow, endpoint);
+    const ukSlowRes = await synthesizePiperAudio(word, britishVoice, speedUkSlow, endpoint, params.volumeWordUkSlow);
     if (ukSlowRes.success && ukSlowRes.wavBuffer && ukSlowRes.wavBase64) {
       resultFiles.push({
         fileName: ukSlowFile,
@@ -621,7 +635,7 @@ export async function generateAllCardAudios(params: {
 
   if (generateExampleUkNormal && example && example.trim()) {
     const exampleUkFile = `${safeWord}_example_uk_normal.wav`;
-    const exampleUkRes = await synthesizePiperAudio(example, britishVoice, speedExUkNormal, endpoint);
+    const exampleUkRes = await synthesizePiperAudio(example, britishVoice, speedExUkNormal, endpoint, params.volumeExampleUkNormal);
     if (exampleUkRes.success && exampleUkRes.wavBuffer && exampleUkRes.wavBase64) {
       resultFiles.push({
         fileName: exampleUkFile,
@@ -643,7 +657,7 @@ export async function generateAllCardAudios(params: {
 
   if (generateExampleUkSlow && example && example.trim()) {
     const exampleUkSlowFile = `${safeWord}_example_uk_slow.wav`;
-    const exampleUkSlowRes = await synthesizePiperAudio(example, britishVoice, speedExUkSlow, endpoint);
+    const exampleUkSlowRes = await synthesizePiperAudio(example, britishVoice, speedExUkSlow, endpoint, params.volumeExampleUkSlow);
     if (exampleUkSlowRes.success && exampleUkSlowRes.wavBuffer && exampleUkSlowRes.wavBase64) {
       resultFiles.push({
         fileName: exampleUkSlowFile,

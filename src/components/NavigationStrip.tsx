@@ -35,6 +35,7 @@ interface NavigationStripProps {
   isVisible?: boolean;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
+  onToggleTts?: () => void;
 }
 
 function getIndicatorClasses(isChecking: boolean, isOnline: boolean, isDisabled: boolean = false): { dot: string; container: string } {
@@ -73,10 +74,11 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
   isVisible = true,
   onMouseEnter,
   onMouseLeave,
+  onToggleTts,
 }) => {
   const themeContext = useAppTheme();
   const { t } = useTranslation();
-  const isDark = (propTheme || themeContext.appTheme) === 'anki-dark';
+  const isDark = themeContext.isDark;
 
   // AI state
   const isAiDisabled = status.ai.state === 'disabled';
@@ -92,10 +94,13 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
     : t('nav.aiDisconnected', { label: status.ai.label || 'AI' });
 
   // TTS state
-  const isTtsChecking = status.tts.state === 'checking' || !!status.tts.checking;
-  const isTtsOnline = status.tts.state === 'connected' || (!isTtsChecking && (!!status.tts.ready || !!status.tts.connected));
-  const ttsClasses = getIndicatorClasses(isTtsChecking, isTtsOnline);
-  const ttsTooltip = isTtsChecking
+  const isTtsDisabled = status.tts.state === 'disabled';
+  const isTtsChecking = !isTtsDisabled && (status.tts.state === 'checking' || !!status.tts.checking);
+  const isTtsOnline = !isTtsDisabled && (status.tts.state === 'connected' || (!isTtsChecking && (!!status.tts.ready || !!status.tts.connected)));
+  const ttsClasses = getIndicatorClasses(isTtsChecking, isTtsOnline, isTtsDisabled);
+  const ttsTooltip = isTtsDisabled
+    ? t('nav.ttsDisabled', 'TTS is currently disabled (Click to activate Local TTS)')
+    : isTtsChecking
     ? t('nav.ttsChecking', { label: status.tts.label || 'TTS' })
     : isTtsOnline
     ? t('nav.ttsReady', { label: status.tts.label || 'TTS' })
@@ -237,17 +242,19 @@ export const NavigationStrip: React.FC<NavigationStripProps> = ({
           </div>
 
           {/* 3. TTS Status */}
-          <div
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+          <button
+            type="button"
+            onClick={onToggleTts}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer hover:opacity-85 ${
               isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-white border-slate-200 text-slate-800 shadow-2xs'
             } ${ttsClasses.container}`}
             title={ttsTooltip}
           >
             <span className="hidden sm:inline font-semibold">
-              TTS
+              {isTtsDisabled ? 'TTS: Off' : 'TTS'}
             </span>
             <span className={`w-2 h-2 rounded-full transition-colors ${ttsClasses.dot}`} />
-          </div>
+          </button>
 
           {/* Manual / Live Refresh Trigger */}
           <button
