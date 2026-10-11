@@ -890,15 +890,15 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
               isDark ? 'bg-zinc-900 border-zinc-700 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
             }`}
           >
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-700/50">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-700/50">
               <div className="flex items-center gap-2">
                 <Globe className="w-4 h-4 text-blue-500" />
-                <h3 className="text-sm font-bold">{t('create.searchInternet') || 'Online Image Search'}</h3>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{t('create.searchInternet') || 'Online Image Search'}</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowInternetPanel(false)}
-                className="text-zinc-400 hover:text-zinc-200 text-sm cursor-pointer p-1"
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-sm cursor-pointer p-1"
               >
                 ✕
               </button>
@@ -906,7 +906,7 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
 
             {/* URL Input Bar */}
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-zinc-400">
+              <label className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
                 {t('create.pasteImageUrl') || 'Direct Image URL:'}
               </label>
               <div className="flex gap-2">
@@ -938,14 +938,14 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
 
             {/* Search query indicator */}
             <div className="pt-2">
-              <span className="text-xs font-semibold text-zinc-400">
+              <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-400">
                 Results for "{editableCard?.word || word || 'illustration'}":
               </span>
             </div>
 
             {/* Results Grid */}
             {isSearchingOnline && (
-              <div className="flex items-center justify-center gap-2 py-8 text-xs text-zinc-400">
+              <div className="flex items-center justify-center gap-2 py-8 text-xs text-zinc-600 dark:text-zinc-400">
                 <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
                 <span>Searching Wikimedia & Unsplash...</span>
               </div>

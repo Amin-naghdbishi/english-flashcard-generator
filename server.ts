@@ -88,6 +88,7 @@ const SETTINGS_FILE = getSettingsFilePath();
 
 const defaultSettings: AppSettings = {
   appTheme: 'anki-light',
+  accentColor: 'blue',
   ai: {
     enabled: true,
     provider: 'ollama',
@@ -338,6 +339,13 @@ function normalizeSettings(raw: any): AppSettings {
     merged.appTheme = 'anki-dark';
   } else {
     merged.appTheme = 'anki-light';
+  }
+
+  // Normalize accentColor
+  if (['blue', 'green', 'purple', 'orange', 'pink', 'red', 'teal'].includes(merged.accentColor)) {
+    merged.accentColor = merged.accentColor;
+  } else {
+    merged.accentColor = 'blue';
   }
 
   // Normalize AI Prompts

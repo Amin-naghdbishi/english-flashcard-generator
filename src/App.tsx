@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { AppSettings, CardData, AppTheme } from './types';
+import { AppSettings, CardData, AppTheme, AccentColor } from './types';
 import { NavigationStrip, NavTab, NavigationStatus, ServiceState } from './components/NavigationStrip';
 import { CreateCardView } from './components/CreateCardView';
 import { BatchCardView } from './components/BatchCardView';
@@ -12,6 +12,7 @@ import { I18nProvider, useTranslation, AppLanguage, AppDirection } from './i18n'
 
 const defaultSettings: AppSettings = {
   appTheme: 'anki-light',
+  accentColor: 'blue',
   language: 'en',
   direction: 'ltr',
   ai: {
@@ -99,7 +100,7 @@ function AppShell({
   settings: AppSettings;
   setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
   status: NavigationStatus;
-  refreshStatuses: (isManual?: boolean) => Promise<void>;
+  refreshStatuses: (isManual?: boolean, overrideSettings?: AppSettings) => Promise<void>;
   onToggleTts: () => void;
 }) {
   const { t } = useTranslation();
@@ -160,7 +161,6 @@ function AppShell({
             settings={settings}
             appTheme={appTheme}
             onUpdateSettings={(newCfg) => {
-              settingsRef.current = newCfg;
               setSettings(newCfg);
               refreshStatuses(true, newCfg);
             }}
@@ -354,6 +354,16 @@ export default function App() {
     });
   };
 
+  const handleSetAccentColor = (newAccent: AccentColor) => {
+    setSettings((prev) => ({
+      ...prev,
+      accentColor: newAccent,
+    }));
+    saveConfig({ accentColor: newAccent }).catch((e) => {
+      console.warn('Failed to persist accent color:', e);
+    });
+  };
+
   const handleLanguageChange = (newLang: AppLanguage) => {
     setSettings((prev) => ({
       ...prev,
@@ -405,6 +415,8 @@ export default function App() {
       <AppThemeProvider
         appTheme={activeAppTheme}
         setAppTheme={handleSetAppTheme}
+        accentColor={settings.accentColor || 'blue'}
+        setAccentColor={handleSetAccentColor}
       >
         <AppShell
           settings={settings}

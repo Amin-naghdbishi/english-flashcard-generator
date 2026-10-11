@@ -9,6 +9,7 @@ import {
   CustomAIProviderConfig,
   CustomTTSProviderConfig,
   AIPromptsConfig,
+  AccentColor,
 } from '../types';
 import { CardPreview } from './CardPreview';
 import {
@@ -39,7 +40,7 @@ import { DEFAULT_AI_PROMPTS } from '../../server/prompts';
 import { OllamaModelTag } from '../../server/ollama';
 import { PiperVoice } from '../../server/piper';
 import { THEME_GROUPS, THEMES, resolveThemeFromNoteType } from '../themes';
-import { useAppTheme, normalizeAppTheme } from '../context/ThemeContext';
+import { useAppTheme, normalizeAppTheme, ACCENT_COLORS } from '../context/ThemeContext';
 import { useTranslation, AppLanguage, AppDirection } from '../i18n';
 import { APP_THEME_NOTE_TYPES } from './UnifiedCardEditor';
 import {
@@ -348,6 +349,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     const normalized = normalizeAppTheme(newTheme);
     const updated = { ...form, appTheme: normalized };
     themeContext.setAppTheme(normalized);
+    updateAndSave(updated);
+  };
+
+  const handleAccentColorSelect = (newAccent: AccentColor) => {
+    const updated = { ...form, accentColor: newAccent };
+    themeContext.setAccentColor(newAccent);
     updateAndSave(updated);
   };
 
@@ -996,6 +1003,42 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                     label="System"
                     onClick={() => handleAppThemeSelect('system')}
                   />
+                </div>
+              </div>
+
+              {/* Accent Color */}
+              <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                    Accent Color
+                  </label>
+                  <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 capitalize">
+                    {form.accentColor || 'blue'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {ACCENT_COLORS.map((c) => {
+                    const isSelected = (form.accentColor || 'blue') === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => handleAccentColorSelect(c.id)}
+                        className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer relative ${
+                          isSelected
+                            ? 'ring-2 ring-offset-2 ring-blue-500 ring-offset-white dark:ring-offset-zinc-900 scale-105'
+                            : 'hover:scale-110 opacity-85 hover:opacity-100'
+                        }`}
+                        style={{ backgroundColor: c.hex }}
+                        title={`${c.name}${isSelected ? ' (Selected)' : ''}`}
+                        aria-label={`Select ${c.name} accent`}
+                      >
+                        {isSelected && (
+                          <Check className="w-4 h-4 text-white drop-shadow-sm stroke-[3]" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

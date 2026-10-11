@@ -168,6 +168,7 @@ export function isCardComplete(card?: Partial<CardData> | ManualOverrides | null
 }
 
 export type AppTheme = 'anki-light' | 'anki-dark' | 'system';
+export type AccentColor = 'blue' | 'green' | 'purple' | 'orange' | 'pink' | 'red' | 'teal';
 
 export type AIProvider = 'ollama' | 'gemini' | 'custom' | string;
 export type TTSProvider = 'piper' | 'online' | 'custom' | string;
@@ -364,6 +365,7 @@ export interface AppSettings {
   anki: AnkiConfig;
   theme: ThemeId;
   appTheme?: AppTheme;
+  accentColor?: AccentColor;
   language?: AppLanguage;
   direction?: AppDirection;
   aiPrompts?: AIPromptsConfig;
