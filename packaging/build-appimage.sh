@@ -4,7 +4,7 @@ set -e
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-DEFAULT_APP_NAME="Flashcard-Generator-v1.1.6"
+DEFAULT_APP_NAME="Flashcard-Generator-v1.1.7"
 APP_NAME="${APPIMAGE_NAME:-$DEFAULT_APP_NAME}"
 TARGET_ARCH="${ARCH:-x86_64}"
 HOST_ARCH="$(uname -m)"
@@ -58,6 +58,7 @@ cp "$SCRIPT_DIR/flashcard-generator.svg" "$APPDIR/usr/share/icons/hicolor/scalab
 echo "Copying compiled dist files into AppDir..."
 rm -rf "$APPDIR/usr/share/flashcard-generator/dist"
 cp -r "$ROOT_DIR/dist" "$APPDIR/usr/share/flashcard-generator/dist"
+cp -r "$ROOT_DIR/public" "$APPDIR/usr/share/flashcard-generator/public"
 cp "$ROOT_DIR/package.json" "$APPDIR/usr/share/flashcard-generator/"
 
 # 7. Provide launcher in usr/bin

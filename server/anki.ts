@@ -274,7 +274,14 @@ export async function ensureAnkiFonts(baseUrl: string): Promise<{ success: boole
     { sourceName: 'Vazirmatn-Bold.woff2', targetName: '_Vazirmatn-Bold.woff2' },
   ];
 
-  const fontsDir = path.resolve(process.cwd(), 'public/fonts');
+  const candidateFontDirs = [
+    path.resolve(process.cwd(), 'public/fonts'),
+    path.resolve(process.cwd(), 'dist/fonts'),
+    path.resolve(__dirname, 'fonts'),
+    path.resolve(__dirname, 'public/fonts'),
+    path.resolve(__dirname, '../public/fonts'),
+  ];
+  const fontsDir = candidateFontDirs.find((d) => fs.existsSync(path.join(d, 'CharisSIL-Regular.woff2'))) || candidateFontDirs[0];
 
   for (const font of fontsToSync) {
     const filePath = path.join(fontsDir, font.sourceName);

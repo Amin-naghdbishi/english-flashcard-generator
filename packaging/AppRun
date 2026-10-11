@@ -62,7 +62,7 @@ while [ $# -gt 0 ]; do
     --help|-h)
       echo "Flashcard Generator - AI Vocabulary Flashcards for Anki"
       echo ""
-      echo "Usage: ./Flashcard-Maker-v2.AppImage [options]"
+      echo "Usage: ./Flashcard-Generator-v1.1.7.AppImage [options]"
       echo ""
       echo "Options:"
       echo "  --port <PORT>   Specify starting server port (default: 3000, auto-fallbacks if occupied)"
