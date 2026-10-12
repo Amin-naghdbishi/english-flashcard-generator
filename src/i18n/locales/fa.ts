@@ -421,7 +421,37 @@ export const fa = {
     },
     guide: {
       title: 'راهنما و مستندات برنامه',
+      helpTutorial: 'آموزش جامع و راهنمای برنامه',
     },
+  },
+
+  // Card Editor Component
+  editor: {
+    noteType: 'نوع کارت',
+    deck: 'دسته (Deck)',
+    detected: 'شناسایی شد',
+    tags: 'برچسب‌ها',
+    manageTags: 'مدیریت برچسب‌ها',
+    searchOrAddTag: 'جستجو یا افزودن برچسب...',
+    addTagBtn: 'افزودن',
+    matchingTags: 'برچسب‌های منطبق',
+    ankiCollectionTags: 'برچسب‌های مجموعه آنکی',
+    showCardInAnki: 'نمایش کارت در آنکی',
+    saveToAnki: 'ذخیره در آنکی',
+    saving: 'در حال ذخیره...',
+    front: 'روی کارت',
+    back: 'پشت کارت',
+    standard: 'استاندارد',
+    spelling: 'املا',
+    addBox: '+ افزودن کادر',
+    cardBg: 'رنگ کارت',
+    cardBorder: 'کادر',
+    wordAudio: 'صوت کلمه',
+    exampleAudio: 'صوت مثال',
+    regenerateAudio: 'تولید مجدد صوت',
+    refreshAudio: 'بروزرسانی صوت',
+    audioOutdated: 'متن تغییر کرده • نیاز به تولید مجدد',
+    generatingAudio: 'در حال تولید صوت...',
   },
 
   // Card Preview Component

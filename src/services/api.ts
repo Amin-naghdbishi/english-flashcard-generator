@@ -11,6 +11,7 @@ import {
   CustomTTSProviderConfig,
   SmartImagesConfig,
   AIPromptsConfig,
+  CardAudioSelection,
 } from '../types';
 import { OllamaModelTag } from '../../server/ollama';
 import { PiperVoice, PiperDiagnosticResult } from '../../server/piper';
@@ -583,4 +584,30 @@ export async function getAnkiModelNames(
   } catch (err: any) {
     return { success: false, modelNames: [], error: err.message };
   }
+}
+
+export async function generateCardAudio(
+  word: string,
+  example: string,
+  selection?: CardAudioSelection
+): Promise<{ success: boolean; audioData?: Partial<CardData>; error?: string }> {
+  const res = await fetch('/api/tts/generate-card-audio', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ word, example, selection }),
+  });
+  return res.json();
+}
+
+export async function moveNoteDeck(
+  noteId: number,
+  deck: string,
+  url?: string
+): Promise<{ success: boolean; error?: string }> {
+  const res = await fetch('/api/anki/change-deck', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ noteId, newDeck: deck, url }),
+  });
+  return res.json();
 }

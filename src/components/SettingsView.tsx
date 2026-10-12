@@ -62,20 +62,21 @@ import {
   Check,
   Eye,
   EyeOff,
+  HelpCircle,
 } from 'lucide-react';
+import { HelpTutorialView } from './HelpTutorialView';
 
 function AudioOptionItem({
   label,
   checked,
   volume,
-  disableUncheck,
   onToggle,
   onVolumeChange,
 }: {
   label: string;
   checked: boolean;
   volume: number;
-  disableUncheck: boolean;
+  disableUncheck?: boolean;
   onToggle: () => void;
   onVolumeChange: (val: number) => void;
 }) {
@@ -87,18 +88,12 @@ function AudioOptionItem({
 
   return (
     <div className="flex items-center gap-2 select-none py-1">
-      <label
-        className={`flex items-center gap-2 cursor-pointer ${
-          disableUncheck ? 'cursor-not-allowed opacity-90' : ''
-        }`}
-        title={disableUncheck ? 'At least one option must remain selected' : undefined}
-      >
+      <label className="flex items-center gap-2 cursor-pointer">
         <input
           type="checkbox"
           checked={checked}
-          disabled={disableUncheck}
           onChange={onToggle}
-          className="w-3.5 h-3.5 rounded-none border border-zinc-400 dark:border-zinc-600 accent-blue-600 cursor-pointer disabled:cursor-not-allowed"
+          className="w-3.5 h-3.5 rounded-none border border-zinc-400 dark:border-zinc-600 accent-blue-600 cursor-pointer"
         />
         <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
           {label}
@@ -162,6 +157,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
   const [form, setForm] = useState<AppSettings>(settings);
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [isShowingTutorial, setIsShowingTutorial] = useState<boolean>(false);
 
   // Collapsible sidebar state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
@@ -777,6 +773,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
 
         {/* Sidebar Footer */}
         <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 space-y-2 mt-auto">
+          {/* Help & Tutorial Full-Screen Trigger (Requirement 6) */}
+          <button
+            type="button"
+            onClick={() => setIsShowingTutorial(true)}
+            className={`w-full py-1.5 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-semibold text-xs rounded-none flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+              isSidebarCollapsed ? 'px-1' : 'px-3'
+            }`}
+            title="Help & Tutorial / راهنما و آموزش جامع"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+            {!isSidebarCollapsed && <span>{t('settings.helpTutorial') || 'Help & Tutorial'}</span>}
+          </button>
+
           {saveStatus && !isSidebarCollapsed && (
             <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
@@ -1885,22 +1894,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         label="Br"
                         checked={Boolean(form.tts.generateBritishNormal)}
                         volume={form.tts.volumeWordUkNormal ?? 100}
-                        disableUncheck={
-                          Boolean(form.tts.generateBritishNormal) &&
-                          (Number(Boolean(form.tts.generateBritishNormal)) +
-                            Number(Boolean(form.tts.generateBritishSlow)) +
-                            Number(Boolean(form.tts.generateAmericanNormal)) +
-                            Number(Boolean(form.tts.generateAmericanSlow))) <= 1
-                        }
                         onToggle={() => {
-                          const current = Boolean(form.tts.generateBritishNormal);
-                          const count =
-                            Number(Boolean(form.tts.generateBritishNormal)) +
-                            Number(Boolean(form.tts.generateBritishSlow)) +
-                            Number(Boolean(form.tts.generateAmericanNormal)) +
-                            Number(Boolean(form.tts.generateAmericanSlow));
-                          if (current && count <= 1) return;
-                          const next = !current;
+                          const next = !Boolean(form.tts.generateBritishNormal);
                           updateAndSave({
                             ...form,
                             tts: {
@@ -1926,22 +1921,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         label="Br Slow"
                         checked={Boolean(form.tts.generateBritishSlow)}
                         volume={form.tts.volumeWordUkSlow ?? 100}
-                        disableUncheck={
-                          Boolean(form.tts.generateBritishSlow) &&
-                          (Number(Boolean(form.tts.generateBritishNormal)) +
-                            Number(Boolean(form.tts.generateBritishSlow)) +
-                            Number(Boolean(form.tts.generateAmericanNormal)) +
-                            Number(Boolean(form.tts.generateAmericanSlow))) <= 1
-                        }
                         onToggle={() => {
-                          const current = Boolean(form.tts.generateBritishSlow);
-                          const count =
-                            Number(Boolean(form.tts.generateBritishNormal)) +
-                            Number(Boolean(form.tts.generateBritishSlow)) +
-                            Number(Boolean(form.tts.generateAmericanNormal)) +
-                            Number(Boolean(form.tts.generateAmericanSlow));
-                          if (current && count <= 1) return;
-                          const next = !current;
+                          const next = !Boolean(form.tts.generateBritishSlow);
                           updateAndSave({
                             ...form,
                             tts: {
@@ -1967,22 +1948,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         label="Am"
                         checked={Boolean(form.tts.generateAmericanNormal)}
                         volume={form.tts.volumeWordUsNormal ?? 100}
-                        disableUncheck={
-                          Boolean(form.tts.generateAmericanNormal) &&
-                          (Number(Boolean(form.tts.generateBritishNormal)) +
-                            Number(Boolean(form.tts.generateBritishSlow)) +
-                            Number(Boolean(form.tts.generateAmericanNormal)) +
-                            Number(Boolean(form.tts.generateAmericanSlow))) <= 1
-                        }
                         onToggle={() => {
-                          const current = Boolean(form.tts.generateAmericanNormal);
-                          const count =
-                            Number(Boolean(form.tts.generateBritishNormal)) +
-                            Number(Boolean(form.tts.generateBritishSlow)) +
-                            Number(Boolean(form.tts.generateAmericanNormal)) +
-                            Number(Boolean(form.tts.generateAmericanSlow));
-                          if (current && count <= 1) return;
-                          const next = !current;
+                          const next = !Boolean(form.tts.generateAmericanNormal);
                           updateAndSave({
                             ...form,
                             tts: {
@@ -2008,22 +1975,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         label="Am Slow"
                         checked={Boolean(form.tts.generateAmericanSlow)}
                         volume={form.tts.volumeWordUsSlow ?? 100}
-                        disableUncheck={
-                          Boolean(form.tts.generateAmericanSlow) &&
-                          (Number(Boolean(form.tts.generateBritishNormal)) +
-                            Number(Boolean(form.tts.generateBritishSlow)) +
-                            Number(Boolean(form.tts.generateAmericanNormal)) +
-                            Number(Boolean(form.tts.generateAmericanSlow))) <= 1
-                        }
                         onToggle={() => {
-                          const current = Boolean(form.tts.generateAmericanSlow);
-                          const count =
-                            Number(Boolean(form.tts.generateBritishNormal)) +
-                            Number(Boolean(form.tts.generateBritishSlow)) +
-                            Number(Boolean(form.tts.generateAmericanNormal)) +
-                            Number(Boolean(form.tts.generateAmericanSlow));
-                          if (current && count <= 1) return;
-                          const next = !current;
+                          const next = !Boolean(form.tts.generateAmericanSlow);
                           updateAndSave({
                             ...form,
                             tts: {
@@ -2058,22 +2011,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         label="Br"
                         checked={Boolean(form.tts.generateExampleUkNormal)}
                         volume={form.tts.volumeExampleUkNormal ?? 100}
-                        disableUncheck={
-                          Boolean(form.tts.generateExampleUkNormal) &&
-                          (Number(Boolean(form.tts.generateExampleUkNormal)) +
-                            Number(Boolean(form.tts.generateExampleUkSlow)) +
-                            Number(Boolean(form.tts.generateExampleUsNormal)) +
-                            Number(Boolean(form.tts.generateExampleUsSlow))) <= 1
-                        }
                         onToggle={() => {
-                          const current = Boolean(form.tts.generateExampleUkNormal);
-                          const count =
-                            Number(Boolean(form.tts.generateExampleUkNormal)) +
-                            Number(Boolean(form.tts.generateExampleUkSlow)) +
-                            Number(Boolean(form.tts.generateExampleUsNormal)) +
-                            Number(Boolean(form.tts.generateExampleUsSlow));
-                          if (current && count <= 1) return;
-                          const next = !current;
+                          const next = !Boolean(form.tts.generateExampleUkNormal);
                           updateAndSave({
                             ...form,
                             tts: {
@@ -2099,22 +2038,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         label="Br Slow"
                         checked={Boolean(form.tts.generateExampleUkSlow)}
                         volume={form.tts.volumeExampleUkSlow ?? 100}
-                        disableUncheck={
-                          Boolean(form.tts.generateExampleUkSlow) &&
-                          (Number(Boolean(form.tts.generateExampleUkNormal)) +
-                            Number(Boolean(form.tts.generateExampleUkSlow)) +
-                            Number(Boolean(form.tts.generateExampleUsNormal)) +
-                            Number(Boolean(form.tts.generateExampleUsSlow))) <= 1
-                        }
                         onToggle={() => {
-                          const current = Boolean(form.tts.generateExampleUkSlow);
-                          const count =
-                            Number(Boolean(form.tts.generateExampleUkNormal)) +
-                            Number(Boolean(form.tts.generateExampleUkSlow)) +
-                            Number(Boolean(form.tts.generateExampleUsNormal)) +
-                            Number(Boolean(form.tts.generateExampleUsSlow));
-                          if (current && count <= 1) return;
-                          const next = !current;
+                          const next = !Boolean(form.tts.generateExampleUkSlow);
                           updateAndSave({
                             ...form,
                             tts: {
@@ -2140,22 +2065,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         label="Am"
                         checked={Boolean(form.tts.generateExampleUsNormal)}
                         volume={form.tts.volumeExampleUsNormal ?? 100}
-                        disableUncheck={
-                          Boolean(form.tts.generateExampleUsNormal) &&
-                          (Number(Boolean(form.tts.generateExampleUkNormal)) +
-                            Number(Boolean(form.tts.generateExampleUkSlow)) +
-                            Number(Boolean(form.tts.generateExampleUsNormal)) +
-                            Number(Boolean(form.tts.generateExampleUsSlow))) <= 1
-                        }
                         onToggle={() => {
-                          const current = Boolean(form.tts.generateExampleUsNormal);
-                          const count =
-                            Number(Boolean(form.tts.generateExampleUkNormal)) +
-                            Number(Boolean(form.tts.generateExampleUkSlow)) +
-                            Number(Boolean(form.tts.generateExampleUsNormal)) +
-                            Number(Boolean(form.tts.generateExampleUsSlow));
-                          if (current && count <= 1) return;
-                          const next = !current;
+                          const next = !Boolean(form.tts.generateExampleUsNormal);
                           updateAndSave({
                             ...form,
                             tts: {
@@ -2181,22 +2092,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
                         label="Am Slow"
                         checked={Boolean(form.tts.generateExampleUsSlow)}
                         volume={form.tts.volumeExampleUsSlow ?? 100}
-                        disableUncheck={
-                          Boolean(form.tts.generateExampleUsSlow) &&
-                          (Number(Boolean(form.tts.generateExampleUkNormal)) +
-                            Number(Boolean(form.tts.generateExampleUkSlow)) +
-                            Number(Boolean(form.tts.generateExampleUsNormal)) +
-                            Number(Boolean(form.tts.generateExampleUsSlow))) <= 1
-                        }
                         onToggle={() => {
-                          const current = Boolean(form.tts.generateExampleUsSlow);
-                          const count =
-                            Number(Boolean(form.tts.generateExampleUkNormal)) +
-                            Number(Boolean(form.tts.generateExampleUkSlow)) +
-                            Number(Boolean(form.tts.generateExampleUsNormal)) +
-                            Number(Boolean(form.tts.generateExampleUsSlow));
-                          if (current && count <= 1) return;
-                          const next = !current;
+                          const next = !Boolean(form.tts.generateExampleUsSlow);
                           updateAndSave({
                             ...form,
                             tts: {
@@ -2623,6 +2520,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           </div>
         )}
       </main>
+
+      {/* Full-Screen Help & Tutorial Modal (Requirement 6) */}
+      {isShowingTutorial && (
+        <HelpTutorialView
+          onClose={() => setIsShowingTutorial(false)}
+          initialLanguage={form.language || 'en'}
+        />
+      )}
     </div>
   );
 };

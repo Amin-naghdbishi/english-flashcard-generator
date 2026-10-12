@@ -680,6 +680,18 @@ export const SHARED_CARD_CSS = `
   display: none !important;
 }
 
+/* Light card protection: prevent unwanted dark inversion or black boxes */
+.editor-canvas-wrapper.theme-is-light {
+  color-scheme: light !important;
+}
+.editor-canvas-wrapper.theme-is-light .card,
+.editor-canvas-wrapper.theme-is-light .comic-card-wrapper,
+.editor-canvas-wrapper.theme-is-light .quest-card,
+.editor-canvas-wrapper.theme-is-light .botanical-card,
+.editor-canvas-wrapper.theme-is-light .minimal-card {
+  color-scheme: light !important;
+}
+
 /* Shared HTML & Custom Blocks CSS */
 .custom-card-block {
   margin-top: 8px !important;

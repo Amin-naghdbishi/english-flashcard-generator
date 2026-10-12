@@ -37,6 +37,7 @@ import {
   verifyFullAnkiNoteAndCards,
   openInAnkiBrowser,
   changeCardsDeck,
+  changeNoteDeck,
   getAnkiTags,
   findNotesByTag,
   getNotesInfo,
@@ -729,6 +730,137 @@ async function startServer() {
     res.json(result);
   });
 
+  // Dedicated Card Audio Generation Endpoint (Word + Example Audio Variants)
+  app.post('/api/tts/generate-card-audio', async (req, res) => {
+    const { word, example, selection } = req.body;
+    const cleanWord = (word || '').trim();
+    const cleanExample = (example || '').trim();
+
+    if (!cleanWord && !cleanExample) {
+      return res.status(400).json({ success: false, error: 'Word or Example text is required to generate audio.' });
+    }
+
+    const ttsProvider = appSettings.tts.provider || 'piper';
+
+    const genAmNorm = selection?.wordUsNormal !== undefined ? Boolean(selection.wordUsNormal) : Boolean(appSettings.tts.generateAmericanNormal);
+    const genAmSlow = selection?.wordUsSlow !== undefined ? Boolean(selection.wordUsSlow) : Boolean(appSettings.tts.generateAmericanSlow);
+    const genUkNorm = selection?.wordUkNormal !== undefined ? Boolean(selection.wordUkNormal) : Boolean(appSettings.tts.generateBritishNormal);
+    const genUkSlow = selection?.wordUkSlow !== undefined ? Boolean(selection.wordUkSlow) : Boolean(appSettings.tts.generateBritishSlow);
+    const genExUsNorm = selection?.exampleUsNormal !== undefined ? Boolean(selection.exampleUsNormal) : Boolean(appSettings.tts.generateExampleUsNormal);
+    const genExUsSlow = selection?.exampleUsSlow !== undefined ? Boolean(selection.exampleUsSlow) : Boolean(appSettings.tts.generateExampleUsSlow);
+    const genExUkNorm = selection?.exampleUkNormal !== undefined ? Boolean(selection.exampleUkNormal) : Boolean(appSettings.tts.generateExampleUkNormal);
+    const genExUkSlow = selection?.exampleUkSlow !== undefined ? Boolean(selection.exampleUkSlow) : Boolean(appSettings.tts.generateExampleUkSlow);
+
+    try {
+      if (ttsProvider === 'online') {
+        const onlineRes = await generateAllOnlineCardAudios({
+          word: cleanWord,
+          example: cleanExample,
+          audioSpeed: appSettings.tts.audioSpeed || 1.0,
+          generateAmericanNormal: genAmNorm,
+          generateAmericanSlow: genAmSlow,
+          generateBritishNormal: genUkNorm,
+          generateBritishSlow: genUkSlow,
+          generateExampleUsNormal: genExUsNorm,
+          generateExampleUsSlow: genExUsSlow,
+          generateExampleUkNormal: genExUkNorm,
+          generateExampleUkSlow: genExUkSlow,
+        });
+
+        return res.json({
+          success: onlineRes.success,
+          error: onlineRes.error,
+          audioData: {
+            wordAudioUsNormalBase64: genAmNorm ? onlineRes.wordAudioUsNormalBase64 : undefined,
+            wordAudioUsSlowBase64: genAmSlow ? onlineRes.wordAudioUsSlowBase64 : undefined,
+            wordAudioUkNormalBase64: genUkNorm ? onlineRes.wordAudioUkNormalBase64 : undefined,
+            wordAudioUkSlowBase64: genUkSlow ? onlineRes.wordAudioUkSlowBase64 : undefined,
+            exampleAudioUsNormalBase64: genExUsNorm ? onlineRes.exampleAudioUsNormalBase64 : undefined,
+            exampleAudioUsSlowBase64: genExUsSlow ? onlineRes.exampleAudioUsSlowBase64 : undefined,
+            exampleAudioUkNormalBase64: genExUkNorm ? onlineRes.exampleAudioUkNormalBase64 : undefined,
+            exampleAudioUkSlowBase64: genExUkSlow ? onlineRes.exampleAudioUkSlowBase64 : undefined,
+            wordAudioUsNormalFileName: genAmNorm ? onlineRes.wordAudioUsNormalFileName : undefined,
+            wordAudioUsSlowFileName: genAmSlow ? onlineRes.wordAudioUsSlowFileName : undefined,
+            wordAudioUkNormalFileName: genUkNorm ? onlineRes.wordAudioUkNormalFileName : undefined,
+            wordAudioUkSlowFileName: genUkSlow ? onlineRes.wordAudioUkSlowFileName : undefined,
+            exampleAudioUsNormalFileName: genExUsNorm ? onlineRes.exampleAudioUsNormalFileName : undefined,
+            exampleAudioUsSlowFileName: genExUsSlow ? onlineRes.exampleAudioUsSlowFileName : undefined,
+            exampleAudioUkNormalFileName: genExUkNorm ? onlineRes.exampleAudioUkNormalFileName : undefined,
+            exampleAudioUkSlowFileName: genExUkSlow ? onlineRes.exampleAudioUkSlowFileName : undefined,
+            audioFiles: onlineRes.files || [],
+            audioGeneratedForWord: cleanWord,
+            audioGeneratedForExample: cleanExample,
+          },
+        });
+      } else {
+        // Offline neural Piper TTS
+        const piperRes = await generateAllCardAudios({
+          word: cleanWord,
+          example: cleanExample,
+          endpoint: appSettings.tts.endpoint,
+          americanVoice: appSettings.tts.americanVoice,
+          britishVoice: appSettings.tts.britishVoice,
+          normalSpeed: appSettings.tts.normalSpeed,
+          slowSpeed: appSettings.tts.slowSpeed,
+          audioSpeed: appSettings.tts.audioSpeed,
+          generateWordSingle: false,
+          generateAmericanNormal: genAmNorm,
+          generateAmericanSlow: genAmSlow,
+          generateBritishNormal: genUkNorm,
+          generateBritishSlow: genUkSlow,
+          generateExampleUsNormal: genExUsNorm,
+          generateExampleUsSlow: genExUsSlow,
+          generateExampleUkNormal: genExUkNorm,
+          generateExampleUkSlow: genExUkSlow,
+          volumeWordUkNormal: appSettings.tts.volumeWordUkNormal,
+          volumeWordUkSlow: appSettings.tts.volumeWordUkSlow,
+          volumeWordUsNormal: appSettings.tts.volumeWordUsNormal,
+          volumeWordUsSlow: appSettings.tts.volumeWordUsSlow,
+          volumeExampleUkNormal: appSettings.tts.volumeExampleUkNormal,
+          volumeExampleUkSlow: appSettings.tts.volumeExampleUkSlow,
+          volumeExampleUsNormal: appSettings.tts.volumeExampleUsNormal,
+          volumeExampleUsSlow: appSettings.tts.volumeExampleUsSlow,
+        });
+
+        return res.json({
+          success: piperRes.success,
+          error: piperRes.error,
+          audioData: {
+            wordAudioUsNormalBase64: genAmNorm ? piperRes.wordAudioUsNormalBase64 : undefined,
+            wordAudioUsSlowBase64: genAmSlow ? piperRes.wordAudioUsSlowBase64 : undefined,
+            wordAudioUkNormalBase64: genUkNorm ? piperRes.wordAudioUkNormalBase64 : undefined,
+            wordAudioUkSlowBase64: genUkSlow ? piperRes.wordAudioUkSlowBase64 : undefined,
+            exampleAudioUsNormalBase64: genExUsNorm ? piperRes.exampleAudioUsNormalBase64 : undefined,
+            exampleAudioUsSlowBase64: genExUsSlow ? piperRes.exampleAudioUsSlowBase64 : undefined,
+            exampleAudioUkNormalBase64: genExUkNorm ? piperRes.exampleAudioUkNormalBase64 : undefined,
+            exampleAudioUkSlowBase64: genExUkSlow ? piperRes.exampleAudioUkSlowBase64 : undefined,
+            wordAudioUsNormalFileName: genAmNorm ? piperRes.wordAudioUsNormalFileName : undefined,
+            wordAudioUsSlowFileName: genAmSlow ? piperRes.wordAudioUsSlowFileName : undefined,
+            wordAudioUkNormalFileName: genUkNorm ? piperRes.wordAudioUkNormalFileName : undefined,
+            wordAudioUkSlowFileName: genUkSlow ? piperRes.wordAudioUkSlowFileName : undefined,
+            exampleAudioUsNormalFileName: genExUsNorm ? piperRes.exampleAudioUsNormalFileName : undefined,
+            exampleAudioUsSlowFileName: genExUsSlow ? piperRes.exampleAudioUsSlowFileName : undefined,
+            exampleAudioUkNormalFileName: genExUkNorm ? piperRes.exampleAudioUkNormalFileName : undefined,
+            exampleAudioUkSlowFileName: genExUkSlow ? piperRes.exampleAudioUkSlowFileName : undefined,
+            audioFiles: (piperRes.files || []).map((f) => ({
+              fileName: f.fileName,
+              fieldSoundTag: f.fieldSoundTag,
+              base64: f.base64,
+              label: f.label,
+              voice: f.voice,
+              speed: f.speed,
+              durationSeconds: f.validation?.durationSeconds,
+            })),
+            audioGeneratedForWord: cleanWord,
+            audioGeneratedForExample: cleanExample,
+          },
+        });
+      }
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || 'Audio generation failed' });
+    }
+  });
+
   // --- Anki Endpoints ---
   app.get('/api/anki/health', async (req, res) => {
     const url = (req.query.url as string) || appSettings.anki.url || 'http://127.0.0.1:8765';
@@ -827,12 +959,24 @@ async function startServer() {
   });
 
   app.post('/api/anki/change-deck', async (req, res) => {
-    const { cardIds, newDeck, url } = req.body;
+    const { cardIds, noteId, newDeck, deck, url } = req.body;
+    const targetDeck = (newDeck || deck || '').trim();
     const ankiUrl = url || appSettings.anki.url || 'http://127.0.0.1:8765';
-    if (!Array.isArray(cardIds) || !newDeck) {
-      return res.status(400).json({ success: false, error: 'cardIds and newDeck are required' });
+
+    if (!targetDeck) {
+      return res.status(400).json({ success: false, error: 'Target deck is required' });
     }
-    const result = await changeCardsDeck(ankiUrl, cardIds, newDeck);
+
+    if (noteId) {
+      const result = await changeNoteDeck(ankiUrl, Number(noteId), targetDeck);
+      return res.json(result);
+    }
+
+    if (!Array.isArray(cardIds) || cardIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'cardIds or noteId is required' });
+    }
+
+    const result = await changeCardsDeck(ankiUrl, cardIds, targetDeck);
     res.json(result);
   });
 
@@ -1381,16 +1525,16 @@ async function startServer() {
         exampleAudioTags.push(`[sound:${cardData.exampleAudioFileName}]`);
       }
 
-      if (wordAudioTags.length > 0) fields.WordAudio = wordAudioTags.join(' ');
-      if (exampleAudioTags.length > 0) fields.ExampleAudio = exampleAudioTags.join(' ');
-      if (cardData.wordAudioUsNormalFileName) fields.WordAudioUsNormal = `[sound:${cardData.wordAudioUsNormalFileName}]`;
-      if (cardData.wordAudioUsSlowFileName) fields.WordAudioUsSlow = `[sound:${cardData.wordAudioUsSlowFileName}]`;
-      if (cardData.wordAudioUkNormalFileName) fields.WordAudioUkNormal = `[sound:${cardData.wordAudioUkNormalFileName}]`;
-      if (cardData.wordAudioUkSlowFileName) fields.WordAudioUkSlow = `[sound:${cardData.wordAudioUkSlowFileName}]`;
-      if (cardData.exampleAudioUsNormalFileName) fields.ExampleAudioUsNormal = `[sound:${cardData.exampleAudioUsNormalFileName}]`;
-      if (cardData.exampleAudioUsSlowFileName) fields.ExampleAudioUsSlow = `[sound:${cardData.exampleAudioUsSlowFileName}]`;
-      if (cardData.exampleAudioUkNormalFileName) fields.ExampleAudioUkNormal = `[sound:${cardData.exampleAudioUkNormalFileName}]`;
-      if (cardData.exampleAudioUkSlowFileName) fields.ExampleAudioUkSlow = `[sound:${cardData.exampleAudioUkSlowFileName}]`;
+      fields.WordAudio = wordAudioTags.join(' ');
+      fields.ExampleAudio = exampleAudioTags.join(' ');
+      fields.WordAudioUsNormal = cardData.wordAudioUsNormalFileName ? `[sound:${cardData.wordAudioUsNormalFileName}]` : '';
+      fields.WordAudioUsSlow = cardData.wordAudioUsSlowFileName ? `[sound:${cardData.wordAudioUsSlowFileName}]` : '';
+      fields.WordAudioUkNormal = cardData.wordAudioUkNormalFileName ? `[sound:${cardData.wordAudioUkNormalFileName}]` : '';
+      fields.WordAudioUkSlow = cardData.wordAudioUkSlowFileName ? `[sound:${cardData.wordAudioUkSlowFileName}]` : '';
+      fields.ExampleAudioUsNormal = cardData.exampleAudioUsNormalFileName ? `[sound:${cardData.exampleAudioUsNormalFileName}]` : '';
+      fields.ExampleAudioUsSlow = cardData.exampleAudioUsSlowFileName ? `[sound:${cardData.exampleAudioUsSlowFileName}]` : '';
+      fields.ExampleAudioUkNormal = cardData.exampleAudioUkNormalFileName ? `[sound:${cardData.exampleAudioUkNormalFileName}]` : '';
+      fields.ExampleAudioUkSlow = cardData.exampleAudioUkSlowFileName ? `[sound:${cardData.exampleAudioUkSlowFileName}]` : '';
 
       // Upload any audio data
       if (cardData.wordAudioUsNormalBase64 && cardData.wordAudioUsNormalFileName) {

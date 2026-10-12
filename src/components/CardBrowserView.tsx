@@ -658,6 +658,14 @@ export const CardBrowserView: React.FC<CardBrowserViewProps> = ({ settings }) =>
             cardData={editingCard}
             noteId={selectedNote.noteId}
             deckName={selectedNote.deckName}
+            onDeckChange={(newDeck) => {
+              setNotes((prevNotes) =>
+                prevNotes.map((n) =>
+                  n.noteId === selectedNote.noteId ? { ...n, deckName: newDeck } : n
+                )
+              );
+            }}
+            availableDecks={availableDecks}
             noteType={currentNoteType}
             onNoteTypeChange={handleNoteTypeChange}
             availableNoteTypes={ankiModelNames}

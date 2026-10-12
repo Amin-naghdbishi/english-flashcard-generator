@@ -8,6 +8,7 @@ import {
   getFrontCustomBlocks,
   getBackCustomBlocks,
   getAllCustomBlocks,
+  CardAudioSelection,
 } from '../types';
 import {
   THEMES,
@@ -22,7 +23,7 @@ import {
 } from '../themes';
 import { useAppTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
-import { getAnkiTags, getAnkiModelNames, openInAnki } from '../services/api';
+import { getAnkiTags, getAnkiModelNames, openInAnki, getAnkiDecks, generateCardAudio, moveNoteDeck } from '../services/api';
 import {
   Volume2,
   Save,
@@ -33,6 +34,7 @@ import {
   ChevronRight,
   Search,
   ExternalLink,
+  Sparkles,
 } from 'lucide-react';
 
 export const APP_THEME_NOTE_TYPES = [
@@ -304,6 +306,8 @@ export interface UnifiedCardEditorProps {
 
   // Deck & Note identity
   deckName?: string;
+  onDeckChange?: (newDeck: string) => void;
+  availableDecks?: string[];
   noteId?: number;
   onShowInAnki?: (noteId: number) => void;
   isShowingInAnki?: boolean;
@@ -424,6 +428,8 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
   availableNoteTypes: propAvailableNoteTypes,
   isNoteTypeDetected = false,
   deckName,
+  onDeckChange,
+  availableDecks: propAvailableDecks,
   noteId,
   onShowInAnki,
   isShowingInAnki = false,
@@ -512,6 +518,197 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
         noteType: newModelName,
         cardType: detectedMode,
       });
+    }
+  };
+
+  // Decks list & Selection (Requirement 8)
+  const [currentDeck, setCurrentDeck] = useState<string>(deckName || cardData?.deck || 'Default');
+  const [deckList, setDeckList] = useState<string[]>(propAvailableDecks || []);
+  const [isMovingDeck, setIsMovingDeck] = useState<boolean>(false);
+  const [deckFeedback, setDeckFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (deckName) {
+      setCurrentDeck(deckName);
+    } else if (cardData?.deck) {
+      setCurrentDeck(cardData.deck);
+    }
+  }, [deckName, cardData?.deck]);
+
+  useEffect(() => {
+    if (propAvailableDecks && propAvailableDecks.length > 0) {
+      setDeckList(propAvailableDecks);
+    } else {
+      getAnkiDecks(ankiUrl).then((res) => {
+        if (res.success && Array.isArray(res.decks)) {
+          setDeckList(res.decks);
+        }
+      });
+    }
+  }, [propAvailableDecks, ankiUrl]);
+
+  const handleSelectDeck = async (newDeck: string) => {
+    setCurrentDeck(newDeck);
+    if (onDeckChange) {
+      onDeckChange(newDeck);
+    }
+    if (cardData && onCardChange) {
+      onCardChange({
+        ...cardData,
+        deck: newDeck,
+      });
+    }
+    const noteIdToMove = noteId || (cardData as any)?.noteId;
+    if (noteIdToMove) {
+      setIsMovingDeck(true);
+      setDeckFeedback(null);
+      try {
+        const res = await moveNoteDeck(noteIdToMove, newDeck, ankiUrl);
+        if (res.success) {
+          setDeckFeedback(`✓ ${newDeck}`);
+          setTimeout(() => setDeckFeedback(null), 3000);
+        } else {
+          setDeckFeedback(`✕ ${res.error || 'Failed'}`);
+          setTimeout(() => setDeckFeedback(null), 4000);
+        }
+      } catch (err: any) {
+        setDeckFeedback(`✕ ${err?.message || 'Error'}`);
+        setTimeout(() => setDeckFeedback(null), 4000);
+      } finally {
+        setIsMovingDeck(false);
+      }
+    }
+  };
+
+  // Audio Selection state (Requirement 1)
+  const effectiveAudioSelection: CardAudioSelection = useMemo(() => {
+    if (cardData?.audioSelection) {
+      return cardData.audioSelection;
+    }
+    const hasAnyAudio = Boolean(
+      cardData?.wordAudioUsNormalBase64 ||
+      cardData?.wordAudioUsNormal ||
+      cardData?.wordAudioUkNormalBase64 ||
+      cardData?.wordAudioUkNormal ||
+      cardData?.exampleAudioUsNormalBase64 ||
+      cardData?.exampleAudioUsNormal ||
+      cardData?.exampleAudioUkNormalBase64 ||
+      cardData?.exampleAudioUkNormal
+    );
+    if (hasAnyAudio) {
+      return {
+        wordBr: Boolean(cardData?.wordAudioUkNormalBase64 || cardData?.wordAudioUkNormal),
+        wordBrSlow: Boolean(cardData?.wordAudioUkSlowBase64 || cardData?.wordAudioUkSlow),
+        wordAm: Boolean(cardData?.wordAudioUsNormalBase64 || cardData?.wordAudioUsNormal),
+        wordAmSlow: Boolean(cardData?.wordAudioUsSlowBase64 || cardData?.wordAudioUsSlow),
+        exampleBr: Boolean(cardData?.exampleAudioUkNormalBase64 || cardData?.exampleAudioUkNormal),
+        exampleBrSlow: Boolean(cardData?.exampleAudioUkSlowBase64 || cardData?.exampleAudioUkSlow),
+        exampleAm: Boolean(cardData?.exampleAudioUsNormalBase64 || cardData?.exampleAudioUsNormal),
+        exampleAmSlow: Boolean(cardData?.exampleAudioUsSlowBase64 || cardData?.exampleAudioUsSlow),
+      };
+    }
+    return {
+      wordBr: true,
+      wordBrSlow: true,
+      wordAm: true,
+      wordAmSlow: true,
+      exampleBr: true,
+      exampleBrSlow: true,
+      exampleAm: true,
+      exampleAmSlow: true,
+    };
+  }, [cardData]);
+
+  // Audio Outdated detection (Requirement 1: text changes invalidate old audio)
+  const cleanCurrentWord = (cardData?.word || '').replace(/<[^>]+>/g, '').trim().toLowerCase();
+  const cleanCurrentExample = (cardData?.example || '').replace(/<[^>]+>/g, '').trim().toLowerCase();
+
+  const isWordAudioOutdated = Boolean(
+    cleanCurrentWord &&
+    cardData?.audioGeneratedForWord &&
+    cleanCurrentWord !== cardData.audioGeneratedForWord.trim().toLowerCase()
+  );
+
+  const isExampleAudioOutdated = Boolean(
+    cleanCurrentExample &&
+    cardData?.audioGeneratedForExample &&
+    cleanCurrentExample !== cardData.audioGeneratedForExample.trim().toLowerCase()
+  );
+
+  const isAudioOutdated = isWordAudioOutdated || isExampleAudioOutdated;
+
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const [audioFeedback, setAudioFeedback] = useState<string | null>(null);
+
+  const handleToggleAudioVariant = (variant: keyof CardAudioSelection) => {
+    if (!cardData || !onCardChange) return;
+    const currentVal = Boolean(effectiveAudioSelection[variant]);
+    const nextVal = !currentVal;
+    const nextSelection: CardAudioSelection = {
+      ...effectiveAudioSelection,
+      [variant]: nextVal,
+    };
+
+    let clearedFields: Partial<CardData> = {};
+    if (!nextVal) {
+      if (variant === 'wordBr' || variant === 'wordUkNormal') {
+        clearedFields = { wordAudioUkNormal: '', wordAudioUkNormalBase64: '', wordAudioUkNormalFileName: '' };
+      } else if (variant === 'wordBrSlow' || variant === 'wordUkSlow') {
+        clearedFields = { wordAudioUkSlow: '', wordAudioUkSlowBase64: '', wordAudioUkSlowFileName: '' };
+      } else if (variant === 'wordAm' || variant === 'wordUsNormal') {
+        clearedFields = { wordAudioUsNormal: '', wordAudioUsNormalBase64: '', wordAudioUsNormalFileName: '' };
+      } else if (variant === 'wordAmSlow' || variant === 'wordUsSlow') {
+        clearedFields = { wordAudioUsSlow: '', wordAudioUsSlowBase64: '', wordAudioUsSlowFileName: '' };
+      } else if (variant === 'exampleBr' || variant === 'exampleUkNormal') {
+        clearedFields = { exampleAudioUkNormal: '', exampleAudioUkNormalBase64: '', exampleAudioUkNormalFileName: '' };
+      } else if (variant === 'exampleBrSlow' || variant === 'exampleUkSlow') {
+        clearedFields = { exampleAudioUkSlow: '', exampleAudioUkSlowBase64: '', exampleAudioUkSlowFileName: '' };
+      } else if (variant === 'exampleAm' || variant === 'exampleUsNormal') {
+        clearedFields = { exampleAudioUsNormal: '', exampleAudioUsNormalBase64: '', exampleAudioUsNormalFileName: '' };
+      } else if (variant === 'exampleAmSlow' || variant === 'exampleUsSlow') {
+        clearedFields = { exampleAudioUsSlow: '', exampleAudioUsSlowBase64: '', exampleAudioUsSlowFileName: '' };
+      }
+    }
+
+    onCardChange({
+      ...cardData,
+      ...clearedFields,
+      audioSelection: nextSelection,
+    });
+  };
+
+  const handleRegenerateAudio = async () => {
+    if (!cardData || !onCardChange || isGeneratingAudio) return;
+    setIsGeneratingAudio(true);
+    setAudioFeedback(null);
+    try {
+      const targetWord = (cardData.word || '').replace(/<[^>]+>/g, '').trim();
+      const targetExample = (cardData.example || '').replace(/<[^>]+>/g, '').trim();
+      const res = await generateCardAudio(
+        targetWord,
+        targetExample,
+        effectiveAudioSelection
+      );
+
+      if (res.success && res.audioData) {
+        onCardChange({
+          ...cardData,
+          ...res.audioData,
+          audioSelection: effectiveAudioSelection,
+          audioGeneratedForWord: targetWord,
+          audioGeneratedForExample: targetExample,
+        });
+        setAudioFeedback('✓ Audio Updated');
+        setTimeout(() => setAudioFeedback(null), 3000);
+      } else {
+        setAudioFeedback(`✕ ${res.error || 'Failed'}`);
+        setTimeout(() => setAudioFeedback(null), 4000);
+      }
+    } catch (err: any) {
+      setAudioFeedback(`✕ ${err?.message || 'Error'}`);
+      setTimeout(() => setAudioFeedback(null), 4000);
+    } finally {
+      setIsGeneratingAudio(false);
     }
   };
 
@@ -878,6 +1075,50 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
     }
   };
 
+  const renderAudioButton = (
+    variantKey: keyof CardAudioSelection,
+    label: string,
+    audioBase64?: string
+  ) => {
+    const isEnabled = Boolean(effectiveAudioSelection[variantKey]);
+    const hasAudio = Boolean(audioBase64);
+
+    return (
+      <div
+        key={variantKey}
+        className={`inline-flex items-center rounded-none border text-[11px] font-semibold transition-all select-none ${
+          isEnabled
+            ? 'bg-blue-600 border-blue-600 text-white shadow-2xs'
+            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 border-zinc-300 dark:border-zinc-700 opacity-60'
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => handleToggleAudioVariant(variantKey)}
+          className="px-2 py-0.5 cursor-pointer hover:opacity-90 flex items-center gap-1"
+          title={`${label}: ${isEnabled ? 'Enabled (Click to disable)' : 'Disabled (Click to enable)'}`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${isEnabled ? 'bg-white' : 'bg-zinc-400 dark:bg-zinc-600'}`} />
+          <span className={!isEnabled ? 'line-through' : ''}>{label}</span>
+        </button>
+
+        {isEnabled && hasAudio && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePlayAudio(audioBase64);
+            }}
+            className="px-1.5 py-0.5 border-l border-blue-500 hover:bg-blue-700 text-white cursor-pointer"
+            title={`Play ${label} audio`}
+          >
+            <Volume2 className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+    );
+  };
+
   const spellingSentence = cardData?.spellingSentence || makeSpellingSentence(cardData?.example || '', cardData?.word || '');
 
   // Theme family detection
@@ -921,6 +1162,9 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
           }
 
           /* Light Card Theme Text Contrast - Ensure dark, crisp text */
+          .editor-canvas-wrapper.theme-is-light {
+            color-scheme: light !important;
+          }
           .editor-canvas-wrapper.theme-is-light,
           .editor-canvas-wrapper.theme-is-light .card,
           .editor-canvas-wrapper.theme-is-light .comic-card-wrapper,
@@ -943,6 +1187,27 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
           .editor-canvas-wrapper.theme-is-light button.text-white,
           .editor-canvas-wrapper.theme-is-light .text-white {
             color: #FFFFFF !important;
+          }
+
+          .editor-canvas-wrapper.theme-is-light input,
+          .editor-canvas-wrapper.theme-is-light textarea,
+          .editor-canvas-wrapper.theme-is-light .quest-input,
+          .editor-canvas-wrapper.theme-is-light .spelling-input {
+            background-color: #FFFFFF !important;
+            color: #0F172A !important;
+            border-color: #CBD5E1 !important;
+            box-shadow: 0 2px 0 #CBD5E1 !important;
+          }
+
+          .editor-canvas-wrapper.theme-is-light .sound-card,
+          .editor-canvas-wrapper.theme-is-light .sound-label {
+            color: #1E293B !important;
+          }
+
+          .editor-canvas-wrapper.theme-is-light .minimal-audio-row button {
+            background-color: #FFFFFF !important;
+            color: #0F172A !important;
+            border-color: #E2E8F0 !important;
           }
 
           /* Dark Card Theme Text Contrast */
@@ -990,32 +1255,63 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
 
       {/* ======================================================== */}
       {/* 1. EDITOR HEADER                                         */}
-      {/* Note Type          Tags       Show In Anki      Save     */}
+      {/* Note Type & Deck      Tags       Show In Anki      Save   */}
       {/* ======================================================== */}
       <div className="w-full flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800 text-xs">
-        {/* Left: Note Type */}
-        <div className="flex items-center gap-2 min-w-0">
-          <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 shrink-0">
-            Note Type
-          </label>
-          <div className="relative">
+        {/* Left: Note Type and Deck Selection */}
+        <div className="flex flex-wrap items-center gap-3 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 shrink-0">
+              Note Type
+            </label>
+            <div className="relative">
+              <select
+                value={currentNoteType}
+                onChange={(e) => handleSelectNoteType(e.target.value)}
+                className="px-2.5 py-1 text-xs font-medium border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-none cursor-pointer focus:outline-none focus:border-blue-500 hover:border-zinc-400 dark:hover:border-zinc-600"
+              >
+                {combinedModelNames.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {(isNoteTypeDetected || Boolean(noteId)) && (
+              <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-none font-semibold">
+                Detected
+              </span>
+            )}
+          </div>
+
+          <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-700 hidden sm:block" />
+
+          {/* Deck Selector & Mover (Requirement 8) */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 shrink-0">
+              Deck
+            </label>
             <select
-              value={currentNoteType}
-              onChange={(e) => handleSelectNoteType(e.target.value)}
-              className="px-2.5 py-1 text-xs font-medium border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-none cursor-pointer focus:outline-none focus:border-blue-500 hover:border-zinc-400 dark:hover:border-zinc-600"
+              value={currentDeck}
+              onChange={(e) => handleSelectDeck(e.target.value)}
+              disabled={isMovingDeck}
+              className="px-2.5 py-1 text-xs font-medium border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-none cursor-pointer focus:outline-none focus:border-blue-500 hover:border-zinc-400 dark:hover:border-zinc-600 max-w-[170px] truncate disabled:opacity-50"
             >
-              {combinedModelNames.map((model) => (
-                <option key={model} value={model}>
-                  {model}
+              {deckList.map((d) => (
+                <option key={d} value={d}>
+                  {d}
                 </option>
               ))}
+              {!deckList.includes(currentDeck) && currentDeck && (
+                <option value={currentDeck}>{currentDeck}</option>
+              )}
             </select>
+            {deckFeedback && (
+              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                {deckFeedback}
+              </span>
+            )}
           </div>
-          {(isNoteTypeDetected || Boolean(noteId)) && (
-            <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-none font-semibold">
-              Detected
-            </span>
-          )}
         </div>
 
         {/* Right: Tags, Show Card in Anki, and Save */}
@@ -1380,6 +1676,74 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
       </div>
 
       {/* ======================================================== */}
+      {/* 2.5 AUDIO SELECTION & REGENERATION CONTROLS (Req 1)      */}
+      {/* Word: [Br] [Br Slow] [Am] [Am Slow]                     */}
+      {/* Example: [Br] [Br Slow] [Am] [Am Slow]                  */}
+      {/* ======================================================== */}
+      <div className="w-full flex flex-wrap items-center justify-between gap-3 px-3 py-2 bg-zinc-50 dark:bg-zinc-900/80 border-b border-zinc-200 dark:border-zinc-800 text-xs select-none">
+        {/* Left: Word & Example audio groups */}
+        <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+          {/* Word Audio Group */}
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1">
+              <Volume2 className="w-3.5 h-3.5 text-blue-500" />
+              <span>Word Audio:</span>
+            </span>
+            <div className="flex items-center gap-1">
+              {renderAudioButton('wordBr', 'Br', cardData?.wordAudioUkNormalBase64)}
+              {renderAudioButton('wordBrSlow', 'Br Slow', cardData?.wordAudioUkSlowBase64)}
+              {renderAudioButton('wordAm', 'Am', cardData?.wordAudioUsNormalBase64)}
+              {renderAudioButton('wordAmSlow', 'Am Slow', cardData?.wordAudioUsSlowBase64)}
+            </div>
+          </div>
+
+          <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-700 hidden sm:block" />
+
+          {/* Example Audio Group */}
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1">
+              <Volume2 className="w-3.5 h-3.5 text-purple-500" />
+              <span>Example Audio:</span>
+            </span>
+            <div className="flex items-center gap-1">
+              {renderAudioButton('exampleBr', 'Br', cardData?.exampleAudioUkNormalBase64)}
+              {renderAudioButton('exampleBrSlow', 'Br Slow', cardData?.exampleAudioUkSlowBase64)}
+              {renderAudioButton('exampleAm', 'Am', cardData?.exampleAudioUsNormalBase64)}
+              {renderAudioButton('exampleAmSlow', 'Am Slow', cardData?.exampleAudioUsSlowBase64)}
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Outdated badge & Regenerate Button */}
+        <div className="flex items-center gap-2">
+          {isAudioOutdated && (
+            <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 border border-amber-300 dark:border-amber-700">
+              Text modified • Regenerate
+            </span>
+          )}
+          {audioFeedback && (
+            <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400">
+              {audioFeedback}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={handleRegenerateAudio}
+            disabled={isGeneratingAudio}
+            className="px-2.5 py-1 font-semibold rounded-none border border-zinc-300 dark:border-zinc-700 hover:border-blue-500 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
+            title="Generate or refresh audio files for currently enabled variants"
+          >
+            {isGeneratingAudio ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+            )}
+            <span>{isAudioOutdated ? 'Regenerate Audio' : 'Refresh Audio'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ======================================================== */}
       {/* 3. WORKSPACE CANVAS: REAL THEME CARD PREVIEW & EDITOR    */}
       {/* Directly renders the exact theme layout & CSS            */}
       {/* ======================================================== */}
@@ -1498,7 +1862,11 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                             <button
                               type="button"
                               onClick={() => handlePlayAudio(cardData.wordAudioUsSlowBase64)}
-                              className="px-2 py-1 text-xs font-bold bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg border-2 border-zinc-300 dark:border-zinc-700 shadow-[0_2px_0_#CBD5E1] dark:shadow-[0_2px_0_#18181B] flex items-center gap-1 cursor-pointer transition-transform active:translate-y-0.5"
+                              className={`px-2 py-1 text-xs font-bold rounded-lg border-2 flex items-center gap-1 cursor-pointer transition-transform active:translate-y-0.5 ${
+                                isThemeLight
+                                  ? 'bg-white hover:bg-zinc-100 text-zinc-800 border-zinc-300 shadow-[0_2px_0_#CBD5E1]'
+                                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700 shadow-[0_2px_0_#18181B]'
+                              }`}
                             >
                               <span>🐢 Slow</span>
                             </button>
@@ -1522,7 +1890,11 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                             <button
                               type="button"
                               onClick={() => handlePlayAudio(cardData.wordAudioUkSlowBase64)}
-                              className="px-2 py-1 text-xs font-bold bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg border-2 border-zinc-300 dark:border-zinc-700 shadow-[0_2px_0_#CBD5E1] dark:shadow-[0_2px_0_#18181B] flex items-center gap-1 cursor-pointer transition-transform active:translate-y-0.5"
+                              className={`px-2 py-1 text-xs font-bold rounded-lg border-2 flex items-center gap-1 cursor-pointer transition-transform active:translate-y-0.5 ${
+                                isThemeLight
+                                  ? 'bg-white hover:bg-zinc-100 text-zinc-800 border-zinc-300 shadow-[0_2px_0_#CBD5E1]'
+                                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700 shadow-[0_2px_0_#18181B]'
+                              }`}
                             >
                               <span>🐢 Slow</span>
                             </button>
@@ -1563,7 +1935,7 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     </div>
 
                     <div className="quest-sound-dock-compact">
-                      <span className="sound-label font-bold text-zinc-700 dark:text-zinc-300">🔊 Pronunciation:</span>
+                      <span className={`sound-label font-bold ${isThemeLight ? 'text-zinc-700' : 'text-zinc-300'}`}>🔊 Pronunciation:</span>
                       {cardData?.wordAudioUsNormalBase64 && (
                         <button
                           type="button"
@@ -1577,7 +1949,11 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                         <button
                           type="button"
                           onClick={() => handlePlayAudio(cardData.wordAudioUsSlowBase64)}
-                          className="px-2 py-1 text-xs font-bold bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg border-2 border-zinc-300 dark:border-zinc-700 shadow-[0_2px_0_#CBD5E1] dark:shadow-[0_2px_0_#18181B] cursor-pointer transition-transform active:translate-y-0.5"
+                          className={`px-2 py-1 text-xs font-bold rounded-lg border-2 cursor-pointer transition-transform active:translate-y-0.5 ${
+                            isThemeLight
+                              ? 'bg-white hover:bg-zinc-100 text-zinc-800 border-zinc-300 shadow-[0_2px_0_#CBD5E1]'
+                              : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700 shadow-[0_2px_0_#18181B]'
+                          }`}
                         >
                           🐢 Slow
                         </button>
@@ -1599,7 +1975,11 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                           }
                         }}
                         placeholder="Type answer here..."
-                        className="quest-input flex-1 px-3 py-2 border-2 border-zinc-300 dark:border-zinc-700 text-base font-bold rounded-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-[0_2px_0_#CBD5E1] dark:shadow-[0_2px_0_#18181B] focus:border-[#58CC02] focus:outline-none"
+                        className={`quest-input flex-1 px-3 py-2 border-2 text-base font-bold rounded-xl focus:border-[#58CC02] focus:outline-none ${
+                          isThemeLight
+                            ? 'bg-white text-zinc-900 border-zinc-300 shadow-[0_2px_0_#CBD5E1]'
+                            : 'bg-zinc-900 text-zinc-100 border-zinc-700 shadow-[0_2px_0_#18181B]'
+                        }`}
                       />
                       <button
                         type="button"
@@ -1663,7 +2043,11 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                             <button
                               type="button"
                               onClick={() => handlePlayAudio(cardData.wordAudioUsSlowBase64)}
-                              className="px-2 py-1 text-xs font-bold bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg border-2 border-zinc-300 dark:border-zinc-700 shadow-[0_2px_0_#CBD5E1] dark:shadow-[0_2px_0_#18181B] flex items-center gap-1 cursor-pointer transition-transform active:translate-y-0.5"
+                              className={`px-2 py-1 text-xs font-bold rounded-lg border-2 flex items-center gap-1 cursor-pointer transition-transform active:translate-y-0.5 ${
+                                isThemeLight
+                                  ? 'bg-white hover:bg-zinc-100 text-zinc-800 border-zinc-300 shadow-[0_2px_0_#CBD5E1]'
+                                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700 shadow-[0_2px_0_#18181B]'
+                              }`}
                             >
                               <span>🐢 Slow</span>
                             </button>
@@ -1687,7 +2071,11 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                             <button
                               type="button"
                               onClick={() => handlePlayAudio(cardData.wordAudioUkSlowBase64)}
-                              className="px-2 py-1 text-xs font-bold bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg border-2 border-zinc-300 dark:border-zinc-700 shadow-[0_2px_0_#CBD5E1] dark:shadow-[0_2px_0_#18181B] flex items-center gap-1 cursor-pointer transition-transform active:translate-y-0.5"
+                              className={`px-2 py-1 text-xs font-bold rounded-lg border-2 flex items-center gap-1 cursor-pointer transition-transform active:translate-y-0.5 ${
+                                isThemeLight
+                                  ? 'bg-white hover:bg-zinc-100 text-zinc-800 border-zinc-300 shadow-[0_2px_0_#CBD5E1]'
+                                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700 shadow-[0_2px_0_#18181B]'
+                              }`}
                             >
                               <span>🐢 Slow</span>
                             </button>
@@ -2634,7 +3022,11 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     <button
                       type="button"
                       onClick={() => handlePlayAudio(cardData.wordAudioUsNormalBase64)}
-                      className="px-2.5 py-1 text-xs border border-zinc-300 dark:border-zinc-700 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer flex items-center gap-1 font-medium"
+                      className={`px-2.5 py-1 text-xs border rounded cursor-pointer flex items-center gap-1 font-medium ${
+                        isThemeLight
+                          ? 'border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-800'
+                          : 'border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200'
+                      }`}
                     >
                       <Volume2 className="w-3.5 h-3.5 text-blue-500" />
                       <span>US Normal</span>
@@ -2644,7 +3036,11 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                     <button
                       type="button"
                       onClick={() => handlePlayAudio(cardData.wordAudioUkNormalBase64)}
-                      className="px-2.5 py-1 text-xs border border-zinc-300 dark:border-zinc-700 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer flex items-center gap-1 font-medium"
+                      className={`px-2.5 py-1 text-xs border rounded cursor-pointer flex items-center gap-1 font-medium ${
+                        isThemeLight
+                          ? 'border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-800'
+                          : 'border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200'
+                      }`}
                     >
                       <Volume2 className="w-3.5 h-3.5 text-sky-500" />
                       <span>UK Normal</span>
@@ -2688,7 +3084,11 @@ export const UnifiedCardEditor: React.FC<UnifiedCardEditorProps> = ({
                           setSpellingStatus('idle');
                         }}
                         placeholder="Type spelling..."
-                        className="flex-1 px-3 py-1.5 text-xs border border-zinc-300 dark:border-zinc-700 rounded bg-transparent"
+                        className={`flex-1 px-3 py-1.5 text-xs border rounded ${
+                          isThemeLight
+                            ? 'border-zinc-300 bg-white text-zinc-900'
+                            : 'border-zinc-700 bg-zinc-900 text-zinc-100'
+                        }`}
                       />
                       <button
                         type="button"

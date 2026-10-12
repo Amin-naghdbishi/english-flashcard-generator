@@ -865,6 +865,8 @@ export const CreateCardView: React.FC<CreateCardViewProps> = ({
           noteType={selectedNoteType}
           onNoteTypeChange={handleNoteTypeChange}
           deckName={deck.trim()}
+          onDeckChange={(newDeck) => setDeck(newDeck)}
+          availableDecks={availableDecks}
           noteId={createdNoteId || undefined}
           editable={true}
           onCardChange={handleCardChange}

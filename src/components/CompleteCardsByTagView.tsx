@@ -746,6 +746,22 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
           {notes.length} cards
         </div>
 
+        {/* Image Generation Toggle (Requirement 4) */}
+        <div className="mb-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+          <label className="flex items-center justify-between text-xs font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer py-1">
+            <span className="flex items-center gap-1.5">
+              <ImageIcon className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+              <span>{t('completeByTag.generateImages') || 'Generate Images'}</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={includeImage}
+              onChange={(e) => setIncludeImage(e.target.checked)}
+              className="w-4 h-4 rounded-none border border-zinc-400 dark:border-zinc-600 accent-blue-600 cursor-pointer"
+            />
+          </label>
+        </div>
+
         {/* Field Settings: Collapsed by default */}
         <div className="mb-4 pt-2 border-t border-zinc-200 dark:border-zinc-800 text-xs">
           <button
@@ -803,6 +819,15 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
                   className="w-3.5 h-3.5 rounded-none border border-zinc-400 dark:border-zinc-600 accent-blue-600"
                 />
                 <span>Mnemonic</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer pt-1 border-t border-zinc-200 dark:border-zinc-800">
+                <input
+                  type="checkbox"
+                  checked={includeImage}
+                  onChange={(e) => setIncludeImage(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded-none border border-zinc-400 dark:border-zinc-600 accent-blue-600"
+                />
+                <span>{t('completeByTag.generateImages') || 'Generate Images'}</span>
               </label>
             </div>
           )}
@@ -930,6 +955,13 @@ export const CompleteCardsByTagView: React.FC<CompleteCardsByTagViewProps> = ({ 
             noteType={selectedNoteType}
             onNoteTypeChange={handleNoteTypeChange}
             deckName={selectedNoteForPreview?.deck}
+            onDeckChange={(newDeck) => {
+              if (selectedNoteForPreview) {
+                setNotes((prev) =>
+                  prev.map((n) => (n.noteId === selectedNoteForPreview.noteId ? { ...n, deck: newDeck } : n))
+                );
+              }
+            }}
             noteId={selectedNoteForPreview?.noteId}
             editable={true}
             canSaveToAnki={Boolean(selectedNoteForPreview?.noteId)}

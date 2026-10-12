@@ -421,7 +421,37 @@ export const en = {
     },
     guide: {
       title: 'User Guide & Documentation',
+      helpTutorial: 'Help & Full Tutorial',
     },
+  },
+
+  // Card Editor Component
+  editor: {
+    noteType: 'Note Type',
+    deck: 'Deck',
+    detected: 'Detected',
+    tags: 'Tags',
+    manageTags: 'Manage Tags',
+    searchOrAddTag: 'Search or add tag...',
+    addTagBtn: 'Add',
+    matchingTags: 'Matching Tags',
+    ankiCollectionTags: 'Anki Collection Tags',
+    showCardInAnki: 'Show Card in Anki',
+    saveToAnki: 'Save to Anki',
+    saving: 'Saving...',
+    front: 'Front',
+    back: 'Back',
+    standard: 'Standard',
+    spelling: 'Spelling',
+    addBox: '+ Add Box',
+    cardBg: 'Card BG',
+    cardBorder: 'Border',
+    wordAudio: 'Word Audio',
+    exampleAudio: 'Example Audio',
+    regenerateAudio: 'Regenerate Audio',
+    refreshAudio: 'Refresh Audio',
+    audioOutdated: 'Text modified • Regenerate',
+    generatingAudio: 'Generating audio...',
   },
 
   // Card Preview Component

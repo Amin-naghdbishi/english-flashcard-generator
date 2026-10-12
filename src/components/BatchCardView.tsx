@@ -1164,6 +1164,16 @@ export const BatchCardView: React.FC<BatchCardViewProps> = ({ settings }) => {
             noteType={selectedNoteType}
             onNoteTypeChange={handleNoteTypeChange}
             deckName={selectedItemForPreview?.deck || deck}
+            onDeckChange={(newDeck) => {
+              if (selectedItemForPreview) {
+                setItems((prev) =>
+                  prev.map((it) => (it.id === selectedItemForPreview.id ? { ...it, deck: newDeck } : it))
+                );
+              } else {
+                setDeck(newDeck);
+              }
+            }}
+            availableDecks={availableDecks}
             noteId={selectedItemForPreview?.noteId}
             editable={true}
             canSaveToAnki={Boolean(selectedItemForPreview?.noteId)}

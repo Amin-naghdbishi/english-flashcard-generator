@@ -757,6 +757,34 @@ export async function changeCardsDeck(baseUrl: string, cardIds: number[], deck: 
   return callAnkiConnect(baseUrl, 'changeDeck', { cards: cardIds, deck });
 }
 
+export async function changeNoteDeck(baseUrl: string, noteId: number, deck: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    let cardIds: number[] = [];
+    const infoRes = await getNotesInfo(baseUrl, [Number(noteId)]);
+    if (infoRes.success && infoRes.notes && infoRes.notes[0]?.cards?.length > 0) {
+      cardIds = infoRes.notes[0].cards;
+    } else {
+      const cardsRes = await callAnkiConnect(baseUrl, 'cardsOfNote', { note: Number(noteId) });
+      if (cardsRes.success && Array.isArray(cardsRes.result) && cardsRes.result.length > 0) {
+        cardIds = cardsRes.result;
+      } else {
+        const findRes = await callAnkiConnect(baseUrl, 'findCards', { query: `nid:${noteId}` });
+        if (findRes.success && Array.isArray(findRes.result) && findRes.result.length > 0) {
+          cardIds = findRes.result;
+        }
+      }
+    }
+
+    if (!cardIds.length) {
+      return { success: false, error: `No cards found for note #${noteId} to move.` };
+    }
+
+    return changeCardsDeck(baseUrl, cardIds, deck);
+  } catch (err: any) {
+    return { success: false, error: err?.message || `Failed to change deck for note #${noteId}` };
+  }
+}
+
 export async function runAnkiPipelineDiagnostic(
   baseUrl: string = 'http://127.0.0.1:8765',
   targetDeck: string = 'English::B1',

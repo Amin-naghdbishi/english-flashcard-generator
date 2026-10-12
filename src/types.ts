@@ -52,6 +52,16 @@ export interface CardData {
   exampleAudioUkNormalFileName?: string;
   exampleAudioUkSlowFileName?: string;
 
+  // Audio string fields for Anki tags and note fields
+  wordAudioUsNormal?: string;
+  wordAudioUsSlow?: string;
+  wordAudioUkNormal?: string;
+  wordAudioUkSlow?: string;
+  exampleAudioUsNormal?: string;
+  exampleAudioUsSlow?: string;
+  exampleAudioUkNormal?: string;
+  exampleAudioUkSlow?: string;
+
   // Primary / fallback audio
   wordAudioBase64?: string;
   exampleAudioBase64?: string;
@@ -71,8 +81,37 @@ export interface CardData {
   // Note tags assigned in Anki
   tags?: string[];
 
+  // Target Anki deck
+  deck?: string;
+
+  // Selected audio variants for this specific card
+  audioSelection?: CardAudioSelection;
+
+  // Text tracking to ensure audio is regenerated when text changes
+  audioGeneratedForWord?: string;
+  audioGeneratedForExample?: string;
+
   // Main Box Customizations (title, text color, background color)
   mainBoxStyles?: MainBoxCustomizations;
+}
+
+export interface CardAudioSelection {
+  wordBr?: boolean;
+  wordBrSlow?: boolean;
+  wordAm?: boolean;
+  wordAmSlow?: boolean;
+  exampleBr?: boolean;
+  exampleBrSlow?: boolean;
+  exampleAm?: boolean;
+  exampleAmSlow?: boolean;
+  wordUkNormal?: boolean;
+  wordUkSlow?: boolean;
+  wordUsNormal?: boolean;
+  wordUsSlow?: boolean;
+  exampleUkNormal?: boolean;
+  exampleUkSlow?: boolean;
+  exampleUsNormal?: boolean;
+  exampleUsSlow?: boolean;
 }
 
 export interface BoxCustomStyle {
@@ -150,6 +189,8 @@ export interface ManualOverrides {
   customBlocks?: CustomCardBlock[];
   mainBoxStyles?: MainBoxCustomizations;
   modelName?: string;
+  deck?: string;
+  audioSelection?: CardAudioSelection;
 }
 
 export function isCardComplete(card?: Partial<CardData> | ManualOverrides | null): boolean {
