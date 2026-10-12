@@ -24,23 +24,6 @@ with support for **Ollama, Piper TTS, and AnkiConnect**
 
 <br>
 
-<!-- Sample Card Themes -->
-<table align="center" border="0">
-  <tr>
-    <td align="center" valign="top" width="50%">
-      <img src="newtheme.jpeg" alt="Botanical Sage Light Theme Card" width="400">
-      <br><br>
-      <b>Botanical Sage (Light)</b>
-    </td>
-    <td align="center" valign="top" width="50%">
-      <img src="newdarktheme.jpeg" alt="Botanical Sage Dark Theme Card" width="400">
-      <br><br>
-      <b>Botanical Sage (Dark)</b>
-    </td>
-  </tr>
-</table>
-
-</div>
 
 ---
 
